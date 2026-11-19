@@ -264,6 +264,14 @@ export const SEVERITY_ORDER = [
 ] as const;
 export type Severity = (typeof SEVERITY_ORDER)[number];
 
+/** One direct dependency behind a finding. `direct` marks the component itself
+ *  being a direct dependency (raise it). */
+export interface IntroducedByItem {
+  name: string;
+  version?: string;
+  direct?: boolean;
+}
+
 export interface VulnItem {
   id: string;
   /** Advisory numbers filed for this CVE (Trivy's VendorIDs: DLA-..., DSA-...,
@@ -312,6 +320,14 @@ export interface VulnItem {
    *  scan did not judge it. A `not_affected` finding is listed in the summary's
    *  `notReachable`, never among the counted `vulnerabilities`. */
   reachability?: Reachability;
+  /** The direct dependencies that bring this component in (at most three,
+   *  nearest first), from the SBOM's dependency graph. Absent when the walk
+   *  could not connect the component; `SecuritySummary.introducedByState` says
+   *  why none of the findings has one. */
+  introducedBy?: IntroducedByItem[];
+  /** The component is build tooling (bomlens:dependency-role=build-tool, e.g.
+   *  the gems of an iOS project), not something the product ships. */
+  buildTool?: boolean;
   /** Optional note recorded alongside vexState. */
   vexDetail?: string;
   /** ISO 8601 timestamp of when vexState was last saved. */
@@ -373,6 +389,10 @@ export type SecuritySummary = Record<Severity, number> & {
   /** Engine failure message when the scan did not complete (scan-security.sh
    *  ScanError). Present => the counts above understate the real exposure. */
   scanError?: string;
+  /** Why no finding names the direct dependency behind it: "no-graph" (the SBOM
+   *  has no dependency edges) or "too-large" (the trace was skipped); "ok" and
+   *  "error" are also possible. Absent when the report predates the trace. */
+  introducedByState?: "ok" | "no-graph" | "too-large" | "error";
   /** How many CVE judgements are on file for this scan, present only when there
    *  are some. Counts the sidecar, not the rows in view: a judgement outlives a
    *  re-scan even when its CVE is no longer among the findings. */
@@ -1345,10 +1365,13 @@ export async function getCapabilities(): Promise<Capabilities> {
  *  the form can pick a human message; `message` keeps the server's raw detail. */
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Machine-readable cause from the server (e.g. SBOM_FILE_EMPTY), when it sent one. */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -1360,10 +1383,25 @@ export interface UploadErrorInfo {
   detail?: string;
 }
 
+const UPLOAD_CODE_KEYS: Record<string, string> = {
+  SBOM_FILE_EMPTY: "source.uploadErrorSbomEmpty",
+  SBOM_JSON_TRUNCATED: "source.uploadErrorSbomTruncated",
+  SBOM_NOT_RECOGNIZED: "source.uploadErrorSbomNotRecognized",
+};
+
+/** The i18n key for an upload refusal code, or undefined for any other code. */
+export function uploadCodeKey(code: string | undefined): string | undefined {
+  return code ? UPLOAD_CODE_KEYS[code] : undefined;
+}
+
 /** Map an upload/stash failure to a user-facing message key. Raw error text
  *  (HTTP statuses, "Failed to fetch") never becomes the headline. */
 export function describeUploadError(e: unknown): UploadErrorInfo {
   if (e instanceof ApiError) {
+    // A supplier SBOM that cannot be read: say which way, and that the file
+    // is the thing to replace. The server's detail stays as fine print.
+    const codeKey = uploadCodeKey(e.code);
+    if (codeKey) return { key: codeKey, detail: e.message };
     if (e.status === 413) return { key: "source.uploadErrorTooLarge" };
     if (e.status >= 500)
       return { key: "source.uploadErrorServer", detail: e.message };
@@ -1415,13 +1453,15 @@ export function uploadFile(
       const body = xhr.responseText;
       if (xhr.status < 200 || xhr.status >= 300) {
         let msg = `upload failed (${xhr.status})`;
+        let code: string | undefined;
         try {
           const j = JSON.parse(body);
           if (j && j.error) msg = j.error;
+          if (j && typeof j.code === "string") code = j.code;
         } catch {
           /* keep default */
         }
-        reject(new ApiError(msg, xhr.status));
+        reject(new ApiError(msg, xhr.status, code));
         return;
       }
       try {

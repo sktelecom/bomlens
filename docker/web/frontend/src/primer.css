@@ -1125,6 +1125,9 @@ a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outli
 .bl-v-aliases > *::before { content: "·"; content: "·" / ""; margin-right: var(--base-size-6); }
 .bl-v-pkg > .bl-mono + .bl-mono { margin-left: var(--base-size-6); }
 .bl-v-compact .bl-v-line2 { margin-top: 0; }
+.bl-v-introduced { display: flex; flex-direction: column; gap: var(--base-size-2); overflow-wrap: anywhere; font-size: var(--text-body-size-small); }
+.bl-v-buildtool { margin-left: var(--base-size-6); color: var(--fgColor-muted); }
+.bl-v-introgap { margin: 0 0 var(--base-size-8); }
 .bl-v-grouprow { grid-column: 1 / -1; display: block; padding: 0 !important; background: var(--bgColor-muted); }
 .bl-v-disclose { all: unset; cursor: pointer; display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8) var(--base-size-12); width: 100%; box-sizing: border-box; padding: var(--base-size-8) var(--base-size-16); }
 .bl-v-disclose:hover .bl-coord-name { color: var(--fgColor-accent); }

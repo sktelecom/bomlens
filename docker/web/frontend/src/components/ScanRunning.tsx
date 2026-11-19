@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { explainFailure } from "@/lib/failureExplain";
+import { currentLiveStep, formatElapsed, QUIET_AFTER_SECONDS } from "@/lib/pipelineSteps";
 import { anyStageMarker, visiblePercent, visibleStages, type StageStatus } from "@/lib/scanProgress";
 import { useToast } from "@/lib/toast";
 
@@ -195,6 +196,7 @@ function Steps({ logs, status, deepCve }: { logs: string[]; status: Status; deep
         <h2 id="run-steps">{t("run.runSteps")}</h2>
         {!failed && <span className="bl-run-pct">{pct}%</span>}
       </div>
+      {status === "running" && <LiveStep logs={logs} />}
       <div className="bl-run-bar">
         <ProgressBar
           progress={failed ? (visible.some((v) => v.status !== "pending") ? pct : 0) : pct}
@@ -246,6 +248,44 @@ function Steps({ logs, status, deepCve }: { logs: string[]; status: Status; deep
         </Timeline>
       </div>
     </section>
+  );
+}
+
+/**
+ * The step the scan is in and how long it has been there, and, when nothing
+ * has been written for a while, that a quiet step is normal. A long step (copying
+ * a folder, resolving dependencies, pulling a large image) writes nothing for
+ * minutes, and a bar that stays put reads as a hang. The times are measured here,
+ * from when the step's first line arrived, since the log lines carry none.
+ */
+function LiveStep({ logs }: { logs: string[] }) {
+  const { t } = useTranslation();
+  const step = currentLiveStep(logs);
+  const stepId = step?.id ?? "";
+  const [now, setNow] = useState(() => Date.now());
+  const stepSince = useRef({ id: stepId, at: Date.now() });
+  const lastLine = useRef({ count: logs.length, at: Date.now() });
+  if (stepSince.current.id !== stepId) stepSince.current = { id: stepId, at: Date.now() };
+  if (lastLine.current.count !== logs.length) lastLine.current = { count: logs.length, at: Date.now() };
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!step) return null;
+  const inStep = (now - stepSince.current.at) / 1000;
+  const quiet = (now - lastLine.current.at) / 1000;
+  return (
+    <div className="bl-run-live" data-testid="run-live" role="status">
+      <span className="bl-strong">{t("run.live.now", { step: t(step.labelKey) })}</span>
+      <span className="bl-muted bl-num" data-testid="run-live-elapsed">
+        {t("run.live.elapsed", { time: formatElapsed(inStep) })}
+      </span>
+      {quiet >= QUIET_AFTER_SECONDS && (
+        <span className="bl-muted" data-testid="run-live-quiet">
+          {t("run.live.quiet", { time: formatElapsed(quiet) })}
+        </span>
+      )}
+    </div>
   );
 }
 

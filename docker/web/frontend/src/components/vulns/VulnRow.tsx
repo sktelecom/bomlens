@@ -10,7 +10,7 @@ import { vulnAliases } from "@/lib/advisories";
 import type { VulnItem } from "@/lib/api";
 import { receivedFor, type ReceivedIndex } from "@/lib/vexReceived";
 
-import { FixedVersions, StatusLabels } from "./cells";
+import { FixedVersions, IntroducedBy, StatusLabels } from "./cells";
 import type { VexFields } from "./vexFields";
 
 interface Props {
@@ -21,6 +21,8 @@ interface Props {
   onToggle: (id: string) => void;
   showEpss: boolean;
   showNvd: boolean;
+  /** The "Introduced by" column is on. */
+  showIntroduced: boolean;
   /** Inside a package block the package is in the block's head, not in the row. */
   inGroup: boolean;
   /** A verdict saved this session, overriding what the scan payload carried. */
@@ -36,7 +38,7 @@ interface Props {
  * one line high: an id that does not fit is not drawn at all (all of them stay
  * in the tooltip and the panel), so a row never ends in half an id.
  */
-export const VulnRow = memo(function VulnRow({ vuln: v, openId, isOpen, onToggle, showEpss, showNvd, inGroup, override, imported }: Props) {
+export const VulnRow = memo(function VulnRow({ vuln: v, openId, isOpen, onToggle, showEpss, showNvd, showIntroduced, inGroup, override, imported }: Props) {
   const { t } = useTranslation();
   const vex: VexFields = override ?? { state: v.vexState, detail: v.vexDetail, updatedAt: v.vexUpdatedAt };
   const received = imported ? receivedFor(imported, v) : v.vexReceived;
@@ -86,6 +88,11 @@ export const VulnRow = memo(function VulnRow({ vuln: v, openId, isOpen, onToggle
               <span className="bl-v-pkg">
                 <PackageCoordinate {...splitPackage(v.pkg)} title={v.purl || v.pkg} shrink className="bl-mono" />
                 <span className="bl-mono">{v.installed}</span>
+                {v.buildTool && (
+                  <span className="bl-v-buildtool" title={t("result.buildToolHint")} data-testid="vuln-build-tool">
+                    {t("result.buildToolTag")}
+                  </span>
+                )}
               </span>
             )}
             {/* With no title the id is already the first line. */}
@@ -105,6 +112,11 @@ export const VulnRow = memo(function VulnRow({ vuln: v, openId, isOpen, onToggle
       <Table.Cell>
         <FixedVersions vuln={v} />
       </Table.Cell>
+      {showIntroduced && (
+        <Table.Cell>
+          <IntroducedBy vuln={v} />
+        </Table.Cell>
+      )}
     </Table.Row>
   );
 });

@@ -28,6 +28,7 @@ import {
   type UsageContext,
 } from "@/lib/api";
 import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "@/lib/demo";
+import { analyzeMinutesEstimate } from "@/lib/analyzeEstimate";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
@@ -523,6 +524,11 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             </p>
           )}
           {isAnalyze && <p className="bl-muted bl-small bl-filehint">{t("source.sbomAnalyzeHint")}</p>}
+          {isAnalyze && file && analyzeMinutesEstimate(file.size) !== null && (
+            <p className="bl-muted bl-small bl-filehint" data-testid="sbom-large-file">
+              {t("source.sbomLargeFile", { minutes: analyzeMinutesEstimate(file.size) })}
+            </p>
+          )}
           {source === "firmware-upload" && (
             <p className="bl-muted bl-small bl-filehint">{t("source.firmwareHint")}</p>
           )}

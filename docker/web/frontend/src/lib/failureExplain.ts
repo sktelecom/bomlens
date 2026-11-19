@@ -20,7 +20,41 @@ export interface FailureExplanation {
 /** The i18n key a machine-readable failure code is explained by, or undefined
  *  for a code this screen has no wording for. */
 export function failureKeyForCode(code: string | undefined): string | undefined {
-  return code === "SCAN_TARGET_NOT_VISIBLE" ? "run.errorTargetNotVisible" : undefined;
+  switch (code) {
+    case "SCAN_TARGET_NOT_VISIBLE":
+      return "run.errorTargetNotVisible";
+    case "SBOM_FILE_EMPTY":
+      return "run.errorSbomEmpty";
+    case "SBOM_JSON_TRUNCATED":
+      return "run.errorSbomTruncated";
+    case "SBOM_NOT_RECOGNIZED":
+      return "run.errorSbomNotRecognized";
+    default:
+      return undefined;
+  }
+}
+
+/** The scanner's "could not read the image" failure, told apart by what the
+ *  registry answered. Docker Hub answers a repository that does not exist with
+ *  the same "unauthorized" as one that needs a login, so that case says both. */
+const IMAGE_FAILED = /could not read the image|could not pull|pull access denied|failed to (?:pull|read) image/i;
+const IMAGE_HOST = /no such host|dial tcp: lookup|name resolution/i;
+const IMAGE_MISSING = /manifest[ _]unknown|name[ _]unknown|manifest for \S+ not found|not found: manifest/i;
+const IMAGE_AUTH = /unauthorized|denied|authentication required|requested access/i;
+
+/** Which image failure the scanner's message and the last log lines describe,
+ *  or undefined when it is not an image failure or says nothing more precise. */
+export function imageFailureKind(
+  error: string | null | undefined,
+  logs: string[],
+): "host" | "missing" | "auth" | undefined {
+  const message = error ?? "";
+  if (!IMAGE_FAILED.test(message)) return undefined;
+  const text = [message, ...logs.slice(-30)].join("\n");
+  if (IMAGE_HOST.test(text)) return "host";
+  if (IMAGE_MISSING.test(text) && !IMAGE_AUTH.test(text)) return "missing";
+  if (IMAGE_AUTH.test(text)) return "auth";
+  return undefined;
 }
 
 const TOOLS = /\b(cdxgen|syft|trivy|grype)\b/gi;
@@ -58,8 +92,23 @@ export function explainFailure(
   if (key === "run.errorTargetNotVisible") {
     return { causeKey: "run.failTargetHiddenCause", fixKey: "run.failTargetHiddenFix", vars: {}, recognised: true };
   }
+  if (key === "run.errorSbomEmpty" || key === "run.errorSbomTruncated" || key === "run.errorSbomNotRecognized") {
+    const causeKey =
+      key === "run.errorSbomEmpty"
+        ? "source.uploadErrorSbomEmpty"
+        : key === "run.errorSbomTruncated"
+          ? "source.uploadErrorSbomTruncated"
+          : "source.uploadErrorSbomNotRecognized";
+    return { causeKey, fixKey: "run.failSbomFileFix", vars: {}, recognised: true };
+  }
   // A key this screen does not know: the server's own wording is the cause.
   if (key) return { causeKey: key, fixKey: "run.failGenericFix", vars: {}, recognised: false };
+
+  const image = imageFailureKind(error, logs);
+  if (image) {
+    const name = image === "host" ? "Host" : image === "missing" ? "Missing" : "Auth";
+    return { causeKey: `run.failImage${name}Cause`, fixKey: `run.failImage${name}Fix`, vars: {}, recognised: true };
+  }
 
   const lines = [...logs, ...(error ?? "").split("\n")];
   let exit = -1;

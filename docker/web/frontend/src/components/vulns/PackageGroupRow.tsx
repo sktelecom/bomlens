@@ -33,6 +33,11 @@ export function PackageGroupRow({ group: g, isOpen, onToggle }: { group: Package
           <SeverityLabel severity={g.maxSeverity} quiet />
           <PackageCoordinate {...splitPackage(g.pkg)} title={g.pkg} strongName className="bl-mono bl-breakall" />
           <span className="bl-mono bl-muted">{g.installed || "-"}</span>
+          {g.vulns.some((v) => v.buildTool) && (
+            <span className="bl-small bl-muted" title={t("result.buildToolHint")} data-testid="vuln-build-tool">
+              {t("result.buildToolTag")}
+            </span>
+          )}
           <span className="bl-muted bl-small">{t("result.pkgGroupCount", { count: g.vulns.length, n: fmt(g.vulns.length) })}</span>
           {g.kev && (
             <Label variant="danger" title={t("result.kevHint")}>

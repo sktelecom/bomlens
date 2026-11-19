@@ -93,6 +93,19 @@ describe("describeUploadError", () => {
     });
   });
 
+  it("names an unreadable supplier SBOM by the server's code, keeping the detail", () => {
+    expect(describeUploadError(new ApiError("The uploaded SBOM file is empty (0 bytes).", 422, "SBOM_FILE_EMPTY"))).toEqual({
+      key: "source.uploadErrorSbomEmpty",
+      detail: "The uploaded SBOM file is empty (0 bytes).",
+    });
+    expect(describeUploadError(new ApiError("cut", 422, "SBOM_JSON_TRUNCATED")).key).toBe("source.uploadErrorSbomTruncated");
+    expect(describeUploadError(new ApiError("text", 422, "SBOM_NOT_RECOGNIZED")).key).toBe("source.uploadErrorSbomNotRecognized");
+  });
+
+  it("ignores an unknown code and falls back to the status", () => {
+    expect(describeUploadError(new ApiError("x", 422, "SOMETHING_ELSE")).key).toBe("source.uploadErrorRejected");
+  });
+
   it("maps a fetch network failure (TypeError) to the unreachable message", () => {
     expect(describeUploadError(new TypeError("Failed to fetch"))).toEqual({
       key: "source.uploadErrorNetwork",

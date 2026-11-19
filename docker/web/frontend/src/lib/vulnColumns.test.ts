@@ -28,9 +28,17 @@ describe("vulnerability columns", () => {
     expect(columnOn("epss", some, { epss: false })).toBe(false);
   });
 
+  it("offers the introduced-by column only when a row names a dependency", () => {
+    expect(columnOn("introduced", columnFacts([v(), v({ introducedBy: [] })]), {})).toBe(false);
+    const some = columnFacts([v({ introducedBy: [{ name: "spring-boot-starter-web", version: "3.2.0" }] }), v()]);
+    expect(some.introducedRows).toBe(1);
+    expect(columnOn("introduced", some, {})).toBe(true);
+    expect(columnOn("introduced", some, { introduced: false })).toBe(false);
+  });
+
   it("ignores a malformed stored value", () => {
     expect(parseColumnPref("not json")).toEqual({});
-    expect(parseColumnPref('{"epss":"yes","nvd":true,"x":1}')).toEqual({ nvd: true });
+    expect(parseColumnPref('{"epss":"yes","nvd":true,"introduced":false,"x":1}')).toEqual({ nvd: true, introduced: false });
     expect(parseColumnPref(null)).toEqual({});
   });
 });

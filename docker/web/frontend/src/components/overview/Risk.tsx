@@ -162,6 +162,9 @@ export function LicensePanel({ result, scanId }: { result: DoneEvent; scanId: st
   const summary = licenseRiskSummary(result.sbom?.componentList ?? []);
   const total = summary.TOTAL;
   if (total === 0) return null;
+  // The table behind these counts holds the first rows only; the component
+  // count in the header is the whole SBOM. Say which this bar counted.
+  const shownOfAll = result.sbom?.truncated ? { shown: fmt(total), total: fmt(result.sbom.components) } : null;
   const href = (tier: LicenseRiskTier) => (scanId ? scanHash(scanId, "licenses", { tier }) : undefined);
   const present = LICENSE_TIER_ORDER.filter((tier) => summary[tier] > 0);
   return (
@@ -171,6 +174,11 @@ export function LicensePanel({ result, scanId }: { result: DoneEvent; scanId: st
       head={scanId ? <span className="bl-muted bl-small bl-box-head-end">{t("result.licenseClassFilterHint")}</span> : undefined}
     >
       <div className="bl-box-body">
+        {shownOfAll && (
+          <p className="bl-muted bl-small bl-flat" data-testid="license-basis">
+            {t("result.licenseClassBasis", shownOfAll)}
+          </p>
+        )}
         <div className="bl-ovbar bl-ovbar-lic" role="group" aria-label={t("result.licenseClassTitle")}>
           {present.map((tier) => {
             const common = {

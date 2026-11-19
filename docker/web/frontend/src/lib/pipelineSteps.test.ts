@@ -7,7 +7,35 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { pipelineStepLabelKey } from "./pipelineSteps";
+import { currentLiveStep, formatElapsed, pipelineStepLabelKey } from "./pipelineSteps";
+
+describe("currentLiveStep", () => {
+  it("is null before any marker", () => {
+    expect(currentLiveStep([])).toBeNull();
+    expect(currentLiveStep(["hello"])).toBeNull();
+  });
+
+  it("follows the newest marker, not the first", () => {
+    expect(currentLiveStep(["▶ Preparing a writable copy of app ..."])?.id).toBe("copy");
+    expect(currentLiveStep(["[1/2] generating", "[build-prep] gradle: resolving", "more output"])?.id).toBe("buildPrep");
+    expect(currentLiveStep(["[build-prep] gradle", "[1/2] cdxgen", "plain line"])?.id).toBe("generate");
+    expect(currentLiveStep(["[1/2] cdxgen", "[security] trivy"])?.id).toBe("security");
+  });
+
+  it("names the image download the server starts", () => {
+    expect(currentLiveStep(["[ui] pulling ghcr.io/x/y ..."])?.id).toBe("pull");
+  });
+});
+
+describe("formatElapsed", () => {
+  it("formats as m:ss and h:mm:ss", () => {
+    expect(formatElapsed(0)).toBe("0:00");
+    expect(formatElapsed(65)).toBe("1:05");
+    expect(formatElapsed(3599)).toBe("59:59");
+    expect(formatElapsed(3725)).toBe("1:02:05");
+    expect(formatElapsed(-4)).toBe("0:00");
+  });
+});
 
 describe("pipelineStepLabelKey", () => {
   it("returns an i18n key for a known step id", () => {

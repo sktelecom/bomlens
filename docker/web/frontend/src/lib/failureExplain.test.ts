@@ -5,6 +5,41 @@ import { describe, expect, it } from "vitest";
 
 import { explainFailure, failureKeyForCode } from "./failureExplain";
 
+describe("unreadable supplier SBOM", () => {
+  it("maps the upload codes to wording that blames the file", () => {
+    expect(failureKeyForCode("SBOM_FILE_EMPTY")).toBe("run.errorSbomEmpty");
+    expect(explainFailure([], "x", failureKeyForCode("SBOM_JSON_TRUNCATED")).causeKey).toBe("source.uploadErrorSbomTruncated");
+    const e = explainFailure([], "x", failureKeyForCode("SBOM_NOT_RECOGNIZED"));
+    expect(e.causeKey).toBe("source.uploadErrorSbomNotRecognized");
+    expect(e.fixKey).toBe("run.failSbomFileFix");
+    expect(e.recognised).toBe(true);
+  });
+});
+
+describe("image failures", () => {
+  const head = "[ERROR] syft could not read the image nosuch/x:9.9: it does not exist, or the registry needs credentials.";
+
+  it("tells a missing image from a refused login", () => {
+    expect(explainFailure([], `${head}\nMANIFEST_UNKNOWN: manifest unknown`, null).causeKey).toBe("run.failImageMissingCause");
+    expect(explainFailure([], `${head}\nDENIED: requested access to the resource is denied`, null).causeKey).toBe("run.failImageAuthCause");
+    expect(explainFailure([], `${head}\nUNAUTHORIZED: authentication required`, null).causeKey).toBe("run.failImageAuthCause");
+  });
+
+  it("names an unresolvable registry host", () => {
+    const e = explainFailure([], `${head}\ndial tcp: lookup registry.example.com: no such host`, null);
+    expect(e.causeKey).toBe("run.failImageHostCause");
+    expect(e.fixKey).toBe("run.failImageHostFix");
+  });
+
+  it("does not read an unrelated denied in the log as an image failure", () => {
+    expect(explainFailure(["permission denied: /tmp/x"], "build failed", null).causeKey).toBe("run.failGenericCause");
+  });
+
+  it("falls back to the generic cause when the image message says nothing more", () => {
+    expect(explainFailure([], head, null).causeKey).toBe("run.failGenericCause");
+  });
+});
+
 describe("explainFailure", () => {
   it("uses the server's classification first", () => {
     expect(explainFailure([], "x", "run.errorGitNotFoundOrPrivate").causeKey).toBe("run.failGitPrivateCause");

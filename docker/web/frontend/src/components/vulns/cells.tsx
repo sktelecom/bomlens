@@ -101,3 +101,25 @@ export function FixedVersions({ vuln: v }: { vuln: Pick<VulnItem, "fixed" | "ins
     </span>
   );
 }
+
+/**
+ * The direct dependencies a finding comes in through (at most three, nearest
+ * first). "(direct)" marks the component itself being one of them: raise it.
+ * A finding the trace could not connect to the root shows a dash.
+ */
+export function IntroducedBy({ vuln: v }: { vuln: Pick<VulnItem, "introducedBy"> }) {
+  const { t } = useTranslation();
+  const list = v.introducedBy ?? [];
+  if (list.length === 0) return <span className="bl-muted">-</span>;
+  return (
+    <span className="bl-v-introduced" data-testid="vuln-introduced-by">
+      {list.map((d) => (
+        <span key={`${d.name}@${d.version ?? ""}`} className="bl-mono">
+          {d.name}
+          {d.version ? ` ${d.version}` : ""}
+          {d.direct && <span className="bl-muted"> ({t("result.introducedDirect")})</span>}
+        </span>
+      ))}
+    </span>
+  );
+}
