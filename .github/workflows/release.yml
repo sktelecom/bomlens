@@ -198,12 +198,17 @@ jobs:
           # image that Android source scans need. It carries no SDK files: the
           # SDK is downloaded from Google by the user's own machine at build time.
 
+          # check-setup compares the image it finds with the version of the
+          # bundle it ships in; write that version in before packing.
+          BUNDLE_VERSION="${{ needs.create-release.outputs.version }}"
+          sed -i "s/@BOMLENS_VERSION@/${BUNDLE_VERSION#v}/" scripts/check-setup.sh scripts/check-setup.bat
+
           cp scripts/scan-sbom.sh release-assets/
           chmod +x release-assets/scan-sbom.sh
           # shellcheck disable=SC2086  # word splitting is how the file list expands
           tar -czf release-assets/bomlens-cli-linux.tar.gz \
             scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py \
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
             docker/android/Dockerfile $LICENSE_FILES
 
           # Windows runtime bundle: both launchers, the orchestration script,
@@ -217,7 +222,7 @@ jobs:
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
             scripts/check-setup.bat scripts/bomlens.settings.example.txt \
             docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py \
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
             docker/android/Dockerfile $LICENSE_FILES
 
           # Examples

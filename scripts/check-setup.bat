@@ -13,7 +13,16 @@ setlocal
 
 call :cfg_load
 
-if not defined SBOM_SCANNER_IMAGE set "SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:latest"
+REM The version of this CLI bundle, written in by the release build (an
+REM unreleased checkout keeps the placeholder). The default scanner image is the
+REM one of that version, as the desktop app uses, not whatever latest is here.
+set "CLI_VERSION=@BOMLENS_VERSION@"
+set "DEFAULT_TAG=%CLI_VERSION%"
+set "CLI_VERSION_KNOWN=1"
+if "%CLI_VERSION:~0,1%"=="@" set "DEFAULT_TAG=latest"
+if "%CLI_VERSION:~0,1%"=="@" set "CLI_VERSION_KNOWN="
+set "SBOM_IMAGE_GIVEN=%SBOM_SCANNER_IMAGE%"
+if not defined SBOM_SCANNER_IMAGE set "SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:%DEFAULT_TAG%"
 set "DOCKER_IMAGE=%SBOM_SCANNER_IMAGE%"
 if not defined UI_PORT set "UI_PORT=8080"
 if not defined ANDROID_IMAGE_PREFIX set "ANDROID_IMAGE_PREFIX=bomlens-android-sdk"
@@ -74,6 +83,14 @@ call :say M_PREPULL
 echo   docker pull %DOCKER_IMAGE%
 call :say M_OFFLINE_HINT
 set /a PROBLEMS+=1
+REM The version tag is not here but a latest is (an older install): say it is not
+REM the image this CLI runs.
+if not defined CLI_VERSION_KNOWN goto :check_android_step
+if defined SBOM_IMAGE_GIVEN goto :check_android_step
+docker image inspect "ghcr.io/sktelecom/bomlens:latest" >nul 2>&1
+if errorlevel 1 goto :check_android_step
+call :say M_N_LATEST
+call :sayval CLI_VERSION
 
 REM 3b) Android SDK image. Not published (its SDK terms bar redistribution), so it
 REM is built on this machine, and only Android scans use it: a missing image is a
@@ -123,9 +140,9 @@ REM line is 3.5 GiB (a 4 GiB engine reports about 3.8), as in scan-sbom.sh.
 :check_mem_step
 set "MEM_BYTES="
 for /f "delims=" %%m in ('docker info --format "{{.MemTotal}}" 2^>nul') do set "MEM_BYTES=%%m"
-if not defined MEM_BYTES goto :check_port_step
-for /f "delims=0123456789" %%x in ("%MEM_BYTES%") do goto :check_port_step
-if "%MEM_BYTES:~7,1%"=="" goto :check_port_step
+if not defined MEM_BYTES goto :check_disk_step
+for /f "delims=0123456789" %%x in ("%MEM_BYTES%") do goto :check_disk_step
+if "%MEM_BYTES:~7,1%"=="" goto :check_disk_step
 set "MEM_MB=%MEM_BYTES:~0,-6%"
 set "MEM_MBN=0"
 set /a "MEM_MBN=%MEM_MB%" 2>nul
@@ -139,13 +156,72 @@ set /a "MEM_F=MEM_T %% 10"
 if %MEM_MBN% LSS 3758 goto :mem_low
 call :say M_O_MEM
 echo   %MEM_W%.%MEM_F% GiB
-goto :check_port_step
+goto :check_disk_step
 
 :mem_low
 call :say M_X_MEM
 echo   %MEM_W%.%MEM_F% GiB
 call :say M_MEM_NOTE
 call :say M_MEM_FIX
+set /a PROBLEMS+=1
+
+REM 4b) Images BomLens has downloaded, their total size, and the engine's free
+REM disk. A first scan of a language downloads 3 to 16 GB. docker image inspect
+REM prints bytes; the last six digits are dropped to get decimal megabytes, so
+REM set /a never sees a number past 32 bits. Each image ID is counted once.
+:check_disk_step
+set "IMG_SEEN= "
+set /a IMG_TOTAL=0
+set "IMG_ANY="
+for /f "tokens=1,2" %%a in ('docker image ls --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]"') do call :img_line %%a %%b
+if not defined IMG_ANY goto :disk_free_step
+call :say M_O_TOTAL
+echo   %IMG_TOTAL% MB
+goto :disk_free_step
+
+:img_line
+echo %IMG_SEEN% | findstr /C:" %~1 " >nul 2>&1
+if not errorlevel 1 goto :eof
+set "IMG_SEEN=%IMG_SEEN%%~1 "
+set "IMG_BYTES="
+for /f "delims=" %%s in ('docker image inspect --format "{{.Size}}" "%~1" 2^>nul') do set "IMG_BYTES=%%s"
+if not defined IMG_BYTES goto :eof
+for /f "delims=0123456789" %%x in ("%IMG_BYTES%") do goto :eof
+if "%IMG_BYTES:~7,1%"=="" goto :eof
+set "IMG_MB=%IMG_BYTES:~0,-6%"
+set /a IMG_TOTAL+=IMG_MB
+if not defined IMG_ANY call :say M_O_IMAGES
+set "IMG_ANY=1"
+echo   %~2  %IMG_MB% MB
+goto :eof
+
+REM Free space is read with a short container, as scan-sbom.sh does. A value that
+REM cannot be read is skipped, not a problem. 5000 MB is the smallest language
+REM image (2.9 GB) plus the 2 GB the CLI keeps free.
+:disk_free_step
+set "PROBE_IMG=%DOCKER_IMAGE%"
+docker image inspect "%PROBE_IMG%" >nul 2>&1
+if errorlevel 1 for /f "delims=" %%i in ('docker image ls --format "{{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /V /C:"<none>"') do set "PROBE_IMG=%%i"
+set "FREE_MB="
+if defined BOMLENS_FAKE_FREE_MB set "FREE_MB=%BOMLENS_FAKE_FREE_MB%"
+if not defined FREE_MB for /f "tokens=4" %%f in ('docker run --rm --pull never --entrypoint df "%PROBE_IMG%" -Pm / 2^>nul ^| findstr /V /C:"Filesystem"') do set "FREE_MB=%%f"
+if not defined FREE_MB goto :check_port_step
+for /f "delims=0123456789" %%x in ("%FREE_MB%") do goto :check_port_step
+set /a "FREE_MBN=%FREE_MB%" 2>nul
+if %FREE_MBN% LSS 5000 goto :disk_low
+call :say M_O_DISK
+echo   %FREE_MBN% MB
+call :say M_DISK_NEED
+call :say M_CLEAN
+call :say M_CLEAN2
+goto :check_port_step
+
+:disk_low
+call :say M_X_DISK
+echo   %FREE_MBN% MB
+call :say M_DISK_NEED
+call :say M_CLEAN
+call :say M_CLEAN2
 set /a PROBLEMS+=1
 
 REM 5) UI port available
@@ -300,13 +376,21 @@ set "M_OPT_WSL=    or WSL2 + docker-ce  https://docs.docker.com/engine/install/"
 set "M_RERUN=    Install it, then run this check again."
 set "M_X_NO_ENGINE=[X] The Docker engine is not running. Start Rancher Desktop or Docker Desktop and wait for its icon to settle."
 set "M_X_NO_IMAGE=[X] The scanner image is not downloaded yet:"
-set "M_PREPULL=    The first run downloads about 250 MB automatically. To fetch it now:"
+set "M_PREPULL=    The first run downloads about 1.4 GB automatically. To fetch it now:"
 set "M_OFFLINE_HINT=    No network at the venue? See bomlens.settings.example.txt (SBOM_IMAGE_TAR) to install from a file."
 set "M_X_MEM=[X] The Docker engine has too little memory. A Maven or Gradle build needs about 4 GB:"
 set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. With the WSL 2 backend or Rancher Desktop: set memory=4GB in .wslconfig in your user folder, then run wsl --shutdown."
 set "M_MEM_NOTE=    An engine set to 4 GB shows as about 3.8 GiB; this check passes from 3.5 GiB."
 set "M_X_PORT=[X] UI port is already in use or reserved:"
 set "M_PORT_FIX=    sbom-ui.bat will move to the next free port by itself. To pin a port, set UI_PORT in bomlens.settings.txt next to these scripts."
+set "M_O_IMAGES=[-] BomLens images on this machine (size on disk):"
+set "M_O_TOTAL=[-] Total size of these images:"
+set "M_O_DISK=[O] Free disk space in the Docker engine:"
+set "M_X_DISK=[X] Free disk space in the Docker engine is low:"
+set "M_DISK_NEED=    A first scan downloads one language image of 3 to 16 GB (.NET about 15 GB). The CLI stops before downloading when the free space is smaller than the image plus 2 GB; BOMLENS_SKIP_DISK_CHECK=1 scans anyway."
+set "M_CLEAN=    Remove an image you no longer need: docker image rm IMAGE. All images no container uses: docker image prune -a"
+set "M_CLEAN2=    Space still short afterwards: compact the disk in Docker Desktop or Rancher Desktop (Settings)."
+set "M_N_LATEST=[-] An image tagged latest is also here, but this CLI uses the version tag above, so it is not used. This CLI is version:"
 set "M_ALL_GOOD=Result: everything is ready. You can run sbom-ui.bat"
 set "M_SOME_BAD=Result: please review the items marked [X] above."
 set "M_PROBLEMS=Items to review:"
@@ -334,13 +418,21 @@ set "M_OPT_WSL=    또는 WSL2 + docker-ce  https://docs.docker.com/engine/insta
 set "M_RERUN=    설치 후 이 점검을 다시 실행하세요."
 set "M_X_NO_ENGINE=[X] Docker 엔진이 실행 중이 아닙니다. Rancher Desktop / Docker Desktop을 켜고 아이콘이 안정될 때까지 기다리세요."
 set "M_X_NO_IMAGE=[X] 스캐너 이미지가 아직 없습니다:"
-set "M_PREPULL=    처음 실행할 때 약 250MB를 자동으로 내려받습니다. 지금 미리 받으려면:"
+set "M_PREPULL=    처음 실행할 때 약 1.4GB를 자동으로 내려받습니다. 지금 미리 받으려면:"
 set "M_OFFLINE_HINT=    현장에 네트워크가 없나요? 파일로 설치하려면 bomlens.settings.example.txt의 SBOM_IMAGE_TAR을 참고하세요."
 set "M_X_MEM=[X] Docker 엔진 메모리가 부족합니다. Maven/Gradle 빌드에는 약 4GB가 필요합니다:"
 set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. WSL 2 백엔드나 Rancher Desktop은 사용자 폴더의 .wslconfig 에 memory=4GB 를 적고 wsl --shutdown 을 실행하세요."
 set "M_MEM_NOTE=    4GB로 설정한 엔진은 약 3.8 GiB로 표시되며, 이 점검은 3.5 GiB부터 통과합니다."
 set "M_X_PORT=[X] UI 포트가 이미 사용 중이거나 예약되어 있습니다:"
 set "M_PORT_FIX=    sbom-ui.bat이 알아서 비어 있는 다음 포트로 옮깁니다. 포트를 고정하려면 스크립트 옆 bomlens.settings.txt에 UI_PORT를 지정하세요."
+set "M_O_IMAGES=[-] 이 컴퓨터의 BomLens 이미지(디스크 차지 크기):"
+set "M_O_TOTAL=[-] 이 이미지들의 합계:"
+set "M_O_DISK=[O] Docker 엔진의 디스크 여유 공간:"
+set "M_X_DISK=[X] Docker 엔진의 디스크 여유 공간이 적습니다:"
+set "M_DISK_NEED=    처음 스캔할 때 언어별 이미지 하나를 3~16GB 내려받습니다(.NET은 약 15GB). 명령줄 도구는 여유 공간이 이미지 크기에 2GB를 더한 값보다 적으면 내려받기 전에 멈추며, BOMLENS_SKIP_DISK_CHECK=1 을 지정하면 그대로 스캔합니다."
+set "M_CLEAN=    필요 없는 이미지 삭제: docker image rm 이미지이름. 어느 컨테이너도 쓰지 않는 이미지 전체 삭제: docker image prune -a"
+set "M_CLEAN2=    지운 뒤에도 공간이 모자라면 Docker Desktop이나 Rancher Desktop의 Settings에서 디스크를 압축하세요."
+set "M_N_LATEST=[-] latest 태그 이미지도 있지만 이 명령줄 도구는 위의 버전 태그를 쓰므로 그 이미지는 쓰이지 않습니다. 이 도구의 버전:"
 set "M_ALL_GOOD=점검 결과: 모두 준비됐습니다. sbom-ui.bat 을 실행해도 좋습니다."
 set "M_SOME_BAD=점검 결과: 위에서 [X] 표시된 항목을 확인하세요."
 set "M_PROBLEMS=확인할 항목 수:"
