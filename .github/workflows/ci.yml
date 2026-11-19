@@ -481,6 +481,14 @@ jobs:
       - name: Empty-after-exclusion completeness tests
         run: bash tests/test-empty-excluded.sh
 
+      # No Docker (Trivy stubbed): a fixed matrix of SBOMs through the report
+      # generators. An incomplete result never reads "No known vulnerabilities
+      # found", and the grade and reasons are the same in every report, the
+      # summary file and what the web server reads. Also proves the check fails
+      # on a copy of docker/lib with completeness marking switched off.
+      - name: Input matrix report tests
+        run: bash tests/test-journey-matrix.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the
