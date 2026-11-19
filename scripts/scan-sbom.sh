@@ -1589,6 +1589,8 @@ remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.jso
 # An earlier run's refused SBOM (declared components that were refused) is not
 # this run's: the check after stage 2 reads its presence as this run's refusal.
 remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
+# Likewise the unprocessed copy a failed post-processing left (see stage 2 below).
+remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.unprocessed.json"
 
 # docker run answers 125 (the engine refused the run), 126 (the command in the
 # image could not be run) and 127 (not found) for failures that are Docker's own,
