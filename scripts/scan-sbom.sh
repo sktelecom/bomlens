@@ -2984,8 +2984,15 @@ elif [ -n "$TARGET" ]; then
         case "$TARGET" in
             -*) log_error "--target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
         esac
+        # A name shaped like a path (./x, ../x, /x, ~/x, C:\x) cannot be an
+        # image reference, so a missing one is a typo: stop, instead of
+        # scanning an image of that name and exiting 0.
         case "$TARGET" in
-            .*|/*|~*|*.zip|*.tar|*.tar.gz|*.tgz|*.bin)
+            .*|/*|\~*|[A-Za-z]:[\\/]*)
+                log_error "--target '$TARGET' is not a file or folder under $(pwd), and a name that starts like a path cannot be a Docker image. Check the spelling and the folder you ran this from, or give an image reference such as alpine:3.20."; exit 1 ;;
+        esac
+        case "$TARGET" in
+            *.zip|*.tar|*.tar.gz|*.tgz|*.bin)
                 log_warn "--target '$TARGET' is not a file or folder under $(pwd), so it is treated as a Docker image name. If you meant a path, check the spelling and the folder you ran this from." ;;
         esac
         MODE="IMAGE"
