@@ -82,6 +82,8 @@ Detected file: `pom.xml`
 
 > Note: a folder that holds both `pom.xml` and `build.gradle` (or `build.gradle.kts`) at its root is read as a Gradle project by default, as before. Use `--build-tool maven` to read only `pom.xml` (the Gradle files are left out of the scan and no Gradle step runs), or `--build-tool gradle` to read only the Gradle files. The scan prints which tool it reads, and the SBOM records it in `bomlens:build-tool-choice` with the reason in `bomlens:build-tool-choice-why`. The two tools can resolve different dependency sets for the same project, so compare the counts before choosing. A folder with one build tool, or a `pom.xml` only in a subfolder, is not affected.
 
+> Note: a private repository or mirror works through your own Maven settings. `~/.m2/settings.xml` and `~/.m2/settings-security.xml` are passed into the scan read-only when they exist (at `/bomlens-settings/m2` inside the container), and the same goes for the Gradle files `~/.gradle/gradle.properties`, `init.gradle`, `init.gradle.kts` and `init.d/`. The CLI, `--ui` and the desktop app do this; the double-click `sbom-ui.bat` does not. A mirror address has to be reachable from inside a container. A proxy that re-signs HTTPS needs `SBOM_EXTRA_CA_CERTS`. See [How do I scan a Java project that builds with Maven?](../guides/java-maven.md).
+
 ## Java (Gradle)
 
 ```bash
@@ -125,13 +127,13 @@ A `[WARN]` says when the build cannot get what it asks for: a toolchain no image
 
 Detected when the project has a Gradle root (`settings.gradle[.kts]` or `build.gradle[.kts]` at the root) and shows a sign of the Android Gradle plugin: the plugin id in the version catalog (`gradle/libs.versions.toml`), the plugin id or a catalog alias in a build script (root or `app/`), a Kotlin DSL `namespace` declaration, or an `AndroidManifest.xml` a few levels down. A manifest with no Gradle root does not count on its own, which also keeps a .NET MAUI app's `Platforms/Android/AndroidManifest.xml` from being misread as an Android project.
 
-Android needs an SDK platform image BomLens does not publish: the Android SDK it contains is not open source, and Google's terms do not allow redistributing it, so the image is built locally instead. The highest `compileSdk`/`compileSdkVersion` found picks the API level (34 if none is found). It is read from the root and `app/` build files, from the sources under `build-logic/` and `buildSrc/` (a convention plugin often sets it there), and from the version catalog (a key such as `android-compileSdk`); the scan then looks for `bomlens-android-sdk<API>:latest`, and if it is missing, prints the build command instead of failing on a missing image:
+Android needs an SDK platform image BomLens does not publish: the Android SDK it contains is not open source, and Google's terms do not allow redistributing it, so the image is built locally instead. The highest `compileSdk`/`compileSdkVersion` found picks the API level (34 if none is found). It is read from the root and `app/` build files, from the sources under `build-logic/` and `buildSrc/` (a convention plugin often sets it there), and from the version catalog (a key such as `android-compileSdk`); the scan then looks for `bomlens-android-sdk<API>:latest`, and if it is missing, the scan stops before it starts and prints the build command:
 
 ```bash
 docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/android
 ```
 
-Building it means accepting Google's SDK terms yourself. Set `ANDROID_IMAGE_PREFIX` to use an image built elsewhere.
+Building it means accepting Google's SDK terms yourself. Set `ANDROID_IMAGE_PREFIX` to use an image built elsewhere. The image takes about 6.3 GB on disk, one per API level ([sizes](docker-image.md#how-much-disk-do-the-images-take)). A step-by-step page is [How do I scan an Android app that builds with Gradle?](../guides/android-gradle.md).
 
 The SDK image runs Java 21, so a Gradle wrapper older than 8.5 cannot run in it. The scan says so before it starts and records the failed step `gradle-wrapper-jdk` on the SBOM. Raise `distributionUrl` in `gradle/wrapper/gradle-wrapper.properties` to 8.5 or later, or build the image on an older JDK with `--build-arg BASE_JDK_IMAGE=<cdxgen Java image>` (see `docker/android/Dockerfile`) and scan with that image's `ANDROID_IMAGE_PREFIX`. A build that turns Isolated Projects on in `gradle.properties` is read with the configuration cache on, since Gradle refuses to run it with the cache off.
 
@@ -256,6 +258,8 @@ Detected files: `*.csproj`, `*.fsproj`, `*.sln` or `*.slnx`, at the root or in f
 ```
 
 Detected files: `Package.swift` (+ `Package.resolved`) for Swift Package Manager, or `Podfile.lock` for CocoaPods.
+
+A step-by-step page is [How do I scan an iOS app that uses SwiftPM or CocoaPods?](../guides/ios-swift.md).
 
 Dependencies are read from the committed lockfiles, so include them in the scan:
 
