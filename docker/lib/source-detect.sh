@@ -792,6 +792,14 @@ detect_lang() {
     esac
     # shellcheck disable=SC2086
     set -- $langs
+    # Nothing at the root: an Xcode project or a Swift package one or two folders
+    # down (App/App.xcodeproj, ios/Podfile) still means Swift. Only when no other
+    # language was found, so a Node.js or Flutter tree with an ios/ folder keeps
+    # the language its root manifest names. project.pbxproj is the file inside an
+    # .xcodeproj; the search is files, as _detect_first reads them.
+    if [ "$#" -eq 0 ] && [ -n "$(_detect_first "$d" 3 -name project.pbxproj -o -name Package.swift -o -name Podfile -o -name Podfile.lock -o -name Package.resolved)" ]; then
+        echo "swift"; return
+    fi
     if [ "$#" -eq 1 ]; then echo "$1"; elif [ "$#" -eq 0 ]; then echo "unknown"; else echo "mixed"; fi
 }
 
