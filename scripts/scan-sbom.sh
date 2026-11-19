@@ -3978,7 +3978,7 @@ note_missing() { missing="${missing:+$missing }$1"; }
 # The heading depends on whether anything requested is missing, which is only
 # known after the lines below are decided, so they are buffered first. A group
 # (not a subshell) keeps note_missing's variable.
-SUMMARY_BUF="$(mktemp)"
+SUMMARY_BUF="$(mktemp)"; SUMMARY_ERR="$(mktemp)"
 {
 if [ "$GENERATE_ONLY" = "true" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
@@ -4036,7 +4036,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         echo "  Otherwise the step degraded — check the log above for its warning." >&2
     fi
 fi
-} > "$SUMMARY_BUF"
+} > "$SUMMARY_BUF" 2> "$SUMMARY_ERR"
 echo "=========================================="
 if [ -n "$missing" ]; then
     echo "  Analysis finished with errors"
@@ -4044,7 +4044,8 @@ else
     echo "  Analysis Complete!"
 fi
 cat "$SUMMARY_BUF"
-rm -f "$SUMMARY_BUF"
+cat "$SUMMARY_ERR" >&2
+rm -f "$SUMMARY_BUF" "$SUMMARY_ERR"
 # What the result holds, in every mode: the numbers come from the scan's own
 # measurement (validate-sbom.sh), not from a count made here. Absent (an older
 # image, an AI SBOM) it prints nothing.
