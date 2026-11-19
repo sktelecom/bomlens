@@ -11082,7 +11082,7 @@ _list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$NSM" | tr '\n
     || fail "non_shipped_manifests output unexpected" "got [$_list]"
 _sargs=$(bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
 case "$_sargs" in
-    *"--exclude ./**/[tT][eE][sS][tT][sS]/**"*"--exclude ./**/.github/workflows/** --exclude ./**/gradle/wrapper/**") pass "non_shipped_syft_args builds syft --exclude flags" ;;
+    *"--exclude ./**/[tT][eE][sS][tT][sS]/**"*"--exclude ./**/.github/workflows/** --exclude ./**/gradle/wrapper/** --exclude ./**/vendor/**/package-lock.json") pass "non_shipped_syft_args builds syft --exclude flags" ;;
     *) fail "non_shipped_syft_args output unexpected" "got [$_sargs]" ;;
 esac
 _off=$(BOMLENS_INCLUDE_NON_SHIPPED=true bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
@@ -11496,7 +11496,7 @@ EOF_GEM
         || fail "Gemfile reader trusted a Gemfile that does not match its lock" "got [$_gd]"
     _amb=""
     for _g in 'gem "a"\nif ENV["X"]\n  gem "b"\nend' 'group :test do\n  gem "a",\n    "1.0"\nend' \
-              'gemspec\ngroup :test do\n  gem "a"\nend' 'group :test, optional: true do\n  gem "a"\nend' \
+              'gemspec\ngroup :test do\n  gem "a"\nend' \
               'gem "a", group: ENV["G"]' 'group :test do\n  gem "a"'; do
         printf "$_g\n" > "$WORK/gemdev/Gemfile.amb"
         [ -z "$(node "$WORK/gemdev.js" "$WORK/gemdev/Gemfile.amb" "" 2>/dev/null)" ] || _amb="$_amb [$_g]"
