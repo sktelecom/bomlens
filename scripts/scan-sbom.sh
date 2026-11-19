@@ -14,6 +14,16 @@ set -e
 # The arguments as given, so a static detection that fails can run again as a build.
 ORIG_ARGS=("$@")
 
+# The script's own warnings and errors go to stderr, so a caller that reads
+# stdout (or a CI log split by stream) sees only results there. Output from
+# the scanner container is passed through unchanged.
+log_warn() {
+    printf '[WARN] %s\n' "$*" >&2
+}
+log_error() {
+    printf '[ERROR] %s\n' "$*" >&2
+}
+
 # ========================================================
 # SBOM Scan Orchestrator (2-stage architecture)
 #
@@ -253,7 +263,7 @@ LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
 # passed to the container for it.
 FAIL_ON_CONFORMANCE="false"; FAIL_ON=()
 fail_on_bad_coverage() {
-    echo "[ERROR] --fail-on: '$1' needs a whole percentage from 0 to 100 without leading zeros, for example license-coverage=80 (there is no default)."
+    log_error "--fail-on: '$1' needs a whole percentage from 0 to 100 without leading zeros, for example license-coverage=80 (there is no default)."
     exit 1
 }
 FORCE_FIRMWARE="false"; FORCE_SOURCE="false"; RELEASE_FOLDER_DIR=""; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
@@ -313,16 +323,16 @@ INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=
 # anything outside the scanned tree.
 add_scan_exclude() {
     local p="$1"
-    [ -n "$p" ] || { echo "[ERROR] --exclude requires a path, e.g. --exclude vendor/legacy"; exit 1; }
+    [ -n "$p" ] || { log_error "--exclude requires a path, e.g. --exclude vendor/legacy"; exit 1; }
     while :; do
         case "$p" in ./*) p="${p#./}" ;; */) p="${p%/}" ;; *) break ;; esac
     done
     case "$p" in
         ""|"."|/*|*\\*|*[[:cntrl:]]*|*"*"*|*"?"*|*"["*)
-            echo "[ERROR] --exclude takes a relative path inside the scanned folder (no glob, no absolute path): $1"; exit 1 ;;
+            log_error "--exclude takes a relative path inside the scanned folder (no glob, no absolute path): $1"; exit 1 ;;
     esac
     case "/$p/" in
-        */../*) echo "[ERROR] --exclude must stay inside the scanned folder (no \"..\"): $1"; exit 1 ;;
+        */../*) log_error "--exclude must stay inside the scanned folder (no \"..\"): $1"; exit 1 ;;
     esac
     SCAN_EXCLUDE="${SCAN_EXCLUDE:+$SCAN_EXCLUDE
 }$p"
@@ -379,7 +389,7 @@ while [[ "$#" -gt 0 ]]; do
         --binary-kb) BINARY_KB_PATH="$2"; shift ;;
         --kb-decisions) BINARY_KB_DECISIONS="$2"; shift ;;
         --components)
-            [ "$#" -ge 2 ] || { echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
+            [ "$#" -ge 2 ] || { log_error "--components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
             COMPONENTS_FILES+=("$2"); shift ;;
         --no-components) NO_COMPONENTS="true" ;;
         --no-spdx3) GENERATE_SPDX3="false" ;;
@@ -401,7 +411,7 @@ while [[ "$#" -gt 0 ]]; do
             # instead of `shift 2` failing on too few remaining arguments.
             DIFF_OLD="${2:-}"; DIFF_NEW="${3:-}"
             [ -n "$DIFF_OLD" ] && [ -n "$DIFF_NEW" ] || {
-                echo "[ERROR] --diff requires two files: --diff <old.json> <new.json>"; exit 1; }
+                log_error "--diff requires two files: --diff <old.json> <new.json>"; exit 1; }
             shift 2 ;;
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
@@ -446,8 +456,8 @@ while [[ "$#" -gt 0 ]]; do
                         *) [ "${2#license-coverage=}" -le 100 ] || fail_on_bad_coverage "$2" ;;
                     esac ;;
                 *)
-                    echo "[ERROR] --fail-on: unknown condition '${2:-}'."
-                    echo "[ERROR] Use one of: vulnerability=critical|high|medium|low, malicious-package, license-conflict, empty-result, incomplete-result[=unreliable], license-coverage=<0-100>."; exit 1 ;;
+                    log_error "--fail-on: unknown condition '${2:-}'."
+                    log_error "Use one of: vulnerability=critical|high|medium|low, malicious-package, license-conflict, empty-result, incomplete-result[=unreliable], license-coverage=<0-100>."; exit 1 ;;
             esac
             FAIL_ON+=("$2"); shift ;;
         --lang) REPORT_LANG="$2"; shift ;;
@@ -455,7 +465,7 @@ while [[ "$#" -gt 0 ]]; do
         --resolve-purl) PURL_RESOLVE="true" ;;
         --resolve-models) MODEL_RESOLVE="true" ;;
         --model-sbom)
-            [ "$#" -ge 2 ] || { echo "[ERROR] --model-sbom requires a file, e.g. --model-sbom my-model_1.0_bom.json"; exit 1; }
+            [ "$#" -ge 2 ] || { log_error "--model-sbom requires a file, e.g. --model-sbom my-model_1.0_bom.json"; exit 1; }
             MODEL_SBOM_FILES+=("$2"); MODEL_RESOLVE="true"; shift ;;
         --analyze-cpe-index) ANALYZE_CPE_INDEX="true" ;;
         --license-registry) LICENSE_REGISTRY="true" ;;
@@ -936,7 +946,7 @@ Architecture: source SBOM generation uses cdxgen's per-language images
 (on-demand); this tool orchestrates + post-processes.
 EOF
             exit 0 ;;
-        *) echo "[ERROR] Unknown option: $1 (see ./scripts/scan-sbom.sh --help for the options)"; exit 1 ;;
+        *) log_error "Unknown option: $1 (see ./scripts/scan-sbom.sh --help for the options)"; exit 1 ;;
     esac
     shift
 done
@@ -964,8 +974,8 @@ fi
 # Docker checks
 # ========================================================
 docker_check() {
-    command -v docker &>/dev/null || { echo "[ERROR] Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
-    docker info >/dev/null 2>&1 || { echo "[ERROR] Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1; }
+    command -v docker &>/dev/null || { log_error "Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
+    docker info >/dev/null 2>&1 || { log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1; }
 }
 
 # `docker run` only auto-pulls an image that is entirely ABSENT locally; once a
@@ -986,9 +996,9 @@ ensure_image_fresh() {
     case "$SBOM_PULL" in
         never)
             if ! docker image inspect "$img" >/dev/null 2>&1; then
-                echo "[ERROR] Image not found and SBOM_PULL=never (no network is touched): $img"
-                echo "        Pull it once first, or unset SBOM_PULL to let this run pull it:"
-                echo "          docker pull $img"
+                log_error "Image not found and SBOM_PULL=never (no network is touched): $img"
+                echo "        Pull it once first, or unset SBOM_PULL to let this run pull it:" >&2
+                echo "          docker pull $img" >&2
                 exit 1
             fi
             return 0
@@ -996,7 +1006,7 @@ ensure_image_fresh() {
         always)
             echo "[INFO] Pulling $img (SBOM_PULL=always)..."
             if ! docker pull "$img"; then
-                echo "[ERROR] Failed to pull $img."
+                log_error "Failed to pull $img."
                 exit 1
             fi
             return 0
@@ -1077,7 +1087,7 @@ _optin_image_ready() {
     echo "[INFO] Pulling $1..."
     if ! _pull_optin "$1"; then
         [ "$SBOM_PULL" = "always" ] && docker image inspect "$1" >/dev/null 2>&1 || return 1
-        echo "[WARN] Could not pull $1 (SBOM_PULL=always); using the copy already here."
+        log_warn "Could not pull $1 (SBOM_PULL=always); using the copy already here."
     fi
     _OPTIN_PULLED="$_OPTIN_PULLED$1 "
 }
@@ -1098,7 +1108,7 @@ _pull_optin() {
         if [ "$elapsed" -ge "$max" ]; then
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
-            echo "[WARN] docker pull $img did not finish within ${max}s (_SBOM_OPTIN_PULL_MAX_SECS); stopped."
+            log_warn "docker pull $img did not finish within ${max}s (_SBOM_OPTIN_PULL_MAX_SECS); stopped."
             return 1
         fi
         sleep 1
@@ -1173,13 +1183,13 @@ EOF_PREFLIGHT
     case "$seen" in *OUT_OK*) ;; *) scan_target_not_visible "$out_dir" "the output folder" "결과를 저장할 폴더"; echo ""; exit 1 ;; esac
 }
 scan_target_not_visible() {  # <host dir> <english role> <korean role>
-    echo "[ERROR] SCAN_TARGET_NOT_VISIBLE: $2 is not visible inside the Docker container: $1"
-    echo "        The Docker engine shares only some folders with its VM (Colima: your home folder;"
-    echo "        Docker Desktop: Settings > Resources > File sharing), so the container sees an empty folder."
-    echo "        Move the project and the output folder under your home folder, or share this location, then run again."
-    echo "[ERROR] SCAN_TARGET_NOT_VISIBLE: $3가 Docker 컨테이너 안에서 보이지 않습니다: $1"
-    echo "        Docker는 일부 폴더만 가상 머신과 공유합니다(Colima는 홈 폴더, Docker Desktop은 Settings > Resources > File sharing)."
-    echo "        프로젝트와 결과 폴더를 홈 폴더 아래로 옮기거나 이 위치를 공유한 뒤 다시 실행하세요."
+    log_error "SCAN_TARGET_NOT_VISIBLE: $2 is not visible inside the Docker container: $1"
+    echo "        The Docker engine shares only some folders with its VM (Colima: your home folder;" >&2
+    echo "        Docker Desktop: Settings > Resources > File sharing), so the container sees an empty folder." >&2
+    echo "        Move the project and the output folder under your home folder, or share this location, then run again." >&2
+    log_error "SCAN_TARGET_NOT_VISIBLE: $3가 Docker 컨테이너 안에서 보이지 않습니다: $1"
+    echo "        Docker는 일부 폴더만 가상 머신과 공유합니다(Colima는 홈 폴더, Docker Desktop은 Settings > Resources > File sharing)." >&2
+    echo "        프로젝트와 결과 폴더를 홈 폴더 아래로 옮기거나 이 위치를 공유한 뒤 다시 실행하세요." >&2
 }
 
 # SBOM_EXTRA_CA_CERTS: the CA bundle of a proxy that inspects TLS. Checked
@@ -1208,15 +1218,15 @@ extra_ca_run() {
 # Web UI mode
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
-    [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
-    [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
-    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
-    [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
-    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
-    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { echo "[ERROR] --model-sbom is not offered with --ui (it links one source scan to model SBOM files on this machine)."; exit 1; }
-    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
-    [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
-    [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
+    [ -z "$VEX_FILE" ] || { log_error "--vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
+    [ -z "$AI_DECLARE_FILE" ] || { log_error "--ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { log_error "--binary-kb is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
+    [ -z "$COMPONENT_VERSIONS_FILE" ] || { log_error "--component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
+    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { log_error "--components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
+    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { log_error "--model-sbom is not offered with --ui (it links one source scan to model SBOM files on this machine)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { log_error "--no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
+    [ "${#FAIL_ON[@]}" -eq 0 ] || { log_error "--fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
+    [ "$FAIL_ON_CONFORMANCE" = "true" ] && { log_error "--fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
     # The web UI owns per-run subfolders itself (server.py creates them under the
     # results folder). The current folder is what the UI scans (/src); results go
@@ -1252,7 +1262,7 @@ if [ "$UI_MODE" = "true" ]; then
     # (e.g. --mount /) safe, and outputs still land only in /host-output.
     MOUNT_FLAGS=(); SCAN_ROOTS=""; SEEN_NAMES=" "
     for m in "${UI_MOUNTS[@]}"; do
-        [ -d "$m" ] || { echo "[ERROR] --mount path is not a directory: $m"; exit 1; }
+        [ -d "$m" ] || { log_error "--mount path is not a directory: $m"; exit 1; }
         abs="$(cd "$m" && pwd)"
         name="$(printf '%s' "$(basename "$abs")" | tr -c 'A-Za-z0-9._-' '-')"
         case "$name" in ''|-|.|..) name="root" ;; esac
@@ -1352,7 +1362,7 @@ if [ "$UI_MODE" = "true" ]; then
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
         "$POSTPROCESS_IMAGE"
 fi
-[ "${#UI_MOUNTS[@]}" -eq 0 ] || { echo "[ERROR] --mount requires --ui."; exit 1; }
+[ "${#UI_MOUNTS[@]}" -eq 0 ] || { log_error "--mount requires --ui."; exit 1; }
 
 # ========================================================
 # Model drift/diff mode — reads two already-generated SBOMs and writes a
@@ -1361,17 +1371,17 @@ fi
 # check below (the same shape UI mode takes above).
 # ========================================================
 if [ -n "$DIFF_OLD" ]; then
-    [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
-    [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
-    [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
-    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb cannot be combined with --diff (a diff writes no SBOM to read a base into)."; exit 1; }
-    [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
-    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
-    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { echo "[ERROR] --model-sbom cannot be combined with --diff (a diff writes no SBOM to link models in)."; exit 1; }
-    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
+    [ "${#FAIL_ON[@]}" -eq 0 ] || { log_error "--fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
+    [ -z "$VEX_FILE" ] || { log_error "--vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
+    [ -z "$AI_DECLARE_FILE" ] || { log_error "--ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { log_error "--binary-kb cannot be combined with --diff (a diff writes no SBOM to read a base into)."; exit 1; }
+    [ -z "$COMPONENT_VERSIONS_FILE" ] || { log_error "--component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
+    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { log_error "--components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
+    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { log_error "--model-sbom cannot be combined with --diff (a diff writes no SBOM to link models in)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { log_error "--no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
     docker_check
-    [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
-    [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
+    [ -f "$DIFF_OLD" ] || { log_error "--diff: old SBOM not found: $DIFF_OLD"; exit 1; }
+    [ -f "$DIFF_NEW" ] || { log_error "--diff: new SBOM not found: $DIFF_NEW"; exit 1; }
     DIFF_OLD_DIR="$(cd "$(dirname "$DIFF_OLD")" && pwd)"; DIFF_OLD_FN="$(basename "$DIFF_OLD")"
     DIFF_NEW_DIR="$(cd "$(dirname "$DIFF_NEW")" && pwd)"; DIFF_NEW_FN="$(basename "$DIFF_NEW")"
     DIFF_OUT_DIR="${OUTPUT_BASE:-$(pwd)}"
@@ -1395,11 +1405,11 @@ if [ -n "$DIFF_OLD" ]; then
     # file, unreadable JSON, nothing to compare); only an exit-0-but-no-file
     # result means the /host-output mount itself did not reach the host.
     if [ "$RC" -eq 0 ] && [ ! -f "$DIFF_OUT_DIR/$DIFF_REPORT_NAME" ]; then
-        echo "[ERROR] diff report not found on host: $DIFF_OUT_DIR/$DIFF_REPORT_NAME"
-        echo "  The container ran but no artifact reached this folder."
-        echo "  Likely cause: this folder is outside Docker Desktop file sharing"
-        echo "  (or Colima's home-only mount — /tmp is not shared to the VM)."
-        echo "  Run from a shared path (e.g. under your home directory) and retry."
+        log_error "diff report not found on host: $DIFF_OUT_DIR/$DIFF_REPORT_NAME"
+        echo "  The container ran but no artifact reached this folder." >&2
+        echo "  Likely cause: this folder is outside Docker Desktop file sharing" >&2
+        echo "  (or Colima's home-only mount — /tmp is not shared to the VM)." >&2
+        echo "  Run from a shared path (e.g. under your home directory) and retry." >&2
         exit 1
     fi
     [ "$RC" -eq 0 ] && echo "[INFO] Model diff report: $DIFF_OUT_DIR/$DIFF_REPORT_NAME"
@@ -1409,13 +1419,13 @@ fi
 # ========================================================
 # Validate
 # ========================================================
-[ -n "$PROJECT_NAME" ] && [ -n "$PROJECT_VERSION" ] || { echo "[ERROR] --project and --version are required ($0 --help)."; exit 1; }
+[ -n "$PROJECT_NAME" ] && [ -n "$PROJECT_VERSION" ] || { log_error "--project and --version are required ($0 --help)."; exit 1; }
 case "${CYCLONEDX_SPEC_VERSION:-1.6}" in
     1.6|1.7) CDX_SPEC_VERSION="${CYCLONEDX_SPEC_VERSION:-1.6}" ;;
-    *) echo "[ERROR] --spec-version '${CYCLONEDX_SPEC_VERSION}' is not supported. Use 1.6 (the default) or 1.7."; exit 1 ;;
+    *) log_error "--spec-version '${CYCLONEDX_SPEC_VERSION}' is not supported. Use 1.6 (the default) or 1.7."; exit 1 ;;
 esac
 if [ "$UPLOAD_TARGET" = "trusca" ] && [ "$GENERATE_ONLY" != "true" ] && [ -z "$TRUSCA_PROJECT_ID" ]; then
-    echo "[ERROR] TRUSCA upload requires a project id: --trusca <id> or TRUSCA_PROJECT_ID env."; exit 1
+    log_error "TRUSCA upload requires a project id: --trusca <id> or TRUSCA_PROJECT_ID env."; exit 1
 fi
 docker_check
 
@@ -1478,7 +1488,7 @@ fi
 # is not removed by cleanup, even when it is still empty after a failure.
 OUTPUT_DIR_PREEXISTED=0
 [ ! -d "$OUTPUT_HOST_DIR" ] || OUTPUT_DIR_PREEXISTED=1
-mkdir -p "$OUTPUT_HOST_DIR" || { echo "[ERROR] cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
+mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 
@@ -1617,17 +1627,17 @@ setup_guard_state() {
         owner=$(cat "$owner_file" 2>/dev/null)
         recorded_path=$(cat "$GUARD_STATE_DIR/$key/path" 2>/dev/null)
         if [ -z "$owner" ] || [ "$recorded_path" != "$target_real" ] || ! command -v docker >/dev/null 2>&1; then
-            echo "[WARN] found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place."
+            log_warn "found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place."
             return 0
         fi
         ps_out=$("${DOCKER_ENV[@]}" docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null)
         ps_rc=$?
         if [ "$ps_rc" -ne 0 ]; then
-            echo "[WARN] could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time."
+            log_warn "could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time."
             return 0
         fi
         if [ -n "$ps_out" ]; then
-            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
+            log_warn "a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
             return 0
         fi
         # Confirmed gone and the path matches: finish what it started
@@ -1644,7 +1654,7 @@ setup_guard_state() {
             cleanup_image="$POSTPROCESS_IMAGE"
         fi
         if [ -z "$cleanup_image" ]; then
-            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+            log_warn "no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
             return 0
         fi
         echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
@@ -1684,7 +1694,7 @@ drop_unused_guard_state() {
 FETCH_LICENSE="${FETCH_LICENSE:-true}"
 case "$DETECTION" in
     build|static|auto) ;;
-    *) echo "[ERROR] --detection takes build, static or auto (got '$DETECTION')."; exit 1 ;;
+    *) log_error "--detection takes build, static or auto (got '$DETECTION')."; exit 1 ;;
 esac
 [ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
 # EPSS + CISA KEV enrichment defaults on, but the host setting must reach the
@@ -1701,14 +1711,14 @@ EXTERNAL_LOOKUP="${EXTERNAL_LOOKUP:-true}"
 # silently producing an English report the user did not expect.
 case "$REPORT_LANG" in
     en|ko) ;;
-    *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
+    *) log_warn "--lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
 esac
 
 # Normalize the conformance profile the same way: default, skt-submission or
 # bsi-tr-03183-2 reach the container, anything else is a typo.
 case "$CONFORMANCE_PROFILE" in
     default|skt-submission|bsi-tr-03183-2) ;;
-    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default, skt-submission or bsi-tr-03183-2); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
+    *) log_warn "--conformance-profile '$CONFORMANCE_PROFILE' not supported (use default, skt-submission or bsi-tr-03183-2); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
 esac
 
 # Common -e flags for the post-process image.
@@ -2375,14 +2385,14 @@ resolve_release_folder() {
     while IFS="$(printf '\t')" read -r kind path; do
         case "${path##*/}" in
             *'$'*|*'`'*|*'"'*|*'\'*)
-                echo "[ERROR] $dir holds an entry whose name contains a character that"
-                echo "        cannot be passed through safely: $path"
-                echo "        Rename it, or add --as-source to scan $dir itself as source."
+                log_error "$dir holds an entry whose name contains a character that"
+                echo "        cannot be passed through safely: $path" >&2
+                echo "        Rename it, or add --as-source to scan $dir itself as source." >&2
                 exit 1 ;;
         esac
     done <<< "$cands"
     if [ "$n" -gt 1 ]; then
-        echo "[ERROR] $dir is not a source tree, and it holds more than one thing to scan:"
+        log_error "$dir is not a source tree, and it holds more than one thing to scan:"
         while IFS="$(printf '\t')" read -r kind path; do
             if [ "$kind" = "rootfs" ]; then
                 echo "          root filesystem  --target \"$path\""
@@ -2454,11 +2464,11 @@ route_rootfs_without_db() {
         echo "       identifying its binaries by signature with the firmware image."
         MODE="FIRMWARE"
     else
-        echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
-        echo "       so there is no installed-package list to read. To identify the"
-        echo "       binaries by signature, get the firmware image and run the same"
-        echo "       command again:"
-        echo "         docker pull $FIRMWARE_IMAGE"
+        log_warn "This root filesystem has no package database (apk/dpkg/rpm),"
+        echo "       so there is no installed-package list to read. To identify the" >&2
+        echo "       binaries by signature, get the firmware image and run the same" >&2
+        echo "       command again:" >&2
+        echo "         docker pull $FIRMWARE_IMAGE" >&2
         MODE="ROOTFS"
     fi
 }
@@ -2490,11 +2500,11 @@ flatten_single_dir() {
 
 ingest_git() {
     local url="$1" tmp args
-    is_git_url "$url" || { echo "[ERROR] unsafe or unsupported git URL: $url"; exit 1; }
-    command -v git >/dev/null 2>&1 || { echo "[ERROR] git not installed (required for --git)."; exit 1; }
+    is_git_url "$url" || { log_error "unsafe or unsupported git URL: $url"; exit 1; }
+    command -v git >/dev/null 2>&1 || { log_error "git not installed (required for --git)."; exit 1; }
     # Clone under the pwd (already shared with Docker Desktop) rather than $TMPDIR,
     # which on macOS is /var/folders and is NOT mounted into the cdxgen container.
-    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-git.XXXXXX") || { echo "[ERROR] mktemp failed"; exit 1; }
+    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-git.XXXXXX") || { log_error "mktemp failed"; exit 1; }
     CLEANUP_DIRS+=("$tmp")
     # Inject a token for private https repos into a LOCAL var only (never logged).
     local clone_url="$url"
@@ -2518,10 +2528,10 @@ ingest_git() {
             rm -rf "$tmp/repo"
             if ! GIT_TERMINAL_PROMPT=0 git clone -- "$clone_url" "$tmp/repo" 2>>/tmp/sbom-git-err \
                 || ! git -C "$tmp/repo" checkout --quiet "$GIT_REF" 2>>/tmp/sbom-git-err; then
-                echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+                log_error "git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
             fi
         else
-            echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+            log_error "git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
         fi
     fi
     rm -f /tmp/sbom-git-err
@@ -2531,10 +2541,10 @@ ingest_git() {
 
 ingest_archive() {
     local arc="$1" tmp lower
-    [ -f "$arc" ] || { echo "[ERROR] archive not found: $arc"; exit 1; }
+    [ -f "$arc" ] || { log_error "archive not found: $arc"; exit 1; }
     # Extract under the pwd (shared with Docker Desktop), not $TMPDIR (/var/folders
     # on macOS is not mounted into the cdxgen container).
-    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-arc.XXXXXX") || { echo "[ERROR] mktemp failed"; exit 1; }
+    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-arc.XXXXXX") || { log_error "mktemp failed"; exit 1; }
     CLEANUP_DIRS+=("$tmp")
     lower=$(printf '%s' "$arc" | tr '[:upper:]' '[:lower:]')
     echo "[INFO] Extracting archive $arc..."
@@ -2550,24 +2560,24 @@ ingest_archive() {
             # guard right through under `-l`+awk.
             if command -v unzip >/dev/null 2>&1; then
                 if unzip -Z1 "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))'; then
-                    echo "[ERROR] unsafe path in archive (zip-slip)"; exit 1
+                    log_error "unsafe path in archive (zip-slip)"; exit 1
                 fi
                 if ! unzip -q -d "$tmp" -- "$arc"; then
-                    echo "[ERROR] unzip failed for $arc"
-                    echo "[HINT] A zip made on Windows with PowerShell Compress-Archive stores"
-                    echo "       backslash path separators that unzip rejects. Re-create it with"
-                    echo "       Windows Explorer (Send to > Compressed folder) and scan again."
+                    log_error "unzip failed for $arc"
+                    echo "[HINT] A zip made on Windows with PowerShell Compress-Archive stores" >&2
+                    echo "       backslash path separators that unzip rejects. Re-create it with" >&2
+                    echo "       Windows Explorer (Send to > Compressed folder) and scan again." >&2
                     exit 1
                 fi
             else
                 # bsdtar (Git Bash on Windows) extracts .zip and rejects traversal.
-                tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { echo "[ERROR] unsafe path in archive"; exit 1; }
-                tar -C "$tmp" -xf "$arc" || { echo "[ERROR] tar (zip) extract failed"; exit 1; }
+                tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { log_error "unsafe path in archive"; exit 1; }
+                tar -C "$tmp" -xf "$arc" || { log_error "tar (zip) extract failed"; exit 1; }
             fi
             ;;
         *)
-            tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { echo "[ERROR] unsafe path in archive"; exit 1; }
-            tar -C "$tmp" --no-same-owner -xf "$arc" || { echo "[ERROR] tar extract failed"; exit 1; }
+            tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { log_error "unsafe path in archive"; exit 1; }
+            tar -C "$tmp" --no-same-owner -xf "$arc" || { log_error "tar extract failed"; exit 1; }
             ;;
     esac
     SCAN_INPUT_DIR=$(flatten_single_dir "$tmp")
@@ -2590,58 +2600,58 @@ if [ -z "$GIT_URL" ] && [ -n "$TARGET" ] && is_git_url "$TARGET"; then
 fi
 # Host-only check, made before anything is cloned or downloaded.
 if [ -n "$AI_DECLARE_FILE" ] && [ ! -f "$AI_DECLARE_FILE" ]; then
-    echo "[ERROR] --ai-declare file not found: $AI_DECLARE_FILE"
-    echo "[ERROR] Pass the path of a declaration (JSON). Every AI scan writes an empty one to start from: <Project>_<Version>_ai-declaration.template.json."; exit 1
+    log_error "--ai-declare file not found: $AI_DECLARE_FILE"
+    log_error "Pass the path of a declaration (JSON). Every AI scan writes an empty one to start from: <Project>_<Version>_ai-declaration.template.json."; exit 1
 fi
 if [ -n "$VEX_FILE" ] && [ ! -f "$VEX_FILE" ]; then
-    echo "[ERROR] --vex file not found: $VEX_FILE"
-    echo "[ERROR] Pass the path of a CycloneDX VEX document (JSON), e.g. --vex supplier-vex.json."; exit 1
+    log_error "--vex file not found: $VEX_FILE"
+    log_error "Pass the path of a CycloneDX VEX document (JSON), e.g. --vex supplier-vex.json."; exit 1
 fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     if [ ! -f "$COMPONENT_VERSIONS_FILE" ]; then
-        echo "[ERROR] --component-versions file not found: $COMPONENT_VERSIONS_FILE"
-        echo "[ERROR] Pass a CSV file with the columns name,version[,reason]. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
+        log_error "--component-versions file not found: $COMPONENT_VERSIONS_FILE"
+        log_error "Pass a CSV file with the columns name,version[,reason]. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
     fi
     # The container checks every row; refusing an oversized file here saves
     # starting the scan for it.
     if [ "$(wc -c < "$COMPONENT_VERSIONS_FILE" | tr -d ' ')" -gt 262144 ]; then
-        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version[,reason])."; exit 1
+        log_error "--component-versions: the file is larger than 256 KiB. It lists one component per line (name,version[,reason])."; exit 1
     fi
 fi
 
 if [ -n "$BINARY_KB_PATH" ]; then
     if [ ! -f "$BINARY_KB_PATH" ] && [ ! -f "$BINARY_KB_PATH/kb.sqlite3" ]; then
-        echo "[ERROR] --binary-kb: no knowledge base at $BINARY_KB_PATH (pass the kb.sqlite3 file, or the folder that holds it)."; exit 1
+        log_error "--binary-kb: no knowledge base at $BINARY_KB_PATH (pass the kb.sqlite3 file, or the folder that holds it)."; exit 1
     fi
 fi
 if [ -n "$BINARY_KB_DECISIONS" ]; then
     if [ -z "$BINARY_KB_PATH" ]; then
-        echo "[ERROR] --kb-decisions needs --binary-kb: the review file records decisions about its results."; exit 1
+        log_error "--kb-decisions needs --binary-kb: the review file records decisions about its results."; exit 1
     fi
     if [ ! -f "$BINARY_KB_DECISIONS" ]; then
-        echo "[ERROR] --kb-decisions file not found: $BINARY_KB_DECISIONS"; exit 1
+        log_error "--kb-decisions file not found: $BINARY_KB_DECISIONS"; exit 1
     fi
     if [ "$(wc -c < "$BINARY_KB_DECISIONS" | tr -d ' ')" -gt 1048576 ]; then
-        echo "[ERROR] --kb-decisions: the file is larger than 1 MiB."; exit 1
+        log_error "--kb-decisions: the file is larger than 1 MiB."; exit 1
     fi
 fi
 if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
-    echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
+    log_error "--no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
 fi
 if [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     DECLARED_COMPONENTS_LABELS=""
     for _cf in "${COMPONENTS_FILES[@]}"; do
         if [ -z "$_cf" ]; then
-            echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1
+            log_error "--components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1
         fi
         if [ ! -f "$_cf" ]; then
-            echo "[ERROR] --components file not found: $_cf"
-            echo "[ERROR] Pass the path of a CycloneDX file (JSON) that lists the components the scan cannot find, e.g. --components sbom-declared.cdx.json."; exit 1
+            log_error "--components file not found: $_cf"
+            log_error "Pass the path of a CycloneDX file (JSON) that lists the components the scan cannot find, e.g. --components sbom-declared.cdx.json."; exit 1
         fi
         # The container checks every component; refusing an oversized file
         # here saves starting the scan for it.
         if [ "$(wc -c < "$_cf" | tr -d ' ')" -gt 4194304 ]; then
-            echo "[ERROR] --components: $_cf is larger than 4 MiB."; exit 1
+            log_error "--components: $_cf is larger than 4 MiB."; exit 1
         fi
         # One name per line, in the order of the files (see components_run).
         DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:+$DECLARED_COMPONENTS_LABELS
@@ -2652,10 +2662,10 @@ if [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
 fi
 
 if [ -n "$GIT_URL" ]; then
-    [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
-    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --git is mutually exclusive with --analyze."; exit 1; }
-    [ -z "$MODEL" ]       || { echo "[ERROR] --git is mutually exclusive with --model."; exit 1; }
-    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --git cannot be combined with --firmware."; exit 1; }
+    [ -z "$TARGET" ]      || { log_error "--git is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { log_error "--git is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$MODEL" ]       || { log_error "--git is mutually exclusive with --model."; exit 1; }
+    [ "$FORCE_FIRMWARE" = "true" ] && { log_error "--git cannot be combined with --firmware."; exit 1; }
     ingest_git "$GIT_URL"
 elif [ -n "$TARGET" ] && [ -f "$TARGET" ] && is_archive "$TARGET"; then
     # An archive is not automatically source. Three cases, decided by content:
@@ -2676,26 +2686,26 @@ fi
 MODE="SOURCE"
 if [ "${#MERGE_FILES[@]}" -gt 0 ]; then
     # Merge several already-generated SBOMs. Exclusive with every scan input.
-    [ -z "$TARGET" ]      || { echo "[ERROR] --merge is mutually exclusive with --target."; exit 1; }
-    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --merge is mutually exclusive with --analyze."; exit 1; }
-    [ -z "$GIT_URL" ]     || { echo "[ERROR] --merge is mutually exclusive with --git."; exit 1; }
-    [ -z "$MODEL" ]       || { echo "[ERROR] --merge is mutually exclusive with --model."; exit 1; }
-    [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --merge cannot be combined with --firmware."; exit 1; }
-    [ "${#MERGE_FILES[@]}" -ge 2 ] || { echo "[ERROR] --merge needs at least 2 SBOM files."; exit 1; }
+    [ -z "$TARGET" ]      || { log_error "--merge is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { log_error "--merge is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$GIT_URL" ]     || { log_error "--merge is mutually exclusive with --git."; exit 1; }
+    [ -z "$MODEL" ]       || { log_error "--merge is mutually exclusive with --model."; exit 1; }
+    [ "$FORCE_FIRMWARE" != "true" ] || { log_error "--merge cannot be combined with --firmware."; exit 1; }
+    [ "${#MERGE_FILES[@]}" -ge 2 ] || { log_error "--merge needs at least 2 SBOM files."; exit 1; }
     if [ -n "$MERGE_ROOT" ]; then
         MR_OK=false
         MR_RESOLVED="$(cd "$(dirname "$MERGE_ROOT")" 2>/dev/null && pwd)/$(basename "$MERGE_ROOT")"
         for mf in "${MERGE_FILES[@]}"; do
             [ "$(cd "$(dirname "$mf")" && pwd)/$(basename "$mf")" = "$MR_RESOLVED" ] && MR_OK=true
         done
-        [ "$MR_OK" = "true" ] || { echo "[ERROR] --merge-root must be one of the --merge input files."; exit 1; }
+        [ "$MR_OK" = "true" ] || { log_error "--merge-root must be one of the --merge input files."; exit 1; }
     fi
     for mf in "${MERGE_FILES[@]}"; do
-        is_sbom_file "$mf" || { echo "[ERROR] not a CycloneDX SBOM (or unsafe path): $mf"; exit 1; }
+        is_sbom_file "$mf" || { log_error "not a CycloneDX SBOM (or unsafe path): $mf"; exit 1; }
     done
     MODE="MERGE"
 elif [ -n "$MERGE_ROOT" ]; then
-    echo "[ERROR] --merge-root only applies with --merge."; exit 1
+    log_error "--merge-root only applies with --merge."; exit 1
 elif [ "$INGEST_SOURCE" = "true" ]; then
     if [ "$INGEST_ROOTFS" = "true" ]; then
         # The archive held a root filesystem, not source. Point the ROOTFS path
@@ -2712,10 +2722,10 @@ elif [ "$INGEST_SOURCE" = "true" ]; then
     fi
 elif [ -n "$ANALYZE_SBOM" ]; then
     # Supplier SBOM analysis takes precedence; it does not use --target.
-    [ -z "$TARGET" ] || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --target."; exit 1; }
-    [ -z "$MODEL" ]  || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --model."; exit 1; }
-    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with --analyze."; exit 1; }
-    [ -f "$ANALYZE_SBOM" ] || { echo "[ERROR] --analyze SBOM file not found: $ANALYZE_SBOM"; exit 1; }
+    [ -z "$TARGET" ] || { log_error "--analyze/--sbom is mutually exclusive with --target."; exit 1; }
+    [ -z "$MODEL" ]  || { log_error "--analyze/--sbom is mutually exclusive with --model."; exit 1; }
+    [ "$FORCE_FIRMWARE" = "true" ] && { log_error "--firmware cannot be combined with --analyze."; exit 1; }
+    [ -f "$ANALYZE_SBOM" ] || { log_error "--analyze SBOM file not found: $ANALYZE_SBOM"; exit 1; }
     MODE="ANALYZE"
     # The risk report needs both license and vulnerability data, so enable them.
     GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
@@ -2726,14 +2736,14 @@ elif [ -n "$AI_DECLARE_FILE" ] && [ -z "$MODEL" ] && [ -z "$MODEL_FILE" ] && [ -
     MODE="AIDECLARE"
     case "${USAGE_CONTEXT:-}" in
         ""|internal|product|redistribute|outputs-only) : ;;
-        *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
+        *) log_error "--usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
     esac
 elif [ -n "$MODEL" ]; then
     # AI model SBOM via the OWASP AIBOM Generator (opt-in bomlens-aibom image).
-    [ -z "$TARGET" ]      || { echo "[ERROR] --model is mutually exclusive with --target."; exit 1; }
-    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --model is mutually exclusive with --analyze."; exit 1; }
-    [ -z "$GIT_URL" ]     || { echo "[ERROR] --model is mutually exclusive with --git."; exit 1; }
-    [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --model cannot be combined with --firmware."; exit 1; }
+    [ -z "$TARGET" ]      || { log_error "--model is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { log_error "--model is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$GIT_URL" ]     || { log_error "--model is mutually exclusive with --git."; exit 1; }
+    [ "$FORCE_FIRMWARE" != "true" ] || { log_error "--model cannot be combined with --firmware."; exit 1; }
     # Research data is published where the paper put it, which for a great deal
     # of science is Figshare rather than a model hub. Both are "the thing I was
     # handed a link to", so one option takes both and the reference decides which
@@ -2746,14 +2756,14 @@ elif [ -n "$MODEL" ]; then
     hf_rc=0; hf_dataset_ref "$MODEL" || hf_rc=$?
     case "$hf_rc:$MODEL" in
         0:*) MODEL="hf:$HF_DATASET_ID"; MODE="DATASET" ;;
-        2:*) echo "[ERROR] --model: not a HuggingFace dataset reference. Use datasets/<owner>/<name> or https://huggingface.co/datasets/<owner>/<name>."
+        2:*) log_error "--model: not a HuggingFace dataset reference. Use datasets/<owner>/<name> or https://huggingface.co/datasets/<owner>/<name>."
              exit 1 ;;
         *figshare*) MODE="DATASET" ;;
         *)          MODE="AIBOM" ;;
     esac
     case "${USAGE_CONTEXT:-}" in
         ""|internal|product|redistribute|outputs-only) : ;;
-        *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
+        *) log_error "--usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
     esac
     # Default the project name to the model's last segment (owner/name -> name).
     # A Figshare reference has no such name, so the item number stands in until
@@ -2768,19 +2778,19 @@ elif [ -n "$MODEL" ]; then
 elif [ -n "$MODEL_FILE" ]; then
     # AI model SBOM read from the file itself. Base image, no network: the whole
     # step is one stdlib Python script inside the container.
-    [ -z "$TARGET" ]       || { echo "[ERROR] --model-file is mutually exclusive with --target."; exit 1; }
-    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --model-file is mutually exclusive with --analyze."; exit 1; }
-    [ -z "$GIT_URL" ]      || { echo "[ERROR] --model-file is mutually exclusive with --git."; exit 1; }
-    [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --model-file cannot be combined with --firmware."; exit 1; }
-    [ -f "$MODEL_FILE" ]   || { echo "[ERROR] --model-file not found: $MODEL_FILE"; exit 1; }
+    [ -z "$TARGET" ]       || { log_error "--model-file is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { log_error "--model-file is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$GIT_URL" ]      || { log_error "--model-file is mutually exclusive with --git."; exit 1; }
+    [ "$FORCE_FIRMWARE" != "true" ] || { log_error "--model-file cannot be combined with --firmware."; exit 1; }
+    [ -f "$MODEL_FILE" ]   || { log_error "--model-file not found: $MODEL_FILE"; exit 1; }
     MODE="MODELFILE"
     case "${USAGE_CONTEXT:-}" in
         ""|internal|product|redistribute|outputs-only) : ;;
-        *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
+        *) log_error "--usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
     esac
 elif [ -n "$TARGET" ]; then
     [ "$FORCE_SOURCE" != "true" ] || [ "$FORCE_FIRMWARE" != "true" ] \
-        || { echo "[ERROR] --as-source cannot be combined with --firmware."; exit 1; }
+        || { log_error "--as-source cannot be combined with --firmware."; exit 1; }
     # A release folder (built artifacts, no source) that holds one root
     # filesystem or firmware image is scanned as that; see resolve_release_folder.
     # A folder that is a rootfs or a Yocto build directory itself is left to
@@ -2811,11 +2821,11 @@ elif [ -n "$TARGET" ]; then
                 MODE="FIRMWARE"
             else
                 MODE="BINARY"
-                echo "[WARN] $(basename "$TARGET") is $packed_kind. It was read as a single file"
-                echo "       without unpacking, so only components with a version string in the outer"
-                echo "       file can be found. Unpacking needs the firmware image:"
-                echo "         docker pull $FIRMWARE_IMAGE"
-                echo "       Then run the same command again."
+                log_warn "$(basename "$TARGET") is $packed_kind. It was read as a single file"
+                echo "       without unpacking, so only components with a version string in the outer" >&2
+                echo "       file can be found. Unpacking needs the firmware image:" >&2
+                echo "         docker pull $FIRMWARE_IMAGE" >&2
+                echo "       Then run the same command again." >&2
             fi
         else
             MODE="BINARY"
@@ -2857,19 +2867,19 @@ elif [ -n "$TARGET" ]; then
                 MODE="ANALYZE"
                 GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
             else
-                echo "[ERROR] This is a Yocto build directory, but it holds neither an SPDX SBOM"
-                echo "        nor an image package manifest to read."
-                echo "        Add these two lines to conf/local.conf and build the image again:"
-                echo '            INHERIT += "create-spdx-3.0"'
-                echo '            INHERIT += "vex"'
-                echo "        The SBOM then lands in tmp/deploy/images/<machine>/<image>.rootfs.spdx.json,"
-                echo "        and this folder can be scanned as-is."
-                echo "        If this build writes its images elsewhere (a relocated DEPLOY_DIR), pass"
-                echo "        the document directly: --analyze <image>.rootfs.spdx.json."
-                echo "        Scanning a build directory as a plain directory tree is not done as a"
-                echo "        fallback: it reports sysroots and native build tools that never ship in"
-                echo "        the image. To scan a tree anyway, point --target at that tree itself"
-                echo "        (an extracted rootfs, for example) rather than at the build directory."
+                log_error "This is a Yocto build directory, but it holds neither an SPDX SBOM"
+                echo "        nor an image package manifest to read." >&2
+                echo "        Add these two lines to conf/local.conf and build the image again:" >&2
+                echo '            INHERIT += "create-spdx-3.0"' >&2
+                echo '            INHERIT += "vex"' >&2
+                echo "        The SBOM then lands in tmp/deploy/images/<machine>/<image>.rootfs.spdx.json," >&2
+                echo "        and this folder can be scanned as-is." >&2
+                echo "        If this build writes its images elsewhere (a relocated DEPLOY_DIR), pass" >&2
+                echo "        the document directly: --analyze <image>.rootfs.spdx.json." >&2
+                echo "        Scanning a build directory as a plain directory tree is not done as a" >&2
+                echo "        fallback: it reports sysroots and native build tools that never ship in" >&2
+                echo "        the image. To scan a tree anyway, point --target at that tree itself" >&2
+                echo "        (an extracted rootfs, for example) rather than at the build directory." >&2
                 exit 1
             fi
         else
@@ -2879,9 +2889,9 @@ elif [ -n "$TARGET" ]; then
         # path there rather than quietly running them.
         case "$YOCTO_SPDX" in
             *'$'*|*'`'*|*'"'*|*'\'*)
-                echo "[ERROR] The SBOM path found in this build directory contains a character"
-                echo "        that cannot be passed through safely: $YOCTO_SPDX"
-                echo "        Rename the folder, or pass the file with --analyze <file>."
+                log_error "The SBOM path found in this build directory contains a character"
+                echo "        that cannot be passed through safely: $YOCTO_SPDX" >&2
+                echo "        Rename the folder, or pass the file with --analyze <file>." >&2
                 exit 1 ;;
         esac
         if [ "$(printf '%s' "$YOCTO_CANDS" | grep -c .)" -gt 1 ]; then
@@ -2912,10 +2922,10 @@ elif [ -n "$TARGET" ]; then
                 echo "[INFO]   Vulnerabilities are matched from the CPEs, since only SPDX 3.0 records"
                 echo '[INFO]   which CVEs a recipe patched — INHERIT += "create-spdx-3.0" adds that.'
             else
-                echo "[WARN] $(basename "$YOCTO_SPDX") is an SPDX 2.x document, and the archive that"
-                echo "[WARN]   holds its packages ($(basename "${YOCTO_SPDX%.spdx.json}.spdx.tar.zst"))"
-                echo "[WARN]   is not beside it, so expect an almost empty result. Keep the two"
-                echo '[WARN]   together, or rebuild with INHERIT += "create-spdx-3.0".'
+                log_warn "$(basename "$YOCTO_SPDX") is an SPDX 2.x document, and the archive that"
+                log_warn "  holds its packages ($(basename "${YOCTO_SPDX%.spdx.json}.spdx.tar.zst"))"
+                log_warn "  is not beside it, so expect an almost empty result. Keep the two"
+                log_warn '  together, or rebuild with INHERIT += "create-spdx-3.0".'
             fi
         fi
         echo "[INFO] Image SBOM: $YOCTO_SPDX"
@@ -2933,7 +2943,7 @@ elif [ -n "$TARGET" ]; then
         # binaries as it would after unpacking the image file. A Yocto build
         # directory is not one: the build records what went into the image.
         if is_yocto_build_dir "$TARGET"; then
-            echo "[ERROR] '$TARGET' is a Yocto build directory, not an unpacked image. Drop --firmware: the scan reads what the build recorded."; exit 1
+            log_error "'$TARGET' is a Yocto build directory, not an unpacked image. Drop --firmware: the scan reads what the build recorded."; exit 1
         fi
         MODE="FIRMWARE"
     elif [ -d "$TARGET" ]; then
@@ -2972,26 +2982,26 @@ elif [ -n "$TARGET" ]; then
     else
         # An image name: syft, Trivy and docker would read one starting with - as an option.
         case "$TARGET" in
-            -*) echo "[ERROR] --target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
+            -*) log_error "--target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
         esac
         case "$TARGET" in
             .*|/*|~*|*.zip|*.tar|*.tar.gz|*.tgz|*.bin)
-                echo "[WARN] --target '$TARGET' is not a file or folder under $(pwd), so it is treated as a Docker image name. If you meant a path, check the spelling and the folder you ran this from." ;;
+                log_warn "--target '$TARGET' is not a file or folder under $(pwd), so it is treated as a Docker image name. If you meant a path, check the spelling and the folder you ran this from." ;;
         esac
         MODE="IMAGE"
     fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
-    echo "[ERROR] --firmware requires '--target <firmware file or unpacked folder>'."; exit 1
+    log_error "--firmware requires '--target <firmware file or unpacked folder>'."; exit 1
 fi
 
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
-    echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+    log_error "--usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
 fi
 if [ -n "$BINARY_KB_PATH" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
-    echo "[ERROR] --binary-kb applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
+    log_error "--binary-kb applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
-    echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
+    log_error "--component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
 # A Yocto build directory given as --target takes --components too, for
 # components declared by recipe (bomlens:yocto-recipe): its SBOM is the one
@@ -3012,32 +3022,32 @@ esac
 if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] && command -v jq >/dev/null 2>&1 \
    && [ -f "$REPO_DIR/docker/lib/license-entry.sh" ] && [ -f "$REPO_DIR/docker/lib/cdx-spdx-ids.json" ] \
    && ! bash "$REPO_DIR/docker/lib/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
-    echo "[ERROR] --license was refused (the reason is above); nothing was scanned."; exit 1
+    log_error "--license was refused (the reason is above); nothing was scanned."; exit 1
 fi
 unset _lic_mode
 
 if [ "$NO_COMPONENTS" = "true" ] && [ "$MODE" != "SOURCE" ]; then
-    echo "[ERROR] --no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
+    log_error "--no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
 fi
 if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" = "ANALYZE" ] && [ -z "$YOCTO_BUILD_DIR" ]; then
-    echo "[ERROR] --components cannot be used with --analyze: the SBOM passed there is received, and is not changed. For a Yocto build, point --target at the build directory instead."; exit 1
+    log_error "--components cannot be used with --analyze: the SBOM passed there is received, and is not changed. For a Yocto build, point --target at the build directory instead."; exit 1
 fi
 if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "ANALYZE" ]; then
-    echo "[ERROR] --components applies to source scans and Yocto build directories only (this target is scanned as $MODE)."; exit 1
+    log_error "--components applies to source scans and Yocto build directories only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
    && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
     _flag="--ai-declare"; [ -n "$AI_DECLARE_FILE" ] || _flag="--no-spdx3"
-    echo "[ERROR] $_flag applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+    log_error "$_flag applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
 fi
 
 if [ "$MODE" = "AIDECLARE" ] && [ "$GENERATE_SPDX3" = "false" ]; then
-    echo "[ERROR] --no-spdx3 cannot be used when --ai-declare is the input: most declared values are written only to the SPDX 3.0.1 document."; exit 1
+    log_error "--no-spdx3 cannot be used when --ai-declare is the input: most declared values are written only to the SPDX 3.0.1 document."; exit 1
 fi
 
 if [ "$VERIFY_WEIGHTS" = "true" ] && [ "$MODE" != "AIBOM" ]; then
-    echo "[ERROR] --verify-weights applies to AI model scans only (use it with --model)."; exit 1
+    log_error "--verify-weights applies to AI model scans only (use it with --model)."; exit 1
 fi
 
 # --resolve-purl is a submitted-SBOM question. The identifiers in an SBOM this
@@ -3047,12 +3057,12 @@ fi
 # the flag still runs.
 # --reachability reads Go source (SOURCE) or one Go executable (BINARY).
 if [ "$REACHABILITY" = "true" ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "BINARY" ]; then
-    echo "[WARN] --reachability applies to a Go source tree or a Go executable; ignoring it for this $MODE scan."
+    log_warn "--reachability applies to a Go source tree or a Go executable; ignoring it for this $MODE scan."
     REACHABILITY="false"
 fi
 
 if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
-    echo "[WARN] --resolve-purl applies to --analyze only; ignoring it for this scan."
+    log_warn "--resolve-purl applies to --analyze only; ignoring it for this scan."
     PURL_RESOLVE="false"
 fi
 
@@ -3060,7 +3070,7 @@ fi
 # using. Another mode has none of them; a warning rather than an error, so a
 # shared command line that carries the flag still runs.
 if [ "$MODEL_RESOLVE" = "true" ] && [ "$MODE" != "SOURCE" ]; then
-    echo "[WARN] --resolve-models and --model-sbom apply to a source scan; ignoring them for this $MODE scan."
+    log_warn "--resolve-models and --model-sbom apply to a source scan; ignoring them for this $MODE scan."
     MODEL_RESOLVE="false"
     MODEL_SBOM_FILES=()
 fi
@@ -3068,11 +3078,11 @@ if [ "${#MODEL_SBOM_FILES[@]}" -gt 0 ]; then
     MODEL_SBOM_LABELS=""
     for _mf in "${MODEL_SBOM_FILES[@]}"; do
         if [ -z "$_mf" ] || [ ! -f "$_mf" ]; then
-            echo "[ERROR] --model-sbom file not found: $_mf"
-            echo "[ERROR] Pass the CycloneDX file (JSON) a --model scan wrote, e.g. my-model_1.0/my-model_1.0_bom.json."; exit 1
+            log_error "--model-sbom file not found: $_mf"
+            log_error "Pass the CycloneDX file (JSON) a --model scan wrote, e.g. my-model_1.0/my-model_1.0_bom.json."; exit 1
         fi
         if [ "$(wc -c < "$_mf" | tr -d ' ')" -gt 16777216 ]; then
-            echo "[ERROR] --model-sbom: $_mf is larger than 16 MiB."; exit 1
+            log_error "--model-sbom: $_mf is larger than 16 MiB."; exit 1
         fi
         # One name per line, in the order of the files (see model_sbom_run).
         MODEL_SBOM_LABELS="${MODEL_SBOM_LABELS:+$MODEL_SBOM_LABELS
@@ -3083,17 +3093,17 @@ if [ "${#MODEL_SBOM_FILES[@]}" -gt 0 ]; then
 fi
 
 if [ "$ANALYZE_CPE_INDEX" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
-    echo "[WARN] --analyze-cpe-index applies to --analyze only; ignoring it for this scan."
+    log_warn "--analyze-cpe-index applies to --analyze only; ignoring it for this scan."
     ANALYZE_CPE_INDEX="false"
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
-    echo "[ERROR] --firmware expects a firmware file or an unpacked folder, but '$TARGET' is neither."; exit 1
+    log_error "--firmware expects a firmware file or an unpacked folder, but '$TARGET' is neither."; exit 1
 fi
 
 if [ "$FORCE_SOURCE" = "true" ] && { [ -z "$TARGET" ] || [ ! -d "$TARGET" ] || [ "$MODE" != "SOURCE" ]; }; then
-    echo "[ERROR] --as-source applies to a directory --target only."
-    echo "        Pass the folder to scan as source: --target <folder> --as-source"; exit 1
+    log_error "--as-source applies to a directory --target only."
+    echo "        Pass the folder to scan as source: --target <folder> --as-source" >&2; exit 1
 fi
 
 # Unified 오픈소스위험분석보고서 (risk-report) is on by default in every mode.
@@ -3115,11 +3125,11 @@ if [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]
     for fo in "${FAIL_ON[@]:-}"; do
         case "$fo" in
             vulnerability=*)
-                echo "[ERROR] --fail-on $fo is not available for AI model and dataset inputs: they have no package dependencies to scan, so no security report is produced."
-                echo "[ERROR] Use --fail-on malicious-package or --fail-on license-conflict for these."; exit 1 ;;
+                log_error "--fail-on $fo is not available for AI model and dataset inputs: they have no package dependencies to scan, so no security report is produced."
+                log_error "Use --fail-on malicious-package or --fail-on license-conflict for these."; exit 1 ;;
             empty-result)
-                echo "[ERROR] --fail-on empty-result is not available for AI model and dataset inputs: they are not judged by how many dependencies they list."
-                echo "[ERROR] Use --fail-on malicious-package, --fail-on license-conflict or --fail-on license-coverage=<pct> for these."; exit 1 ;;
+                log_error "--fail-on empty-result is not available for AI model and dataset inputs: they are not judged by how many dependencies they list."
+                log_error "Use --fail-on malicious-package, --fail-on license-conflict or --fail-on license-coverage=<pct> for these."; exit 1 ;;
         esac
     done
 fi
@@ -3228,12 +3238,12 @@ esac
 # The copy sits in the output folder, which Docker already shares.
 if [ -n "$SCAN_EXCLUDE" ]; then
     if [ "$MODE" != "SOURCE" ]; then
-        echo "[ERROR] --exclude applies to a source scan (a folder, --git or an archive), not to $MODE mode."
+        log_error "--exclude applies to a source scan (a folder, --git or an archive), not to $MODE mode."
         exit 1
     fi
     while IFS= read -r _ex; do
         if [ ! -e "$SCAN_INPUT_DIR/$_ex" ] && [ ! -L "$SCAN_INPUT_DIR/$_ex" ]; then
-            echo "[WARN] --exclude path not found in the scanned folder, ignored: $_ex"
+            log_warn "--exclude path not found in the scanned folder, ignored: $_ex"
         fi
     done <<EOF_EXCLUDE
 $SCAN_EXCLUDE
@@ -3246,7 +3256,7 @@ EOF_EXCLUDE
     [ "$OUTPUT_HOST_DIR" = "$SCAN_INPUT_DIR" ] || SCAN_EXCLUDE_SKIP="$OUTPUT_HOST_DIR $_view"
     echo "[INFO] Excluding $(printf '%s\n' "$SCAN_EXCLUDE" | grep -c .) path(s) from the scan; scanning a copy of the tree."
     copy_without_excluded "$SCAN_INPUT_DIR" "$_view" "" \
-        || { echo "[ERROR] could not copy the source tree for --exclude"; exit 1; }
+        || { log_error "could not copy the source tree for --exclude"; exit 1; }
     SCAN_INPUT_DIR="$_view"
     # For the declared-components step, which says when a bomlens:artifact is
     # missing because it is under one of these paths (see exclude_run).
@@ -3261,7 +3271,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # SCAN_INPUT_DIR = the tree we scan (current dir, or a cloned/extracted temp
     # dir). Artifacts go to OUTPUT_HOST_DIR (the per-run subfolder), which is kept
     # separate from the scanned tree, even for --git/zip ingestion.
-    [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
+    [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { log_error "source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
     LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
     # Build or static? Static needs the registry lookup to fill the licenses a lock
     # file does not carry, so "auto" leaves it to a build when that lookup is off
@@ -3270,7 +3280,7 @@ if [ "$MODE" = "SOURCE" ]; then
     if [ "$DETECTION" = static ]; then
         DETECTION_USED="static"; DETECTION_WHY="requested"
         if ! static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
-            echo "[WARN] --detection static: $STATIC_DETECTION_WHY; the SBOM may be incomplete."
+            log_warn "--detection static: $STATIC_DETECTION_WHY; the SBOM may be incomplete."
         fi
     elif [ "$DETECTION" = auto ] && [ "$BYTE_STABLE" != "true" ] && [ "$FETCH_LICENSE" = "true" ] \
          && [ "$_LICENSE_REGISTRY_USER" != "false" ] && static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
@@ -3303,16 +3313,16 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$LANG_DET" = "mixed" ]; then java_mixed_note "$SCAN_INPUT_DIR"; fi
         if [ "$LANG_DET" = "swift" ]; then
             echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
-            echo "[WARN]   UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
+            log_warn "  UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
         fi
         if [ "$LANG_DET" = "cpp" ]; then
-            echo "[WARN] C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
-            echo "[WARN]   Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers."
-            echo "[WARN]   For open source copied (vendored) into the sources, add --identify-vendored (opt-in image)."
+            log_warn "C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
+            log_warn "  Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers."
+            log_warn "  For open source copied (vendored) into the sources, add --identify-vendored (opt-in image)."
         fi
         if [ "$LANG_DET" = "unknown" ]; then
-            echo "[WARN] No package manifest detected; using cdxgen all-in-one (results may be sparse)."
-            echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
+            log_warn "No package manifest detected; using cdxgen all-in-one (results may be sparse)."
+            log_warn "  If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
         fi
     fi
     # Before any build: show the first download, and stop at once when the
@@ -3368,7 +3378,7 @@ if [ "$MODE" = "SOURCE" ]; then
     HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
     case "$HOST_GOTOOLCHAIN" in
         *[!A-Za-z0-9.+_-]*)
-            echo "[WARN] Ignoring GOTOOLCHAIN: not a Go toolchain name (e.g. auto, local, go1.26.0)."
+            log_warn "Ignoring GOTOOLCHAIN: not a Go toolchain name (e.g. auto, local, go1.26.0)."
             HOST_GOTOOLCHAIN="" ;;
     esac
     # Names only (see build_prep_env_args), so this is safe inside the eval.
@@ -3406,7 +3416,7 @@ if [ "$MODE" = "SOURCE" ]; then
             [ -n "$REACHABILITY_NONCE" ] || REACHABILITY_NONCE="$$${RANDOM}${RANDOM}$(date +%s)"
             REACH_ARGS="-v \"$(hostpath "$REACH_TOOLS_DIR")\":/bomlens-tools:ro -e BOMLENS_REACHABILITY=true -e BOMLENS_GOVULNCHECK=/bomlens-tools/govulncheck -e BOMLENS_REACHABILITY_NONCE=$REACHABILITY_NONCE"
         else
-            echo "[WARN] --reachability: could not take govulncheck from $POSTPROCESS_IMAGE (an older image without it?); the Go call analysis is skipped. Refresh it (docker pull) and run again."
+            log_warn "--reachability: could not take govulncheck from $POSTPROCESS_IMAGE (an older image without it?); the Go call analysis is skipped. Refresh it (docker pull) and run again."
             [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
             REACH_TOOLS_DIR=""
         fi
@@ -3507,7 +3517,7 @@ if [ "$MODE" = "SOURCE" ]; then
         RUNNING_CONTAINER_NAME=""
         _s1_why="could not be pulled"
         [ "$SBOM_PULL" != never ] || _s1_why="SBOM_PULL=never"
-        echo "[WARN] $JAVA_RETRY_IMAGE is not here ($_s1_why); keeping the result from $CDX_IMG."
+        log_warn "$JAVA_RETRY_IMAGE is not here ($_s1_why); keeping the result from $CDX_IMG."
         break
     fi
     RUNNING_CONTAINER_NAME=""
@@ -3527,7 +3537,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # --- stage 1 passes done
     if [ -n "$STAGE1_FIRST_SBOM" ]; then
         if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-            echo "[WARN] The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
+            log_warn "The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
             "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
             mv -f "$STAGE1_FIRST_SBOM" "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
             STAGE1_RC="$STAGE1_FIRST_RC"; STAGE1_LOG="$STAGE1_FIRST_LOG"; CDX_IMG="$STAGE1_FIRST_IMG"
@@ -3554,15 +3564,15 @@ if [ "$MODE" = "SOURCE" ]; then
         STAGE1_FAIL_REASON="$(stage1_fail_reason "$STAGE1_OOM" "$STAGE1_LOG" "$STAGE1_RC")"
         case "$STAGE1_FAIL_REASON" in
             oom)
-                echo "[WARN] cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG" ;;
             disk-space)
-                echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG" ;;
             network)
-                echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG" ;;
             cdxgen-unavailable)
-                echo "[WARN] cdxgen could not be started in its image (rc=$STAGE1_RC, command not found); see $STAGE1_LOG. Falling back to a manifest-only scan (direct dependencies only)." ;;
+                log_warn "cdxgen could not be started in its image (rc=$STAGE1_RC, command not found); see $STAGE1_LOG. Falling back to a manifest-only scan (direct dependencies only)." ;;
             *)
-                echo "[WARN] cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)." ;;
+                log_warn "cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)." ;;
         esac
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
@@ -3597,7 +3607,7 @@ if [ "$MODE" = "SOURCE" ]; then
                 _s1_where="the cdxgen log could not be masked, so it was not kept."
             fi
             if [ -n "$_s1_other" ] || [ -z "$_s1_steps" ]; then
-                echo "[WARN] cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
+                log_warn "cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
             else
                 echo "[INFO] ${_s1_where}"
             fi
@@ -3650,7 +3660,7 @@ if [ "$MODE" = "SOURCE" ]; then
                     version) _dc_why="is a version before 1.13.2" ;;
                     *)       _dc_why="is not a BomLens image name" ;;
                 esac
-                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and has no grype, and no deep-cve image of the same build is known, so the grype CPE match does not run. Set SBOM_DEEP_CVE_IMAGE to choose one."
+                log_warn "--deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and has no grype, and no deep-cve image of the same build is known, so the grype CPE match does not run. Set SBOM_DEEP_CVE_IMAGE to choose one."
                 DEEP_CVE_FALLBACK_FROM="SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
             fi
         else
@@ -3658,7 +3668,7 @@ if [ "$MODE" = "SOURCE" ]; then
             if _optin_image_ready "$DEEP_CVE_IMAGE"; then
                 PP_IMAGE="$DEEP_CVE_IMAGE"; PP_HAS_GRYPE=1
             else
-                echo "[WARN] --deep-cve: the grype image $DEEP_CVE_IMAGE is not available; continuing without the grype CPE match."
+                log_warn "--deep-cve: the grype image $DEEP_CVE_IMAGE is not available; continuing without the grype CPE match."
                 DEEP_CVE_FALLBACK_FROM="the grype image was not available: $DEEP_CVE_IMAGE"
             fi
         fi
@@ -3671,7 +3681,7 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$DEEP_LICENSE_IMAGE" = "$PP_IMAGE" ]; then
             :
         elif ! _optin_image_ready "$DEEP_LICENSE_IMAGE"; then
-            echo "[WARN] --deep-license: the scancode image $DEEP_LICENSE_IMAGE is not available; continuing on $PP_IMAGE without the licence scan."
+            log_warn "--deep-license: the scancode image $DEEP_LICENSE_IMAGE is not available; continuing on $PP_IMAGE without the licence scan."
             DEEP_LICENSE_FALLBACK_FROM="$DEEP_LICENSE_IMAGE"
         elif [ -n "$PP_HAS_GRYPE" ]; then
             DL_PRE_IMAGE="$DEEP_LICENSE_IMAGE"
@@ -3727,8 +3737,8 @@ if [ "$MODE" = "SOURCE" ]; then
     # stops with "SBOM not found"). Checked only when it is needed.
     if [ -n "$STAGE1_FAILED" ] \
        && [ -z "$("${DOCKER_ENV[@]}" docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}' "$PP_IMAGE" 2>/dev/null | grep -v '<no value>')" ]; then
-        echo "[ERROR] cdxgen produced no SBOM, and the post-processing image $PP_IMAGE is older than this CLI: it cannot run the manifest-only fallback."
-        echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $STAGE1_LOG"
+        log_error "cdxgen produced no SBOM, and the post-processing image $PP_IMAGE is older than this CLI: it cannot run the manifest-only fallback."
+        echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $STAGE1_LOG" >&2
         exit 1
     fi
     # What stage 1 ran with, for the input fingerprint stage 2 records in the
@@ -3779,13 +3789,13 @@ EOF
         fi
         if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             if [ "$DETECTION" = auto ]; then
-                echo "[WARN] Static detection could not read the lock file; scanning again with a build."
+                log_warn "Static detection could not read the lock file; scanning again with a build."
                 exec "$0" "${ORIG_ARGS[@]}" --detection build
             fi
-            echo "[ERROR] Static detection failed. Scan again with --detection build."
+            log_error "Static detection failed. Scan again with --detection build."
         fi
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-            echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
+            log_error "SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
         fi
         exit "$_pp_rc"
     }
@@ -3793,9 +3803,9 @@ EOF
         # The fallback reads manifests only. When it found no component, "direct
         # dependencies only" would say the opposite of what the SBOM holds.
         if sbom_has_components "$OUTPUT_HOST_DIR/$OUTPUT_FILE"; then
-            echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+            log_warn "Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
         else
-            echo "[WARN] Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $STAGE1_LOG"
+            log_warn "Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $STAGE1_LOG"
         fi
     fi
 else
@@ -3901,7 +3911,7 @@ else
     if [ "$DEEP_CVE" = "true" ]; then
         case "$MODE" in
             FIRMWARE|AIBOM|MODELFILE|DATASET|AIDECLARE)
-                echo "[WARN] --deep-cve does not apply to a $MODE scan; running without grype." >&2
+                log_warn "--deep-cve does not apply to a $MODE scan; running without grype." >&2
                 DEEP_CVE="false" ;;
             *)
                 RUN_IMAGE="$DEEP_CVE_IMAGE"; optin_image_note deep-cve
@@ -3931,11 +3941,11 @@ fi
 # host — catch that in ALL modes, not just --generate-only, instead of printing
 # "Analysis Complete!" over a folder with no SBOM.
 if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-    echo "[ERROR] SBOM not found on host: $OUTPUT_HOST_DIR/$OUTPUT_FILE"
-    echo "  The container ran but no artifact reached this folder."
-    echo "  Likely cause: this folder is outside Docker Desktop file sharing"
-    echo "  (or Colima's home-only mount — /tmp is not shared to the VM)."
-    echo "  Run from a shared path (e.g. under your home directory) and retry."
+    log_error "SBOM not found on host: $OUTPUT_HOST_DIR/$OUTPUT_FILE"
+    echo "  The container ran but no artifact reached this folder." >&2
+    echo "  Likely cause: this folder is outside Docker Desktop file sharing" >&2
+    echo "  (or Colima's home-only mount — /tmp is not shared to the VM)." >&2
+    echo "  Run from a shared path (e.g. under your home directory) and retry." >&2
     exit 1
 fi
 
@@ -4008,11 +4018,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     fi
     if [ -n "$missing" ]; then
         echo ""
-        echo "[WARN] requested but not produced: ${missing}"
-        echo "  The scan finished, but these artifacts are not in the output folder."
-        echo "  If the scanner image predates the feature, refresh it:"
-        echo "    docker pull ${RUN_IMAGE}"
-        echo "  Otherwise the step degraded — check the log above for its warning."
+        log_warn "requested but not produced: ${missing}"
+        echo "  The scan finished, but these artifacts are not in the output folder." >&2
+        echo "  If the scanner image predates the feature, refresh it:" >&2
+        echo "    docker pull ${RUN_IMAGE}" >&2
+        echo "  Otherwise the step degraded — check the log above for its warning." >&2
     fi
 fi
 } > "$SUMMARY_BUF"
@@ -4050,7 +4060,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
         *)
             if [ "$sum_components" -eq 0 ]; then
                 printf '  %-12s %s\n' "Components:" "0 identified"
-                echo "[WARN] No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above."
+                log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above."
             else
                 sum_detail=""
                 case "$sum_purl_pct" in ''|-|*[!0-9]*) ;; *) sum_detail="purl on ${sum_purl_pct}%" ;; esac
@@ -4060,7 +4070,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 esac
                 printf '  %-12s %s\n' "Components:" "${sum_components} identified${sum_detail:+ ($sum_detail)}"
                 if [ -n "$sum_basis" ]; then printf '  %-12s %s\n' "" "counted: ${sum_basis}"; fi
-                [ "${sum_licensed:-0}" != "0" ] || echo "[WARN] No component declares a license, so license checks have nothing to work with. Read the log above."
+                [ "${sum_licensed:-0}" != "0" ] || log_warn "No component declares a license, so license checks have nothing to work with. Read the log above."
             fi
             # Under --analyze these describe the submitted document's history, not
             # this run, so they are not reported.
@@ -4073,16 +4083,16 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                         cdxgen-crash) sum_why="the dependency analyzer failed" ;;
                         *)           sum_why="the dependency analyzer could not run" ;;
                     esac
-                    echo "[WARN] Reduced analysis: ${sum_why}, so only direct dependencies were identified."
+                    log_warn "Reduced analysis: ${sum_why}, so only direct dependencies were identified."
                 fi
                 if [ -n "$sum_empty_manifests" ] && [ "${sum_components:-}" = "0" ]; then
                     case ",${sum_complete_reasons}," in
-                        *,lockfile-corrupt,*) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. A lock file is damaged: re-create it with the package manager and scan again." ;;
-                        *,resolution-failed,*) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see the log above)." ;;
-                        *) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed." ;;
+                        *,lockfile-corrupt,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. A lock file is damaged: re-create it with the package manager and scan again." ;;
+                        *,resolution-failed,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see the log above)." ;;
+                        *) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed." ;;
                     esac
                 fi
-                [ -z "$sum_failed" ] || echo "[WARN] Steps that failed: ${sum_failed} (details in the log above)"
+                [ -z "$sum_failed" ] || log_warn "Steps that failed: ${sum_failed} (details in the log above)"
             fi
             ;;
     esac
@@ -4093,7 +4103,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
             printf '  %-12s %s\n' "Completeness:" "${sum_complete} (${sum_complete_reasons})"
             while IFS=$'\t' read -r sum_code sum_fix; do
                 [ -n "$sum_code" ] || continue
-                echo "[WARN] ${sum_code}: ${sum_fix}"
+                log_warn "${sum_code}: ${sum_fix}"
             done <<< "$sum_complete_fix"
             echo "  To fail a CI run on this, add --fail-on incomplete-result (or incomplete-result=unreliable)."
             ;;
@@ -4108,8 +4118,8 @@ if [ -f "$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE" ]; then
     n_versionless=$(tr -d '\r' < "$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE" | grep -v '^[[:space:]]*#' \
         | grep -v '^name,version$' | grep -c '^[^,].*,[[:space:]]*$' || true)
     if [ "${n_versionless:-0}" -gt 0 ]; then
-        echo "[WARN] ${n_versionless} component(s) have no version, so nothing can be matched against them."
-        echo "  Write each version in ${VERSIONS_TEMPLATE} and run again with --component-versions \"$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE\""
+        log_warn "${n_versionless} component(s) have no version, so nothing can be matched against them."
+        echo "  Write each version in ${VERSIONS_TEMPLATE} and run again with --component-versions \"$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE\"" >&2
     fi
 fi
 echo "=========================================="
@@ -4124,25 +4134,25 @@ echo "=========================================="
 GATE_EXIT=0
 if [ "${#FAIL_ON[@]}" -gt 0 ]; then
     if [ ! -f "$GATE_RESULT_FILE" ]; then
-        echo "[ERROR] --fail-on: this scan produced no result to judge. If the scanner image predates the option, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
+        log_error "--fail-on: this scan produced no result to judge. If the scanner image predates the option, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
         GATE_EXIT=5
     else
         gate_lines=0
         while IFS=$'\t' read -r gate_status gate_cond gate_detail; do
             gate_lines=$((gate_lines + 1))
             case "$gate_status" in
-                met)      echo "[ERROR] --fail-on ${gate_cond}: ${gate_detail}"; GATE_EXIT=4 ;;
+                met)      log_error "--fail-on ${gate_cond}: ${gate_detail}"; GATE_EXIT=4 ;;
                 ok)       echo "[GATE] ${gate_cond}: ${gate_detail}" ;;
-                *)        echo "[ERROR] --fail-on ${gate_cond} cannot be judged: ${gate_detail:-the result line is not understood}"
+                *)        log_error "--fail-on ${gate_cond} cannot be judged: ${gate_detail:-the result line is not understood}"
                           # An older image does not know a newer condition; say how to get one that does.
-                          [ "$gate_detail" != "not a known condition" ] || echo "[ERROR] --fail-on ${gate_cond}: the scanner image predates this condition, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
+                          [ "$gate_detail" != "not a known condition" ] || log_error "--fail-on ${gate_cond}: the scanner image predates this condition, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
                           [ "$GATE_EXIT" -eq 4 ] || GATE_EXIT=5 ;;
             esac
         done < "$GATE_RESULT_FILE"
         # One line per condition asked for. Fewer means the judgement was cut off,
         # and an incomplete result is not a pass.
         if [ "$gate_lines" -ne "${#FAIL_ON[@]}" ]; then
-            echo "[ERROR] --fail-on: the result holds ${gate_lines} of ${#FAIL_ON[@]} conditions, so the judgement is incomplete."
+            log_error "--fail-on: the result holds ${gate_lines} of ${#FAIL_ON[@]} conditions, so the judgement is incomplete."
             [ "$GATE_EXIT" -eq 4 ] || GATE_EXIT=5
         fi
         [ "$GATE_EXIT" -ne 0 ] || echo "[GATE] every --fail-on condition was judged and none is met."
@@ -4157,11 +4167,11 @@ fi
 # failed, 3 means this run produced no conformance report to judge at all.
 if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then
     if [ ! -f "$CONFORMANCE_RESULT_FILE" ]; then
-        echo "[ERROR] --fail-on-conformance: this scan produced no conformance check report to judge."
+        log_error "--fail-on-conformance: this scan produced no conformance check report to judge."
         exit 3
     fi
     if [ "$(cat "$CONFORMANCE_RESULT_FILE")" = "fail" ]; then
-        echo "[ERROR] Conformance check failed. See ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.md / .html for details."
+        log_error "Conformance check failed. See ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.md / .html for details."
         exit 2
     fi
 fi
