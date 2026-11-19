@@ -2094,6 +2094,18 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
             "licensed\t\(.licenseCoverage.declared // 0)",
             "licensePercent\t\(.licenseCoverage.pct // "-")"'
         printf 'purlPercent\t%s\n' "${_sum_purl:--}"
+        # A shallow fallback analysis and any failed post-processing step are the
+        # two reasons a result is smaller than the scan was asked to give. Values
+        # come from the SBOM (a supplier's document under --analyze), so every
+        # control character is replaced and the length is capped before they can
+        # reach a terminal.
+        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-tool-degraded") | .value)
+               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:100] | "reduced\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
+        # Manifests that declare dependencies, in a scan that found none.
+        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-empty-with-manifests") | .value)
+               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:200] | "emptyManifests\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
+        printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r --argjson more "${PIPELINE_STEPS_FAILED_MORE:-0}" '
+            if length > 0 then "failedSteps\t\(map(gsub("\\p{Cc}"; " ") | .[0:100]) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)" else empty end' 2>/dev/null
         # What the component count is made of. A scan of an image lists OS packages
         # next to libraries, and a firmware scan lists files; without the split the
         # same project reads as 15 in one report and 96 in another.
@@ -2107,18 +2119,6 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
                    | if $os + $f == 0 then empty
                      else "basis\t\($k | length - $os - $f) libraries, \($os) OS packages, \($f) files" end' "$SBOM" 2>/dev/null | head -n 1
         fi
-        # A shallow fallback analysis and any failed post-processing step are the
-        # two reasons a result is smaller than the scan was asked to give. Values
-        # come from the SBOM (a supplier's document under --analyze), so every
-        # control character is replaced and the length is capped before they can
-        # reach a terminal.
-        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-tool-degraded") | .value)
-               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:100] | "reduced\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
-        # Manifests that declare dependencies, in a scan that found none.
-        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-empty-with-manifests") | .value)
-               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:200] | "emptyManifests\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
-        printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r --argjson more "${PIPELINE_STEPS_FAILED_MORE:-0}" '
-            if length > 0 then "failedSteps\t\(map(gsub("\\p{Cc}"; " ") | .[0:100]) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)" else empty end' 2>/dev/null
         # The verdict assess-completeness.sh already wrote (loaded above for a
         # CycloneDX document): the grade, the reason codes, and one fix sentence per
         # reason, in English (the CLI prints them). Only an incomplete result is
