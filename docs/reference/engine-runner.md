@@ -138,7 +138,21 @@ A container's values never reach a command line or the docker CLI's environment:
 
 The `bomlens-runner` command uses Docker when the policy file has a `docker` object with these options (`secrets` aside). It reads a `SecretRef` `{"secret": {"name": "proxy", "key": "url"}}` from the runner's environment variable `BOMLENS_SECRET_PROXY_URL` (the name and key in upper case, other characters as `_`); those variables are not passed to the `docker` commands.
 
-CI runs the Docker backend on the runner's daemon (`tests/test-engine-runner-docker.sh`): a source scan with a host folder and with a named volume, a cancelled scan and an image scan.
+CI runs the Docker backend on the runner's daemon (`tests/test-engine-runner-docker.sh`): a source scan with a host folder and with a named volume, a cancelled scan, a runner killed during stage 1 whose container is then listed and removed, and an image scan.
+
+## Removing containers a killed worker left
+
+When the process that calls the runner is killed (`SIGKILL`, a hard time limit), the runner's own removal never runs and the container it was following stays. A later call with the same `scan_id` removes it; for the others, a program can clean up on a schedule:
+
+```python
+for c in backend.list_engine_containers():
+    if c.deadline is None or c.deadline < time.time() or scan_has_ended(c.scan_id):
+        backend.remove_engine_container(c.name)
+```
+
+`list_engine_containers(labels=None)` returns an `EngineContainer` for each engine container in the backend's scope, running or not: its `name`, `scan_id`, `component`, `deadline` (Unix time) and `running`. A field the platform did not record, or recorded in a form the runner does not write, is `None`. Docker lists the containers with the `instance_labels`; Kubernetes lists the Jobs in the namespace, with a deadline of the Job's start time plus its `activeDeadlineSeconds`. `labels` narrows the list further. Which containers to remove is the program's decision.
+
+`remove_engine_container(name)` removes one container (Docker) or Job and its Pod (Kubernetes) and returns once it is gone, or raises `ContainerStillRunning`. It returns `False` and removes nothing when no engine container in scope has that name. On Kubernetes, Jobs also end at their `activeDeadlineSeconds` and are deleted `ttl_after_finished` seconds later without this.
 
 ## Versions
 

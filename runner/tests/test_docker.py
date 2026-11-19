@@ -377,6 +377,60 @@ class Setup(unittest.TestCase):
         self.assertIn(f"label={b.LABEL_SCAN}=s1", ps)
         self.assertIn(["rm", "--force", "cid-left"], cli.calls)
 
+    def test_list_engine_containers(self):
+        backend, cli = make()
+        rows = ["a" * 64 + "\tbomlens-s1-2-stage1\trunning\ts1\tengine-stage1\t1800000000",
+                "b" * 64 + "\tbomlens-s2-3-stage2,alias\texited\ts2\tengine-stage2\t",
+                "c" * 64 + "\tother\texited\tBad Scan\tsomething\tsoon",
+                "not a row"]
+        cli.run = lambda argv, timeout: cli.calls.append(argv) or done(out="\n".join(rows))
+        found = backend.list_engine_containers({"example.com/role": "engine"})
+        ps = cli.calls[0]
+        self.assertEqual(ps[:3], ["ps", "--all", "--no-trunc"])
+        for label in (f"{b.LABEL_PART_OF}={b.PART_OF}", "example.com/instance=prod", "example.com/role=engine"):
+            self.assertIn(f"label={label}", ps)
+        self.assertEqual(found, [
+            b.EngineContainer("bomlens-s1-2-stage1", "s1", "engine-stage1", 1800000000, True),
+            b.EngineContainer("bomlens-s2-3-stage2", "s2", "engine-stage2", None, False),
+            b.EngineContainer("other", None, None, None, False),
+        ])
+
+    def test_list_refuses_bad_labels_and_reports_a_failed_listing(self):
+        backend, cli = make()
+        with self.assertRaises(PolicyError):
+            backend.list_engine_containers({"bad key!": "x"})
+        cli.run = lambda argv, timeout: done(1, err="permission denied")
+        with self.assertRaises(BackendUnavailable):
+            backend.list_engine_containers()
+
+    def test_remove_engine_container_only_in_scope(self):
+        backend, cli = make()
+        cli.removed = False
+        real = cli.run
+
+        def run(argv, timeout):
+            if argv[0] == "ps":
+                cli.calls.append(argv)
+                return done(out="d" * 64 + "\n")
+            return real(argv, timeout)
+        cli.run = run
+        self.assertTrue(backend.remove_engine_container("bomlens-s1-2-stage1"))
+        ps = cli.argv("ps")
+        self.assertIn("name=^/bomlens-s1-2-stage1$", ps)
+        self.assertIn(f"label={b.LABEL_PART_OF}={b.PART_OF}", ps)
+        self.assertIn("label=example.com/instance=prod", ps)
+        self.assertIn(["rm", "--force", "d" * 64], cli.calls)
+
+        backend, cli = make()
+        cli.run = lambda argv, timeout: cli.calls.append(argv) or done(out="")
+        self.assertFalse(backend.remove_engine_container("someone-else"))
+        self.assertFalse(backend.remove_engine_container("a.b"))
+        self.assertIn("name=^/a\\.b$", cli.calls[-1])
+        self.assertFalse(any(c[0] == "rm" for c in cli.calls))
+        for bad in ("", "-x", "a b", "../x"):
+            with self.assertRaises(PolicyError):
+                backend.remove_engine_container(bad)
+
     def test_bad_options(self):
         with self.assertRaises(PolicyError):
             DockerBackend(opts(volume_strategy="volumes_from"))

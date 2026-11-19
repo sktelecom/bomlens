@@ -4,14 +4,14 @@
 """Run the BomLens scan engine from another program.
 
 The runner reads the engine's execution plan, runs its containers through a
-backend (Kubernetes Jobs), and checks the result manifest, following the
+backend (Kubernetes Jobs or Docker containers), and checks the result manifest, following the
 engine contract (docs/reference/engine-contract.md). See
 docs/reference/engine-runner.md.
 """
 
 from . import _release
 from .backend import (COMPONENTS, LABEL_COMPONENT, LABEL_NETWORK, LABEL_PART_OF, LABEL_SCAN, NETWORK_EGRESS,
-                      NETWORK_NONE, PART_OF, Backend, ContainerOutcome, ContainerSpec, MountSpec)
+                      NETWORK_NONE, PART_OF, Backend, ContainerOutcome, ContainerSpec, EngineContainer, MountSpec)
 from .errors import (BackendUnavailable, BomLensError, ContainerStillRunning, ContractError, EngineError,
                      EngineWroteNoResult, ImageNotAllowed, ManifestMissing, OutputTooLarge, PlanRejected,
                      PolicyError, ScanCancelled, ScanTimedOut, UnsupportedContractVersion)
@@ -33,7 +33,7 @@ def release_images() -> Images:
 
 __all__ = [
     "BackendUnavailable", "Backend", "BomLensError", "COMPONENTS", "ContainerOutcome", "ContainerSpec",
-    "ContainerStillRunning", "ContractError", "EngineError", "EngineResult", "EngineWroteNoResult",
+    "ContainerStillRunning", "ContractError", "EngineContainer", "EngineError", "EngineResult", "EngineWroteNoResult",
     "ImageNotAllowed", "Images", "LABEL_COMPONENT", "LABEL_NETWORK", "LABEL_PART_OF", "LABEL_SCAN", "Limits",
     "ManifestMissing", "MountSpec", "NETWORK_EGRESS", "NETWORK_NONE", "Output", "OutputTooLarge", "PART_OF",
     "PinnedImage", "Plan", "PlanRejected", "PolicyError", "RunResult", "RunnerPolicy", "ScanCancelled",

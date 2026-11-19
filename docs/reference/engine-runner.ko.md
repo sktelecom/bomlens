@@ -164,7 +164,21 @@ named volume은 `volume-nocopy`로 마운트하고, `/tmp`는 새로 만든 작�
 
 `bomlens-runner` 명령은 정책 파일에 `docker` 객체가 있으면 Docker를 씁니다. 객체에는 위 옵션(`secrets` 제외)을 적습니다. `SecretRef` `{"secret": {"name": "proxy", "key": "url"}}`는 실행기 환경변수 `BOMLENS_SECRET_PROXY_URL`에서 읽습니다(이름과 키를 대문자로, 그 밖의 문자는 `_`로 바꿈). 이 변수들은 `docker` 명령에 넘기지 않습니다.
 
-CI는 러너의 데몬에서 Docker 백엔드를 돌립니다(`tests/test-engine-runner-docker.sh`). 호스트 폴더와 named volume 각각으로 한 소스 스캔, 취소한 스캔, 이미지 스캔을 확인합니다.
+CI는 러너의 데몬에서 Docker 백엔드를 돌립니다(`tests/test-engine-runner-docker.sh`). 호스트 폴더와 named volume 각각으로 한 소스 스캔, 취소한 스캔, 1단계 도중 강제 종료한 실행기의 컨테이너를 나열하고 제거하는 경우, 이미지 스캔을 확인합니다.
+
+## 강제 종료된 워커가 남긴 컨테이너 정리
+
+실행기를 호출한 프로세스가 강제 종료되면(`SIGKILL`, 강제 시간 제한) 실행기의 제거 코드가 돌지 않아, 따라가던 컨테이너가 남습니다. 같은 `scan_id`로 다시 호출하면 그 컨테이너를 제거합니다. 나머지는 프로그램이 주기적으로 정리할 수 있습니다.
+
+```python
+for c in backend.list_engine_containers():
+    if c.deadline is None or c.deadline < time.time() or scan_has_ended(c.scan_id):
+        backend.remove_engine_container(c.name)
+```
+
+`list_engine_containers(labels=None)`는 백엔드 범위 안의 엔진 컨테이너마다 `EngineContainer`를 돌려줍니다. 실행 중인지와 상관없이 모두 나열하며, 항목은 `name`, `scan_id`, `component`, `deadline`(유닉스 시각), `running`입니다. 플랫폼이 기록하지 않았거나 실행기가 쓰지 않는 형태로 기록된 값은 `None`입니다. Docker는 `instance_labels`가 붙은 컨테이너를, 쿠버네티스는 네임스페이스의 Job을 나열하고, 쿠버네티스의 deadline은 Job 시작 시각에 `activeDeadlineSeconds`를 더한 값입니다. `labels`로 범위를 더 좁힐 수 있습니다. 어느 컨테이너를 지울지는 프로그램이 판단합니다.
+
+`remove_engine_container(name)`는 컨테이너 하나(Docker) 또는 Job과 그 Pod(쿠버네티스)를 제거하고, 사라진 것을 확인한 뒤 돌아오거나 `ContainerStillRunning`을 냅니다. 범위 안에 그 이름의 엔진 컨테이너가 없으면 아무것도 지우지 않고 `False`를 돌려줍니다. 쿠버네티스의 Job은 이 함수가 없어도 `activeDeadlineSeconds`에 끝나고, 그 뒤 `ttl_after_finished`초가 지나면 삭제됩니다.
 
 ## 버전
 
