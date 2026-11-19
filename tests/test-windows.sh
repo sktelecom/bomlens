@@ -2134,6 +2134,15 @@ done
   && ! grep -qE ':/(tmp/sbomhome/\.m2|root/\.gradle)/[^ ]' "$LOG" \
   && pass "neither ~/.m2 nor ~/.gradle is mounted whole, and nothing is mounted inside a cache folder" \
   || { fail "neither ~/.m2 nor ~/.gradle is mounted whole, and nothing is mounted inside a cache folder" "rc=$RC"; show; }
+BOMLENS_CANCEL_GRACE=45 HOME="$fake_home" scan_in "$d" --ui --output-dir "$d"
+ok=1
+for m in ".m2/settings.xml:/bomlens-settings/m2/settings.xml:ro" ".m2/settings-security.xml:/bomlens-settings/m2/settings-security.xml:ro" \
+         ".gradle/gradle.properties:/bomlens-settings/gradle/gradle.properties:ro" ".gradle/init.gradle:/bomlens-settings/gradle/init.gradle:ro" \
+         ".gradle/init.gradle.kts:/bomlens-settings/gradle/init.gradle.kts:ro" ".gradle/init.d:/bomlens-settings/gradle/init.d:ro"; do
+    in_log "$(host_form "$fake_home")/$m" || ok=0
+done
+[ "$ok" = 1 ] && pass "--ui mounts the user's Maven and Gradle settings read-only, like the CLI scan" \
+  || { fail "--ui mounts the user's Maven and Gradle settings read-only" "rc=$RC"; show; }
 [ "$_prev_xch" = "__unset__" ] && unset XDG_CACHE_HOME || export XDG_CACHE_HOME="$_prev_xch"
 [ "$_prev_lad" = "__unset__" ] && unset LOCALAPPDATA || export LOCALAPPDATA="$_prev_lad"
 

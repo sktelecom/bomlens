@@ -242,6 +242,35 @@ export function scanMountArgs(dirs = []) {
   return args;
 }
 
+// 사용자의 Maven, Gradle 설정 파일을 UI 컨테이너에 읽기 전용으로 붙이는 docker run 인자(순수 —
+// 단위 테스트 가능). scan-sbom.sh의 경로 규칙과 같다: ~/.m2의 settings.xml과
+// settings-security.xml은 /bomlens-settings/m2/ 아래로, ~/.gradle의 gradle.properties,
+// init.gradle, init.gradle.kts와 init.d 폴더는 /bomlens-settings/gradle/ 아래로 붙인다.
+// 실제로 있는 것만 붙인다(없는 파일을 -v로 주면 엔진이 빈 폴더를 만든다). 파일 내용은 읽지
+// 않고 로그에도 쓰지 않는다. 형제 cdxgen 컨테이너는 --volumes-from으로 이 마운트를 물려받는다.
+export const SETTINGS_TARGET = "/bomlens-settings";
+export function settingsMountArgs({
+  home = os.homedir(),
+  isFile = (p) => fs.statSync(p, { throwIfNoEntry: false })?.isFile() === true,
+  isDir = (p) => fs.statSync(p, { throwIfNoEntry: false })?.isDirectory() === true,
+} = {}) {
+  const base = String(home ?? "").trim();
+  if (!base) return [];
+  const args = [];
+  const add = (source, target) => args.push("-v", `${source}:${SETTINGS_TARGET}/${target}:ro`);
+  for (const name of ["settings.xml", "settings-security.xml"]) {
+    const source = path.join(base, ".m2", name);
+    if (isFile(source)) add(source, `m2/${name}`);
+  }
+  for (const name of ["gradle.properties", "init.gradle", "init.gradle.kts"]) {
+    const source = path.join(base, ".gradle", name);
+    if (isFile(source)) add(source, `gradle/${name}`);
+  }
+  const initDir = path.join(base, ".gradle", "init.d");
+  if (isDir(initDir)) add(initDir, "gradle/init.d");
+  return args;
+}
+
 // Android SDK 이미지의 빌드 파일(Dockerfile만 든 폴더)을 UI 컨테이너에 읽기 전용으로 붙인다.
 // 서버가 사용자 동의 뒤 호스트 Docker로 이미지를 만들 때 이 폴더를 빌드 컨텍스트로 쓴다.
 // 폴더가 없으면(개발 실행에서 못 찾은 경우 등) 아무것도 붙이지 않고, 서버는 빌드 불가로 답한다.
@@ -600,6 +629,8 @@ export class UiContainer {
       // 추가 스캔 대상 폴더(읽기 전용) — 웹 UI의 "디렉터리 경로" 입력 선택지가 된다.
       ...scanMountArgs(this.scanMounts),
       ...androidBuildArgs(this.androidBuildDir),
+      // 사용자의 Maven, Gradle 설정(읽기 전용). 있는 파일만 붙는다.
+      ...settingsMountArgs(),
       "-v",
       engineMount(),
       // 5-P PR 2: entrypoint.sh가 이 경로에서 이전 실행의 가드 기록을 찾는다.
