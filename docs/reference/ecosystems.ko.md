@@ -82,6 +82,8 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 참고: 최상위 폴더에 `pom.xml`과 `build.gradle`(또는 `build.gradle.kts`)이 함께 있으면 예전처럼 Gradle 프로젝트로 읽습니다. `pom.xml`만 읽으려면 `--build-tool maven`을 쓰고(Gradle 파일은 스캔에서 제외하며 Gradle 단계도 실행하지 않습니다), Gradle 파일만 읽으려면 `--build-tool gradle`을 씁니다. 스캔 로그에 읽는 도구가 출력되고, SBOM에는 `bomlens:build-tool-choice`로 도구가, `bomlens:build-tool-choice-why`로 이유가 남습니다. 같은 프로젝트라도 두 도구가 해석하는 의존성 집합은 다를 수 있으니 고르기 전에 개수를 비교해 보세요. 빌드 도구가 하나뿐인 폴더나 `pom.xml`이 하위 폴더에만 있는 경우에는 영향이 없습니다.
 
+> 참고: 사내 저장소나 미러는 본인의 Maven 설정으로 동작합니다. `~/.m2/settings.xml`과 `~/.m2/settings-security.xml`이 있으면 읽기 전용으로 스캔에 넘기고(컨테이너 안의 `/bomlens-settings/m2`), Gradle 파일인 `~/.gradle/gradle.properties`, `init.gradle`, `init.gradle.kts`, `init.d/`도 같습니다. CLI와 `--ui`, 데스크톱 앱은 이렇게 하지만 더블클릭하는 `sbom-ui.bat`은 하지 않습니다. 미러 주소는 컨테이너 안에서 접속할 수 있어야 합니다. HTTPS를 다시 서명하는 프록시라면 `SBOM_EXTRA_CA_CERTS`가 필요합니다. [Maven으로 빌드하는 자바 프로젝트는 어떻게 스캔하나요?](../guides/java-maven.ko.md)를 보세요.
+
 ## Java (Gradle)
 
 ```bash
@@ -125,13 +127,13 @@ cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 �
 
 Gradle 루트(`settings.gradle[.kts]` 또는 `build.gradle[.kts]`가 루트에 있음)가 있고, Android Gradle 플러그인의 흔적이 함께 있을 때 감지합니다. 버전 카탈로그(`gradle/libs.versions.toml`)의 플러그인 id, 빌드 스크립트(루트 또는 `app/`)의 플러그인 id나 카탈로그 별칭, Kotlin DSL `namespace` 선언, 또는 몇 단계 아래의 `AndroidManifest.xml` 중 하나면 됩니다. Gradle 루트 없이 매니페스트만 있으면 인정하지 않는데, 이 덕분에 .NET MAUI 앱의 `Platforms/Android/AndroidManifest.xml`을 Android 프로젝트로 잘못 읽지 않습니다.
 
-Android는 BomLens가 배포하지 않는 SDK 플랫폼 이미지가 필요합니다. 담긴 Android SDK 자체가 오픈소스가 아니고 구글 약관이 재배포를 허용하지 않아서, 이 이미지는 쓰는 쪽에서 직접 빌드해야 합니다. 찾은 `compileSdk`/`compileSdkVersion` 중 가장 높은 값으로 API 레벨을 정하고(못 찾으면 34), 루트와 `app/`의 빌드 파일, `build-logic/`과 `buildSrc/` 아래 소스(공통 플러그인이 여기서 값을 정하는 경우가 많습니다), 버전 카탈로그(`android-compileSdk` 같은 키)를 모두 읽습니다. `bomlens-android-sdk<API>:latest`를 찾습니다. 이미지가 없으면 이미지 없음으로 실패하는 대신 빌드 명령을 그대로 출력합니다.
+Android는 BomLens가 배포하지 않는 SDK 플랫폼 이미지가 필요합니다. 담긴 Android SDK 자체가 오픈소스가 아니고 구글 약관이 재배포를 허용하지 않아서, 이 이미지는 쓰는 쪽에서 직접 빌드해야 합니다. 찾은 `compileSdk`/`compileSdkVersion` 중 가장 높은 값으로 API 레벨을 정하고(못 찾으면 34), 루트와 `app/`의 빌드 파일, `build-logic/`과 `buildSrc/` 아래 소스(공통 플러그인이 여기서 값을 정하는 경우가 많습니다), 버전 카탈로그(`android-compileSdk` 같은 키)를 모두 읽습니다. `bomlens-android-sdk<API>:latest`를 찾습니다. 이미지가 없으면 스캔을 시작하기 전에 멈추고 빌드 명령을 그대로 출력합니다.
 
 ```bash
 docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/android
 ```
 
-빌드한다는 것은 구글 SDK 약관에 직접 동의한다는 뜻입니다. 다른 곳에서 빌드한 이미지를 쓰려면 `ANDROID_IMAGE_PREFIX`를 설정하세요.
+빌드한다는 것은 구글 SDK 약관에 직접 동의한다는 뜻입니다. 다른 곳에서 빌드한 이미지를 쓰려면 `ANDROID_IMAGE_PREFIX`를 설정하세요. 이미지는 디스크에서 약 6.3GB를 차지하며 API 레벨마다 하나씩 필요합니다([크기](docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요)). 단계별 안내는 [Gradle로 빌드하는 안드로이드 앱은 어떻게 스캔하나요?](../guides/android-gradle.ko.md)에 있습니다.
 
 SDK 이미지는 Java 21에서 실행되므로 Gradle 8.5보다 오래된 래퍼는 이 이미지에서 실행되지 않습니다. 스캔을 시작하기 전에 이를 안내하고 SBOM에 실패 단계 `gradle-wrapper-jdk`를 남깁니다. `gradle/wrapper/gradle-wrapper.properties`의 `distributionUrl`을 8.5 이상으로 올리거나, `--build-arg BASE_JDK_IMAGE=<cdxgen Java 이미지>`로 더 낮은 JDK 기반 이미지를 직접 빌드한 뒤(`docker/android/Dockerfile` 참고) 그 이미지의 `ANDROID_IMAGE_PREFIX`로 스캔하세요. `gradle.properties`에서 Isolated Projects를 켠 빌드는 구성 캐시를 끄면 Gradle이 실행을 거부하므로, 구성 캐시를 켠 채로 읽습니다.
 
@@ -256,6 +258,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 ```
 
 감지 파일: Swift Package Manager는 `Package.swift` (+ `Package.resolved`), CocoaPods는 `Podfile.lock`.
+
+단계별 안내는 [SwiftPM이나 CocoaPods를 쓰는 iOS 앱은 어떻게 스캔하나요?](../guides/ios-swift.ko.md)에 있습니다.
 
 의존성은 커밋된 잠금 파일에서 읽으므로 스캔에 함께 포함하세요.
 
