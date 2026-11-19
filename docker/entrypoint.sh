@@ -1097,6 +1097,19 @@ case "$SCAN_MODE" in
             exit 1
         fi
         rm -f "$IMAGE_SYFT_LOG"
+        # An archive with no repository tag is named by syft after its path in
+        # this container (/target/<file>); name it after the file instead.
+        case "$TARGET_IMAGE" in
+            docker-archive:/target/*|oci-archive:/target/*)
+                _ar_base="${TARGET_IMAGE##*/}"; _ar_base="${_ar_base%.tar.gz}"; _ar_base="${_ar_base%.tgz}"; _ar_base="${_ar_base%.tar}"
+                if jq --arg old "${TARGET_IMAGE#*:}" --arg new "$_ar_base" \
+                    'if (.metadata.component.name // "") == $old then .metadata.component.name = $new else . end' \
+                    "$OUTPUT_FILE" > "$OUTPUT_FILE.rename" 2>/dev/null; then
+                    mv "$OUTPUT_FILE.rename" "$OUTPUT_FILE"
+                else
+                    rm -f "$OUTPUT_FILE.rename"
+                fi ;;
+        esac
         # Pin the later reads of this image (Trivy's license scan, the file
         # view) to the digest syft read, so a tag that moves meanwhile cannot
         # give them another image. An archive is read as it is. With no digest
