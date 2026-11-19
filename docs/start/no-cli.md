@@ -24,8 +24,10 @@ All you need is a Docker engine. On Windows, for a first install, **Rancher Desk
 The first time, install and download take a while. Roughly:
 
 - Installing and first launch of Rancher Desktop: about 5–10 minutes
-- First download of the scanner image (about 250 MB): usually a minute or two (varies by network, only the first time)
-- First scan of a project, which fetches a language image (0.6–1.7 GB): a few more minutes, also once per language
+- First download of the scanner image (about 1.4 GB on disk): a few minutes, varying by network, only the first time
+- First scan of a project, which fetches a language image (3 to 16 GB on disk, for example 2.9 GB for Node.js and 5.6 GB for Java): several more minutes, also once per language
+
+So plan for about 10 GB of free disk space in the Docker engine. [Image sizes and how to free the space](../reference/docker-image.md#how-much-disk-do-the-images-take) lists every image. The command line stops with a message before a download when the space is not enough; the web UI and the desktop app warn.
 
 Once set up, opening the app and scanning afterward takes 1–2 minutes for a project with a lock file already committed. Without one, cdxgen resolves dependencies itself before it can scan them (see the [web UI reference](../reference/ui.md#new-scan)), which took 6–7 minutes in repeated testing on a Node.js project with no `package-lock.json`.
 
@@ -37,7 +39,7 @@ There are two paths. The desktop app is the simplest, so it is recommended. The 
 flowchart TD
     A["Install Docker engine<br/>(Rancher Desktop)"] --> B["Get the desktop app<br/>.exe from releases/latest"]
     B --> C["Double-click<br/>(if SmartScreen: More info, Run)"]
-    C --> D["First-run image download<br/>about 250 MB, once"]
+    C --> D["First-run image download<br/>about 1.4 GB, once"]
     D --> E["Enter project name and version"]
     E --> F["Upload source ZIP and scan"]
     F --> G["Download NOTICE.txt / NOTICE.html"]
@@ -46,8 +48,8 @@ flowchart TD
 ### Path A — desktop app (recommended)
 
 1. **Install a Docker engine**. Download the Windows installer from [rancherdesktop.io](https://rancherdesktop.io/), install it, and run it. If it asks whether to use Kubernetes during install, you can turn it off. When the taskbar icon settles (usually 1–2 minutes), it is ready.
-2. **Get and run the app**. Click [Download BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click the file. It is unsigned for now, so if Windows shows a "Windows protected your PC" warning, click its More info (추가 정보) link and choose Run anyway (실행) on the screen that follows; the dialog's own labels are in your Windows display language, so a Korean-language Windows shows Korean text as in the screenshot below. The app opens with no console window. The signing rules for the installer and what the app sends over the network are in the [code signing policy](../reference/code-signing-policy.md).
-3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait. On later launches, the app pulls a newer image automatically when one has been published, so there is nothing to redownload or reinstall by hand.
+2. **Get and run the app**. Click [Download BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe). The app is unsigned for now, so two Windows prompts can appear. In Edge, the downloads panel may say that `BomLens-Setup.exe` is not commonly downloaded and show no way to open it: open the item's menu (the three dots), choose Keep, and if it asks again, expand Show more and choose Keep anyway (the exact labels depend on your Edge version). Then double-click the file. If Windows shows a "Windows protected your PC" warning, click its More info (추가 정보) link and choose Run anyway (실행) on the screen that follows; the dialog's own labels are in your Windows display language, so a Korean-language Windows shows Korean text as in the screenshot below. The app opens with no console window. The signing rules for the installer and what the app sends over the network are in the [code signing policy](../reference/code-signing-policy.md).
+3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait. On later launches, the app pulls a newer image automatically when one has been published, so there is nothing to redownload by hand.
 
 ![The SmartScreen warning as shown on a Korean-language Windows: click the dialog's More info (추가 정보) link, then Run anyway (실행) on the screen that follows](../images/smartscreen.png)
 
@@ -84,9 +86,15 @@ If you prefer a script over the desktop app, this path works too.
 ===========================================
 ```
 
+The sizes in that notice are rough estimates. The scanner image takes about 1.4 GB on disk and a language image 3 to 16 GB.
+
 To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, the Docker engine's memory and port status, in your Windows display language.
 
 ![The BomLens web UI](../images/web-ui-en.png)
+
+## How do I update the app?
+
+At startup the app checks for a newer release. When there is one, an Update available dialog offers Open download page, which opens the [latest release page](https://github.com/sktelecom/bomlens/releases/latest). Download the installer there and run it again; you can also do this without waiting for the dialog. The installer is unsigned like the first one, so the same Edge and SmartScreen steps apply. Your scan results stay in the `sbom-output` folder under your home directory. When the app starts, it pulls the scanner image that matches its version if that image is not on the machine yet.
 
 ## If the app won't open on macOS
 
@@ -137,7 +145,9 @@ When the scan finishes, download the notice from the results screen as per-forma
 - **It says "Docker is not installed"**: make sure Rancher Desktop is installed and running.
 - **It says "the Docker engine is not running"**: start Rancher Desktop, wait for the icon to settle, then run it again.
 - **The scan finished but there are no files in the results folder**: this can happen if the results folder is outside Docker's file-sharing scope. This tool saves to `sbom-output` under your home directory (`C:\Users\...`), which is usually safe. If you still don't see them, download them directly with the download buttons in the browser.
-- **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself. If port 8080 was busy the launcher moves to the next free port and prints the address it chose, so use that one.
+- **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself. If port 8080 was busy the launcher moves to the next free port and prints the address it chose, so use that one. To fix the port yourself, put `UI_PORT=9090` in the settings file below. The desktop app picks a free local port on its own, so there is nothing to change. From a terminal, `scan-sbom.sh --ui` stops with a message when its port is busy and names a free one, for example `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`.
+- **A message says there is not enough free disk space**: the Docker engine has less free than the image to download plus 2 GB. [Free the space](../reference/docker-image.md#how-do-i-free-the-space) by removing images you no longer need, or set `BOMLENS_SKIP_DISK_CHECK=1` to try anyway.
+- **My company's repository needs a login**: a Maven or Gradle project that downloads from a private repository needs the credentials in your own `~/.m2/settings.xml` or `~/.gradle/gradle.properties`. The desktop app passes them into the scan read-only; the double-click `sbom-ui.bat` does not. See [How do I scan a Java project that builds with Maven?](../guides/java-maven.md#does-my-private-repository-work).
 - **"Image download failed" on a company network**: this is almost always a proxy. The image is downloaded by the **Docker daemon**, not by the launcher, so proxy settings in your command prompt have no effect — set them in Docker Desktop (`Settings > Resources > Proxies`) or Rancher Desktop (`Preferences > WSL > Proxy`). If the proxy also intercepts `localhost`, add `localhost` to its bypass list, otherwise the browser shows an error even when the scan is running fine.
 - **Scans fail with `certificate signed by unknown authority` or `PKIX path building failed`**: your network's proxy inspects HTTPS and re-signs it with its own CA, which the scan containers do not trust. Get that CA bundle in PEM form from your IT team and put `SBOM_EXTRA_CA_CERTS=C:\path\to\proxy-ca.pem` in `bomlens.settings.txt` (a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`); `sbom-ui.bat` then mounts it into the scan containers. The desktop app reads the same name as an environment variable. When a scan fails this way, its log shows a `[WARN]` line naming this option. It does not cover image downloads: those are done by the Docker daemon, so the CA has to be trusted in Docker Desktop or Rancher Desktop as well.
 - **No usable network at all**: the launcher can install from a file instead of downloading. Ask for `bomlens-image.tar`, put it next to the `.bat` files, and it is used automatically — no network, no command line. See "Settings file" below.
@@ -175,6 +185,8 @@ The scanner images are the same on every operating system. Remove only the ones 
 docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
            ghcr.io/sktelecom/bomlens-firmware ghcr.io/sktelecom/bomlens-deep-cve
 ```
+
+The language images a scan downloaded (`ghcr.io/cdxgen/...`, and `bomlens-android-sdk<API>` for Android) are larger than the scanner image, and the command above does not remove them. The [Docker image reference](../reference/docker-image.md#how-do-i-free-the-space) has one command that removes all of them by name, and how to compact the engine's disk afterwards on Docker Desktop, Rancher Desktop and Colima. Docker does not give the space back to Windows or macOS until the disk is compacted.
 
 Your scan results live in the `sbom-output` folder under your home directory. Leave it alone if you want to keep the reports.
 
