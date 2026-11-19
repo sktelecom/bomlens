@@ -7,7 +7,7 @@ import unittest
 import _support  # noqa: F401  (puts src on the path)
 
 from bomlens_runner import backend as b
-from bomlens_runner.errors import BackendUnavailable, ContainerStillRunning, EngineError
+from bomlens_runner.errors import BackendUnavailable, ContainerStillRunning, EngineError, PolicyError
 from bomlens_runner.kubernetes import KubeApi, KubernetesBackend, KubernetesOptions, job_manifest
 from bomlens_runner.policy import Limits, SecretRef
 
@@ -265,6 +265,80 @@ class Api(unittest.TestCase):
         KubeApi("http://127.0.0.1:8001", insecure_http=True)
         with self.assertRaises(BackendUnavailable):
             KubeApi("ftp://x")
+
+
+class Jobs:
+    """Plays the API server for the Job listing and one Job's removal."""
+
+    def __init__(self, items=(), job=None, job_status=200, list_status=200):
+        self.items, self.job, self.job_status, self.list_status = list(items), job, job_status, list_status
+        self.calls = []
+
+    def request(self, method, path, body=None):
+        self.calls.append((method, path))
+        if method == "DELETE":
+            return 200, {}
+        if "/pods" in path:
+            return 200, {"items": []}
+        if "?" in path:
+            return self.list_status, {"items": self.items}
+        return self.job_status, self.job or {}
+
+
+def job(name, labels=None, status=None, deadline=210, **meta):
+    return {"metadata": {"name": name, "labels": labels or {}, **meta},
+            "spec": {"activeDeadlineSeconds": deadline}, "status": status or {}}
+
+
+class EngineContainers(unittest.TestCase):
+    def backend(self, api):
+        clock = Clock()
+        return KubernetesBackend(api, OPTS, clock=clock, sleep=clock.sleep)
+
+    def test_list(self):
+        api = Jobs([
+            job("bomlens-s1-2-stage1", {b.LABEL_SCAN: "s1", b.LABEL_COMPONENT: "engine-stage1"},
+                {"startTime": "2026-11-19T00:00:00Z", "active": 1}),
+            job("bomlens-s2-3-stage2", {b.LABEL_SCAN: "s2", b.LABEL_COMPONENT: "engine-stage2"},
+                {"conditions": [{"type": "Complete", "status": "True"}]},
+                creationTimestamp="2026-11-19T00:00:10Z"),
+            job("odd", {b.LABEL_SCAN: "Not An Id", b.LABEL_COMPONENT: "x"}, deadline="soon",
+                creationTimestamp="yesterday"),
+            {"metadata": {}},
+        ])
+        found = self.backend(api).list_engine_containers({"example.com/app": "scanner"})
+        method, path = api.calls[0]
+        self.assertEqual(method, "GET")
+        self.assertIn("labelSelector=app.kubernetes.io%2Fpart-of%3Dbomlens-engine%2Cexample.com%2Fapp%3Dscanner",
+                      path)
+        self.assertEqual(found, [
+            b.EngineContainer("bomlens-s1-2-stage1", "s1", "engine-stage1", 1795046400 + 210, True),
+            b.EngineContainer("bomlens-s2-3-stage2", "s2", "engine-stage2", 1795046410 + 210, False),
+            b.EngineContainer("odd", None, None, None, True),
+        ])
+
+    def test_list_refuses_bad_labels_and_reports_a_failed_listing(self):
+        with self.assertRaises(PolicyError):
+            self.backend(Jobs()).list_engine_containers({"a": "b,c=d"})
+        with self.assertRaises(BackendUnavailable):
+            self.backend(Jobs(list_status=403)).list_engine_containers()
+
+    def test_remove_only_an_engine_job(self):
+        api = Jobs(job=job("bomlens-s1-2-stage1", {b.LABEL_PART_OF: b.PART_OF}))
+        self.assertTrue(self.backend(api).remove_engine_container("bomlens-s1-2-stage1"))
+        self.assertIn(("DELETE", "/apis/batch/v1/namespaces/scan/jobs/bomlens-s1-2-stage1"), api.calls)
+
+        api = Jobs(job=job("app-db", {"app": "db"}))
+        self.assertFalse(self.backend(api).remove_engine_container("app-db"))
+        self.assertFalse(any(m == "DELETE" for m, _ in api.calls))
+
+        api = Jobs(job_status=404)
+        self.assertFalse(self.backend(api).remove_engine_container("gone"))
+        with self.assertRaises(BackendUnavailable):
+            self.backend(Jobs(job_status=500)).remove_engine_container("bomlens-x")
+        for bad in ("", "Upper", "a/b", "-x"):
+            with self.assertRaises(PolicyError):
+                self.backend(Jobs()).remove_engine_container(bad)
 
 
 if __name__ == "__main__":

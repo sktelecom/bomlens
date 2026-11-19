@@ -53,7 +53,7 @@ EXIT_NOT_RUN = 127
 
 _TRIVY_OFFLINE = {"TRIVY_SKIP_DB_UPDATE": "true", "TRIVY_SKIP_JAVA_DB_UPDATE": "true",
                   "TRIVY_OFFLINE_SCAN": "true", "TRIVY_NO_PROGRESS": "true"}
-_SCAN_ID_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?")
+_SCAN_ID_RE = b.SCAN_ID_RE
 _PROJECT_TOKEN_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _LEGACY_IPV4_RE = re.compile(r"[0-9a-fA-FxX.]{1,64}")
 _NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)

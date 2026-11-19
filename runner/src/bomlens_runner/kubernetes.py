@@ -20,15 +20,17 @@ import http.client
 import json
 import os
 import queue
+import re
 import ssl
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Callable, Mapping
 from urllib.parse import quote, urlencode, urlsplit
 
 from . import backend as b
-from .errors import BackendUnavailable, ContainerStillRunning, EngineError
+from .errors import BackendUnavailable, ContainerStillRunning, EngineError, PolicyError
 from .policy import SecretRef
 
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -36,6 +38,18 @@ CONTAINER = "engine"
 _FATAL_WAIT = frozenset(("InvalidImageName", "CreateContainerConfigError", "CreateContainerError",
                          "ErrImageNeverPull", "RunContainerError"))
 _PULL_WAIT = frozenset(("ErrImagePull", "ImagePullBackOff"))
+_JOB_NAME_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
+
+
+def _epoch(value) -> int | None:
+    """Unix time of an RFC 3339 time the API server wrote, or None."""
+    if not isinstance(value, str):
+        return None
+    try:
+        t = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    return int(t.replace(tzinfo=timezone.utc).timestamp())
 
 
 class KubeApi:
@@ -257,6 +271,58 @@ class KubernetesBackend:
             name = item.get("metadata", {}).get("name")
             if isinstance(name, str):
                 self._delete(name)
+
+    @staticmethod
+    def _selector(labels: Mapping[str, str] | None) -> str:
+        terms = {b.LABEL_PART_OF: b.PART_OF, **(labels or {})}
+        for k, v in terms.items():
+            if not b.LABEL_KEY_RE.fullmatch(k) or not b.LABEL_VALUE_RE.fullmatch(v):
+                raise PolicyError("a label is not valid")
+        return ",".join(f"{k}={v}" for k, v in sorted(terms.items()))
+
+    def list_engine_containers(self, labels: Mapping[str, str] | None = None) -> list[b.EngineContainer]:
+        """The engine Jobs in the namespace. A Job's deadline is its start
+        (or creation) time plus its activeDeadlineSeconds."""
+        status, doc = self.api.request("GET", f"{self._jobs}?{urlencode({'labelSelector': self._selector(labels)})}")
+        if status != 200:
+            raise BackendUnavailable(f"the runner cannot list Jobs (HTTP {status})")
+        found = []
+        for item in (i for i in doc.get("items", []) if isinstance(i, dict)):
+            meta, spec, st = (item.get(k) if isinstance(item.get(k), dict) else {}
+                              for k in ("metadata", "spec", "status"))
+            name = meta.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            item_labels = meta.get("labels") if isinstance(meta.get("labels"), dict) else {}
+            scan, component = item_labels.get(b.LABEL_SCAN), item_labels.get(b.LABEL_COMPONENT)
+            start = _epoch(st.get("startTime")) or _epoch(meta.get("creationTimestamp"))
+            limit = spec.get("activeDeadlineSeconds")
+            if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
+                limit = None
+            ended = any(isinstance(c, dict) and c.get("type") in ("Complete", "Failed") and c.get("status") == "True"
+                        for c in st.get("conditions") or [])
+            found.append(b.EngineContainer(
+                name=name,
+                scan_id=scan if isinstance(scan, str) and b.SCAN_ID_RE.fullmatch(scan) else None,
+                component=component if component in b.COMPONENTS else None,
+                deadline=start + limit if start is not None and limit is not None else None,
+                running=not ended and not meta.get("deletionTimestamp")))
+        return found
+
+    def remove_engine_container(self, name: str) -> bool:
+        if not isinstance(name, str) or not _JOB_NAME_RE.fullmatch(name):
+            raise PolicyError("the Job name is not valid")
+        status, doc = self.api.request("GET", f"{self._jobs}/{quote(name, safe='')}")
+        if status == 404:
+            return False
+        if status != 200:
+            raise BackendUnavailable(f"the runner cannot read the Job (HTTP {status})")
+        meta = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
+        labels = meta.get("labels") if isinstance(meta.get("labels"), dict) else {}
+        if labels.get(b.LABEL_PART_OF) != b.PART_OF:
+            return False
+        self._delete(name)
+        return True
 
     def run(self, spec: b.ContainerSpec, on_line: Callable[[str], None],
             cancelled: Callable[[], bool]) -> b.ContainerOutcome:

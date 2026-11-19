@@ -11,6 +11,7 @@ container must have ended and been removed.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Mapping, Protocol
 
@@ -26,6 +27,12 @@ PART_OF = "bomlens-engine"
 COMPONENTS = ("engine-plan", "engine-stage1", "engine-restore", "engine-stage2", "engine-image", "engine-chown")
 NETWORK_NONE = "none"
 NETWORK_EGRESS = "egress"
+
+# Label keys and values as both platforms take them, and a scan id as the
+# orchestrator takes it.
+LABEL_KEY_RE = re.compile(r"([a-z0-9.-]{1,253}/)?[A-Za-z0-9]([A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?")
+LABEL_VALUE_RE = re.compile(r"([A-Za-z0-9]([A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?)?")
+SCAN_ID_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?")
 
 VOLUME_WORKSPACE = "workspace"
 VOLUME_TRIVY_DB = "trivy-db"
@@ -63,6 +70,19 @@ class ContainerSpec:
     pull_timeout: int = 1800
 
 
+@dataclass(frozen=True)
+class EngineContainer:
+    """An engine container (a Docker container, or a Kubernetes Job) a
+    backend found. A field the platform did not record, or recorded in a form
+    the runner does not write, is None."""
+    name: str
+    scan_id: str | None
+    component: str | None
+    #: Unix time after which the container may be removed whatever it does.
+    deadline: int | None
+    running: bool
+
+
 @dataclass
 class ContainerOutcome:
     started: bool = False
@@ -90,6 +110,21 @@ class Backend(Protocol):
 
     def remove_leftovers(self, scan_label: str) -> None:
         """Remove containers an earlier attempt of this scan left behind."""
+
+    def list_engine_containers(self, labels: Mapping[str, str] | None = None) -> list[EngineContainer]:
+        """The engine containers in this backend's scope, running or not.
+
+        labels narrows the list to containers that carry them as well. Which
+        of them to remove (a scan that ended, a deadline that passed) is the
+        caller's decision.
+        """
+
+    def remove_engine_container(self, name: str) -> bool:
+        """Remove one engine container in scope by name, and confirm it is gone.
+
+        Returns False when no engine container in scope has that name, so a
+        name that came from elsewhere never removes another container.
+        """
 
     def run(self, spec: ContainerSpec, on_line: Callable[[str], None],
             cancelled: Callable[[], bool]) -> ContainerOutcome:

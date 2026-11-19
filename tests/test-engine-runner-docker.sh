@@ -10,6 +10,8 @@
 #   - a source scan of examples/nodejs: plan, stage 1, stage 2, the result
 #     manifest checked, no container left, the source tree unchanged;
 #   - a cancelled scan: no container left, the source unchanged;
+#   - a runner killed during stage 1: its container is listed and removed
+#     through list_engine_containers and remove_engine_container;
 #   - an image scan of a small public image.
 #
 # Usage: BOMLENS_TEST_IMAGE=<image with a repo digest> tests/test-engine-runner-docker.sh
@@ -150,6 +152,35 @@ wait "$rpid" || true
 [ "$(jq -r .error "$WORK/d3.json" 2>/dev/null)" = ScanCancelled ] && pass "SIGTERM cancels the scan" || fail "cancel: $(cat "$WORK/d3.json")"
 [ "$(live d3)" = 0 ] && pass "a cancelled scan leaves no container" || fail "containers left after cancel"
 [ "$(tree_hash "$WS/d3/src")" = "$before" ] && pass "a scan cancelled in stage 1 leaves the source unchanged" || fail "the cancelled scan changed the source"
+
+echo "== killed runner =="
+mkdir -p "$WS/d5"; cp -R "$ROOT_DIR/examples/nodejs" "$WS/d5/src"
+PIDFILE="$WORK/d5.pid" run_scan bind "$WS" source d5 "$WS/d5" > "$WORK/d5.json" 2> "$WORK/d5.log" &
+rpid=$!
+for _ in $(seq 1 120); do
+    [ -n "$(docker ps -q --filter label=bomlens.engine/scan=d5 --filter label=app.kubernetes.io/component=engine-stage1)" ] && break
+    sleep 1
+done
+# SIGKILL: no finally runs, so the stage 1 container stays behind.
+if [ -s "$WORK/d5.pid" ]; then kill -KILL "$(cat "$WORK/d5.pid")"; else kill -KILL "$rpid" 2>/dev/null || true; fi
+wait "$rpid" 2>/dev/null || true
+[ "$(live d5)" -ge 1 ] && pass "a killed runner leaves its container" || fail "no container left by the killed runner"
+reaped="$(PYTHONPATH="$ROOT_DIR/runner/src" WSV="$WS" python3 - <<'PY'
+import json, os, time
+from bomlens_runner.docker import DockerBackend, DockerOptions
+backend = DockerBackend(DockerOptions(volume_strategy="bind", workspace=os.environ["WSV"],
+                                      instance_labels={"example.com/suite": "docker"}))
+left = [c for c in backend.list_engine_containers() if c.scan_id == "d5"]
+ok = bool(left) and all(c.component == "engine-stage1" and c.deadline and c.deadline > time.time() for c in left)
+removed = [backend.remove_engine_container(c.name) for c in left]
+print(json.dumps({"listed": len(left), "fields": ok, "removed": all(removed) and bool(removed),
+                  "after": len([c for c in backend.list_engine_containers() if c.scan_id == "d5"])}))
+PY
+)" || reaped='{}'
+[ "$(jq -r .listed <<<"$reaped")" -ge 1 ] 2>/dev/null && [ "$(jq -r .fields <<<"$reaped")" = true ] \
+    && pass "list_engine_containers names the scan, the stage and a future deadline" || fail "listing: $reaped"
+[ "$(jq -r .removed <<<"$reaped")" = true ] && [ "$(jq -r .after <<<"$reaped")" = 0 ] && [ "$(live d5)" = 0 ] \
+    && pass "remove_engine_container removes it" || fail "removal: $reaped"
 
 echo "== image scan =="
 mkdir -p "$WS/d4"

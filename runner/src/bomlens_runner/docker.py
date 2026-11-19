@@ -41,8 +41,8 @@ _TOKEN_RE = re.compile(r"[A-Za-z0-9._/-]+")
 _VOLUME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,254}")
 _NETWORK_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 _HEX_RE = re.compile(r"[0-9a-f]{6,64}")
-_LABEL_KEY_RE = re.compile(r"([a-z0-9.-]{1,253}/)?[A-Za-z0-9]([A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?")
-_LABEL_VALUE_RE = re.compile(r"([A-Za-z0-9]([A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?)?")
+_LABEL_KEY_RE = b.LABEL_KEY_RE
+_LABEL_VALUE_RE = b.LABEL_VALUE_RE
 _FORBIDDEN_NETWORKS = frozenset(("host", "none", "bridge", "default"))
 _NO_SUCH = ("no such object", "no such container", "not found")
 
@@ -205,6 +205,52 @@ class DockerBackend:
             raise BackendUnavailable("the engine containers could not be listed")
         for cid in _text(done).split():
             self._remove(cid)
+
+    def _scope(self, labels: Mapping[str, str] | None) -> list[str]:
+        argv = ["--filter", f"label={b.LABEL_PART_OF}={b.PART_OF}"]
+        for k, v in sorted({**self.opts.instance_labels, **(labels or {})}.items()):
+            if not _LABEL_KEY_RE.fullmatch(k) or not _LABEL_VALUE_RE.fullmatch(v):
+                raise PolicyError("a label is not valid")
+            argv += ["--filter", f"label={k}={v}"]
+        return argv
+
+    def list_engine_containers(self, labels: Mapping[str, str] | None = None) -> list[b.EngineContainer]:
+        fields = ("{{.ID}}", "{{.Names}}", "{{.State}}", f'{{{{.Label "{b.LABEL_SCAN}"}}}}',
+                  f'{{{{.Label "{b.LABEL_COMPONENT}"}}}}', f'{{{{.Label "{LABEL_DEADLINE}"}}}}')
+        done = self.cli.run(["ps", "--all", "--no-trunc", *self._scope(labels), "--format", "\t".join(fields)], 60)
+        if done.returncode != 0:
+            raise BackendUnavailable("the engine containers could not be listed")
+        found = []
+        for line in _text(done).splitlines():
+            cols = line.split("\t")
+            if len(cols) != len(fields) or not _HEX_RE.fullmatch(cols[0]):
+                continue
+            name = cols[1].split(",")[0]
+            if not _NETWORK_RE.fullmatch(name):
+                continue
+            scan, component, deadline = cols[3], cols[4], cols[5]
+            found.append(b.EngineContainer(
+                name=name,
+                scan_id=scan if b.SCAN_ID_RE.fullmatch(scan) else None,
+                component=component if component in b.COMPONENTS else None,
+                deadline=int(deadline) if deadline.isdigit() and len(deadline) <= 12 else None,
+                running=cols[2] in ("running", "restarting", "paused", "removing")))
+        return found
+
+    def remove_engine_container(self, name: str) -> bool:
+        if not _NETWORK_RE.fullmatch(name):
+            raise PolicyError("the container name is not valid")
+        # The name filter is a regular expression; "." is the only character
+        # of a valid name that means something there.
+        pattern = name.replace(".", "\\.")
+        done = self.cli.run(["ps", "--all", "--quiet", "--no-trunc", "--filter", f"name=^/{pattern}$",
+                             *self._scope(None)], 60)
+        if done.returncode != 0:
+            raise BackendUnavailable("the engine containers could not be listed")
+        ids = [cid for cid in _text(done).split() if _HEX_RE.fullmatch(cid)]
+        for cid in ids:
+            self._remove(cid)
+        return bool(ids)
 
     def run(self, spec: b.ContainerSpec, on_line: Callable[[str], None],
             cancelled: Callable[[], bool]) -> b.ContainerOutcome:
