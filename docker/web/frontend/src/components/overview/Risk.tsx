@@ -135,7 +135,6 @@ export function SeverityPanel({ security, scanId }: { security: SecuritySummary;
                     key={s}
                     className="bl-sevcell"
                     href={scanHash(scanId, "vulnerabilities", { severity: s as Severity })}
-                    aria-label={`${t(`severity.${s}`)} ${fmt(security[s])}`}
                   >
                     {inner}
                   </a>
