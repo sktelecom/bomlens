@@ -1819,12 +1819,21 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "${SOURCE_ROOT:-/src}" ] \
    && [ "$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 1)" = "0" ]; then
     _empty_manifests="$(source_manifests "${SOURCE_ROOT:-/src}" 5)"
     if [ -n "$_empty_manifests" ]; then
-        echo "[WARN] the source declares dependencies ($_empty_manifests) but the SBOM has no components; the scan did not resolve them."
-        mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-with-manifests" "$_empty_manifests"
-        # The resolver steps that failed, which are most often why (a Gradle
-        # or pip step that could not run), from the SBOM build-prep stamped.
-        _empty_failed="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value] | unique | join(", ")' "$OUTPUT_FILE" 2>/dev/null)"
-        er_record generate degraded no_components "manifests found: $_empty_manifests${_empty_failed:+; steps that failed: $_empty_failed}" "" "" "{\"components\":0}"
+        # Components build-prep left out on purpose (development-only, or modules
+        # that are not deployed): the dependencies were resolved, then dropped.
+        _empty_excluded="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:excluded-components") | .value | strings | select(length > 0)] | first // ""' "$OUTPUT_FILE" 2>/dev/null)"
+        if [ -n "$_empty_excluded" ]; then
+            echo "[WARN] every dependency the source declares ($_empty_manifests) was left out as development-only or not deployed, so the SBOM has no components. List them with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (left out: $_empty_excluded)."
+            mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-all-excluded" "$_empty_manifests"
+            er_record generate degraded no_components "all declared dependencies were left out as development-only or not deployed; manifests found: $_empty_manifests" "" "" "{\"components\":0}"
+        else
+            echo "[WARN] the source declares dependencies ($_empty_manifests) but the SBOM has no components; the scan did not resolve them."
+            mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-with-manifests" "$_empty_manifests"
+            # The resolver steps that failed, which are most often why (a Gradle
+            # or pip step that could not run), from the SBOM build-prep stamped.
+            _empty_failed="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value] | unique | join(", ")' "$OUTPUT_FILE" 2>/dev/null)"
+            er_record generate degraded no_components "manifests found: $_empty_manifests${_empty_failed:+; steps that failed: $_empty_failed}" "" "" "{\"components\":0}"
+        fi
     fi
 fi
 
