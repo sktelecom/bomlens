@@ -24,6 +24,10 @@ Try it without installing anything: the [live demo](https://sktelecom.github.io/
   <img src="docs/images/web-ui-demo.png" alt="BomLens web UI Overview screen for a finished scan: component/vulnerability/dependency/artifact counts, a needs-attention banner, and the severity and license classification distributions" width="860" />
 </p>
 
+## What is an SBOM?
+
+An SBOM (Software Bill of Materials) is a list of the components that make up a piece of software: each library or package, its version and its license, and how they depend on each other. With it you can answer which open-source licenses a product carries and whether it contains a component with a known vulnerability. BomLens writes it in CycloneDX, a standard JSON format. If you build an Android, Java or iOS app, there is a short start page for each: [Android (Gradle)](docs/guides/android-gradle.md), [Java (Maven)](docs/guides/java-maven.md) and [iOS (SwiftPM and CocoaPods)](docs/guides/ios-swift.md).
+
 ## Why it exists
 
 SK Telecom asks its suppliers to submit an SBOM. BomLens lets a supplier produce one that meets the [submission requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/), see what is in its software, and act on the vulnerabilities found. The `skt-submission` conformance profile checks an SBOM against those requirements ([supplier SBOM guide](docs/guides/supplier-sbom.md)). Anyone can use it, whether or not they supply SK Telecom.
@@ -42,6 +46,7 @@ Full docs — searchable, English and Korean — live at **[sktelecom.github.io/
 
 - [First scan](docs/start/first-scan.md) ([한국어](docs/start/first-scan.ko.md)) — install through your first SBOM
 - [No-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) — click by click, for non-developers
+- [Android (Gradle)](docs/guides/android-gradle.md), [Java (Maven)](docs/guides/java-maven.md), [iOS (SwiftPM and CocoaPods)](docs/guides/ios-swift.md) - what to prepare for each
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, an existing SBOM, firmware
 - [CLI reference](docs/reference/cli.md) — every option and environment variable
 - [CI/CD integration](docs/guides/ci-cd.md) — gate a pipeline on scan results
