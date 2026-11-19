@@ -40,6 +40,30 @@ unset SWIFT_SIGNING_KEY
 # The BOMLENS_* opt-out switches count as set only for 1 or true, as documented.
 opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 
+# Build tool for a root that holds both pom.xml and build.gradle(.kts):
+# BOMLENS_BUILD_TOOL=auto|maven|gradle. auto keeps Gradle (the long-standing
+# behavior), maven and gradle read only the named tool's files. The tool not
+# chosen is left out of cdxgen's search (--exclude below) and, for Maven, the
+# Gradle steps are skipped. BUILD_TOOL_CHOSEN stays empty without a tie, so a
+# project with one build tool is never touched by this setting.
+BUILD_TOOL_CHOSEN=""; BUILD_TOOL_WHY=""; BUILD_TOOL_EXCLUDE=""
+if [ -f pom.xml ] && { [ -f build.gradle ] || [ -f build.gradle.kts ]; }; then
+    case "${BOMLENS_BUILD_TOOL:-auto}" in
+        maven)
+            BUILD_TOOL_CHOSEN=maven; BUILD_TOOL_WHY="requested with --build-tool maven"
+            BUILD_TOOL_EXCLUDE="**/build.gradle **/build.gradle.kts **/settings.gradle **/settings.gradle.kts" ;;
+        gradle)
+            BUILD_TOOL_CHOSEN=gradle; BUILD_TOOL_WHY="requested with --build-tool gradle"
+            BUILD_TOOL_EXCLUDE="**/pom.xml" ;;
+        auto|"")
+            BUILD_TOOL_CHOSEN=gradle; BUILD_TOOL_WHY="pom.xml and build.gradle both found; Gradle is the default (--build-tool maven reads pom.xml instead)" ;;
+        *)
+            echo "[build-prep] WARN: BOMLENS_BUILD_TOOL=${BOMLENS_BUILD_TOOL} is not auto, maven or gradle; using auto." >&2
+            BUILD_TOOL_CHOSEN=gradle; BUILD_TOOL_WHY="pom.xml and build.gradle both found; Gradle is the default (--build-tool maven reads pom.xml instead)" ;;
+    esac
+    echo "[build-prep] build tool: pom.xml and build.gradle both found; reading $BUILD_TOOL_CHOSEN ($BUILD_TOOL_WHY)"
+fi
+
 # ---------------------------------------------------------------------------
 # Source-tree guard — hand the scanned project back exactly as we found it.
 #
@@ -1096,7 +1120,7 @@ wrapper_shell() {
     esac
     echo sh
 }
-if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
+if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } || [ "$BUILD_TOOL_CHOSEN" = maven ]; }; then
     _mvn_cmd=""; _mvn_sh=""
     if [ -f ./mvnw ] && [ -d .mvn/wrapper ]; then
         _mvn_cmd=./mvnw
@@ -1487,7 +1511,7 @@ GRADLE_INIT
     rm -rf "$_gr_dir"
 }
 
-if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
+if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN" != maven ] && command -v gradle >/dev/null 2>&1; then
     # A gradlew checked out without the executable bit (a 100644 entry, common
     # from Windows) still runs, through sh (bash when its first line names bash):
     # the JDK image was chosen from its wrapper version, and cdxgen runs it
@@ -1612,7 +1636,7 @@ fi
 
 # A root Gradle build that did not reach the Gradle step above (no gradle
 # command; cdxgen may still run ./gradlew) gets the settings copied here.
-if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
+if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN" != maven ]; then
     gradle_settings_copy
 fi
 
@@ -2130,6 +2154,10 @@ if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
     for _d in $NON_SHIPPED_PATHS; do set -- "$@" --exclude "**/$_d/**"; done
     for _d in $NON_SHIPPED_FILE_GLOBS; do set -- "$@" --exclude "**/$_d"; done
 fi
+# The build tool not chosen (BOMLENS_BUILD_TOOL, root with pom.xml and build.gradle).
+set -f
+for _d in $BUILD_TOOL_EXCLUDE; do set -- "$@" --exclude "$_d"; done
+set +f
 set -- "$@" "$SRC"
 
 # PHP (Composer) / .NET - cdxgen resolves both directly with no pre-resolve step,
@@ -2618,7 +2646,7 @@ if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && [ -z "$_gpk_skip" ] && command -v no
     }
     # The Gradle builds to check, one folder per line.
     _gpk_roots=""
-    if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+    if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN" != maven ]; then
         if { [ -f ./gradlew ] && [ -n "$_gpk_has_java" ]; } || [ -n "$_gpk_has_gradle" ]; then
             _gpk_roots="."
         fi
@@ -6275,6 +6303,27 @@ CARGO_CPR_INDEX
         fi
         rm -f "$_jscpr"
     fi
+fi
+
+# Record which build tool was read when pom.xml and build.gradle sat together
+# (bomlens:build-tool-choice, with the reason in bomlens:build-tool-choice-why).
+if [ "${rc:-1}" -eq 0 ] && [ -n "$BUILD_TOOL_CHOSEN" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _btjs=$(mktemp).js
+    cat > "$_btjs" <<'BT_JS'
+const fs = require('fs');
+const [bomPath, tool, why] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || []).filter(
+  p => p.name !== 'bomlens:build-tool-choice' && p.name !== 'bomlens:build-tool-choice-why');
+props.push({ name: 'bomlens:build-tool-choice', value: tool });
+props.push({ name: 'bomlens:build-tool-choice-why', value: why });
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+BT_JS
+    node "$_btjs" "$OUT" "$BUILD_TOOL_CHOSEN" "$BUILD_TOOL_WHY" || log "build tool: recording skipped (non-fatal)"
+    rm -f "$_btjs"
 fi
 
 # Record what the non-shipped exclusion left out: the patterns in
