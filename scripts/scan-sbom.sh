@@ -1495,22 +1495,36 @@ if [ "$UPLOAD_VAR" = "true" ] && [ -z "${API_KEY:-}" ] && [ -z "${API_URL:-}" ] 
     echo "[INFO] No upload server is set (API_URL, API_KEY), so the SBOM is not uploaded. Use --generate-only to hide this line."
 fi
 
+# Removes a file an earlier run left in the result folder. When another program
+# holds it open (a viewer, an editor, a virus scanner; on Windows also a scan
+# that is still running), rm refuses with one terse line: name the file, the
+# likely reason and what to do instead.
+remove_earlier_result() {
+    local f="$1" err
+    err="$(rm -f -- "$f" 2>&1)" && return 0
+    log_error "Cannot remove the result of an earlier run: $f"
+    [ -z "$err" ] || echo "        ($err)" >&2
+    echo "        Another program probably has it open (a viewer, an editor, a virus scanner, or an earlier scan that is still running)." >&2
+    echo "        Close it and run again, or give this run another folder with -o <folder>." >&2
+    exit 1
+}
+
 # --fail-on-conformance judges this run's own result file, so a stale one from
 # an earlier run at the same --project/--version (this folder is reused, not
 # recreated) must not be mistaken for this run's verdict. Removed before the
 # scan runs; the final check below then trusts "exists" to mean "this run
 # produced it".
 CONFORMANCE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_conformance.result"
-[ "$FAIL_ON_CONFORMANCE" = "true" ] && rm -f "$CONFORMANCE_RESULT_FILE"
+if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then remove_earlier_result "$CONFORMANCE_RESULT_FILE"; fi
 # Same for --fail-on: only this run's own judgement may decide the exit code.
 GATE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_gate.result"
-[ "${#FAIL_ON[@]}" -gt 0 ] && rm -f "$GATE_RESULT_FILE"
+if [ "${#FAIL_ON[@]}" -gt 0 ]; then remove_earlier_result "$GATE_RESULT_FILE"; fi
 # The closing summary's facts (docker/lib/validate-sbom.sh) belong to this run only.
 SUMMARY_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_summary.result"
-rm -f "$SUMMARY_RESULT_FILE"
+remove_earlier_result "$SUMMARY_RESULT_FILE"
 # A cdxgen log an earlier source scan kept (see stage 1 below) is not this
 # run's, whatever mode this run is.
-rm -f "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
+remove_earlier_result "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
 
 # A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
 # the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
@@ -1522,13 +1536,13 @@ rm -f "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
 # nothing (stage 1 hasn't run yet) or stage 1's own fresh file; entrypoint.sh
 # is told that file's name (BOMLENS_RUN_INPUT, below) so it skips it rather
 # than mistaking it for a stale one.
-rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
+remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
 # The conda sidecar stage 1 may write beside it is kept by stage 2's cleanup
 # for the same reason, so an old one is cleared here too.
-rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
+remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
 # An earlier run's refused SBOM (declared components that were refused) is not
 # this run's: the check after stage 2 reads its presence as this run's refusal.
-rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
+remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 
 # The Docker engine stopped under a running scan (Docker Desktop quit or was
 # restarted, the VM ran out of memory): the client reports it in the container's
