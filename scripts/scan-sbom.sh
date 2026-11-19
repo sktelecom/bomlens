@@ -1491,6 +1491,13 @@ OUTPUT_DIR_PREEXISTED=0
 mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
+# No API key and no upload server named (API_URL, --trusca): there is nothing to
+# upload to, and the upload would fail on the missing key after the scan. Skip it.
+if [ "$UPLOAD_VAR" = "true" ] && [ -z "${API_KEY:-}" ] && [ -z "${API_URL:-}" ] \
+   && [ "$UPLOAD_TARGET" != "trusca" ]; then
+    UPLOAD_VAR="false"
+    echo "[INFO] No upload server is set (API_URL, API_KEY), so the SBOM is not uploaded. Use --generate-only to hide this line."
+fi
 
 # --fail-on-conformance judges this run's own result file, so a stale one from
 # an earlier run at the same --project/--version (this folder is reused, not
@@ -3980,7 +3987,7 @@ note_missing() { missing="${missing:+$missing }$1"; }
 # (not a subshell) keeps note_missing's variable.
 SUMMARY_BUF="$(mktemp)"; SUMMARY_ERR="$(mktemp)"
 {
-if [ "$GENERATE_ONLY" = "true" ]; then
+if [ "$UPLOAD_VAR" = "false" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
     echo "  Output dir: ${OUTPUT_HOST_DIR}"
     echo "  SBOM: ${OUTPUT_FILE}"
