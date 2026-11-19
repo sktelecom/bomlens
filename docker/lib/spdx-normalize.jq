@@ -12,7 +12,7 @@
 # unrecognized string is returned unchanged, so a valid-but-wrong SPDX id from the
 # upstream tool (e.g. cdxgen FETCH_LICENSE marking a package 0BSD) is preserved
 # rather than silently rewritten to a guess.
-def normalize($s):
+def normalize_base($s):
   ($s | ascii_downcase | gsub("[ ,._/-]+"; " ") | sub("^ +";"") | sub(" +$";"")) as $n |
   if   ($n | test("(lesser|library) general public.*2 1.*later")) then "LGPL-2.1-or-later"
   elif ($n | test("(lesser|library) general public.*2 1")) then "LGPL-2.1-only"
@@ -44,6 +44,49 @@ def normalize($s):
   elif ($n | test("bsd.*3")) then "BSD-3-Clause"
   elif ($n | test("bsd.*2")) then "BSD-2-Clause"
   else $s end;
+
+# An SPDX exception id (Classpath-exception-2.0, Universal-FOSS-exception-1.0 ...)
+# is not a license. A list such as "GPL-2.0-or-later OR Classpath-exception-2.0"
+# says the exception modifies the license before it, so it becomes
+# "GPL-2.0-or-later WITH Classpath-exception-2.0". The other choices stay joined
+# by OR ("EPL-2.0 OR GPL-2.0-only OR Classpath-exception-2.0" becomes
+# "EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0"). Only a plain list of
+# single ids and "X WITH Y" terms is rewritten; anything with parentheses or AND
+# is returned unchanged.
+def is_spdx_exception($t): ($t | test("^[A-Za-z0-9.+-]+$")) and ((($t | test("exception"; "i")) or ($t | test("^(Linux-syscall-note|LLGPL)$"))));
+def fix_exception_or($s):
+  ($s | split(" OR ")) as $p
+  | if ($p | length) < 2
+       or ($p | any(.[]; test("^[A-Za-z0-9.+-]+( WITH [A-Za-z0-9.+-]+)?$") | not))
+    then $s
+    else
+      (reduce $p[] as $t ([];
+         if (is_spdx_exception($t)) and (length > 0)
+            and ((.[-1] | test(" WITH ")) | not) and ((is_spdx_exception(.[-1])) | not)
+         then .[-1] += " WITH " + $t
+         else . + [$t] end)) | join(" OR ")
+    end;
+
+# normalize: normalize_base, then the license exception that the text names or
+# that an OR list separates from its license (see above).
+# The GPL a name with an exception clause refers to ("GNU General Public License,
+# version 2 with the GNU Classpath Exception", "GPLv2 with classpath exception"),
+# or "" when the name is not a plain GPL one (a mix with CDDL, an LGPL).
+def gpl_with_exception_base($l):
+  if ($l | test("lgpl|lesser|library general|cddl|mpl|epl|eclipse|apache|mit ")) then ""
+  elif ($l | test("general public license|gpl")) then
+    (($l | capture("(?:version |v|gplv?)(?<v>[23])") | .v) // "2") as $v
+    | "GPL-\($v).0-" + (if ($l | test("or later|or any later|or later")) then "or-later" else "only" end)
+  else "" end;
+
+def normalize($s):
+  normalize_base($s) as $b
+  | ($s | ascii_downcase) as $l
+  | (if ($b | test("^GPL-[0-9.]+-(only|or-later)$")) then $b else gpl_with_exception_base($l) end) as $g
+  | if $g != "" and ($l | test("classpath exception")) then $g + " WITH Classpath-exception-2.0"
+    elif $g != "" and ($l | test("universal foss exception")) then $g + " WITH Universal-FOSS-exception-1.0"
+    elif $b == $s and ($s | test(" OR ")) then fix_exception_or($s)
+    else $b end;
 
 # identify_license_text — classify a full license text by its distinctive clause
 # wording, for entries where the upstream tool gave up on the name (cdxgen's Go

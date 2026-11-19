@@ -543,8 +543,13 @@ LICENSE_FIX='(.components) |= (if type=="array" then map(
     .licenses |= map(
       if (has("expression") and (.expression|type)=="string") then
         (normalize(.expression)) as $n |
-        (if $n != .expression then {license:{id:$n}} else . end)
+        (if $n == .expression then .
+         elif ($n | test("\\s")) then {expression:$n}
+         else {license:{id:$n}} end)
       elif ((.license|type)=="object" and (.license.id == null) and ((.license.name // null) != null)) then
+        (normalize(.license.name)) as $en |
+        if ($en != .license.name) and ($en | test("\\s")) then {expression:$en}
+        else
         .license |= (normalize(.name) as $n |
           if $n != .name then ({id:$n} + (if .url then {url:.url} else {} end))
           elif (.name | test("^(custom|unknown|noassertion)$"; "i"))
@@ -554,6 +559,7 @@ LICENSE_FIX='(.components) |= (if type=="array" then map(
                ({id:$tid} + (if .url then {url:.url} else {} end) + {text:.text})
              else . end)
           else . end)
+        end
       else . end
     )
   else . end
