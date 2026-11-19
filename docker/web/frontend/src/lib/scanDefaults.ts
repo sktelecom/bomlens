@@ -232,6 +232,27 @@ export interface FolderInfo {
   subProjects: string[];
   /** Build files directly in the folder; absent when not known. */
   buildTools?: { maven?: boolean; gradle?: boolean };
+  /** The container engine's memory in GB when it is below what a Maven or
+   *  Gradle build needs; absent when enough or not readable. */
+  engineMemoryLowGb?: number;
+  /** Another scan is running now. */
+  otherScanRunning?: boolean;
+}
+
+/** What to tell the user before a Maven or Gradle scan starts: the engine has
+ *  less memory than the build needs, or another scan is already running. Null
+ *  when the folder has no Maven or Gradle build or there is nothing to say. */
+export function buildAdvisory(
+  info: FolderInfo | null | undefined,
+): { lowMemoryGb?: number; otherScanRunning: boolean } | null {
+  if (!info || !(info.buildTools?.maven || info.buildTools?.gradle)) return null;
+  const lowMemoryGb =
+    typeof info.engineMemoryLowGb === "number" && info.engineMemoryLowGb > 0
+      ? info.engineMemoryLowGb
+      : undefined;
+  const otherScanRunning = info.otherScanRunning === true;
+  if (lowMemoryGb === undefined && !otherScanRunning) return null;
+  return { lowMemoryGb, otherScanRunning };
 }
 
 /** The version to prefill: one the source itself states (a docker tag, a

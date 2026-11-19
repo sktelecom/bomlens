@@ -825,8 +825,23 @@ describe("getProjectInfo / scanExists", () => {
       hasManifest: true,
       subProjects: ["a"],
       buildTools: { maven: true, gradle: false },
+      otherScanRunning: false,
     });
     expect(fetchMock.mock.calls[0][0]).toBe("/project-info?source=rootfs-dir&target=%2Fscan-targets%2Fx%2Fapp");
+  });
+
+  it("carries the engine memory warning and the running-scan flag, and drops a bad value", async () => {
+    const answer = (extra: object) =>
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ version: "", versionFrom: "", hasManifest: true, subProjects: [], buildTools: { maven: true, gradle: false }, ...extra }),
+      });
+    vi.stubGlobal("fetch", answer({ engineMemoryLowGb: 3, otherScanRunning: true }));
+    expect(await getProjectInfo("current-dir", "")).toMatchObject({ engineMemoryLowGb: 3, otherScanRunning: true });
+    vi.stubGlobal("fetch", answer({ engineMemoryLowGb: "3", otherScanRunning: "yes" }));
+    const bad = await getProjectInfo("current-dir", "");
+    expect(bad).not.toHaveProperty("engineMemoryLowGb");
+    expect(bad?.otherScanRunning).toBe(false);
   });
 
   it("is null when the folder cannot be read or the server is unreachable", async () => {

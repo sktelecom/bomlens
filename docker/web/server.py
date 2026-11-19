@@ -1077,6 +1077,49 @@ def project_info(scan_dir):
     return out
 
 
+# Same line as warn_low_engine_memory in docker/lib/source-detect.sh: a 4 GiB
+# engine reports a little under 4 GiB (about 3.8), so below 3.5 GiB is "low".
+_LOW_ENGINE_MEMORY_MB = 3584
+
+
+def engine_memory_mb():
+    """The container engine's memory in MiB from `docker info`, or None when it
+    cannot be read (no CLI, no socket, no answer). Host free memory is not
+    visible from inside the container and is not looked at."""
+    if not docker_cli_present() or not docker_capable():
+        return None
+    try:
+        r = subprocess.run(
+            ["docker", "info", "--format", "{{.MemTotal}}"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    text = r.stdout.decode("utf-8", "replace").strip()
+    if not text.isdigit():
+        return None
+    return int(text) // 1024 // 1024
+
+
+def prescan_advisory(info):
+    """What to tell the user before a scan starts, from project_info()'s answer:
+    for a Maven or Gradle folder, whether the engine has less memory than the
+    build needs (engineMemoryLowGb is its size in GB, rounded as the CLI warning
+    rounds it, else absent) and whether another scan is already running. Only
+    verified facts: a value that cannot be read is left out."""
+    out = {"otherScanRunning": False}
+    with _scan_lock:
+        out["otherScanRunning"] = bool(_scan_active)
+    tools = _as_dict(info.get("buildTools"))
+    if tools.get("maven") or tools.get("gradle"):
+        mb = engine_memory_mb()
+        if mb is not None and 0 < mb < _LOW_ENGINE_MEMORY_MB:
+            out["engineMemoryLowGb"] = (mb + 512) // 1024
+    return out
+
+
 def scan_target_not_visible(scan_dir):
     """The message to stop a scan with when the folder to scan is empty inside
     this container, else None. A folder the container engine does not share with
@@ -6793,7 +6836,9 @@ class Handler(BaseHTTPRequestHandler):
         if not scan_dir:
             self._send(404, json.dumps({"error": "folder not found"}))
             return
-        self._send(200, json.dumps(project_info(scan_dir)))
+        info = project_info(scan_dir)
+        info.update(prescan_advisory(info))
+        self._send(200, json.dumps(info))
 
     def _scan_exists(self, qs):
         """GET /scan-exists?project=&version= : whether a finished scan with the

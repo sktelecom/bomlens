@@ -1876,6 +1876,11 @@ export interface ProjectInfo {
   /** Which build files sit directly in the folder. Both true is when the form
    *  offers the Maven or Gradle choice. */
   buildTools: { maven: boolean; gradle: boolean };
+  /** The container engine's memory in GB, only when it is below what a Maven
+   *  or Gradle build needs (the CLI's 3.5 GiB line). Absent otherwise. */
+  engineMemoryLowGb?: number;
+  /** Another scan is running now. */
+  otherScanRunning: boolean;
 }
 
 /** Ask the server what the folder to scan says about itself. The folder is
@@ -1900,6 +1905,10 @@ export async function getProjectInfo(
         maven: j.buildTools?.maven === true,
         gradle: j.buildTools?.gradle === true,
       },
+      ...(typeof j.engineMemoryLowGb === "number" && j.engineMemoryLowGb > 0
+        ? { engineMemoryLowGb: j.engineMemoryLowGb }
+        : {}),
+      otherScanRunning: j.otherScanRunning === true,
     };
   } catch {
     return null;
