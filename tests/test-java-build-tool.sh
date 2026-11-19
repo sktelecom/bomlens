@@ -78,7 +78,7 @@ case "$out" in *"--build-tool takes auto, maven or gradle"*) pass "the message n
 case "$(bash "$ROOT_DIR/scripts/scan-sbom.sh" --help 2>&1)" in *"--build-tool <tool>"*) pass "--help lists --build-tool" ;; *) fail "--help lists --build-tool" ;; esac
 
 echo "== license exceptions =="
-cp "$FIX/java-license-exceptions/bom.json" "$WORK/lic.json"
+cp "$FIX/java-license-exceptions/sbom-exceptions.cdx.json" "$WORK/lic.json"
 bash "$LIB/normalize-sbom.sh" "$WORK/lic.json" >/dev/null 2>&1
 lic() { jq -c --arg n "$1" '.components[] | select(.name==$n) | .licenses' "$WORK/lic.json"; }
 check "jakarta.annotation-api: exception joined with WITH" "$(lic jakarta.annotation-api)" '[{"expression":"GPL-2.0-or-later WITH Classpath-exception-2.0"}]'
