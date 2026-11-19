@@ -1476,7 +1476,7 @@ if command -v tar >/dev/null 2>&1; then
   printf 'layer' > "$d/blobs/sha256/abc123"
   ( cd "$d" && tar -cf image.tar manifest.json blobs ) >/dev/null 2>&1
   scan_in "$d" --project Cimg --version 1 --target image.tar --generate-only
-  { in_out "Container image archive detected" && in_out "Mode: BINARY"; } \
+  { in_out "Container image archive detected" && in_out "Mode: IMAGE"; } \
     && pass "--target <docker save tar> is recognized and not auto-extracted as source" \
     || { fail "docker-save tar container-archive detection"; show; }
 else

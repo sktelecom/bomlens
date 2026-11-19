@@ -1361,7 +1361,7 @@ else
         || fail "no-socket image scan: rc $rc" "$(tail -6 "$IMG/ok.log")"
     image_run "$IMG/bad" registry.example/denied:1
     rc=$?
-    [ "$rc" = 1 ] && grep -q 'registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME' "$IMG/bad.log" \
+    [ "$rc" = 1 ] && grep -q 'the registry refused access. Sign in with SYFT_REGISTRY_AUTH_USERNAME' "$IMG/bad.log" \
         && grep -q 'UNAUTHORIZED' "$IMG/bad.log" \
         && [ "$(jq -r '.run.status' "$IMG/bad/bomlens-result.json" 2>/dev/null)" = "failed" ] \
         && pass "an unreachable image fails with the credentials hint, syft's own error and a failed run" \
