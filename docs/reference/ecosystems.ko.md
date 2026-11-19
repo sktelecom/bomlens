@@ -80,6 +80,8 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 ---
 
+> 참고: 최상위 폴더에 `pom.xml`과 `build.gradle`(또는 `build.gradle.kts`)이 함께 있으면 예전처럼 Gradle 프로젝트로 읽습니다. `pom.xml`만 읽으려면 `--build-tool maven`을 쓰고(Gradle 파일은 스캔에서 제외하며 Gradle 단계도 실행하지 않습니다), Gradle 파일만 읽으려면 `--build-tool gradle`을 씁니다. 스캔 로그에 읽는 도구가 출력되고, SBOM에는 `bomlens:build-tool-choice`로 도구가, `bomlens:build-tool-choice-why`로 이유가 남습니다. 같은 프로젝트라도 두 도구가 해석하는 의존성 집합은 다를 수 있으니 고르기 전에 개수를 비교해 보세요. 빌드 도구가 하나뿐인 폴더나 `pom.xml`이 하위 폴더에만 있는 경우에는 영향이 없습니다.
+
 ## Java (Gradle)
 
 ```bash

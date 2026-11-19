@@ -425,6 +425,12 @@ while [[ "$#" -gt 0 ]]; do
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --detection) DETECTION="${2:-}"; shift ;;
+        --build-tool)
+            case "${2:-}" in
+                auto|maven|gradle) export BOMLENS_BUILD_TOOL="$2" ;;
+                *) echo "[ERROR] --build-tool takes auto, maven or gradle (got '${2:-}')."; exit 1 ;;
+            esac
+            shift ;;
         --fail-on-conformance) FAIL_ON_CONFORMANCE="true" ;;
         # Repeatable. The list of conditions is closed (checked below), so a typo
         # fails here instead of quietly gating on nothing.
@@ -728,6 +734,11 @@ Options:
                          npm-shrinkwrap.json, pnpm-lock.yaml, bun.lock or
                          gradle.lockfile covers the whole tree, and builds
                          otherwise. DETECTION=<how> in the environment does the same
+  --build-tool <tool>    Which build tool a Java folder with both pom.xml and
+                         build.gradle is read with: auto (default, Gradle), maven
+                         or gradle. The choice is recorded on the SBOM as
+                         bomlens:build-tool-choice. BOMLENS_BUILD_TOOL=<tool> in
+                         the environment does the same
   --fail-on-conformance  Exit 2 if this scan's own conformance check report says
                          "fail" (exit 3 if no conformance check report was produced
                          for this scan). Not offered with --ui. See "Exit

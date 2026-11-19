@@ -80,6 +80,8 @@ Detected file: `pom.xml`
 
 ---
 
+> Note: a folder that holds both `pom.xml` and `build.gradle` (or `build.gradle.kts`) at its root is read as a Gradle project by default, as before. Use `--build-tool maven` to read only `pom.xml` (the Gradle files are left out of the scan and no Gradle step runs), or `--build-tool gradle` to read only the Gradle files. The scan prints which tool it reads, and the SBOM records it in `bomlens:build-tool-choice` with the reason in `bomlens:build-tool-choice-why`. The two tools can resolve different dependency sets for the same project, so compare the counts before choosing. A folder with one build tool, or a `pom.xml` only in a subfolder, is not affected.
+
 ## Java (Gradle)
 
 ```bash

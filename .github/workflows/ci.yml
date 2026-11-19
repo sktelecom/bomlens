@@ -462,6 +462,11 @@ jobs:
       - name: Swift detection tests
         run: bash tests/test-swift-detect.sh
 
+      # No Docker: the build tool chosen for a folder with both pom.xml and
+      # build.gradle, and license exceptions written as WITH.
+      - name: Java build tool and license exception tests
+        run: bash tests/test-java-build-tool.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the
