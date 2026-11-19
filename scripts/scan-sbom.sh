@@ -4002,13 +4002,14 @@ rm -f "$SUMMARY_BUF"
 # image, an AI SBOM) it prints nothing.
 if [ -f "$SUMMARY_RESULT_FILE" ]; then
     sum_complete=""; sum_complete_reasons=""; sum_complete_fix=""
-    sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""; sum_empty_manifests=""
+    sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""; sum_empty_manifests=""; sum_basis=""
     while IFS=$'\t' read -r sum_key sum_val; do
         case "$sum_key" in
             components)     sum_components="$sum_val" ;;
             licensed)       sum_licensed="$sum_val" ;;
             licensePercent) sum_license_pct="$sum_val" ;;
             purlPercent)    sum_purl_pct="$sum_val" ;;
+            basis)          sum_basis="$sum_val" ;;
             reduced)        sum_reduced="$sum_val" ;;
             emptyManifests) sum_empty_manifests="$sum_val" ;;
             failedSteps)    sum_failed="$sum_val" ;;
@@ -4031,6 +4032,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                     *) sum_detail="${sum_detail:+$sum_detail, }license declared on ${sum_license_pct}% (${sum_licensed:-0} of ${sum_components})" ;;
                 esac
                 printf '  %-12s %s\n' "Components:" "${sum_components} identified${sum_detail:+ ($sum_detail)}"
+                if [ -n "$sum_basis" ]; then printf '  %-12s %s\n' "" "counted: ${sum_basis}"; fi
                 [ "${sum_licensed:-0}" != "0" ] || echo "[WARN] No component declares a license, so license checks have nothing to work with. Read the log above."
             fi
             # Under --analyze these describe the submitted document's history, not
