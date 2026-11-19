@@ -117,6 +117,7 @@ export function vulnCsvRows(
       v.epss ?? "",
       v.kev ? "yes" : "",
       v.title,
+      (v.introducedBy ?? []).map((d) => (d.version ? `${d.name} ${d.version}` : d.name)).join("; "),
     ]),
   ];
 }

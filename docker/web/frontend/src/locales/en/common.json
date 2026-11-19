@@ -85,7 +85,11 @@
     "dropRefused": "{{name}} is not a file this input takes. Accepted: {{types}}",
     "rootfsAdvanced": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. A Yocto build directory is recognized as one, and the image SBOM the build published is analyzed instead of the build tree. Paths outside the folder are rejected. Place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
     "rootfsAdvancedTitle": "Advanced: OS root filesystems, /src, Yocto and --mount",
-    "currentDirIsOutput": "This folder is where BomLens saves results, so it is not a project to scan. Pick a folder instead."
+    "currentDirIsOutput": "This folder is where BomLens saves results, so it is not a project to scan. Pick a folder instead.",
+    "uploadErrorSbomEmpty": "The SBOM file is empty (0 bytes). The problem is in the file, not in BomLens. Ask the supplier to send it again.",
+    "uploadErrorSbomTruncated": "The SBOM file ends before its JSON document does, so it was probably cut off when it was saved or sent. Ask the supplier to send the file again.",
+    "uploadErrorSbomNotRecognized": "The file is not valid JSON, so it cannot be read as an SBOM. Check that it is a CycloneDX or SPDX JSON file, or ask the supplier to export it again.",
+    "sbomLargeFile": "A file this size can take about {{minutes}} minutes or more to analyze. The progress screen shows the step the scan is in."
   },
   "options": {
     "notice": "Notice",
@@ -284,6 +288,10 @@
       "componentVersions": {
         "title": "Component versions template",
         "desc": "Components found without a version, as a name,version CSV with the versions left empty. Fill in the versions and pass the file back with --component-versions."
+      },
+      "completeness": {
+        "title": "Result completeness",
+        "desc": "How complete this result is, and the reasons when it is not. The overview and the reports read the same file."
       }
     },
     "download": "Download",
@@ -532,7 +540,15 @@
     "vulnColumnRows": "{{shown}} of {{total}} rows have a value",
     "vulnRefsMore": "{{count}} more",
     "vulnSeverityChipHint": "Pick a severity to show only those rows. Pick it again to show all.",
-    "warnSameFolderScan": "Another scan of this folder was still running, so this scan left its working files alone. Two scans of one folder may run at once; if the results look incomplete, scan again after the first one has finished."
+    "warnSameFolderScan": "Another scan of this folder was still running, so this scan left its working files alone. Two scans of one folder may run at once; if the results look incomplete, scan again after the first one has finished.",
+    "colIntroducedBy": "Introduced by",
+    "csvIntroducedBy": "Introduced by",
+    "introducedDirect": "direct",
+    "introducedNoGraph": "The SBOM has no dependency graph, so the direct dependency behind each finding cannot be shown.",
+    "introducedTooLarge": "The SBOM is too large to trace each finding to the direct dependency behind it.",
+    "buildToolTag": "(build tool)",
+    "buildToolHint": "A build tool listed by the project's lock file (for example a Ruby gem of an iOS project). It does not ship in the app.",
+    "licenseClassBasis": "Counted over the first {{shown}} of {{total}} components."
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -846,7 +862,32 @@
     "logDone": "Finished",
     "logFailed": "Failed",
     "failTargetHiddenCause": "The scanner cannot see the folder you selected.",
-    "failTargetHiddenFix": "Check that Docker shares this folder (Colima shares only your home folder; Docker Desktop shares the folders under Settings > Resources > File sharing) and that the folder is not empty. Move the project under your home folder or share its location, then scan again."
+    "failTargetHiddenFix": "Check that Docker shares this folder (Colima shares only your home folder; Docker Desktop shares the folders under Settings > Resources > File sharing) and that the folder is not empty. Move the project under your home folder or share its location, then scan again.",
+    "failSbomFileFix": "Ask the supplier to send the SBOM again, then start a new scan with the new file.",
+    "failImageHostCause": "The registry in the image name could not be found.",
+    "failImageHostFix": "Check the host name in the image name and the network or DNS settings of this machine, then scan again.",
+    "failImageMissingCause": "The registry answered that this image or tag does not exist.",
+    "failImageMissingFix": "Check the image name and the tag (for example repository/name:1.2.3), then scan again.",
+    "failImageAuthCause": "The registry refused access to this image. A private image needs a login. Docker Hub gives the same answer when the image name is wrong.",
+    "failImageAuthFix": "Check the name first. For a private image, run docker login for that registry on this machine, or save the image with docker save and scan the tar file, then scan again.",
+    "live": {
+      "now": "Now: {{step}}",
+      "elapsed": "{{time}} in this step",
+      "quiet": "No new log output for {{time}}. Some steps of a large project stay quiet for several minutes.",
+      "copy": "Copying the folder to a writable location",
+      "pull": "Downloading the image",
+      "buildPrep": "Resolving dependencies with the project's build tool",
+      "generate": "Generating the SBOM",
+      "post": "Final steps",
+      "normalize": "Normalizing the SBOM",
+      "notice": "Writing the notices",
+      "license": "Reading licenses",
+      "security": "Checking vulnerabilities",
+      "deepCve": "Deep CVE matching",
+      "reachability": "Checking reachability",
+      "risk": "Writing the risk report",
+      "analyze": "Analyzing the supplier SBOM"
+    }
   },
   "overview": {
     "needsAttention": "Needs attention",
@@ -1828,7 +1869,8 @@
       "build-failed": "The image build failed. The log below says what Docker reported.",
       "sdk-install": "The Android SDK could not be installed during the build. The log below says why.",
       "connection": "The connection to the app was lost during the build.",
-      "unknown": "The build failed for a reason BomLens does not recognise. The log below says what Docker reported."
+      "unknown": "The build failed for a reason BomLens does not recognise. The log below says what Docker reported.",
+      "notfound": "The registry has no image with this name or tag. Check the name and try again."
     },
     "confirmStart": "BomLens is about to build the image {{image}}. This takes time (several minutes or more) and uses disk space (several gigabytes or more) on this computer. Start it when you are ready, or skip.",
     "startBuild": "Start the build",
@@ -1846,7 +1888,8 @@
       "dns": "The registry could not be resolved. Check the network or DNS settings.",
       "proxy": "The connection was refused or intercepted, which usually means a proxy or a corporate certificate. Ask whoever runs the network.",
       "auth": "The registry refused the download for lack of permission.",
-      "unknown": "The download failed. The log above says what docker reported."
+      "unknown": "The download failed. The log above says what docker reported.",
+      "notfound": "The registry has no image with this name or tag. Check the name and try again."
     }
   },
   "cisa": {

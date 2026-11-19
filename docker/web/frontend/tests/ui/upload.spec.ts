@@ -186,3 +186,38 @@ test("the dropzone has no axe violations, before and after a file", async ({ pag
     .analyze();
   expect(filled.violations).toEqual([]);
 });
+
+test("a supplier SBOM the server cannot read is refused with a reason that blames the file", async ({ page }) => {
+  await stub(page, { uploadOk: true });
+  await page.route("**/upload**", (r) =>
+    r.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "The uploaded SBOM file is empty (0 bytes).", code: "SBOM_FILE_EMPTY" }),
+    }),
+  );
+  let streamed = false;
+  await page.route("**/scan-stream**", (r) => {
+    streamed = true;
+    return r.abort();
+  });
+  await page.goto("/#/new");
+  await page.fill("#project", "supplier");
+  await page.fill("#version", "1.0");
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
+  await page.locator("#file").setInputFiles({ name: "supplier.json", mimeType: "application/json", buffer: Buffer.from("{}") });
+  await page.getByTestId("run-scan").click();
+  await expect(page.getByRole("alert").filter({ hasText: "The SBOM file is empty (0 bytes)" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Ask the supplier to send it again" })).toBeVisible();
+  expect(streamed).toBe(false);
+});
+
+test("a large supplier SBOM says roughly how long the analysis takes", async ({ page }) => {
+  await stub(page, { uploadOk: true });
+  await page.goto("/#/new");
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
+  await page.locator("#file").setInputFiles({ name: "big.json", mimeType: "application/json", buffer: Buffer.alloc(14 * 1024 * 1024, 32) });
+  await expect(page.getByTestId("sbom-large-file")).toContainText("about 5 minutes or more");
+  await page.locator("#file").setInputFiles({ name: "small.json", mimeType: "application/json", buffer: Buffer.from("{}") });
+  await expect(page.getByTestId("sbom-large-file")).toHaveCount(0);
+});

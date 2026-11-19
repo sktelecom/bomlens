@@ -97,6 +97,33 @@ test("a running scan shows the title, the project, the steps with their states a
   await expect(page.getByTestId("run-log")).toHaveJSProperty("open", true);
 });
 
+test("the running screen names the current step and how long it has been in it", async ({ page }) => {
+  await setup(page);
+  await fakeStream(page);
+  await start(page);
+  // Nothing recognisable has been logged yet: no step is named.
+  await expect(page.getByTestId("run-live")).toHaveCount(0);
+  await emit(page, "log", "\u25b6 Preparing a writable copy of demo ...");
+  const live = page.getByTestId("run-live");
+  await expect(live).toContainText("Now: Copying the folder to a writable location");
+  await expect(page.getByTestId("run-live-elapsed")).toContainText(/^\d+:\d\d in this step$/);
+  await emit(page, "log", "[build-prep] gradle: resolving");
+  await expect(live).toContainText("Now: Resolving dependencies with the project's build tool");
+  // A step that has only just started is not described as quiet.
+  await expect(page.getByTestId("run-live-quiet")).toHaveCount(0);
+});
+
+test("a long quiet step is called quiet, not hung, once a minute passes without output", async ({ page }) => {
+  await page.clock.install();
+  await setup(page);
+  await fakeStream(page);
+  await start(page);
+  await emit(page, "log", "[build-prep] gradle: resolving");
+  await expect(page.getByTestId("run-live")).toBeVisible();
+  await page.clock.fastForward(70_000);
+  await expect(page.getByTestId("run-live-quiet")).toContainText("No new log output for 1:");
+});
+
 test("the log follows new lines at its end, stops when scrolled up, and resumes at the end", async ({ page }) => {
   await setup(page);
   await fakeStream(page);
@@ -226,6 +253,18 @@ test("a failed git clone leads with the cause and the fix, keeps the scanner mes
   await expect(steps).not.toContainText("failed");
   await expect(steps.getByText("waiting")).toHaveCount(5);
   await expect(steps.locator(".bl-run-pct")).toHaveCount(0);
+});
+
+test("a missing image and a refused login are told apart", async ({ page }) => {
+  await setup(page);
+  await fakeStream(page);
+  await start(page);
+  await emit(page, "error", {
+    detail: "[ERROR] syft could not read the image nosuch/x:9.9: it does not exist, or the registry needs credentials.\nMANIFEST_UNKNOWN: manifest unknown",
+  });
+  const failed = page.getByTestId("run-failed");
+  await expect(failed).toContainText("The registry answered that this image or tag does not exist.");
+  await expect(failed).toContainText("Check the image name and the tag");
 });
 
 test("an unrecognised failure opens the run log and says to read it", async ({ page }) => {

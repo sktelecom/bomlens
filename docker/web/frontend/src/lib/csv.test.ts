@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { csvFilename, toCsv } from "./csv";
+import type { VulnItem } from "./api";
+import { csvFilename, toCsv, vulnCsvRows } from "./csv";
 
 describe("toCsv", () => {
   it("writes a header and rows separated by CRLF", () => {
@@ -64,5 +65,21 @@ describe("csvFilename", () => {
     expect(csvFilename("///", "components", "2026-08-15")).toBe(
       "scan-components-2026-08-15.csv",
     );
+  });
+});
+
+describe("vulnCsvRows", () => {
+  const base: VulnItem = { id: "CVE-1", severity: "HIGH", pkg: "tomcat-embed-core", installed: "10.1.1", fixed: "10.1.2", title: "t" };
+
+  it("ends each row with the direct dependencies that introduce it", () => {
+    const rows = vulnCsvRows(
+      [
+        { ...base, introducedBy: [{ name: "spring-boot-starter-web", version: "3.2.0" }, { name: "x" }] },
+        base,
+      ],
+      ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+    );
+    expect(rows[1][9]).toBe("spring-boot-starter-web 3.2.0; x");
+    expect(rows[2][9]).toBe("");
   });
 });

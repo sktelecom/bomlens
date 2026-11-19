@@ -70,3 +70,54 @@ const STEP_LABEL_KEY: Record<string, string> = {
 export function pipelineStepLabelKey(step: string): string | undefined {
   return STEP_LABEL_KEY[step];
 }
+
+/**
+ * What a running scan is doing right now, read from the live log. The scanner
+ * prefixes the lines of each stage with a marker; the last marker seen is the
+ * current step. The server adds two of its own before the scanner starts (the
+ * writable copy of the folder and the image download).
+ */
+const LIVE_STEPS: ReadonlyArray<{ id: string; labelKey: string; match: RegExp }> = [
+  { id: "copy", labelKey: "run.live.copy", match: /Preparing a writable copy/i },
+  { id: "pull", labelKey: "run.live.pull", match: /^\[ui\] pulling/i },
+  { id: "buildPrep", labelKey: "run.live.buildPrep", match: /\[build-prep\]/i },
+  { id: "generate", labelKey: "run.live.generate", match: /\[1\/2\]/ },
+  { id: "post", labelKey: "run.live.post", match: /\[2\/2\]/ },
+  { id: "normalize", labelKey: "run.live.normalize", match: /\[normalize\]/i },
+  { id: "notice", labelKey: "run.live.notice", match: /\[notice\]/i },
+  { id: "license", labelKey: "run.live.license", match: /\[(?:license|os-licenses)\]/i },
+  { id: "security", labelKey: "run.live.security", match: /\[(?:security|vex)\]/i },
+  { id: "deepCve", labelKey: "run.live.deepCve", match: /\[nvd-cpe\]/i },
+  { id: "reachability", labelKey: "run.live.reachability", match: /\[reachability\]/i },
+  { id: "risk", labelKey: "run.live.risk", match: /\[risk\]/i },
+  { id: "analyze", labelKey: "run.live.analyze", match: /\[analyze\]/i },
+];
+
+export interface LiveStep {
+  id: string;
+  labelKey: string;
+}
+
+/** The step the newest recognisable log line belongs to, or null before any. */
+export function currentLiveStep(logs: readonly string[]): LiveStep | null {
+  for (let i = logs.length - 1; i >= 0; i--) {
+    const line = logs[i];
+    for (const step of LIVE_STEPS) {
+      if (step.match.test(line)) return { id: step.id, labelKey: step.labelKey };
+    }
+  }
+  return null;
+}
+
+/** A length of time as m:ss, or h:mm:ss from an hour on (no unit words, so the
+ *  same text reads in every language). */
+export function formatElapsed(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const sec = String(s % 60).padStart(2, "0");
+  const min = Math.floor(s / 60);
+  if (min < 60) return `${min}:${sec}`;
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}:${sec}`;
+}
+
+/** Seconds without a new log line after which the screen says the quiet is normal. */
+export const QUIET_AFTER_SECONDS = 60;

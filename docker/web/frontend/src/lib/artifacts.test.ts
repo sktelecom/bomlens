@@ -86,6 +86,13 @@ describe("groupArtifacts", () => {
     expect(cv.formats.map((f) => [f.ext, f.viewable])).toEqual([["csv", true]]);
   });
 
+  it("gives the completeness file a viewable JSON card instead of leaving it unlisted", () => {
+    const groups = groupArtifacts([file(`${PREFIX}_bom.json`), file(`${PREFIX}_completeness.json`)]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom", "completeness"]);
+    expect(groups[1].titleKey).toBe("result.kind.completeness.title");
+    expect(groups[1].formats.map((f) => [f.ext, f.viewable])).toEqual([["json", true]]);
+  });
+
   it("gives the SBOM kept after a refused declaration its own viewable card, not the SBOM card", () => {
     const groups = groupArtifacts([file(`${PREFIX}_bom.refused.json`)]);
     expect(groups.map((g) => g.key)).toEqual(["refusedSbom"]);

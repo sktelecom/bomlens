@@ -21,6 +21,7 @@
 
 /* ---- Steps ---- */
 .bl-run-steps-body { padding: var(--base-size-12) var(--base-size-16) var(--base-size-8); }
+.bl-run-live { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--base-size-4) var(--base-size-12); padding: var(--base-size-12) var(--base-size-16) 0; font-size: var(--text-body-size-medium); }
 .bl-run-pct { margin-left: auto; color: var(--fgColor-muted); font-size: var(--text-body-size-small); font-variant-numeric: tabular-nums; }
 .bl-run-bar { padding: var(--base-size-12) var(--base-size-16) 0; }
 .bl-run-step { display: inline-flex; flex-wrap: wrap; column-gap: var(--base-size-4); align-items: baseline; }

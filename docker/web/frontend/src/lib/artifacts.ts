@@ -116,6 +116,13 @@ const GROUPS: GroupSpec[] = [
     match: (n) => n.endsWith("_component-versions.template.csv"),
   },
   {
+    // How complete the result is and why (assess-completeness.sh). The overview
+    // banner reads it; the file is also kept with the downloads.
+    key: "completeness",
+    rank: 7,
+    match: (n) => n.endsWith("_completeness.json"),
+  },
+  {
     key: "license",
     rank: 6,
     match: (n) => n.includes("_scancode"),

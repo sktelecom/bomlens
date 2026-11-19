@@ -224,6 +224,51 @@ test.describe("search, severity and sort", () => {
   });
 });
 
+test.describe("introduced by", () => {
+  const rows = [
+    {
+      id: "CVE-2025-10",
+      severity: "HIGH",
+      pkg: "tomcat-embed-core",
+      installed: "10.1.1",
+      fixed: "10.1.2",
+      title: "tomcat flaw",
+      cvss: 7.5,
+      introducedBy: [{ name: "spring-boot-starter-web", version: "3.2.0" }, { name: "tomcat-embed-core", version: "10.1.1", direct: true }],
+    },
+    { id: "CVE-2025-11", severity: "LOW", pkg: "rake", installed: "13.0", fixed: "13.1", title: "rake flaw", cvss: 3, buildTool: true },
+  ];
+
+  test("a column names the direct dependency behind a finding, a dash where none is known, and tags build tools", async ({ page }) => {
+    await openVulns(page, "", { security: security(rows, { introducedByState: "ok" }) });
+    await expect(page.getByRole("columnheader", { name: "Introduced by" })).toBeVisible();
+    const cells = page.getByTestId("vuln-introduced-by");
+    await expect(cells).toHaveCount(1);
+    await expect(cells).toContainText("spring-boot-starter-web 3.2.0");
+    await expect(cells).toContainText("tomcat-embed-core 10.1.1 (direct)");
+    await expect(page.getByTestId("vuln-build-tool")).toHaveText("(build tool)");
+    await expect(page.getByTestId("vuln-introduced-gap")).toHaveCount(0);
+  });
+
+  for (const [state, text] of [
+    ["no-graph", "The SBOM has no dependency graph"],
+    ["too-large", "The SBOM is too large to trace each finding"],
+  ] as const) {
+    test(`with no value in any row the reason (${state}) replaces the empty column`, async ({ page }) => {
+      await openVulns(page, "", { security: security(VULNS, { introducedByState: state }) });
+      await expect(page.getByRole("columnheader", { name: "Introduced by" })).toHaveCount(0);
+      await expect(page.getByTestId("vuln-introduced-gap")).toContainText(text);
+    });
+  }
+
+  test("CSV export ends each row with the dependencies that introduce it", async ({ page }) => {
+    await openVulns(page, "", { security: security(rows, { introducedByState: "ok" }) });
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
+    const text = readFileSync((await download.path()) as string, "utf8");
+    expect(text).toContain("spring-boot-starter-web 3.2.0; tomcat-embed-core 10.1.1");
+  });
+});
+
 test.describe("file actions", () => {
   test("CSV export hands over the visible rows in the table's order, with a BOM and formula-safe cells", async ({ page }) => {
     const rows = [

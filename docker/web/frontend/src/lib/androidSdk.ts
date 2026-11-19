@@ -89,6 +89,7 @@ const REASONS = new Set([
   "dns",
   "proxy",
   "auth",
+  "notfound",
   "build-failed",
   "sdk-install",
   "connection",

@@ -85,7 +85,11 @@
     "dropRefused": "{{name}}은 이 입력에서 받을 수 없는 파일입니다. 받는 형식: {{types}}",
     "rootfsAdvanced": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. Yocto 빌드 디렉터리는 그렇게 인식해서, 빌드 트리 대신 빌드가 만든 이미지 SBOM을 분석합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 --mount로 마운트하거나 Docker 이미지 입력을 사용하세요.",
     "rootfsAdvancedTitle": "고급: OS 루트 파일시스템, /src, Yocto, --mount",
-    "currentDirIsOutput": "이 폴더는 BomLens가 결과를 저장하는 폴더라서 스캔할 프로젝트가 아닙니다. 폴더를 직접 고르세요."
+    "currentDirIsOutput": "이 폴더는 BomLens가 결과를 저장하는 폴더라서 스캔할 프로젝트가 아닙니다. 폴더를 직접 고르세요.",
+    "uploadErrorSbomEmpty": "SBOM 파일이 비어 있습니다(0바이트). 문제는 BomLens가 아니라 파일에 있습니다. 공급사에 다시 보내 달라고 요청하세요.",
+    "uploadErrorSbomTruncated": "SBOM 파일이 JSON 문서가 끝나기 전에 끝납니다. 저장하거나 전송하는 중에 잘렸을 가능성이 큽니다. 공급사에 파일을 다시 보내 달라고 요청하세요.",
+    "uploadErrorSbomNotRecognized": "올바른 JSON이 아니어서 SBOM으로 읽을 수 없습니다. CycloneDX 또는 SPDX JSON 파일이 맞는지 확인하거나, 공급사에 다시 내보내 달라고 요청하세요.",
+    "sbomLargeFile": "이 정도 크기의 파일은 분석에 약 {{minutes}}분 이상 걸릴 수 있습니다. 진행 화면에서 지금 어느 단계인지 볼 수 있습니다."
   },
   "options": {
     "notice": "고지문",
@@ -284,6 +288,10 @@
       "componentVersions": {
         "title": "컴포넌트 버전 템플릿",
         "desc": "버전 없이 발견된 컴포넌트를 버전 칸을 비운 name,version CSV로 담은 파일입니다. 버전을 채워 --component-versions로 다시 넘기면 됩니다."
+      },
+      "completeness": {
+        "title": "결과 완전성",
+        "desc": "이 결과가 얼마나 완전한지와, 완전하지 않은 이유를 담은 파일입니다. 개요 화면과 보고서가 같은 파일을 읽습니다."
       }
     },
     "download": "다운로드",
@@ -532,7 +540,15 @@
     "vulnRefsMore": "{{count}}개 더 보기",
     "vulnSeverityChipHint": "심각도를 고르면 그 행만 보입니다. 다시 누르면 전체가 보입니다.",
     "vulnBundleSummary_one": "패키지 {{count}}개를 올리면 CVE {{cves}}건이 해소됩니다",
-    "warnSameFolderScan": "같은 폴더를 스캔하는 다른 작업이 아직 실행 중이어서, 이 스캔은 그 작업의 임시 파일을 건드리지 않았습니다. 한 폴더를 동시에 두 번 스캔해도 되지만, 결과가 불완전해 보이면 먼저 시작한 스캔이 끝난 뒤 다시 스캔하세요."
+    "warnSameFolderScan": "같은 폴더를 스캔하는 다른 작업이 아직 실행 중이어서, 이 스캔은 그 작업의 임시 파일을 건드리지 않았습니다. 한 폴더를 동시에 두 번 스캔해도 되지만, 결과가 불완전해 보이면 먼저 시작한 스캔이 끝난 뒤 다시 스캔하세요.",
+    "colIntroducedBy": "유입 경로",
+    "csvIntroducedBy": "유입 경로",
+    "introducedDirect": "직접",
+    "introducedNoGraph": "SBOM에 의존 관계 정보가 없어서 취약점마다 어느 직접 의존성을 거쳐 들어왔는지 보여 줄 수 없습니다.",
+    "introducedTooLarge": "SBOM이 너무 커서 취약점마다 어느 직접 의존성을 거쳐 들어왔는지 추적하지 않았습니다.",
+    "buildToolTag": "(빌드 도구)",
+    "buildToolHint": "프로젝트의 잠금 파일에 적힌 빌드 도구입니다(예: iOS 프로젝트의 Ruby gem). 앱에 포함되어 배포되지 않습니다.",
+    "licenseClassBasis": "컴포넌트 {{total}}개 중 처음 {{shown}}개 기준으로 센 값입니다."
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -846,7 +862,32 @@
     "logDone": "완료",
     "logFailed": "실패",
     "failTargetHiddenCause": "스캐너가 선택한 폴더를 볼 수 없습니다.",
-    "failTargetHiddenFix": "Docker가 이 폴더를 공유하는지(Colima는 홈 폴더 아래만, Docker Desktop은 Settings > Resources > File sharing의 폴더만 공유합니다)와 폴더가 비어 있지 않은지 확인하세요. 프로젝트를 홈 폴더 아래로 옮기거나 그 위치를 공유한 뒤 다시 스캔하세요."
+    "failTargetHiddenFix": "Docker가 이 폴더를 공유하는지(Colima는 홈 폴더 아래만, Docker Desktop은 Settings > Resources > File sharing의 폴더만 공유합니다)와 폴더가 비어 있지 않은지 확인하세요. 프로젝트를 홈 폴더 아래로 옮기거나 그 위치를 공유한 뒤 다시 스캔하세요.",
+    "failSbomFileFix": "공급사에 SBOM을 다시 보내 달라고 요청한 뒤, 새 파일로 스캔을 다시 시작하세요.",
+    "failImageHostCause": "이미지 이름에 적힌 레지스트리를 찾지 못했습니다.",
+    "failImageHostFix": "이미지 이름의 호스트 이름과 이 컴퓨터의 네트워크 또는 DNS 설정을 확인한 뒤 다시 스캔하세요.",
+    "failImageMissingCause": "레지스트리가 이 이미지 또는 태그가 없다고 응답했습니다.",
+    "failImageMissingFix": "이미지 이름과 태그(예: repository/name:1.2.3)를 확인한 뒤 다시 스캔하세요.",
+    "failImageAuthCause": "레지스트리가 이 이미지에 대한 접근을 거부했습니다. 비공개 이미지는 로그인이 필요합니다. Docker Hub는 이미지 이름이 틀렸을 때도 같은 응답을 줍니다.",
+    "failImageAuthFix": "먼저 이름을 확인하세요. 비공개 이미지라면 이 컴퓨터에서 해당 레지스트리에 docker login을 하거나, docker save로 이미지를 tar 파일로 저장해 그 파일을 스캔한 뒤 다시 스캔하세요.",
+    "live": {
+      "now": "지금: {{step}}",
+      "elapsed": "이 단계 {{time}} 경과",
+      "quiet": "{{time}} 동안 새 로그 출력이 없습니다. 큰 프로젝트는 일부 단계에서 몇 분간 출력이 없을 수 있습니다.",
+      "copy": "폴더를 쓰기 가능한 위치로 복사하는 중",
+      "pull": "이미지를 내려받는 중",
+      "buildPrep": "프로젝트 빌드 도구로 의존성을 해석하는 중",
+      "generate": "SBOM을 생성하는 중",
+      "post": "마무리 단계",
+      "normalize": "SBOM을 정규화하는 중",
+      "notice": "고지문을 작성하는 중",
+      "license": "라이선스를 읽는 중",
+      "security": "취약점을 확인하는 중",
+      "deepCve": "심층 CVE 대조 중",
+      "reachability": "도달 가능성을 확인하는 중",
+      "risk": "위험 보고서를 작성하는 중",
+      "analyze": "공급사 SBOM을 분석하는 중"
+    }
   },
   "overview": {
     "needsAttention": "주의 필요",
@@ -1828,7 +1869,8 @@
       "build-failed": "이미지를 만들지 못했습니다. 아래 로그에 Docker가 보고한 내용이 있습니다.",
       "sdk-install": "만드는 중에 Android SDK를 설치하지 못했습니다. 이유는 아래 로그에 있습니다.",
       "connection": "만드는 중에 앱과의 연결이 끊겼습니다.",
-      "unknown": "BomLens가 알지 못하는 이유로 실패했습니다. 아래 로그에 Docker가 보고한 내용이 있습니다."
+      "unknown": "BomLens가 알지 못하는 이유로 실패했습니다. 아래 로그에 Docker가 보고한 내용이 있습니다.",
+      "notfound": "레지스트리에 이 이름이나 태그의 이미지가 없습니다. 이름을 확인한 뒤 다시 시도하세요."
     },
     "confirmStart": "{{image}} 이미지를 만들기 시작하려 합니다. 시간이 걸리고(수 분 이상) 이 컴퓨터의 디스크를 사용합니다(수 GB 이상). 준비되면 시작하고, 아니면 건너뛰세요.",
     "startBuild": "만들기 시작",
@@ -1846,7 +1888,8 @@
       "dns": "레지스트리 주소를 찾지 못했습니다. 네트워크나 DNS 설정을 확인해 주세요.",
       "proxy": "연결이 거부되거나 중간에서 가로채였습니다. 프록시나 사내 인증서 문제일 때 이렇게 나타납니다. 네트워크 담당자에게 문의해 주세요.",
       "auth": "권한이 없어 레지스트리가 받기를 거부했습니다.",
-      "unknown": "받기에 실패했습니다. 위 로그에 docker가 보고한 내용이 있습니다."
+      "unknown": "받기에 실패했습니다. 위 로그에 docker가 보고한 내용이 있습니다.",
+      "notfound": "레지스트리에 이 이름이나 태그의 이미지가 없습니다. 이름을 확인한 뒤 다시 시도하세요."
     }
   },
   "cisa": {

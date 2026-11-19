@@ -188,6 +188,13 @@ export function VulnerabilitiesTable({
   // A sort in the URL (a shared link) that names a column shows that column.
   const showEpss = columnOn("epss", facts, columnPref) || (facts.epssRows > 0 && sort.key === "epss");
   const showNvd = columnOn("nvd", facts, columnPref) || (facts.nvdRows > 0 && sort.key === "nvdSeverity");
+  // The direct dependency behind each finding. When no row has one the column
+  // would be empty, so the reason is shown above the table instead.
+  const showIntroduced = columnOn("introduced", facts, columnPref);
+  const introducedGap =
+    facts.introducedRows === 0 && (security.introducedByState === "no-graph" || security.introducedByState === "too-large")
+      ? security.introducedByState
+      : null;
   const setColumn = (id: VulnColumnId, on: boolean) =>
     setColumnPref((p) => {
       const next = { ...p, [id]: on };
@@ -207,6 +214,7 @@ export function VulnerabilitiesTable({
       t("result.csvEpss"),
       t("result.csvKev"),
       t("result.csvTitle"),
+      t("result.csvIntroducedBy"),
     ];
     downloadCsv(
       csvFilename(scanId ?? "scan", "vulnerabilities", new Date().toISOString().slice(0, 10)),
@@ -342,7 +350,7 @@ export function VulnerabilitiesTable({
   const q = query.trim().toLowerCase();
   const filtering = Boolean(q || severityFilter || view !== "all");
   const compact = density === "compact";
-  const cols = ["auto", "auto", ...(showEpss ? ["auto"] : []), ...(showNvd ? ["auto"] : []), "minmax(360px, 1fr)", "minmax(96px, 168px)"].join(" ");
+  const cols = ["auto", "auto", ...(showEpss ? ["auto"] : []), ...(showNvd ? ["auto"] : []), "minmax(360px, 1fr)", "minmax(96px, 168px)", ...(showIntroduced ? ["minmax(140px, 240px)"] : [])].join(" ");
   const truncated = items.length < security.TOTAL;
 
   const row = (v: VulnItem, inGroup: boolean) => {
@@ -356,6 +364,7 @@ export function VulnerabilitiesTable({
         onToggle={toggleOpen}
         showEpss={showEpss}
         showNvd={showNvd}
+        showIntroduced={showIntroduced}
         inGroup={inGroup}
         override={vexOverrides[vexKey(v)]}
         imported={imported}
@@ -469,6 +478,17 @@ export function VulnerabilitiesTable({
                   },
                 ]
               : []),
+            ...(facts.introducedRows > 0
+              ? [
+                  {
+                    id: "introduced",
+                    label: t("result.colIntroducedBy"),
+                    checked: showIntroduced,
+                    onToggle: () => setColumn("introduced", !showIntroduced),
+                    detail: t("result.vulnColumnRows", { shown: fmt(facts.introducedRows), total: fmt(facts.rows) }),
+                  },
+                ]
+              : []),
           ]}
         />
         <FilterRow
@@ -485,6 +505,11 @@ export function VulnerabilitiesTable({
           }}
           shown={filtering ? t("result.vulnShown", { shown: visible.length, total: items.length }) : undefined}
         />
+        {introducedGap && (
+          <p className="bl-muted bl-small bl-flat bl-v-introgap" data-testid="vuln-introduced-gap">
+            {t(introducedGap === "no-graph" ? "result.introducedNoGraph" : "result.introducedTooLarge")}
+          </p>
+        )}
         {visible.length === 0 ? (
           <div className="bl-box bl-v-state" data-testid="vuln-no-match">
             <Blankslate>
@@ -515,6 +540,7 @@ export function VulnerabilitiesTable({
                     )}
                     <Table.Header>{t("result.colVulnerability")}</Table.Header>
                     <Table.Header>{t("result.colFixed")}</Table.Header>
+                    {showIntroduced && <Table.Header>{t("result.colIntroducedBy")}</Table.Header>}
                   </Table.Row>
                 </Table.Head>
                 <Table.Body>
