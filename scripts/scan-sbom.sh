@@ -1484,10 +1484,6 @@ if [ "$SBOM_OUTPUT_FLAT" = "1" ]; then
 else
     OUTPUT_HOST_DIR="$OUTPUT_BASE/$RUN_NAME"
 fi
-# Whether this run creates the result folder: a folder the user made beforehand
-# is not removed by cleanup, even when it is still empty after a failure.
-OUTPUT_DIR_PREEXISTED=0
-[ ! -d "$OUTPUT_HOST_DIR" ] || OUTPUT_DIR_PREEXISTED=1
 mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
@@ -1534,6 +1530,15 @@ rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
 # this run's: the check after stage 2 reads its presence as this run's refusal.
 rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 
+# The Docker engine stopped under a running scan (Docker Desktop quit or was
+# restarted, the VM ran out of memory): the client reports it in the container's
+# log, and cdxgen's own failure messages are not the cause. <rc> <log>
+engine_stopped_during_scan() {
+    grep -qE 'error waiting for container|Cannot connect to the Docker daemon|error during connect' "$2" 2>/dev/null && return 0
+    case "$1" in 137|143) docker info >/dev/null 2>&1 || return 0 ;; esac
+    return 1
+}
+
 # Temp dirs (git clone / archive extract) are cleaned on any exit. A container
 # build step (e.g. npm install during a source scan) can leave root-owned files
 # in the mounted temp dir on Linux, where the host user cannot rm them; fall back
@@ -1564,12 +1569,11 @@ cleanup() {
     done
     # A run that ended in failure leaves no result folder holding nothing but
     # its own .scanmeta.json: an empty folder reads as a scan that produced
-    # something. Only a folder this run created per-run (not the flat layout,
-    # not the folder the user ran in) and only when .scanmeta.json is all there
-    # is; any artifact, log or file of an earlier run keeps it.
+    # something. Only a per-run folder (not the flat layout, not the folder the
+    # user ran in), and only when .scanmeta.json is all there is, even if an
+    # earlier failed run left it; any artifact, log or file keeps the folder.
     if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
        && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
-       && [ "${OUTPUT_DIR_PREEXISTED:-1}" = "0" ] \
        && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json 2>/dev/null | head -n 1)" ]; then
         rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
         rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true
@@ -3563,6 +3567,15 @@ if [ "$MODE" = "SOURCE" ]; then
             rm -f "$STAGE1_FIRST_SBOM" "$STAGE1_FIRST_LOG"
         fi
         STAGE1_FIRST_SBOM=""
+    fi
+    if engine_stopped_during_scan "$STAGE1_RC" "$STAGE1_LOG"; then
+        _eng_line="$(grep -E 'error waiting for container|Cannot connect to the Docker daemon|error during connect' "$STAGE1_LOG" 2>/dev/null | head -n 1)"
+        log_error "The Docker engine stopped while the scan was running (rc=$STAGE1_RC${_eng_line:+: $_eng_line}). The scan did not finish and no result was written."
+        echo "        Start the engine again (Docker Desktop, Rancher Desktop, or colima start), and give it more memory if it stopped for lack of it." >&2
+        echo "        Then run the same command again." >&2
+        "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 \
+            || echo "        Once the engine is back, remove the stopped container: docker rm -f $STAGE1_CONTAINER" >&2
+        exit 1
     fi
     # A package registry or download refused for an untrusted certificate (a
     # proxy that inspects TLS) gets one line naming SBOM_EXTRA_CA_CERTS.
