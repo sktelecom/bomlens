@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAdvisory,
   DEFAULT_VERSION,
   mergedProjects,
   parseSbomIdentity,
@@ -202,5 +203,27 @@ describe("mergedProjects", () => {
     expect(mergedProjects({ version: "", hasManifest: true, subProjects: ["a", "b"] })).toEqual([]);
     expect(mergedProjects({ version: "", hasManifest: false, subProjects: ["a"] })).toEqual([]);
     expect(mergedProjects(null)).toEqual([]);
+  });
+});
+
+describe("buildAdvisory", () => {
+  const base = { version: "", hasManifest: true, subProjects: [] };
+  it("is null without a Maven or Gradle build or without anything to say", () => {
+    expect(buildAdvisory(null)).toBeNull();
+    expect(buildAdvisory({ ...base, engineMemoryLowGb: 3, otherScanRunning: true })).toBeNull();
+    expect(buildAdvisory({ ...base, buildTools: { maven: true } })).toBeNull();
+  });
+  it("reports low engine memory and a running scan for a Maven or Gradle folder", () => {
+    expect(buildAdvisory({ ...base, buildTools: { maven: true }, engineMemoryLowGb: 3 })).toEqual({
+      lowMemoryGb: 3,
+      otherScanRunning: false,
+    });
+    expect(buildAdvisory({ ...base, buildTools: { gradle: true }, otherScanRunning: true })).toEqual({
+      lowMemoryGb: undefined,
+      otherScanRunning: true,
+    });
+  });
+  it("ignores a non-positive memory value", () => {
+    expect(buildAdvisory({ ...base, buildTools: { maven: true }, engineMemoryLowGb: 0 })).toBeNull();
   });
 });

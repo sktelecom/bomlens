@@ -256,6 +256,22 @@ export function NewScan({
           />
         </div>
       )}
+      {state.advisory && (
+        <div className="bl-ns-banner" data-testid="build-advisory">
+          <Banner
+            variant="warning"
+            title={t("newscan.advisoryTitle")}
+            description={
+              <>
+                {state.advisory.lowMemoryGb !== undefined && (
+                  <span>{t("newscan.advisoryMemory", { gb: state.advisory.lowMemoryGb })} </span>
+                )}
+                {state.advisory.otherScanRunning && <span>{t("newscan.advisoryBusy")}</span>}
+              </>
+            }
+          />
+        </div>
+      )}
       <div className="bl-ns">
         <div role="radiogroup" aria-label={t("newscan.source")} className="bl-ns-groups">
           {SOURCE_GROUPS.map((group) => {

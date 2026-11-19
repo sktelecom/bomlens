@@ -38,6 +38,7 @@ import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
 import {
   type FolderInfo,
+  buildAdvisory,
   mergedProjects,
   parseSbomIdentity,
   pickVersion,
@@ -354,6 +355,7 @@ export function useScanForm({
   const showDetection = isSourceScan;
   // Offered only when the chosen folder holds both pom.xml and build.gradle(.kts).
   const showBuildTool = isSourceScan && hasBothBuildTools(projectInfo?.buildTools);
+  const advisory = isSourceScan ? buildAdvisory(projectInfo) : null;
   // A declaration file sits at the root of a source tree, or of a Yocto build
   // directory picked with the folder input (the server reads it there).
   const showReadDeclared =
@@ -778,7 +780,7 @@ export function useScanForm({
     byteStable, setByteStable,
     analyzeCpeIndex, setAnalyzeCpeIndex,
     readLockFile, setReadLockFile, showDetection,
-    buildTool, setBuildTool, showBuildTool,
+    buildTool, setBuildTool, showBuildTool, advisory,
     readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,

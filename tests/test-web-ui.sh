@@ -109,6 +109,45 @@ if [ "$(bt both)" = '{"gradle": true, "maven": true}' ] && [ "$(bt kts)" = '{"gr
 else
     fail "/project-info buildTools" "both=$(bt both) kts=$(bt kts) proj=$(bt proj) multi=$(bt multi) linked=$(bt linked)"
 fi
+info=$(curl -fsS "$BASE/project-info?source=rootfs-dir&target=$SCANROOT/proj" 2>/dev/null)
+if echo "$info" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['otherScanRunning'] is False and 'engineMemoryLowGb' not in d, d" 2>/dev/null; then
+    pass "/project-info adds no memory warning when the engine cannot be asked"
+else
+    fail "/project-info without an engine" "$info"
+fi
+# The memory warning against a fake docker: 3 GiB warns, 4 GiB and an unreadable answer do not,
+# a folder without Maven or Gradle never asks, and a running scan is reported.
+mkdir -p "$WORK/memfake"
+cat > "$WORK/memfake/docker" <<'STUB'
+#!/bin/sh
+[ "$1" = info ] || exit 1
+[ -n "$FAKE_MEM" ] && { echo "$FAKE_MEM"; exit 0; }
+exit 1
+STUB
+chmod +x "$WORK/memfake/docker"
+touch "$WORK/memfake/sock"
+mem_check() {  # mem_check <MemTotal bytes or empty> -> prints the advisory as JSON
+    PATH="$WORK/memfake:$PATH" SBOM_DOCKER_SOCK="$WORK/memfake/sock" FAKE_MEM="$1" \
+        SBOM_OUTPUT_DIR="$OUT" python3 -I - "$ROOT_DIR" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+print(json.dumps(server.prescan_advisory({"buildTools": {"maven": True, "gradle": False}}), sort_keys=True))
+print(json.dumps(server.prescan_advisory({"buildTools": {"maven": False, "gradle": False}}), sort_keys=True))
+server._scan_active.add("x_1")
+print(json.dumps(server.prescan_advisory({"buildTools": {"maven": False, "gradle": True}}), sort_keys=True))
+PY
+}
+m3=$(mem_check 3221225472); m4=$(mem_check 4294967296); mx=$(mem_check "")
+if [ "$(echo "$m3" | sed -n 1p)" = '{"engineMemoryLowGb": 3, "otherScanRunning": false}' ] \
+   && [ "$(echo "$m3" | sed -n 2p)" = '{"otherScanRunning": false}' ] \
+   && [ "$(echo "$m3" | sed -n 3p)" = '{"engineMemoryLowGb": 3, "otherScanRunning": true}' ] \
+   && [ "$(echo "$m4" | sed -n 1p)" = '{"otherScanRunning": false}' ] \
+   && [ "$(echo "$mx" | sed -n 1p)" = '{"otherScanRunning": false}' ]; then
+    pass "the pre-scan check warns below 3.5 GiB of engine memory for Maven or Gradle only, and reports a running scan"
+else
+    fail "pre-scan memory advisory" "3GiB=$m3 4GiB=$m4 unreadable=$mx"
+fi
 for bad in "$SCANROOT/escape" "$SCANROOT/../elsewhere" "/etc" "../../etc" "$SCANROOT/nope"; do
     code=$(curl -s -o /dev/null -w '%{http_code}' --get --data-urlencode "target=$bad" --data-urlencode "source=rootfs-dir" "$BASE/project-info")
     [ "$code" = "404" ] || fail "/project-info answered $code for $bad"
