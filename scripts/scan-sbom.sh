@@ -938,6 +938,8 @@ Environment:
   TRUSCA_PROJECT_ID      Target TRUSCA project id (UUID, required for trusca)
   TRUSCA_REF             Ingest ref label (default: main)
   TRUSCA_RELEASE         Ingest release label (default: --version value)
+  UI_PORT                With --ui: the port on this computer (default: 8080).
+                         If it is busy, pick another: UI_PORT=8081 ./scripts/scan-sbom.sh --ui
   EXTERNAL_LOOKUP        With --ui: enable the web UI's CVE/package lookup
                          against OSV.dev (default: true; set false for
                          air-gapped runs)
@@ -1295,6 +1297,19 @@ if [ "$UI_MODE" = "true" ]; then
         MOUNT_FLAGS+=(-v "$(hostpath "$abs"):/scan-targets/$uniq:ro")
         SCAN_ROOTS="$SCAN_ROOTS/scan-targets/$uniq|$(hostpath "$abs")"$'\n'
     done
+    # The address is printed only when the port is free: a busy port used to show
+    # the address first and then Docker's raw "port is already allocated".
+    case "$UI_PORT" in
+        ''|*[!0-9]*) log_error "UI_PORT must be a port number (1 to 65535), got '$UI_PORT'."; exit 1 ;;
+    esac
+    if [ "$UI_PORT" -lt 1 ] || [ "$UI_PORT" -gt 65535 ]; then
+        log_error "UI_PORT must be a port number (1 to 65535), got '$UI_PORT'."; exit 1
+    fi
+    if (exec 3<>"/dev/tcp/127.0.0.1/$UI_PORT") 2>/dev/null; then
+        log_error "Port $UI_PORT is already in use on this computer, so the web UI cannot start there."
+        echo "        Use another port, for example: UI_PORT=$((UI_PORT + 1)) ./scripts/scan-sbom.sh --ui" >&2
+        exit 1
+    fi
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="

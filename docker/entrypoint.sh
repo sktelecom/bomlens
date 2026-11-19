@@ -1090,7 +1090,14 @@ case "$SCAN_MODE" in
                 docker-archive:*|oci-archive:*|oci-dir:*)
                     echo "[ERROR] syft could not read the image archive $TARGET_IMAGE: check that the path is mounted into the container and holds an image in that format." ;;
                 *)
-                    echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works." ;;
+                    # Not found and refused are different problems with different fixes.
+                    if grep -qiE 'unauthorized|authentication required|pull access denied|denied:|requires authentication|\b40[13]\b' "$IMAGE_SYFT_LOG" 2>/dev/null; then
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: the registry refused access. Sign in with SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG. With the CLI, running docker login and docker pull first also works."
+                    elif grep -qiE 'manifest unknown|not found|no such (image|host)|name unknown|MANIFEST_UNKNOWN|repository does not exist' "$IMAGE_SYFT_LOG" 2>/dev/null; then
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: no image has that name or tag. Check the spelling, the tag and the registry host."
+                    else
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works."
+                    fi ;;
             esac
             [ -s "$IMAGE_SYFT_LOG" ] && tail -5 "$IMAGE_SYFT_LOG" >&2
             rm -f "$IMAGE_SYFT_LOG" ${IMAGE_SOURCE_TMPL:+"$IMAGE_SOURCE_TMPL"} ${IMAGE_SOURCE_JSON:+"$IMAGE_SOURCE_JSON"}
