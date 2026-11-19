@@ -1530,6 +1530,11 @@ if [ "$SBOM_OUTPUT_FLAT" = "1" ]; then
 else
     OUTPUT_HOST_DIR="$OUTPUT_BASE/$RUN_NAME"
 fi
+# A folder the user made beforehand, with nothing in it, is theirs and stays after
+# a failed run. One that already held a .scanmeta.json is an earlier failed run's
+# leftover and may go.
+OUTPUT_DIR_OURS=1
+if [ -d "$OUTPUT_HOST_DIR" ] && [ ! -e "$OUTPUT_HOST_DIR/.scanmeta.json" ]; then OUTPUT_DIR_OURS=0; fi
 mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
@@ -1669,10 +1674,11 @@ cleanup() {
     # A run that ended in failure leaves no result folder holding nothing but
     # its own .scanmeta.json: an empty folder reads as a scan that produced
     # something. Only a per-run folder (not the flat layout, not the folder the
-    # user ran in), and only when .scanmeta.json is all there is, even if an
-    # earlier failed run left it; any artifact, log or file keeps the folder.
+    # user ran in) this run made or an earlier failed run left (see
+    # OUTPUT_DIR_OURS), and only when .scanmeta.json is all there is; any artifact, log or file keeps the folder.
     if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
        && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
+       && [ "${OUTPUT_DIR_OURS:-0}" = "1" ] \
        && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json 2>/dev/null | head -n 1)" ]; then
         rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
         rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true
