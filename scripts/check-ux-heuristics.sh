@@ -55,7 +55,7 @@ check_silent_exits() {
     # Look at the offending line plus the 3 lines above it for a user message.
     local ctx
     ctx="$(sed -n "$((n>3 ? n-3 : 1)),${n}p" "$file")"
-    if ! printf '%s' "$ctx" | grep -qiE 'echo|printf|print_error|status |>&2|call :say'; then
+    if ! printf '%s' "$ctx" | grep -qiE 'echo|printf|print_error|log_error|log_warn|windows_path_too_long|status |>&2|call :say'; then
       note_fail "$file:$n — exit without a user-facing message"
       bad=1
     fi
