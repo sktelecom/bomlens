@@ -44,6 +44,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "bundle-lock": "pipelineSteps.bundleLock",
   "gradle-dependencies": "pipelineSteps.gradleDependencies",
   "gradle-packages": "pipelineSteps.gradlePackages",
+  "gradle-wrapper-jdk": "pipelineSteps.gradleWrapperJdk",
   "maven-dependency-tree": "pipelineSteps.mavenDependencyTree",
   "maven-dependency-jars": "pipelineSteps.mavenDependencyJars",
   "maven-dependency-resolve": "pipelineSteps.mavenDependencyResolve",

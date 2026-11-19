@@ -456,6 +456,7 @@
         ko: {
           title: "BomLens를 준비하고 있습니다",
           subtitle: "처음 실행에서는 스캐너 이미지를 한 번 내려받습니다.",
+          subtitleStart: "Docker를 확인하고 스캐너를 시작합니다.",
           stepsLabel: "시작 단계",
           steps: {
             docker: "Docker 확인",
@@ -520,6 +521,7 @@
         en: {
           title: "Getting BomLens ready",
           subtitle: "The first run downloads the scanner image once.",
+          subtitleStart: "Checking Docker and starting the scanner.",
           stepsLabel: "Startup steps",
           steps: {
             docker: "Check Docker",
@@ -583,7 +585,7 @@
       var s = STR[lang];
 
       document.getElementById("title").textContent = s.title;
-      document.getElementById("subtitle").textContent = s.subtitle;
+      document.getElementById("subtitle").textContent = s.subtitleStart;
       document.getElementById("report").textContent = s.report;
       document.getElementById("log-summary").textContent = s.logSummary;
       document.getElementById("log").dataset.empty = s.logEmpty;
@@ -697,6 +699,9 @@
 
       function render(state, reason) {
         currentState = state;
+        // Only a first download says "first run"; every other start does not.
+        document.getElementById("subtitle").textContent =
+          Steps.subtitleKind(state, lastPull) === "first" ? s.subtitle : s.subtitleStart;
         var states = Steps.stepStates(state);
         var failedId = Steps.failedStep(state);
         var announce = "";

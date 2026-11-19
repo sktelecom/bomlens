@@ -13,9 +13,11 @@ import { fileURLToPath } from "node:url";
 // so it never tries to pull the multi-GB scanner image or talk to Docker.
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+// Before the app knows whether the image is already on this machine the screen does not
+// claim a first run; "pulling" (see capture.spec.ts) is what says the first download.
 const SUBTITLE: Record<"en" | "ko", string> = {
-  en: "The first run downloads the scanner image once.",
-  ko: "처음 실행에서는 스캐너 이미지를 한 번 내려받습니다.",
+  en: "Checking Docker and starting the scanner.",
+  ko: "Docker를 확인하고 스캐너를 시작합니다.",
 };
 
 // Seeds the docker-missing screen (SBOM_SMOKE_SCREEN) and checks the rebranded

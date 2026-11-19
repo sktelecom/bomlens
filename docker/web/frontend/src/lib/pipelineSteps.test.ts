@@ -23,6 +23,7 @@ describe("pipelineStepLabelKey", () => {
       "go-mod-tidy",
       "bundle-lock",
       "gradle-dependencies",
+      "gradle-wrapper-jdk",
       "maven-dependency-jars",
       "maven-dependency-resolve",
       "android-release-classpath",

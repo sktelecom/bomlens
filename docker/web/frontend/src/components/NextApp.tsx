@@ -14,6 +14,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
+import { unloadGuardEnabled, warnBeforeUnload } from "@/lib/unloadGuard";
 import { OverviewHeaderLines } from "./Overview";
 import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
@@ -280,6 +281,14 @@ export function NextApp() {
     });
     void refreshRecent();
   }, []);
+
+  // Closing the tab or window ends a running scan and keeps nothing of it, so
+  // the browser asks first. Only while a scan runs.
+  useEffect(() => {
+    if (status !== "running" || !unloadGuardEnabled()) return;
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [status]);
 
   // Reset to the idle New scan screen (in-memory state only; the URL is set by
   // the caller — clicking a `#/` anchor — or by the hash router).

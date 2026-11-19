@@ -59,6 +59,11 @@ const MAIN = {
     updateDownload: "다운로드 페이지 열기",
     updateLater: "나중에",
     scanMountChooseTitle: "스캔할 폴더 선택",
+    scanMountLimitTitle: "추가할 수 있는 폴더 수를 넘었습니다",
+    scanMountLimit: (max, dropped, added) =>
+      (added > 0 ? `폴더 ${added}개를 추가했습니다. ` : "") +
+      `스캔 폴더는 최대 ${max}개까지 추가할 수 있어서 ${dropped}개는 추가하지 못했습니다. ` +
+      "더 이상 쓰지 않는 폴더를 목록에서 제거한 뒤 다시 추가하세요.",
     helpMenu: "도움말",
     reportProblem: "문제 신고",
   },
@@ -93,6 +98,11 @@ const MAIN = {
     updateDownload: "Open download page",
     updateLater: "Later",
     scanMountChooseTitle: "Choose folders to scan",
+    scanMountLimitTitle: "Folder limit reached",
+    scanMountLimit: (max, dropped, added) =>
+      (added > 0 ? `${added} folder${added === 1 ? "" : "s"} added. ` : "") +
+      `At most ${max} scan folders can be added, so ${dropped} ${dropped === 1 ? "was" : "were"} not added. ` +
+      "Remove a folder you no longer use from the list, then add it again.",
     helpMenu: "Help",
     reportProblem: "Report a problem",
   },

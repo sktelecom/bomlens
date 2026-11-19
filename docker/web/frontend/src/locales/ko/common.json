@@ -531,7 +531,8 @@
     "vulnColumnRows": "{{total}}행 중 {{shown}}행에 값이 있습니다",
     "vulnRefsMore": "{{count}}개 더 보기",
     "vulnSeverityChipHint": "심각도를 고르면 그 행만 보입니다. 다시 누르면 전체가 보입니다.",
-    "vulnBundleSummary_one": "패키지 {{count}}개를 올리면 CVE {{cves}}건이 해소됩니다"
+    "vulnBundleSummary_one": "패키지 {{count}}개를 올리면 CVE {{cves}}건이 해소됩니다",
+    "warnSameFolderScan": "같은 폴더를 스캔하는 다른 작업이 아직 실행 중이어서, 이 스캔은 그 작업의 임시 파일을 건드리지 않았습니다. 한 폴더를 동시에 두 번 스캔해도 되지만, 결과가 불완전해 보이면 먼저 시작한 스캔이 끝난 뒤 다시 스캔하세요."
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -1012,7 +1013,8 @@
     "declaredService": "AI 선언에 적은 서비스 기록",
     "componentVersions": "제공된 컴포넌트 버전 채우기",
     "upstreamPurl": "상위 소스 저장소 purl 추가",
-    "matchCpe": "NVD CPE 색인 대조"
+    "matchCpe": "NVD CPE 색인 대조",
+    "gradleWrapperJdk": "Gradle 래퍼용 JDK 선택"
   },
   "completeness": {
     "bannerTitle": "결과 완전성: {{grade}}",
@@ -1763,6 +1765,8 @@
     "colActions": "작업",
     "searchChip": "“{{query}}”",
     "noMatchHint": "다른 검색어나 유형을 시도해 보세요.",
+    "cancelled": "취소됨",
+    "cancelledHint": "스캔이 끝나기 전에 취소되어 남은 결과가 없습니다.",
     "loading": "스캔 목록을 불러오는 중입니다…",
     "keptAfterReinstall": "앱을 제거하거나 다시 설치해도 결과는 이 폴더에 그대로 남습니다."
   },

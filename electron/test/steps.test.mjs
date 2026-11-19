@@ -86,3 +86,13 @@ test("pullPayload carries the tally, whole elapsed seconds and the update flag",
   assert.equal(pullPayload({ complete: 0, total: 0 }, 5_000, 4_000).secs, 0);
   assert.equal(pullPayload({ complete: 1, total: 2 }, 0, 1_000, true).update, true);
 });
+
+test("subtitleKind says first run only while the image is being downloaded for the first time", () => {
+  assert.equal(Steps.subtitleKind("pulling", { complete: 1, total: 3 }), "first");
+  assert.equal(Steps.subtitleKind("pulling", null), "first");
+  // A background refresh of an image already on this machine is not a first run.
+  assert.equal(Steps.subtitleKind("pulling", { update: true }), "start");
+  for (const state of ["idle", "checking", "starting", "ready", "failed-docker", "failed-pull"]) {
+    assert.equal(Steps.subtitleKind(state, null), "start", state);
+  }
+});

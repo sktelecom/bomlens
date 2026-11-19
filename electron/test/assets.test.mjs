@@ -70,3 +70,16 @@ test("hex colours appear only in the fallback palette, never in rules", () => {
     assert.doesNotMatch(rules, /#[0-9a-fA-F]{3,8}\b/, `${screen} has a hex colour outside the fallback`);
   }
 });
+
+test("the installer's side picture is the BomLens icon on a 164x314 24-bit bitmap the package config names", () => {
+  const config = read(path.join(appRoot, "electron-builder.yml"));
+  for (const key of ["installerSidebar", "uninstallerSidebar"]) {
+    const m = new RegExp(`^\\s+${key}:\\s*(\\S+)`, "m").exec(config);
+    assert.ok(m, `${key} is not set in electron-builder.yml`);
+    const bmp = fs.readFileSync(path.join(appRoot, m[1]));
+    assert.equal(bmp.toString("latin1", 0, 2), "BM", `${m[1]} is not a bitmap`);
+    assert.equal(bmp.readInt32LE(18), 164, `${m[1]} width`);
+    assert.equal(Math.abs(bmp.readInt32LE(22)), 314, `${m[1]} height`);
+    assert.equal(bmp.readUInt16LE(28), 24, `${m[1]} must be 24-bit for the installer`);
+  }
+});

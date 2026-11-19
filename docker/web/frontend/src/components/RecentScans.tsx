@@ -87,8 +87,8 @@ function ScanName({ scan }: { scan: RecentScan }) {
   const full = scan.version ? `${scan.project} @${scan.version}` : scan.project;
   // One line: when the column is narrow the end of the line (the version first)
   // gives way to an ellipsis, and the tooltip always holds both in full.
-  return (
-    <Link href={scanHash(scan.id)} title={full} className="bl-scanname">
+  const body = (
+    <>
       <span aria-hidden={cut || undefined}>{shown}</span>
       {cut && <VisuallyHidden>{scan.project}</VisuallyHidden>}
       {scan.version && (
@@ -97,6 +97,19 @@ function ScanName({ scan }: { scan: RecentScan }) {
           {scan.version}
         </span>
       )}
+    </>
+  );
+  // A cancelled scan kept nothing, so there is nothing to open.
+  if (scan.cancelled) {
+    return (
+      <span title={full} className="bl-scanname bl-muted" data-testid="scan-cancelled-name">
+        {body}
+      </span>
+    );
+  }
+  return (
+    <Link href={scanHash(scan.id)} title={full} className="bl-scanname">
+      {body}
     </Link>
   );
 }
@@ -131,12 +144,21 @@ function SeverityCell({ scan, all }: { scan: RecentScan; all: RecentScan[] }) {
   const cmp = scanComparison(all, scan.id);
   return (
     <span className="bl-lbl-wrap">
+      {scan.cancelled && (
+        <Label variant="secondary" title={t("recent.cancelledHint")} data-testid="scan-cancelled">
+          {t("recent.cancelled")}
+        </Label>
+      )}
       {scan.refused && (
         <Label variant="attention" title={t("recent.refusedHint")}>
           {t("recent.refused")}
         </Label>
       )}
-      {scan.maxSeverity ? <SeverityLabel severity={scan.maxSeverity} /> : <span className="bl-muted">—</span>}
+      {scan.maxSeverity ? (
+        <SeverityLabel severity={scan.maxSeverity} />
+      ) : scan.cancelled ? null : (
+        <span className="bl-muted">—</span>
+      )}
       {cmp && cmp.severityDir !== "same" && <Trend up={cmp.severityDir === "up"} />}
     </span>
   );
@@ -149,6 +171,7 @@ function ComponentsCell({ scan, all }: { scan: RecentScan; all: RecentScan[] }) 
   const { t } = useTranslation();
   const fmt = useFormatNumber();
   const cmp = scanComparison(all, scan.id);
+  if (scan.cancelled) return <span className="bl-muted bl-num">—</span>;
   return (
     <span className="bl-num bl-compcell">
       {fmt(scan.components)}
@@ -395,7 +418,9 @@ export function RecentScans({ scans, newHref, onDelete, loading, outputDir }: Pr
                   <SeverityCell scan={s} all={scans} />
                 </span>
                 <span className="bl-muted bl-small bl-num">
-                  {t("recent.rowMeta", { count: s.components, date: formatRelativeTime(s.generatedAt, now, i18n.language) })}
+                  {s.cancelled
+                    ? formatRelativeTime(s.generatedAt, now, i18n.language)
+                    : t("recent.rowMeta", { count: s.components, date: formatRelativeTime(s.generatedAt, now, i18n.language) })}
                 </span>
               </div>
               {/* The demo's data is fixed, so nothing there can be deleted. */}

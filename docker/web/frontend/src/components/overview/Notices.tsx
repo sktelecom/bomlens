@@ -11,6 +11,7 @@ import { gradeLabel, isIncomplete } from "@/lib/completeness";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { pipelineStepLabelKey } from "@/lib/pipelineSteps";
 import { inputSbomFileName, isAiScan } from "@/lib/results";
+import { scanWarningText } from "@/lib/scanWarnings";
 import { formatBytes } from "@/lib/utils";
 
 import { CompletenessReasons } from "../CompletenessReasons";
@@ -241,11 +242,18 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
       testId: "scan-warnings",
       body: (
         <ul>
-          {result.scanWarnings!.map((w) => (
-            <li key={w} className="bl-mono bl-breakall">
-              {w.replace(/^\[WARN\]\s*/, "")}
-            </li>
-          ))}
+          {result.scanWarnings!.map((w) => {
+            const shown = scanWarningText(w);
+            return shown.key ? (
+              <li key={w} data-testid="scan-warning-coded">
+                {t(shown.key)}
+              </li>
+            ) : (
+              <li key={w} className="bl-mono bl-breakall">
+                {shown.text}
+              </li>
+            );
+          })}
         </ul>
       ),
     });

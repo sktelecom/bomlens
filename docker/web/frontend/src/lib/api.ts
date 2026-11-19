@@ -1795,6 +1795,9 @@ export interface RecentScan {
   /** The run stopped because its declaration file was refused: it has no
    *  SBOM (components is 0), and opening it shows the refusal. */
   refused?: boolean;
+  /** The scan was cancelled (the tab was closed before it finished): nothing
+   *  was kept but this record, so there is nothing to open. */
+  cancelled?: boolean;
 }
 
 /** List past scans (newest first). Empty on any failure — history is optional. */

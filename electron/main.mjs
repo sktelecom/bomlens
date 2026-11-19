@@ -26,7 +26,7 @@ import {
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { classifyPullFailure, createPullProgress, pullPayload } from "./lib/pullprogress.mjs";
-import { addScanMounts, parseScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
+import { MAX_SCAN_MOUNTS, parseScanMounts, planScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
 import { buildMenuTemplate, ISSUE_FORM_URL } from "./lib/helpmenu.mjs";
 import { createStartupLogger } from "./lib/log.mjs";
@@ -502,10 +502,21 @@ function registerApp() {
       properties: ["openDirectory", "multiSelections"],
     });
     if (canceled || filePaths.length === 0) return { ok: false, reason: "canceled" };
-    const next = addScanMounts(savedScanMounts(), filePaths);
-    saveScanMounts(next);
+    const plan = planScanMounts(savedScanMounts(), filePaths);
+    // 상한을 넘어 받지 못한 폴더가 있으면 선택 직후에 알린다. 새로 들어간 것이 없으면
+    // 재시작 없이 끝낸다(목록이 그대로이므로 스캐너를 끊을 이유가 없다).
+    if (plan.dropped.length > 0) {
+      await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        title: t.scanMountLimitTitle,
+        message: t.scanMountLimit(MAX_SCAN_MOUNTS, plan.dropped.length, plan.added.length),
+        buttons: ["OK"],
+      });
+    }
+    if (plan.added.length === 0) return { ok: false, reason: plan.dropped.length > 0 ? "limit" : "unchanged" };
+    saveScanMounts(plan.next);
     await restartForScanMounts();
-    return { ok: true, mounts: next };
+    return { ok: true, mounts: plan.next };
   });
 
   ipcMain.handle("scan-mounts:remove", async (event, hostPath) => {

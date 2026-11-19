@@ -51,7 +51,9 @@ async function stub(page: Page, caps: object, extra: { info?: object; exists?: b
 }
 
 test.beforeEach(async ({ page }) => {
+  // The tab-close prompt would stop a test that leaves a running scan.
   await page.addInitScript(() => {
+    (window as unknown as { __BOMLENS_NO_UNLOAD_GUARD__: boolean }).__BOMLENS_NO_UNLOAD_GUARD__ = true;
     window.localStorage.removeItem("bomlens.knownScanRoots");
     window.localStorage.removeItem("bomlens.lastScanRoot");
   });
@@ -146,4 +148,27 @@ test("the first-run screen waits for the list instead of flashing before it", as
   release();
   await expect(page.getByRole("link", { name: /a @1/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Generate your first SBOM" })).toHaveCount(0);
+});
+
+test("a cancelled scan is listed as cancelled, is not a link, and the list says where results stay", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ outputHostDir: "/Users/dev/sbom-output", hostDir: "/p" }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "gone_2.0", project: "gone", version: "2.0", components: 0, maxSeverity: null, isAiScan: false, componentType: null, inputSource: "scan-target-src", generatedAt: 1700000100, cancelled: true },
+        { id: "ok_1.0", project: "ok", version: "1.0", components: 5, maxSeverity: null, isAiScan: false, componentType: "application", inputSource: "current-dir", generatedAt: 1700000000 },
+      ]),
+    }),
+  );
+  await page.goto("/#/");
+  await expect(page.getByTestId("scan-cancelled")).toHaveText("Cancelled");
+  await expect(page.getByTestId("scan-cancelled-name")).toContainText("gone");
+  await expect(page.getByRole("link", { name: /gone/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /ok @1.0/ })).toBeVisible();
+  await expect(page.getByTestId("recent-output-dir")).toHaveText("/Users/dev/sbom-output");
+  await expect(page.getByTestId("recent-kept-note")).toContainText("after you remove or reinstall the app");
 });
