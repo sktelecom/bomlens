@@ -31,6 +31,12 @@ cd "$SRC" 2>/dev/null || exit 0
 
 log() { echo "[build-prep] $*"; }
 
+# The swift cdxgen images set SWIFT_SIGNING_KEY (the public key their toolchain
+# was verified with). It is not a secret, but cdxgen's environment audit lists
+# any variable named like a credential and printed a "Credential Exposure"
+# table in every Swift scan log. Nothing here reads it.
+unset SWIFT_SIGNING_KEY
+
 # The BOMLENS_* opt-out switches count as set only for 1 or true, as documented.
 opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 
@@ -2249,22 +2255,44 @@ FIX_LIC_JS
 }
 fix_lic_mapping
 
+# A Swift tree (Package.swift, a committed Package.resolved or an Xcode project):
+# cdxgen resolves it with `swift package`, which clones every dependency, and a
+# clone that waits for a login or a server that does not answer used to hold the
+# scan with no output. Git is told not to ask (GIT_TERMINAL_PROMPT=0) and the run
+# gets the same time limit as the other resolver steps (BOMLENS_PREP_TIMEOUT).
+CDXGEN_SWIFT_TREE=""
+if [ -n "$(find . \( -name .git -o -name node_modules -o -name Pods -o -name vendor -o -name .build \) -prune -o \
+        \( -name Package.swift -o -name Package.resolved -o -name '*.xcodeproj' \) -print 2>/dev/null | head -n 1)" ]; then
+    CDXGEN_SWIFT_TREE=1
+    GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"; export GIT_TERMINAL_PROMPT
+fi
+run_cdxgen() {
+    if [ -n "$CDXGEN_SWIFT_TREE" ]; then
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$@"
+    else
+        run_supervised "$@"
+    fi
+}
+
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
 if command -v cdxgen >/dev/null 2>&1; then
     log "cdxgen (PATH)"
-    run_supervised cdxgen "$@"
+    run_cdxgen cdxgen "$@"
     rc=$?
 elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
     log "cdxgen (/opt/cdxgen/bin/cdxgen.js)"
-    run_supervised node /opt/cdxgen/bin/cdxgen.js "$@"
+    run_cdxgen node /opt/cdxgen/bin/cdxgen.js "$@"
     rc=$?
 elif [ -f /opt/bin/cdxgen ]; then
     log "cdxgen (/opt/bin/cdxgen)"
-    run_supervised /opt/bin/cdxgen "$@"
+    run_cdxgen /opt/bin/cdxgen "$@"
     rc=$?
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
+fi
+if [ "${rc:-0}" -eq 124 ]; then
+    log "cdxgen: stopped after ${PREP_TIMEOUT_DEFAULT}s on a Swift tree (a dependency clone that does not finish is the usual cause); raise BOMLENS_PREP_TIMEOUT to wait longer"
 fi
 
 # Poetry with no lock file, second half. With pyproject.toml present cdxgen

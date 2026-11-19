@@ -457,6 +457,11 @@ jobs:
       - name: Ecosystem resolution tests
         run: bash tests/test-ecosystem-resolution.sh
 
+      # No Docker: an Xcode project or Swift package below the root is Swift,
+      # and build-prep.sh drops SWIFT_SIGNING_KEY and limits the Swift run.
+      - name: Swift detection tests
+        run: bash tests/test-swift-detect.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the
