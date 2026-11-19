@@ -6,13 +6,13 @@ description: Install BomLens and generate your first SBOM. The fastest path need
 
 From install to your first [SBOM](../concepts/what-is-sbom.md), step by step. The fastest path needs no command line — download the app and double-click.
 
-> Just want an SBOM or a notice quickly, no commands? Start with the [no-CLI quick start](../start/no-cli.md).
+> Just want an SBOM or a notice quickly, no commands? Start with the [no-CLI quick start](../start/no-cli.md). Building an Android, Java or iOS app? There is a short page for each: [Android (Gradle)](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS (SwiftPM and CocoaPods)](../guides/ios-swift.md).
 
 BomLens runs on a Docker engine, but the desktop app and web UI set it up and pull the image for you. You only manage Docker yourself for the CLI — see [Requirements](#requirements) below if you still need to install one.
 
 ## Start without the command line (recommended)
 
-Download [BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 250 MB), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
+Download the installer for your system, [Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 1.4 GB on disk), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so Edge may hold the download back and Windows SmartScreen may warn when you open it. The [no-CLI quick start](../start/no-cli.md) shows each of those steps, how to update the app, and what to do on macOS.
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
@@ -28,9 +28,9 @@ git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-`--depth 1` skips the repository history, which cuts the download from about 465 MB to about 50 MB. The first launch can take a minute or two before the page loads: the script downloads the scanner image if it is missing (about 250 MB), or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
+`--depth 1` skips the repository history, which cuts the download from about 465 MB to about 50 MB. The first launch can take a minute or two before the page loads: the script downloads the scanner image if it is missing (about 1.4 GB on disk), or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
 
-Results go to `~/sbom-output` (change it with `--output-dir`): each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only; on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after cloning, that is the BomLens repository itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+Results go to `~/sbom-output` (change it with `--output-dir`): each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, the script stops before it prints an address and names a free port to use, for example `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`. On Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead (see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after cloning, that is the BomLens repository itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
@@ -43,7 +43,7 @@ Screen layout and per-target details are in the [web UI reference](../reference/
 
 ## Your first SBOM (CLI)
 
-Advanced, for automation and CI. Run from the cloned repo. The first run downloads the scanner image (about 250 MB) and a language image (0.6-1.7 GB), so allow a few minutes. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
+Advanced, for automation and CI. Run from the cloned repo. The first run downloads the scanner image (about 1.4 GB on disk) and a language image (3 to 16 GB on disk, for example 2.9 GB for Node.js and 5.6 GB for Java), so allow a few minutes to tens of minutes depending on the network. Before a download the script prints the size and stops if the Docker engine has less free space than that plus 2 GB ([sizes and cleanup](../reference/docker-image.md#how-much-disk-do-the-images-take)). A long step prints a `Still running` line every minute, so a quiet terminal is not a hang. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
 
 <!-- runnable -->
 ```bash
@@ -132,7 +132,7 @@ BomLens needs only a Docker *engine* — not a specific product.
 |------|---------|
 | Docker | 20.10+ |
 | Memory | 4 GB+ allocated to the Docker engine |
-| Disk | 4 GB+ (for the Docker image) |
+| Disk | about 10 GB free in the Docker engine for a first scan of one language; 20 GB or more for .NET or a mixed-language tree |
 | OS | Linux, macOS, Windows |
 | Arch | AMD64, ARM64 |
 
@@ -146,6 +146,8 @@ If you already run a Docker engine (Docker Desktop, Rancher Desktop, Colima, doc
 bash scripts/check-setup.sh
 docker run --rm hello-world
 ```
+
+The check also lists the BomLens images on the machine with their sizes, their total and the engine's free disk space, and says how to free space when it is low. `BOMLENS_SKIP_DISK_CHECK=1` skips the stop before a download.
 
 If BomLens stops with `Cannot reach the Docker engine`, the `docker` command exists but the engine is not running. Start Docker Desktop or Rancher Desktop and wait for its icon to settle, or run `colima start` for Colima, then run the command again.
 
@@ -185,6 +187,14 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 Clone the repo inside WSL and run `./scripts/scan-sbom.sh ...` as above. For the CLI on Windows without WSL2, install [Git for Windows](https://git-scm.com/download/win) (Git Bash) and use `scripts\scan-sbom.bat`.
 
+## Can I stop a scan?
+
+In the web UI and the desktop app, Cancel asks first, because it stops the scan and keeps nothing it found. Closing the browser tab or the app window during a scan cancels it the same way, and the scan then appears in the list as Cancelled. On the command line, press Ctrl+C.
+
+## Reading the completeness grade
+
+Every scan writes `{Project}_{Version}_completeness.json`, and the Overview screen and the reports show the same grade: `complete`, `partial` or `unreliable`. A partial or unreliable grade means the list can be short, for example because a lock file is missing or a build step failed, and it names the reasons. Read a result with no vulnerabilities as "none found" only when the grade is `complete`. In the Vulnerabilities list, the Introduced by column names the direct dependency each finding arrives through, so you know which one to update. The columns are described in the [web UI reference](../reference/ui.md); the grade values in the [artifacts reference](../reference/artifacts.md).
+
 ## Next steps
 
 | Goal | Doc |
@@ -193,6 +203,8 @@ Clone the repo inside WSL and run `./scripts/scan-sbom.sh ...` as above. For the
 | Notice, security & risk reports, web UI | [Reports guide](../guides/reports.md) |
 | Every option and CI/CD | [CLI reference](../reference/cli.md) |
 | Language example projects | [Ecosystems](../reference/ecosystems.md) |
+| Android, Java or iOS projects | [Android](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS](../guides/ios-swift.md) |
+| Image sizes and freeing disk | [Docker image reference](../reference/docker-image.md#how-much-disk-do-the-images-take) |
 | Internals | [Architecture](../concepts/architecture.md) |
 | Contributing | [Contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) |
 
