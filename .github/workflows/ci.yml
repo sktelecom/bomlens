@@ -467,6 +467,11 @@ jobs:
       - name: Java build tool and license exception tests
         run: bash tests/test-java-build-tool.sh
 
+      # No Docker: a scan whose declared dependencies were all left out as
+      # development-only is reported as partial with its own reason.
+      - name: Empty-after-exclusion completeness tests
+        run: bash tests/test-empty-excluded.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the

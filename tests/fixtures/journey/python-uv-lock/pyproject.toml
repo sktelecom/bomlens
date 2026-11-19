@@ -1,0 +1,13 @@
+[project]
+name = "itsdang"
+version = "2.3.0"
+description = "Safely pass data to untrusted environments and back."
+requires-python = ">=3.10"
+
+[dependency-groups]
+tests = ["pytest"]
+dev = ["pytest", "tox"]
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"

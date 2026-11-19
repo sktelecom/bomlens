@@ -37,6 +37,9 @@
 #   bomlens:sbom-empty-with-manifests             (empty-with-manifests, or
 #                                                 unsupported-build-system when every
 #                                                 manifest is a vcpkg, Conan or CMake FetchContent one)
+#   bomlens:sbom-empty-all-excluded              (only-excluded-dependencies: every declared
+#                                                 dependency was left out as development-only
+#                                                 or not deployed, so none is listed)
 #   bomlens:sbom-tool-degraded                    (tool-degraded)
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
 #                                                 (resolution-failed)
@@ -88,6 +91,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   ($reg[0]) as $R
   | ([ .components[]? | recurse(.components[]?) ]) as $comps
   | (prop("bomlens:sbom-empty-with-manifests") | first // null) as $empty
+  | (prop("bomlens:sbom-empty-all-excluded") | first // null) as $allexcl
   | (prop("bomlens:sbom-tool-degraded") | first // null) as $degraded
   | ([ prop("bomlens:pipeline-step-failed")[] | clean(100) | select(. as $s | ($R.resolutionSteps | index($s)) or any(($R.resolutionStepPrefixes // [])[]; . as $p | $s | startswith($p))) ]
        | unique | .[0:20]) as $failed
@@ -107,8 +111,9 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   | ($empty != null and ($empty | split(",") | map(gsub("^\\s+|\\s+$"; "") | split("/") | last)
         | all(.[]; test("^(vcpkg\\.json|conanfile\\.(txt|py)|CMakeLists\\.txt)$")))) as $cpp_only
   | ([
-      (if ($comps | length) == 0 and ($empty == null) and ($model_root | not)
+      (if ($comps | length) == 0 and ($empty == null) and ($allexcl == null) and ($model_root | not)
          then {code: (if $supplied then "no-components-supplied" else "no-components" end), detail: ""} else empty end),
+      (if $allexcl != null and $empty == null then {code: "only-excluded-dependencies", detail: ($allexcl | clean(200))} else empty end),
       (if $empty != null then {code: (if $cpp_only then "unsupported-build-system" else "empty-with-manifests" end), detail: ($empty | clean(200))} else empty end),
       (if $degraded != null then {code: "tool-degraded", detail: ($degraded | clean(100))} else empty end),
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),

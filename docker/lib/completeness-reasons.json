@@ -44,6 +44,13 @@
       "fixEn": "Scan with --identify-vendored to identify C/C++ source that is copied into the tree, or list the dependencies in sbom-declared.cdx.json at the project root and scan again.",
       "fixKo": "--identify-vendored 옵션으로 트리에 복사된 C/C++ 소스를 식별하거나, 프로젝트 최상위 폴더의 sbom-declared.cdx.json에 의존성을 직접 적은 뒤 다시 스캔하세요."
     },
+    "only-excluded-dependencies": {
+      "grade": "partial",
+      "en": "Every dependency the source declares ({detail}) was left out of the SBOM because it is only for development or tests, or is not part of the deployed product, so the SBOM lists no component. If the product really has no runtime dependencies, this result is correct.",
+      "ko": "소스에 선언된 의존성({detail})이 모두 개발용·테스트용이거나 배포 대상이 아니라서 SBOM에서 제외되어 컴포넌트가 없습니다. 제품에 런타임 의존성이 실제로 없다면 이 결과가 맞습니다.",
+      "fixEn": "To list the excluded ones, scan again with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (development dependencies) or BOMLENS_MAVEN_FULL_GRAPH=1 (Maven). The names left out are in the SBOM property bomlens:excluded-components.",
+      "fixKo": "제외된 의존성을 목록에 넣으려면 BOMLENS_INCLUDE_DEV_DEPENDENCIES=1(개발 의존성) 또는 BOMLENS_MAVEN_FULL_GRAPH=1(Maven)로 다시 스캔하세요. 제외된 이름은 SBOM의 bomlens:excluded-components 속성에 있습니다."
+    },
     "no-components": {
       "grade": "partial",
       "en": "No component was found, so there is nothing to check for vulnerabilities or licenses. If this project should have dependencies, find out why none were found.",
