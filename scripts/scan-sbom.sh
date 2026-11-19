@@ -973,9 +973,30 @@ fi
 # ========================================================
 # Docker checks
 # ========================================================
+# windows_path_too_long <path> <what>: under Git Bash, a path of 260 characters
+# or more (the Windows MAX_PATH limit) cannot be used as a working folder or a
+# mount source by docker.exe. Prints the cause and a way out, and returns 0 for
+# such a path; returns 1 elsewhere and for a path that fits.
+windows_path_too_long() {
+    local p="$1" what="$2" win
+    [ -n "$DOCKER_MSYS" ] || return 1
+    win="$(hostpath "$p")"
+    [ "${#win}" -ge 260 ] || return 1
+    log_error "$what is ${#win} characters long: $win"
+    echo "        Windows allows 259 characters in a path, so Docker cannot use it. This is not a Docker engine problem." >&2
+    echo "        Move the project closer to the drive root (for example C:\\src\\app), or run from a shorter folder, and run again." >&2
+    return 0
+}
+
 docker_check() {
     command -v docker &>/dev/null || { log_error "Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
-    docker info >/dev/null 2>&1 || { log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1; }
+    if ! docker info >/dev/null 2>&1; then
+        # Windows (Git Bash): a working folder of 260 characters or more makes
+        # docker.exe fail before it reaches the engine, with the same outcome as
+        # an engine that is not running. Tell the two apart.
+        windows_path_too_long "$(pwd)" "the working folder" && exit 1
+        log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1
+    fi
 }
 
 # `docker run` only auto-pulls an image that is entirely ABSENT locally; once a
@@ -1428,6 +1449,13 @@ if [ "$UPLOAD_TARGET" = "trusca" ] && [ "$GENERATE_ONLY" != "true" ] && [ -z "$T
     log_error "TRUSCA upload requires a project id: --trusca <id> or TRUSCA_PROJECT_ID env."; exit 1
 fi
 docker_check
+if [ -n "$DOCKER_MSYS" ] && [ -n "$TARGET" ] && [ -e "$TARGET" ]; then
+    case "$TARGET" in
+        /*|[A-Za-z]:*) _target_abs="$TARGET" ;;
+        *)             _target_abs="$(pwd)/$TARGET" ;;
+    esac
+    if windows_path_too_long "$_target_abs" "The --target path"; then exit 1; fi
+fi
 
 # A scan container whose own run never got the chance to remove it (the
 # process killed under memory pressure, a terminal force-closed, the host
