@@ -34,7 +34,7 @@ extract_fn() {
     ' "$SCRIPT"
 }
 
-for fn in ensure_image_fresh _refresh_image_quietly; do
+for fn in log_warn log_error ensure_image_fresh _refresh_image_quietly; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then
         echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1
