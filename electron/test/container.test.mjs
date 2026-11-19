@@ -35,6 +35,7 @@ import {
   resolveHostDir,
   versionTagBefore1132,
   scanMountArgs,
+  settingsMountArgs,
   androidBuildArgs,
   defaultAndroidBuildDir,
   prepareAndroidBuildDir,
@@ -580,4 +581,38 @@ test("androidBuildArgs keeps Windows paths with a drive letter, spaces and Korea
   assert.equal(args[0], "-v");
   assert.equal(args[1], `${dir}:/opt/bomlens-android-build:ro`);
   assert.equal(args.length, 4);
+});
+
+test("settingsMountArgs mounts only the settings files that exist, read-only, at the CLI's paths", () => {
+  const present = new Set([
+    path.join("/home/u", ".m2", "settings.xml"),
+    path.join("/home/u", ".gradle", "gradle.properties"),
+    path.join("/home/u", ".gradle", "init.d"),
+  ]);
+  const args = settingsMountArgs({
+    home: "/home/u",
+    isFile: (p) => present.has(p) && !p.endsWith("init.d"),
+    isDir: (p) => present.has(p) && p.endsWith("init.d"),
+  });
+  assert.deepEqual(args, [
+    "-v", `${path.join("/home/u", ".m2", "settings.xml")}:/bomlens-settings/m2/settings.xml:ro`,
+    "-v", `${path.join("/home/u", ".gradle", "gradle.properties")}:/bomlens-settings/gradle/gradle.properties:ro`,
+    "-v", `${path.join("/home/u", ".gradle", "init.d")}:/bomlens-settings/gradle/init.d:ro`,
+  ]);
+});
+
+test("settingsMountArgs covers every file the CLI mounts and nothing when none exist", () => {
+  const all = settingsMountArgs({ home: "/h", isFile: () => true, isDir: () => true });
+  const targets = all.filter((_, i) => i % 2 === 1).map((v) => v.split(":")[1]);
+  assert.deepEqual(targets, [
+    "/bomlens-settings/m2/settings.xml",
+    "/bomlens-settings/m2/settings-security.xml",
+    "/bomlens-settings/gradle/gradle.properties",
+    "/bomlens-settings/gradle/init.gradle",
+    "/bomlens-settings/gradle/init.gradle.kts",
+    "/bomlens-settings/gradle/init.d",
+  ]);
+  assert.ok(all.filter((_, i) => i % 2 === 1).every((v) => v.endsWith(":ro")));
+  assert.deepEqual(settingsMountArgs({ home: "/h", isFile: () => false, isDir: () => false }), []);
+  assert.deepEqual(settingsMountArgs({ home: "" }), []);
 });

@@ -1329,6 +1329,16 @@ if [ "$UI_MODE" = "true" ]; then
         MOUNT_FLAGS+=(-v "$(hostpath "$abs"):/scan-targets/$uniq:ro")
         SCAN_ROOTS="$SCAN_ROOTS/scan-targets/$uniq|$(hostpath "$abs")"$'\n'
     done
+    # The user's Maven and Gradle settings, read-only and only the files that
+    # exist, at the same /bomlens-settings paths the CLI scan uses. The cdxgen
+    # sibling container inherits them through --volumes-from. Contents are never read here.
+    for _mf in settings.xml settings-security.xml; do
+        [ -f "$HOME/.m2/$_mf" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.m2/$_mf"):/bomlens-settings/m2/$_mf:ro")
+    done
+    for _gf in gradle.properties init.gradle init.gradle.kts; do
+        [ -f "$HOME/.gradle/$_gf" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.gradle/$_gf"):/bomlens-settings/gradle/$_gf:ro")
+    done
+    [ -d "$HOME/.gradle/init.d" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.gradle/init.d"):/bomlens-settings/gradle/init.d:ro")
     # The address is printed only when the port is free: a busy port used to show
     # the address first and then Docker's raw "port is already allocated".
     case "$UI_PORT" in
