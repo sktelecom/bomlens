@@ -12,9 +12,11 @@
 # check-setup.sh - checks that the environment is ready before BomLens is used
 # (macOS/Linux/WSL2; check-setup.bat is the Windows counterpart and probes the
 # same things). It checks, in order: Docker installed, engine running, scanner
-# image present, the Android SDK image (only Android scans need it), that the
-# container can see the folder you scan (the current folder, or the one given as
-# the first argument), engine memory for Java builds, UI port free. Each blocked
+# image present (the version of this CLI), the Android SDK image (only Android
+# scans need it), that the container can see the folder you scan (the current
+# folder, or the one given as the first argument), engine memory for Java
+# builds, the images BomLens has downloaded with their total size and the free
+# disk space of the engine (with how to clean up), UI port free. Each blocked
 # item says what to do next, in English or Korean.
 #
 # Language: SBOM_LANG=ko|en, else the locale (LC_ALL, LC_MESSAGES, LANG); Korean
@@ -34,7 +36,15 @@
 
 set -u
 
-DOCKER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"
+# The version of this CLI bundle, written in by the release build (an unreleased
+# checkout keeps the placeholder). The default scanner image is the one of that
+# version, as the desktop app uses, not whatever :latest is on this machine.
+BOMLENS_CLI_VERSION="@BOMLENS_VERSION@"
+case "$BOMLENS_CLI_VERSION" in
+    @*) DEFAULT_IMAGE_TAG="latest"; CLI_VERSION_KNOWN=0 ;;
+    *)  DEFAULT_IMAGE_TAG="$BOMLENS_CLI_VERSION"; CLI_VERSION_KNOWN=1 ;;
+esac
+DOCKER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:$DEFAULT_IMAGE_TAG}"
 UI_PORT="${UI_PORT:-8080}"
 # Engine memory below this is a hint for Maven/Gradle builds (3.5 GiB; a 4 GiB
 # engine reports about 3.8 GiB), the same line as scan-sbom.sh's warning.
@@ -76,13 +86,21 @@ if [ "$SBOM_LANG" = ko ]; then
     M_RERUN="   설치 후 이 점검을 다시 실행하세요."
     M_X_NO_ENGINE="Docker 엔진이 실행 중이 아닙니다. Rancher Desktop / Docker Desktop을 켜고 아이콘이 안정될 때까지 기다리세요."
     M_X_NO_IMAGE="스캐너 이미지가 아직 없습니다:"
-    M_PREPULL="   처음 실행할 때 약 250MB를 자동으로 내려받습니다. 지금 미리 받으려면:"
+    M_PREPULL="   처음 실행할 때 약 1.4GB를 자동으로 내려받습니다. 지금 미리 받으려면:"
     M_OFFLINE_HINT="   네트워크가 없나요? 다른 곳에서 docker save 로 만든 tar 파일을 docker load -i <파일> 로 설치할 수 있습니다."
     M_X_MEM="Docker 엔진 메모리가 부족합니다. Maven/Gradle 빌드에는 약 4GB가 필요합니다:"
     M_MEM_FIX="   Colima: colima stop && colima start --memory 4 / Docker Desktop: Settings > Resources > Memory / WSL2: %UserProfile%\\.wslconfig 의 memory=4GB 후 wsl --shutdown"
     M_MEM_NOTE="   4GB로 설정한 엔진은 약 3.8 GiB로 표시되며, 이 점검은 3.5 GiB부터 통과합니다."
     M_X_PORT="UI 포트가 이미 사용 중입니다:"
     M_PORT_FIX="   다른 포트로 실행하려면 UI_PORT를 바꾸세요. 예: UI_PORT=9090 으로 다시 실행"
+    M_O_IMAGES="이 컴퓨터의 BomLens 이미지(디스크 차지 크기):"
+    M_O_TOTAL="이 이미지들의 합계:"
+    M_O_DISK="Docker 엔진의 디스크 여유 공간:"
+    M_X_DISK="Docker 엔진의 디스크 여유 공간이 적습니다:"
+    M_DISK_NEED="   처음 스캔할 때 언어별 이미지 하나를 3~16GB 내려받습니다(.NET은 약 15GB). 명령줄 도구는 여유 공간이 이미지 크기에 2GB를 더한 값보다 적으면 내려받기 전에 멈추며, BOMLENS_SKIP_DISK_CHECK=1 을 지정하면 그대로 스캔합니다."
+    M_CLEAN="   필요 없는 이미지 삭제: docker image rm <이미지>. 어느 컨테이너도 쓰지 않는 이미지 전체 삭제: docker image prune -a"
+    M_CLEAN2="   지운 뒤에도 공간이 모자라면 Docker Desktop이나 Rancher Desktop의 Settings에서 디스크를 압축하거나, Colima는 colima ssh -- sudo fstrim -av 를 실행하세요."
+    M_N_LATEST="latest 태그 이미지도 있지만 이 명령줄 도구는 위의 버전 태그를 쓰므로 그 이미지는 쓰이지 않습니다. 이 도구의 버전:"
     M_ALL_GOOD="점검 결과: 모두 준비됐습니다. 웹 UI를 실행해도 좋습니다."
     M_SOME_BAD="점검 결과: 위에서 ❌ 표시된 항목을 확인하세요."
     M_PROBLEMS="확인할 항목 수:"
@@ -107,13 +125,21 @@ else
     M_RERUN="   Install it, then run this check again."
     M_X_NO_ENGINE="The Docker engine is not running. Start Rancher Desktop or Docker Desktop and wait for its icon to settle."
     M_X_NO_IMAGE="The scanner image is not downloaded yet:"
-    M_PREPULL="   The first run downloads about 250 MB automatically. To fetch it now:"
+    M_PREPULL="   The first run downloads about 1.4 GB automatically. To fetch it now:"
     M_OFFLINE_HINT="   No network? Make a tar elsewhere with docker save, then install it here with docker load -i <file>."
     M_X_MEM="The Docker engine has too little memory. A Maven or Gradle build needs about 4 GB:"
     M_MEM_FIX="   Colima: colima stop && colima start --memory 4 / Docker Desktop: Settings > Resources > Memory / WSL2: memory=4GB in %UserProfile%\\.wslconfig, then wsl --shutdown"
     M_MEM_NOTE="   An engine set to 4 GB shows as about 3.8 GiB; this check passes from 3.5 GiB."
     M_X_PORT="The UI port is already in use:"
     M_PORT_FIX="   To run on another port, change UI_PORT. Example: run again with UI_PORT=9090"
+    M_O_IMAGES="BomLens images on this machine (size on disk):"
+    M_O_TOTAL="Total size of these images:"
+    M_O_DISK="Free disk space in the Docker engine:"
+    M_X_DISK="Free disk space in the Docker engine is low:"
+    M_DISK_NEED="   A first scan downloads one language image of 3 to 16 GB (.NET about 15 GB). The CLI stops before downloading when the free space is smaller than the image plus 2 GB; BOMLENS_SKIP_DISK_CHECK=1 scans anyway."
+    M_CLEAN="   Remove an image you no longer need: docker image rm <image>. All images no container uses: docker image prune -a"
+    M_CLEAN2="   Space still short afterwards: compact the disk in Docker Desktop or Rancher Desktop (Settings), or on Colima run: colima ssh -- sudo fstrim -av"
+    M_N_LATEST="An image tagged latest is also here, but this CLI uses the version tag above, so it is not used. This CLI is version:"
     M_ALL_GOOD="Result: everything is ready. You can start the web UI."
     M_SOME_BAD="Result: please review the items marked ❌ above."
     M_PROBLEMS="Items to review:"
@@ -160,6 +186,12 @@ else
     note "     docker pull $DOCKER_IMAGE"
     note "$M_OFFLINE_HINT"
     problems=$((problems + 1))
+    # The version tag is not here but a :latest is (an older install): say it
+    # is not the image this CLI runs.
+    if [ "$CLI_VERSION_KNOWN" = 1 ] && [ -z "${SBOM_SCANNER_IMAGE:-}" ] \
+       && docker image inspect "ghcr.io/sktelecom/bomlens:latest" >/dev/null 2>&1; then
+        note "-  $M_N_LATEST $BOMLENS_CLI_VERSION"
+    fi
 fi
 
 # 3b) Android SDK image. Not published (its SDK terms bar redistribution), so it
@@ -209,6 +241,59 @@ case "$mem_bytes" in
             problems=$((problems + 1))
         elif [ "$mem_mb" -gt 0 ]; then
             ok "$M_O_MEM $mem_gib"
+        fi ;;
+esac
+
+# 4b) Images BomLens has downloaded and the engine's free disk. A first scan of a
+# language downloads 3 to 16 GB; the sizes here are what the images take on disk
+# (docker image inspect), each image counted once however many tags it has.
+# Free space is read with a short container, as scan-sbom.sh does; an engine
+# whose value cannot be read is not a problem.
+img_total_mb=0; img_seen=" "; img_lines=""
+while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    img_id="${row%% *}"; img_ref="${row#* }"
+    case "$img_seen" in *" $img_id "*) continue ;; esac
+    img_seen="$img_seen$img_id "
+    img_bytes=$(docker image inspect --format '{{.Size}}' "$img_id" 2>/dev/null)
+    img_bytes=${img_bytes%%$'\r'*}
+    case "$img_bytes" in ''|*[!0-9]*) continue ;; esac
+    img_mb=$((img_bytes / 1000000))
+    img_total_mb=$((img_total_mb + img_mb))
+    img_lines="$img_lines$(awk -v r="$img_ref" -v m="$img_mb" 'BEGIN { printf "     %-60s %6.1f GB\n", r, m / 1000 }')
+"
+done <<EOF_IMGS
+$(docker image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E ' (ghcr\.io/cdxgen/|ghcr\.io/sktelecom/(bomlens|sbom-)|bomlens-android-sdk)' | grep -v ':<none>$')
+EOF_IMGS
+if [ -n "$img_lines" ]; then
+    note "-  $M_O_IMAGES"
+    printf '%s' "$img_lines"
+    note "   $M_O_TOTAL $(awk -v m="$img_total_mb" 'BEGIN { printf "%.1f", m / 1000 }') GB"
+fi
+probe_img="$DOCKER_IMAGE"
+docker image inspect "$probe_img" >/dev/null 2>&1 || probe_img=$(docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -n 1)
+free_mb=""
+if [ -n "${BOMLENS_FAKE_FREE_MB:-}" ]; then
+    free_mb="$BOMLENS_FAKE_FREE_MB"
+elif [ -n "$probe_img" ]; then
+    free_mb=$(docker run --rm --pull never --entrypoint df "$probe_img" -Pm / 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}')
+fi
+case "$free_mb" in
+    ''|*[!0-9]*) ;;
+    *)
+        free_gb=$(awk -v m="$free_mb" 'BEGIN { printf "%.1f", m / 1000 }')
+        # 5 GB: the smallest language image (2.9 GB) plus the 2 GB the CLI keeps free.
+        if [ "$free_mb" -lt 5000 ]; then
+            bad "$M_X_DISK $free_gb GB"
+            note "$M_DISK_NEED"
+            note "$M_CLEAN"
+            note "$M_CLEAN2"
+            problems=$((problems + 1))
+        else
+            ok "$M_O_DISK $free_gb GB"
+            note "$M_DISK_NEED"
+            note "$M_CLEAN"
+            note "$M_CLEAN2"
         fi ;;
 esac
 
