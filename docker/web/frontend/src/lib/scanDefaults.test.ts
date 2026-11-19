@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_VERSION,
+  mergedProjects,
   parseSbomIdentity,
+  pickVersion,
   SBOM_PARSE_MAX_CHARS,
   suggestIdentity,
 } from "./scanDefaults";
@@ -166,5 +169,38 @@ describe("parseSbomIdentity", () => {
   it("skips oversized inputs", () => {
     const huge = `{"pad":"${"x".repeat(SBOM_PARSE_MAX_CHARS)}"}`;
     expect(parseSbomIdentity(huge)).toBeNull();
+  });
+});
+
+describe("pickVersion", () => {
+  const info = { version: "2.4.1", hasManifest: true, subProjects: [] as string[] };
+
+  it("takes the version the folder's manifest states", () => {
+    expect(pickVersion({ project: "app" }, info)).toBe("2.4.1");
+  });
+
+  it("prefers a version the source itself states", () => {
+    expect(pickVersion({ project: "nginx", version: "1.25" }, info)).toBe("1.25");
+  });
+
+  it("falls back to the placeholder when the folder states none or is unknown", () => {
+    expect(pickVersion({ project: "app" }, { ...info, version: "" })).toBe(DEFAULT_VERSION);
+    expect(pickVersion({ project: "app" }, null)).toBe(DEFAULT_VERSION);
+  });
+
+  it("shows no version while no project is identified", () => {
+    expect(pickVersion({}, info)).toBe("");
+  });
+});
+
+describe("mergedProjects", () => {
+  it("lists the projects a folder with no manifest of its own would merge", () => {
+    expect(mergedProjects({ version: "", hasManifest: false, subProjects: ["a", "b"] })).toEqual(["a", "b"]);
+  });
+
+  it("is empty for a folder that is one project, or holds fewer than two", () => {
+    expect(mergedProjects({ version: "", hasManifest: true, subProjects: ["a", "b"] })).toEqual([]);
+    expect(mergedProjects({ version: "", hasManifest: false, subProjects: ["a"] })).toEqual([]);
+    expect(mergedProjects(null)).toEqual([]);
   });
 });

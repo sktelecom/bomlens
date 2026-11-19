@@ -223,3 +223,33 @@ export function parseSbomIdentity(jsonText: string): IdentitySuggestion | null {
   }
   return null;
 }
+
+/** What the server says about a folder (GET /project-info), as far as the form
+ *  needs it. */
+export interface FolderInfo {
+  version: string;
+  hasManifest: boolean;
+  subProjects: string[];
+}
+
+/** The version to prefill: one the source itself states (a docker tag, a
+ *  versioned file name), then the one the folder's manifest states, then the
+ *  placeholder once a project is identified. Empty while nothing is identified,
+ *  so a lone version never shows beside an empty name. */
+export function pickVersion(
+  suggested: IdentitySuggestion,
+  info: FolderInfo | null,
+): string {
+  if (suggested.version) return suggested.version;
+  if (!suggested.project) return "";
+  return info?.version || DEFAULT_VERSION;
+}
+
+/** The sub-projects scanning this folder would merge into one SBOM, or an empty
+ *  list: a folder with a manifest of its own is one project (a multi-module
+ *  build has sub-folders with manifests of their own), and fewer than two
+ *  sub-projects merge nothing. */
+export function mergedProjects(info: FolderInfo | null): string[] {
+  if (!info || info.hasManifest || info.subProjects.length < 2) return [];
+  return info.subProjects;
+}

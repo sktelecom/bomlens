@@ -22,10 +22,10 @@
     "currentDir": "Current folder",
     "currentDirPath": "Current folder",
     "currentDirHint": "Scans the source in this folder (mounted as /src). To scan another folder, pick Directory / rootfs, or start BomLens from that folder.",
-    "rootfsDir": "Directory / rootfs",
+    "rootfsDir": "Choose folder",
     "yoctoBuildDir": "Yocto build directory",
-    "rootfsPlaceholder": "centos-rootfs/  (relative to the current folder)",
-    "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. A Yocto build directory is recognized as one, and the image SBOM the build published is analyzed instead of the build tree. Paths outside the folder are rejected. Place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
+    "rootfsPlaceholder": "my-project/  (subfolder of the current folder)",
+    "rootfsHint": "Pick the folder to scan. A project folder is built to resolve its full dependency tree; a folder that holds several projects is merged into one SBOM.",
     "scanRoot": "Scan location",
     "scanRootCurrent": "Current folder ({{path}})",
     "scanRootCurrentNoPath": "Current folder",
@@ -54,7 +54,7 @@
     "firmwareUnavailable": "Firmware analysis needs Docker running (the firmware image runs as a sibling container).",
     "siblingPullNotice": "First run pulls the dedicated image (a large, one-time download); later runs reuse it.",
     "dockerImage": "Docker image",
-    "dockerHint": "Scans a local/remote Docker image (Docker socket required).",
+    "dockerHint": "Scans a local or remote Docker image (Docker socket required). For a private registry, run docker login and docker pull on this machine first, then enter the image name. For an image saved with docker save, run docker load -i <file>.tar first and enter the loaded name.",
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI model or dataset",
     "aiModelPlaceholder": "google-bert/bert-base-uncased, datasets/allenai/tulu-3-sft-mixture or figshare.com/articles/.../33412285",
@@ -82,7 +82,10 @@
     "aiDeclare": "Enter model information",
     "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub.",
     "aiDeclareUnavailable": "Describing a model from a declaration needs the SPDX 3.0.1 converter, which this image does not have. Use the full image, or scan the model from HuggingFace or a file.",
-    "dropRefused": "{{name}} is not a file this input takes. Accepted: {{types}}"
+    "dropRefused": "{{name}} is not a file this input takes. Accepted: {{types}}",
+    "rootfsAdvanced": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. A Yocto build directory is recognized as one, and the image SBOM the build published is analyzed instead of the build tree. Paths outside the folder are rejected. Place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
+    "rootfsAdvancedTitle": "Advanced: OS root filesystems, /src, Yocto and --mount",
+    "currentDirIsOutput": "This folder is where BomLens saves results, so it is not a project to scan. Pick a folder instead."
   },
   "options": {
     "notice": "Notice",
@@ -1759,7 +1762,9 @@
     "moreActions": "More actions for {{name}}",
     "colActions": "Actions",
     "searchChip": "“{{query}}”",
-    "noMatchHint": "Try a different search or type."
+    "noMatchHint": "Try a different search or type.",
+    "loading": "Loading scans…",
+    "keptAfterReinstall": "Results stay in this folder after you remove or reinstall the app."
   },
   "validation": {
     "required": "Fill in the required fields marked above.",
@@ -1773,7 +1778,8 @@
     "exclude": "Use a relative path with no .. , no wildcard and no backslash, one per line.",
     "truscaProjectId": "Enter the TRUSCA project id.",
     "requiredList": "Fill in the required fields: {{fields}}",
-    "formatList": "Check the format of: {{fields}}"
+    "formatList": "Check the format of: {{fields}}",
+    "targetFolder": "Choose the folder to scan. Use Add folder if none is listed."
   },
   "provenance": {
     "folder": "Scanned folder",
@@ -2566,5 +2572,16 @@
   "filters": {
     "active": "Active filters",
     "remove": "Remove filter: {{label}}"
+  },
+  "startConfirm": {
+    "titleMerged": "This folder holds several projects",
+    "titleOverwrite": "A scan with this name already exists",
+    "titleBoth": "Check before scanning",
+    "merged": "This folder has no project file of its own and holds {{n}} projects ({{names}}). Scanning it merges them into one SBOM. To scan one project, choose it as a subfolder.",
+    "mergedMore": "and {{n}} more",
+    "overwrite": "{{name}} already has a finished scan. Overwrite it, or keep both. Keeping both saves the new result in a folder with a time suffix.",
+    "keepBoth": "Keep both",
+    "replace": "Overwrite",
+    "continue": "Scan anyway"
   }
 }

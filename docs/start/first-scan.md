@@ -12,7 +12,7 @@ BomLens runs on a Docker engine, but the desktop app and web UI set it up and pu
 
 ## Start without the command line (recommended)
 
-Download [BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 250 MB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
+Download [BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 250 MB), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
@@ -24,13 +24,13 @@ No commands beyond launching it: run in the browser, scan, and download results.
 
 ```bash
 git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under the current folder
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under ~/sbom-output
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
 `--depth 1` skips the repository history, which cuts the download from about 465 MB to about 50 MB. The first launch can take a minute or two before the page loads: the script downloads the scanner image if it is missing (about 250 MB), or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
 
-The folder you run from is the output base: each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only; on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after cloning, that is the BomLens repository itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead, and the results are saved inside that folder); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+Results go to `~/sbom-output` (change it with `--output-dir`): each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only; on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after cloning, that is the BomLens repository itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 

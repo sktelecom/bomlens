@@ -63,7 +63,7 @@ Download the installer and double-click it: [BomLens-Setup.exe](https://github.c
 
 ```bash
 git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens   # --depth 1: about 50 MB instead of the full history
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to ~/sbom-output
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 

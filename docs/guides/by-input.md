@@ -143,7 +143,7 @@ $SBOM --project team5-image --version 1.0.0 \
 - The component list is the packages installed in the image, and vulnerabilities carry the verdicts the build itself made (patched by a recipe, judged not applicable, or still open). Only the open ones count as findings.
 - Components get the upstream repository purl for the projects the [firmware guide](firmware.md#upstream-repository-purl) lists. A build that wrote only SPDX 2.2 carries no build verdicts, so with `--security` its CPEs are matched against the NVD CPE index in the image instead; SPDX 2.2 does not record which CVEs a recipe patched, so these findings can include CVEs the recipe already patched. SPDX 3.0 records it.
 - If several machines or images were built, the newest SBOM is analyzed and every candidate is listed in the log; pass `--analyze <file>` to choose a different one.
-- In the web UI, pick the folder with the **Directory / rootfs** input (mount it with `--ui --mount ~/poky/build`, or use Add folder in the desktop app) — the same detection runs there.
+- In the web UI, pick the folder with the **Choose folder** input (mount it with `--ui --mount ~/poky/build`, or use Add folder in the desktop app) — the same detection runs there.
 - For the full behavior and its limits, see the [Yocto section of the supplier SBOM guide](supplier-sbom.md#yocto-images).
 
 **Deliverables**: notice, SBOM, risk report, conformance check report
@@ -251,7 +251,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Scan target | Input |
 |-------------|-------|
 | Current folder | scans the source in the folder where the UI was launched |
-| Directory path | a subfolder under the launch folder (e.g. an OS rootfs), a folder mounted with `--ui --mount <dir>`, or a folder picked with the desktop app's "Add folder" button |
+| Choose folder | a subfolder under the launch folder, a folder mounted with `--ui --mount <dir>`, or a folder picked with the desktop app's "Add folder" button |
 | GitHub URL | enter the URL |
 | ZIP upload | upload a `.zip`/tar file |
 | Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |

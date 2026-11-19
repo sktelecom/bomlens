@@ -55,6 +55,11 @@ interface Props {
   newHref: string;
   /** Ask to delete a past scan (the confirm dialog in NextApp does the work). */
   onDelete: (id: string) => void;
+  /** The list has not been fetched yet. An empty list is then not "no scans
+   *  yet": the first-run screen waits for the answer. */
+  loading?: boolean;
+  /** The host folder the results are kept in. */
+  outputDir?: string;
 }
 
 /** One icon per scan type, the same ones the New scan tiles use for that input. */
@@ -249,6 +254,20 @@ function RecentEmpty({ newHref }: { newHref: string }) {
   );
 }
 
+/** Shown while the list is on its way, in place of the first-run screen: a
+ *  list that has not arrived is not an empty one. */
+function RecentLoading({ newHref }: { newHref: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="bl-scanmgmt">
+      <RecentHeader newHref={newHref} withAction={false} />
+      <p role="status" className="bl-muted" data-testid="recent-loading">
+        {t("recent.loading")}
+      </p>
+    </div>
+  );
+}
+
 interface RecentSort {
   key: RecentSortKey;
   dir: RecentSortDir;
@@ -260,7 +279,7 @@ interface RecentSort {
  * figure is computed from the real `/scans` list; Type is derived only from
  * signals the data carries (see lib/recent.ts).
  */
-export function RecentScans({ scans, newHref, onDelete }: Props) {
+export function RecentScans({ scans, newHref, onDelete, loading, outputDir }: Props) {
   const { t, i18n } = useTranslation();
   const fmt = useFormatNumber();
   const narrow = useMediaQuery(NARROW_QUERY);
@@ -282,7 +301,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
     <SortHeader label={label} active={sort.key === key} dir={sort.dir} onSort={() => onSort(key)} align={align} />
   );
 
-  if (scans.length === 0) return <RecentEmpty newHref={newHref} />;
+  if (scans.length === 0) return loading ? <RecentLoading newHref={newHref} /> : <RecentEmpty newHref={newHref} />;
 
   const chips = [
     ...(query.trim() ? [{ key: "q", label: t("recent.searchChip", { query: query.trim() }), onRemove: () => setQuery("") }] : []),
@@ -447,8 +466,15 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
       {!IS_STATIC_DEMO && (
         <p className="bl-muted bl-small bl-sourcenote">
           <FileDirectoryIcon size={14} />
-          <code className="bl-code">~/sbom-output</code>
+          <code className="bl-code" data-testid="recent-output-dir">
+            {outputDir || "~/sbom-output"}
+          </code>
           <span>{t("recent.source")}</span>
+        </p>
+      )}
+      {!IS_STATIC_DEMO && (
+        <p className="bl-muted bl-small bl-flat" data-testid="recent-kept-note">
+          {t("recent.keptAfterReinstall")}
         </p>
       )}
     </div>

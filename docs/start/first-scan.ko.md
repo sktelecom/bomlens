@@ -12,7 +12,7 @@ BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI�
 
 ## 명령어 없이 시작하기 (권장)
 
-[Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe)를 눌러 받은 파일을 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(약 250MB)를 받은 뒤 http://localhost:8080 을 엽니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 클릭만으로 따라가는 안내는 [비개발자 빠른 시작](../start/no-cli.ko.md)에 있습니다.
+[Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe)를 눌러 받은 파일을 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(약 250MB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 클릭만으로 따라가는 안내는 [비개발자 빠른 시작](../start/no-cli.ko.md)에 있습니다.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](../images/desktop-startup.png)
 
@@ -24,13 +24,13 @@ BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI�
 
 ```bash
 git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
-./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열리고, 산출물은 현재 폴더 아래 하위 폴더에 저장됩니다
+./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열리고, 산출물은 ~/sbom-output 아래 하위 폴더에 저장됩니다
 #   Windows: scripts\sbom-ui.bat 더블클릭
 ```
 
 `--depth 1`은 저장소 이력을 받지 않아 내려받는 양이 약 465MB에서 약 50MB로 줄어듭니다. 처음 실행할 때는 화면이 뜨기까지 1~2분 걸릴 수 있습니다. 스캐너 이미지가 없으면 받고(약 250MB), 있으면 새 버전이 있는지 확인하는 동안 서버가 아직 준비되지 않아, 자동으로 열린 브라우저 탭에 연결 오류가 보일 수 있습니다. 터미널에 `BomLens Web UI listening`이 나오면 탭을 새로고침하세요.
 
-실행한 폴더가 산출물 베이스이고, 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장됩니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다(bash 전용, Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요. [설정 파일](no-cli.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(클론 직후의 현재 폴더는 BomLens 저장소 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요. 결과는 그 폴더 안에 저장됩니다), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
+산출물은 `~/sbom-output`에 저장되고(`--output-dir`로 바꿉니다), 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더가 생깁니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다(bash 전용, Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요. [설정 파일](no-cli.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(클론 직후의 현재 폴더는 BomLens 저장소 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
 
 ![BomLens 웹 UI](../images/web-ui.png)
 

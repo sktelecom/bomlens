@@ -25,6 +25,8 @@ import { ScreenHeader } from "@/components/primer";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
 import { useScanForm } from "@/lib/useScanForm";
 
+import { StartConfirmDialog } from "./StartConfirmDialog";
+
 import {
   ActionNotes,
   FormatOptions,
@@ -383,6 +385,12 @@ export function NewScan({
           </div>
         </div>
       </div>
+      <StartConfirmDialog
+        confirm={state.confirm}
+        project={state.project.trim()}
+        version={state.version.trim()}
+        onAnswer={state.answerConfirm}
+      />
     </>
   );
 }
