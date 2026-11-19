@@ -262,6 +262,17 @@ TOTAL_COMP=$(jq "$FIRST_PARTY_DEF"'[ ([.metadata.component // empty]
                    | map(select((.type // "") == "data"
                                 and ((.properties // []) | any(.name == "bomlens:dataset:collectedBy")))))[],
                    (.components[]? | select(first_party | not)) ] | length' "$SBOM")
+# What the total is made of, so the same project does not read as 15 here and 96
+# elsewhere: OS packages and file entries are counted next to libraries. Empty when
+# the SBOM holds only libraries.
+TOTAL_BASIS=$(jq -r "$FIRST_PARTY_DEF"'def kind: if .type == "file" then "file"
+        elif .type == "operating-system" or ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
+        else "lib" end;
+    [ .components[]? | select(first_party | not) | kind ] as $k
+    | ([ $k[] | select(. == "os") ] | length) as $os
+    | ([ $k[] | select(. == "file") ] | length) as $f
+    | if $os + $f == 0 then empty
+      else "\($k | length - $os - $f) libraries, \($os) OS packages, \($f) files" end' "$SBOM" 2>/dev/null || true)
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -309,6 +320,7 @@ done)
     echo "Third-party Open Source Licenses for ${PROJECT}"
     echo "Generated: ${GEN_AT}"
     echo "Total components: ${TOTAL_COMP} · Distinct licenses: ${TOTAL_LIC}"
+    if [ -n "$TOTAL_BASIS" ]; then echo "Counted: ${TOTAL_BASIS}"; fi
     echo ""
     # A notice built from an empty or partial SBOM lists only what was found; it
     # must not read as the notice of the whole product.
@@ -367,6 +379,8 @@ n_s() {
     # shellcheck disable=SC2059  # the format is a trusted built-in string
     printf -- "$f" "$@"
 }
+N_BASIS=""
+if [ -n "$TOTAL_BASIS" ]; then N_BASIS="$(esc "counted: ${TOTAL_BASIS}")"; fi
 report_bom_facts "$SBOM"
 N_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
 N_TITLE="$(n_s title 'Third-party open source notice')"
@@ -389,7 +403,7 @@ HTMLHEAD
     echo "<body>"
     report_page_head "$N_TITLE" "$PROJECT_ESC" "$N_VERSION" "" \
         "$(esc "$(report_type_label "${MODE:-}")")" "$(report_time_html "$GEN_AT")" \
-        "$(report_str components "$(report_num "$TOTAL_COMP")")" "$N_LICS"
+        "$(report_str components "$(report_num "$TOTAL_COMP")")" "$N_BASIS" "$N_LICS"
 
     if [ "$INCOMPLETE" = "true" ]; then
         report_completeness_html

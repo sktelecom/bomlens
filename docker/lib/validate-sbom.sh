@@ -431,7 +431,14 @@ cdx_checks() {
                 elif ((\$top.name) as \$n | [\".\",\"..\",\"/\",\"/scan\"] | index(\$n)) != null
                 then (if \$typeRequired then \"fail\" else \"warn\" end)
                 else \"pass\" end),
-        detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")
+        detail_ko:(if ((\$top.name//\"\")|length)==0 and ((\$top.version//\"\")|length)==0 then \"최상위 구성요소(metadata.component)에 이름과 버전이 없습니다\"
+                   elif ((\$top.name//\"\")|length)==0 then \"최상위 구성요소에 이름이 없습니다(버전 \" + \$top.version + \")\"
+                   elif ((\$top.version//\"\")|length)==0 then \"최상위 구성요소에 버전이 없습니다(이름 \" + \$top.name + \")\"
+                   else \"\" end),
+        detail:(if ((\$top.name//\"\")|length)==0 and ((\$top.version//\"\")|length)==0 then \"the top-level component has no name and no version (metadata.component)\"
+                elif ((\$top.name//\"\")|length)==0 then \"the top-level component has no name (version \" + \$top.version + \")\"
+                elif ((\$top.version//\"\")|length)==0 then \"the top-level component has no version (name \" + \$top.name + \")\"
+                else (\$top.name + \"@\" + \$top.version) end
                 + (if (\$top.name // \"\") as \$n | [\".\",\"..\",\"/\",\"/scan\"] | index(\$n) then \" (a fixed value, not a product name: change metadata.component.name)\" else \"\" end)), missing:[]},
        # Nothing to measure is not a coverage failure, EXCEPT when the packages
        # went missing because this check stopped counting file components. A
@@ -508,8 +515,10 @@ cdx_checks() {
        {id:\"transitive\", label:\"Transitive dependencies (graph edges)\", required:true,
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        detail_ko:(if \$dep_edges==0 and \$tot>0 then \"의존 관계 간선이 0개입니다. 구성요소 \(\$tot)개가 있지만 서로의 관계가 기록되지 않았습니다(직접 의존성만 읽는 대체 경로로 만든 SBOM에서 흔합니다).\" else \"\" end),
         status:(if \$dep_edges>0 then \"pass\" elif \$tot==0 then \"warn\" else \"fail\" end),
         detail:((if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
+                 elif \$dep_edges==0 then \"0 edge(s): \(\$tot) components are listed but none is related to another (common in an SBOM made by a fallback that reads direct dependencies only)\"
                  else \"\(\$dep_edges) edge(s)\" end)
                 + (if \$agg==\"\" then \"\"
                    elif \$agg==\"unknown\" and \$dep_edges==0 and \$tot>0 then \", graph completeness unknown\"
@@ -1711,6 +1720,46 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
 fi
 
 # --------------------------------------------------------
+# Remediation for the plain format rows. A mandatory row that fails (and the
+# advisory ones that warn) said what was wrong but not how to close it; the
+# supplier had to guess. Attached only where the row has no guide of its own, so
+# the registry and submission guides above are untouched, and like them it never
+# changes a status or the result. The affected names are in the row's `missing`.
+# --------------------------------------------------------
+if GUIDED=$(printf '%s' "$CHECKS" | jq -c '
+    def g($how; $how_ko): {how: $how, how_ko: $how_ko, docUrl: "https://sktelecom.github.io/bomlens/reference/cli/"};
+    {
+      "spec-version": g("Regenerate the SBOM as a CycloneDX version the checker accepts (1.4 to 1.7); the format version is set by the generator, not by editing the file.";
+                        "검사기가 받는 CycloneDX 버전(1.4~1.7)으로 SBOM을 다시 생성합니다. 형식 버전은 파일을 고치지 않고 생성 도구 설정으로 정합니다."),
+      "timestamp": g("Add metadata.timestamp (ISO 8601, for example 2026-01-31T09:00:00Z), or regenerate the SBOM with a current generator.";
+                     "metadata.timestamp(ISO 8601, 예: 2026-01-31T09:00:00Z)를 넣거나 최신 생성 도구로 SBOM을 다시 만듭니다."),
+      "tools": g("Record the generating tool under metadata.tools (name and version), or regenerate the SBOM with a generator that writes it.";
+                 "SBOM을 만든 도구를 metadata.tools(이름과 버전)에 적거나, 이를 기록하는 생성 도구로 다시 만듭니다."),
+      "top-component": g("Set metadata.component.name and metadata.component.version to the product name and release version the SBOM describes.";
+                         "metadata.component.name과 metadata.component.version에 SBOM이 설명하는 제품 이름과 릴리스 버전을 넣습니다."),
+      "name-version": g("Give every component a name and a version. A component whose version is unknown should be removed or its version looked up in the product build record; the affected components are named with this item.";
+                        "모든 구성요소에 이름과 버전을 넣습니다. 버전을 모르는 구성요소는 빼거나 제품 빌드 기록에서 버전을 찾아 채웁니다. 이 항목에 적힌 구성요소가 고칠 대상입니다."),
+      "purl": g("Give every component a package URL (purl) that includes its version, for example pkg:maven/org.example/lib@1.2.3. The affected components named with this item have none.";
+                "모든 구성요소에 버전이 포함된 패키지 URL(purl)을 넣습니다(예: pkg:maven/org.example/lib@1.2.3). 이 항목에 적힌 구성요소에 purl이 없습니다."),
+      "purl-syntax": g("Correct the package URLs named with this item to the purl format (pkg:type/namespace/name@version); the generator that wrote them usually has a purl option or needs an update.";
+                       "이 항목에 적힌 패키지 URL을 purl 형식(pkg:type/namespace/name@version)으로 고칩니다. 생성 도구의 purl 옵션을 확인하거나 도구를 갱신합니다."),
+      "purl-type": g("Use a purl type defined by the purl specification (maven, npm, pypi, golang and so on); a made-up type cannot be matched to a vulnerability database.";
+                     "purl 명세에 정의된 type(maven, npm, pypi, golang 등)을 씁니다. 임의로 만든 type은 취약점 데이터베이스와 대조할 수 없습니다."),
+      "purl-namespace": g("Add the namespace the purl type requires (for example the groupId for Maven) to the components named with this item.";
+                          "이 항목에 적힌 구성요소의 purl에 해당 type이 요구하는 namespace(예: Maven의 groupId)를 넣습니다."),
+      "no-generic": g("Replace pkg:generic identifiers with the package manager purl the component was obtained from, so it can be matched to advisories.";
+                      "pkg:generic 식별자를 구성요소를 받아 온 패키지 관리자의 purl로 바꿉니다. 그래야 보안 권고와 대조할 수 있습니다."),
+      "transitive": g("The SBOM lists components but not how they depend on each other. Regenerate it from the build (the resolved dependency tree, for example mvn dependency:tree or npm ls --all) so that the dependencies array carries the edges; an SBOM made by reading only the declared direct dependencies has none.";
+                      "SBOM에 구성요소는 있지만 서로의 의존 관계가 없습니다. 해석된 의존성 트리를 쓰는 빌드 단계(예: mvn dependency:tree, npm ls --all)에서 SBOM을 다시 생성해 dependencies 배열에 관계를 담습니다. 선언된 직접 의존성만 읽어 만든 SBOM에는 관계가 없습니다.")
+    } as $G
+    | map(if (.reviewGuide // null) == null and .status != "pass" and ((.source // "") != "na") and $G[.id] != null
+          then . + {reviewGuide: $G[.id]} else . end)' 2>/dev/null); then
+    CHECKS="$GUIDED"
+else
+    echo "[validate] WARN: remediation guidance join failed; continuing without it." >&2
+fi
+
+# --------------------------------------------------------
 # Join the regulatory crosswalk (best-effort) over EVERY check, not just the G7
 # elements: docker/lib/regulation-crosswalk.json is keyed by check id, so a plain
 # CycloneDX check picks up its CRA / BSI / NTIA references the same way a G7
@@ -2045,6 +2094,19 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
             "licensed\t\(.licenseCoverage.declared // 0)",
             "licensePercent\t\(.licenseCoverage.pct // "-")"'
         printf 'purlPercent\t%s\n' "${_sum_purl:--}"
+        # What the component count is made of. A scan of an image lists OS packages
+        # next to libraries, and a firmware scan lists files; without the split the
+        # same project reads as 15 in one report and 96 in another.
+        if [ "$FORMAT" = "CycloneDX" ]; then
+            jq -r 'def kind: if .type == "file" then "file"
+                             elif .type == "operating-system" or ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
+                             else "lib" end;
+                   [ .components[]? | kind ] as $k
+                   | ([ $k[] | select(. == "os") ] | length) as $os
+                   | ([ $k[] | select(. == "file") ] | length) as $f
+                   | if $os + $f == 0 then empty
+                     else "basis\t\($k | length - $os - $f) libraries, \($os) OS packages, \($f) files" end' "$SBOM" 2>/dev/null | head -n 1
+        fi
         # A shallow fallback analysis and any failed post-processing step are the
         # two reasons a result is smaller than the scan was asked to give. Values
         # come from the SBOM (a supplier's document under --analyze), so every
@@ -2142,6 +2204,20 @@ if [ "$REPORT_LANG" = "ko" ]; then
       | .frameworks |= map(.title = ($F[.id].title_ko // .title))') || RXW="$XW_SUMMARY"
 fi
 
+# Supplier feedback (ANALYZE only): one sentence per failing row, and per warning
+# row that names offenders, to send back to the supplier unchanged. Built from the
+# render copy, so it reads in the report language. Empty when nothing qualifies.
+supplier_feedback() {
+    [ "${MODE:-}" = "ANALYZE" ] || return 0
+    printf '%s' "$RCHECKS" | jq -r --arg aff "$C_SUPPLIER_AFFECTED" --arg more "$C_SUPPLIER_MORE" '
+        .[] | select(.status == "fail" or (.status == "warn" and ((.missing // []) | length) > 0 and ((.source // "") != "na")))
+        | ((.missing // []) | map(tostring | gsub("[\\x00-\\x1f\\x7f]"; " "))) as $m
+        | "- " + .label + ": " + (.detail | tostring) + "."
+          + (if ($m | length) > 0 then " " + $aff + ": " + ($m[0:5] | join(", "))
+               + (if ($m | length) > 5 then " (" + ($more | sub("%d"; (($m | length) - 5 | tostring))) + ")" else "" end) + "."
+             else "" end)
+          + (if (.reviewGuide.how // "") != "" then " " + .reviewGuide.how else "" end)'
+}
 # Chrome strings: English literals by default (byte-identical), catalog for ko.
 if [ "$REPORT_LANG" = "ko" ]; then
     C_MD_TITLE=$(tfmt conformance.md_title "$PROJECT")
@@ -2170,6 +2246,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_SUG_CAND=$(kstr conformance.th_sug_candidate); C_TH_SUG_BASIS=$(kstr conformance.th_sug_basis)
     C_TH_SUG_CONF=$(kstr conformance.th_sug_confidence)
     C_H2_REVIEW=$(kstr conformance.h2_review); C_REVIEW_INTRO=$(kstr conformance.review_intro)
+    C_H2_SUPPLIER=$(kstr conformance.h2_supplier); C_SUPPLIER_INTRO=$(kstr conformance.supplier_intro)
+    C_SUPPLIER_AFFECTED=$(kstr conformance.supplier_affected); C_SUPPLIER_MORE=$(kstr conformance.supplier_more)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
     C_G_FIX=$(kstr conformance.group_fixable); C_G_PERSON=$(kstr conformance.group_person)
@@ -2210,6 +2288,9 @@ else
     C_TH_SUG_COMP="Component"; C_TH_SUG_CUR="Current value"; C_TH_SUG_CAND="Candidate"
     C_TH_SUG_BASIS="Basis"; C_TH_SUG_CONF="Confidence"
     C_H2_REVIEW="What needs a person"; C_REVIEW_INTRO="Items no scan can settle, and what to establish for each."
+    C_H2_SUPPLIER="Message for the supplier"
+    C_SUPPLIER_INTRO="The sentences below can be sent to the supplier as they are. Each names the problem, the affected components and how to fix it."
+    C_SUPPLIER_AFFECTED="Affected"; C_SUPPLIER_MORE="and %d more"
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
     C_YES="yes"; C_NO="no"
@@ -2225,6 +2306,7 @@ else
     C_PILL_NA="Not applicable:"
     C_PILL_UNTRACE="Untraceable (pkg:generic):"
 fi
+SUPPLIER_TEXT="$(supplier_feedback)"
 
 # Pipeline-steps-failed line for md/html. Built once here, in whichever
 # language was chosen above, then just emitted where empty. The step ids come
@@ -2460,6 +2542,14 @@ fi
             "\($ref) \(.reviewGuide.docUrl)",
             ""'
     fi
+    if [ -n "$SUPPLIER_TEXT" ]; then
+        echo "## ${C_H2_SUPPLIER}"
+        echo ""
+        echo "${C_SUPPLIER_INTRO}"
+        echo ""
+        echo "$SUPPLIER_TEXT"
+        echo ""
+    fi
 } > "$MD"
 
 # --------------------------------------------------------
@@ -2648,6 +2738,12 @@ HTMLHEAD
         echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_EXPLAINED}</h2><span class=\"counter\">$(report_num "$(echo "$RCHECKS" | jq '[.[] | (.explained // [])[]] | length')")</span></div>"
         echo "$RCHECKS" | jq -r '"<ul class=\"rows mono\">" + ([.[] | select((.explained // []) | length > 0) | .explained[]
             | "<li>" + (.name|tostring|@html) + ": " + (.reason|tostring|@html) + "</li>"] | join("")) + "</ul>"'
+        echo "</div>"
+    fi
+    if [ -n "$SUPPLIER_TEXT" ]; then
+        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_SUPPLIER}</h2></div>"
+        echo "<p class=\"meta\">${C_SUPPLIER_INTRO}</p>"
+        printf '%s\n' "$SUPPLIER_TEXT" | jq -R -s -r '"<ul class=\"rows\">" + ([split("\n")[] | select(startswith("- ")) | "<li>" + (.[2:] | @html) + "</li>"] | join("")) + "</ul>"'
         echo "</div>"
     fi
     # The fill-in fragments used to live here as their own section; they now ride

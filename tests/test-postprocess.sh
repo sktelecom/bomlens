@@ -13026,6 +13026,48 @@ cn=$(jq -r '.checks[] | select(.id=="transitive") | .detail' "$WORK/compnone_con
     && pass "no compositions declared leaves the transitive detail exactly as before" \
     || fail "transitive detail changed with no compositions present" "$cn"
 
+echo "== conformance guidance: failing rows carry a fix, the names, and a supplier sentence =="
+SF="$FIX/supplier-feedback"
+for sfcase in no-version:name-version:lodash bad-purl:purl-syntax:npm:express no-top:top-component:top-level; do
+    sfname="${sfcase%%:*}"; sfrest="${sfcase#*:}"; sfrow="${sfrest%%:*}"; sfneedle="${sfrest#*:}"
+    MODE=ANALYZE bash "$LIB/validate-sbom.sh" "$SF/$sfname.json" "$WORK/sf-$sfname" "supplier" >/dev/null 2>&1
+    sfhow=$(jq -r --arg id "$sfrow" '.checks[] | select(.id==$id) | .reviewGuide.how // ""' "$WORK/sf-${sfname}_conformance.json")
+    [ -n "$sfhow" ] && pass "$sfname: the $sfrow row carries a fix" || fail "$sfname: no fix on the $sfrow row"
+    sfhowko=$(jq -r --arg id "$sfrow" '.checks[] | select(.id==$id) | .reviewGuide.how_ko // ""' "$WORK/sf-${sfname}_conformance.json")
+    [ -n "$sfhowko" ] && pass "$sfname: the fix has Korean wording" || fail "$sfname: no Korean fix on the $sfrow row"
+    if sed -n '/^## Message for the supplier/,$p' "$WORK/sf-${sfname}_conformance.md" | grep -q -- "- .*$sfneedle"; then
+        pass "$sfname: the supplier section names the problem ($sfneedle)"
+    else
+        fail "$sfname: supplier section missing the $sfneedle sentence"
+    fi
+    grep -q "Message for the supplier" "$WORK/sf-${sfname}_conformance.html" \
+        && pass "$sfname: the HTML report has the supplier section" || fail "$sfname: HTML lacks the supplier section"
+done
+sftop=$(jq -r '.checks[] | select(.id=="top-component") | .detail' "$WORK/sf-no-top_conformance.json")
+case "$sftop" in
+    *"(none)@"*) fail "top-level detail still prints (none)@" "$sftop" ;;
+    *"no name and no version"*) pass "a missing top-level component reads as a sentence, not (none)@" ;;
+    *) fail "top-level detail unexpected" "$sftop" ;;
+esac
+bash "$LIB/validate-sbom.sh" "$SF/no-version.json" "$WORK/sf-nomode" "supplier" >/dev/null 2>&1
+grep -q "Message for the supplier" "$WORK/sf-nomode_conformance.md" \
+    && fail "a non-ANALYZE run must not print the supplier section" || pass "no supplier section outside ANALYZE"
+jq '.dependencies = []' "$FIX/good-cyclonedx.json" > "$WORK/sf-noedge.json"
+bash "$LIB/validate-sbom.sh" "$WORK/sf-noedge.json" "$WORK/sf-noedge" "supplier" >/dev/null 2>&1
+sfe=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)|\(.detail)|\(.reviewGuide.how // "")"' "$WORK/sf-noedge_conformance.json")
+case "$sfe" in
+    fail\|*"none is related to another"*\|*"dependencies array"*) pass "0 edges with components: the verdict stays fail and the detail and fix say why" ;;
+    *) fail "0-edge transitive row wrong" "$sfe" ;;
+esac
+jq '.components += [{"type":"library","name":"libc","version":"1","purl":"pkg:deb/debian/libc@1"},{"type":"file","name":"/a"}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/sf-basis.json"
+bash "$LIB/generate-notice.sh" "$WORK/sf-basis.json" "$WORK/sf-basis" sfb >/dev/null 2>&1
+grep -q "^Counted: 2 libraries, 1 OS packages, 1 files" "$WORK/sf-basis_NOTICE.txt" \
+    && pass "the notice header states what the total counts" || fail "notice header lacks the count basis"
+bash "$LIB/generate-notice.sh" "$FIX/good-cyclonedx.json" "$WORK/sf-plain" sfp >/dev/null 2>&1
+grep -q "^Counted:" "$WORK/sf-plain_NOTICE.txt" \
+    && fail "a libraries-only notice should not print a basis line" || pass "a libraries-only notice keeps its header"
+
 echo "== import-vex: a supplier's CycloneDX VEX is read against the SBOM, and refused when it should be =="
 VEXDIR="$WORK/importvex"; mkdir -p "$VEXDIR"
 cat > "$VEXDIR/bom.json" <<'JSON'

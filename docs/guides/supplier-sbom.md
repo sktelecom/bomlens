@@ -222,6 +222,8 @@ Uploads are capped at 100 MB. For scale, the reference `core-image-minimal` docu
 After validation and analysis, send the risk report (`_risk-report.html`) to whoever sent the SBOM and ask for the following.
 
 - Fix the conformance `fail` items and send the SBOM again.
+
+The conformance report ends with a "Message for the supplier" section under `--analyze`: one sentence per failed item (and per warning that names components) with the affected component names and how to fix it. Copy it into the request as it is. Each failed item also carries its own fix in the report, and a missing top-level name or version is stated in words.
 - Prepare a response plan or risk justification for Critical vulnerabilities within 7 days and High within 30 days (recommended deadlines).
 
 Response tracking, exception approval, and history management are out of scope for this tool — they belong to a separate vulnerability and risk management system. This tool covers validating, analyzing, and reporting on a single SBOM locally.
