@@ -1,7 +1,11 @@
 #!/bin/bash
+# shellcheck extended-analysis=false
 # Copyright 2026 SK Telecom Co., Ltd.
 # SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
+#
+# The directive above turns off ShellCheck's data-flow analysis for this file,
+# which at this size needs more memory than a CI runner has.
 #
 # test-postprocess.sh — No-Docker unit tests for the SBOM post-processing
 # scripts (normalize-sbom.sh, stamp-metadata.sh, generate-notice.sh), driven by
