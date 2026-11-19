@@ -71,8 +71,8 @@ If you prefer a script over the desktop app, this path works too.
 
 ```text
 ===========================================
-  First run: downloading the scanner image (about 250 MB).
-  The first scan of a project also fetches a language image (0.6-1.7 GB).
+  First run: downloading the scanner image (about 1.4 GB).
+  The first scan of a project also fetches a language image (about 3 to 16 GB).
   Image:
   ghcr.io/sktelecom/bomlens:latest
 ===========================================
