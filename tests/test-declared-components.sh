@@ -953,7 +953,7 @@ out="$(bash "$SCRIPT" --project x --version 1 --no-components --components "$FIX
 grep -q '^  --no-components ' "$SCRIPT" && pass "--no-components is in the help" || fail "--no-components missing from the help"
 # An earlier run's _bom.refused.json is removed with the earlier SBOM, before
 # stage 1, so the check after stage 2 reads only this run's refusal.
-rm_line="$(grep -n '^rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"$' "$SCRIPT" | cut -d: -f1)"
+rm_line="$(grep -n '^remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"$' "$SCRIPT" | cut -d: -f1)"
 stage1_line="$(grep -n '^# Stage 1: produce SBOM' "$SCRIPT" | cut -d: -f1)"
 check_line="$(grep -n '_bom.refused.json" \]; then' "$SCRIPT" | cut -d: -f1)"
 [ -n "$rm_line" ] && [ -n "$stage1_line" ] && [ -n "$check_line" ] && [ "$rm_line" -lt "$stage1_line" ] && [ "$stage1_line" -lt "$check_line" ] \
