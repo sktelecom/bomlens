@@ -5059,6 +5059,118 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== sec-introduced-by: each finding names the direct dependency it arrives through =="
+IBDIR="$WORK/introby"; mkdir -p "$IBDIR"
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2024-1111","PkgName":"tomcat-embed-core","InstalledVersion":"10.1.16","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16"}},{"VulnerabilityID":"CVE-2024-2222","PkgName":"snakeyaml","InstalledVersion":"1.33","Severity":"CRITICAL","PkgIdentifier":{"PURL":"pkg:maven/org.yaml/snakeyaml@1.33"}}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+IBSBOM="$FIX/introduced-by/petclinic-slim.cdx.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
+    bash "$LIB/scan-security.sh" "$IBSBOM" "$IBDIR/g" petclinic >/dev/null 2>&1 || fail "scan-security.sh failed on the introduced-by input"
+ibt=$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID=="CVE-2024-1111") | .introducedBy[].name] | join(",")' "$IBDIR/g_security.json")
+[ "$ibt" = "spring-boot-starter-web" ] \
+    && pass "tomcat-embed-core is traced to spring-boot-starter-web" || fail "introducedBy for tomcat-embed-core: '$ibt'"
+ibd=$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID=="CVE-2024-2222") | .introducedBy[] | "\(.name):\(.direct)"] | join(",")' "$IBDIR/g_security.json")
+[ "$ibd" = "snakeyaml:true" ] && pass "a direct dependency names itself and is marked direct" || fail "introducedBy for snakeyaml: '$ibd'"
+[ "$(jq -r '.IntroducedBy.State' "$IBDIR/g_security.json")" = "ok" ] \
+    && pass "the document records that the graph was usable" || fail "IntroducedBy.State not ok"
+grep -q "| Fixed | Introduced by |" "$IBDIR/g_security.md" && grep -q "spring-boot-starter-web 3.2.0" "$IBDIR/g_security.md" \
+    && pass "the Markdown table gains an Introduced by column" || fail "Markdown table lacks the Introduced by column"
+grep -q "<th>Introduced by</th>" "$IBDIR/g_security.html" \
+    && pass "the HTML table gains an Introduced by column" || fail "HTML table lacks the Introduced by column"
+cp "$IBSBOM" "$IBDIR/g_bom.json"
+bash "$LIB/generate-risk-report.sh" "$IBDIR/g" petclinic SOURCE >/dev/null 2>&1 || fail "generate-risk-report.sh failed on the introduced-by input"
+grep -q 'Raise or replace the direct dependencies that bring in the most findings: .*`spring-boot-starter-web 3.2.0` (1 finding(s))' "$IBDIR/g_risk-report.md" \
+    && pass "the risk report's next steps name the direct dependency to raise, with its finding count" || fail "next step for the direct dependency missing"
+grep -q "<code>snakeyaml 1.33</code>" "$IBDIR/g_risk-report.html" \
+    && pass "the HTML next steps list the direct dependencies too" || fail "HTML next step missing"
+grep -q "not checked, so some findings may not apply" "$IBDIR/g_risk-report.md" \
+    && pass "the risk report carries the false-positive and test-scope sentence" || fail "false-positive sentence missing"
+REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$IBDIR/g" petclinic SOURCE >/dev/null 2>&1
+grep -q "직접 의존성을 올리거나 교체" "$IBDIR/g_risk-report.md" \
+    && pass "the Korean next step reads in Korean" || fail "Korean next step missing"
+
+grep -q "Reading this report" "$IBDIR/g_security.md" && grep -q "fixtures" "$IBDIR/g_security.md" \
+    && pass "a source scan states the false-positive caveat and the folders it leaves out" || fail "caveat or scope line missing"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE BOMLENS_INCLUDE_NON_SHIPPED=1 \
+    bash "$LIB/scan-security.sh" "$IBSBOM" "$IBDIR/inc" petclinic >/dev/null 2>&1
+grep -q "leaves out folders" "$IBDIR/inc_security.md" \
+    && fail "the scope line must disappear when non-shipped folders are included" || pass "no scope line when non-shipped folders are included"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE REPORT_LANG=ko \
+    bash "$LIB/scan-security.sh" "$IBSBOM" "$IBDIR/ko" petclinic >/dev/null 2>&1
+grep -q "도입 경로" "$IBDIR/ko_security.html" && pass "the Korean HTML report names the column" || fail "Korean column header missing"
+jq 'del(.dependencies)' "$IBSBOM" > "$IBDIR/nograph.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
+    bash "$LIB/scan-security.sh" "$IBDIR/nograph.json" "$IBDIR/ng" petclinic >/dev/null 2>&1
+if [ "$(jq -r '.IntroducedBy.State' "$IBDIR/ng_security.json")" = "no-graph" ] \
+    && grep -q "no dependency graph" "$IBDIR/ng_security.md" && ! grep -q "Introduced by |" "$IBDIR/ng_security.md"; then
+    pass "without a dependency graph the column is left out and the report says why"
+else
+    fail "no-graph handling wrong"
+fi
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+v=""; i=1
+while [ $i -le 12 ]; do
+    v="$v{\"VulnerabilityID\":\"CVE-2024-$i\",\"PkgName\":\"libx$i\",\"InstalledVersion\":\"1\",\"Severity\":\"LOW\",\"PkgIdentifier\":{\"PURL\":\"pkg:deb/debian/libx$i@1\"}},"
+    i=$((i + 1))
+done
+echo "{\"SchemaVersion\":2,\"Results\":[{\"Target\":\"img\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[${v%,}]}]}" > "$out"
+exit 0
+SH
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=IMAGE \
+    bash "$LIB/scan-security.sh" "$IBSBOM" "$IBDIR/img" petclinic >/dev/null 2>&1
+grep -q "Update or replace the base image" "$IBDIR/img_security.md" \
+    && pass "an image with mostly OS-package findings is pointed at its base image" || fail "base image hint missing"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
+    bash "$LIB/scan-security.sh" "$IBSBOM" "$IBDIR/notimg" petclinic >/dev/null 2>&1
+grep -qi "base image" "$IBDIR/notimg_security.md" \
+    && fail "the base image hint is for image scans only" || pass "no base image hint outside an image scan"
+
+echo "== build-tool role: gems in an iOS project are marked as build tooling, elsewhere left alone =="
+BTDIR="$WORK/buildtool"; mkdir -p "$BTDIR"
+jq -n '{bomFormat:"CycloneDX",specVersion:"1.5",version:1,metadata:{component:{type:"application",name:"app",version:"1"}},
+  components:[{type:"library",name:"Alamofire",version:"5.8",purl:"pkg:swift/github.com/Alamofire/Alamofire@5.8"},
+              {type:"library",name:"fastlane",version:"2.2",purl:"pkg:gem/fastlane@2.2"}]}' > "$BTDIR/ios.json"
+jq '.components |= map(select(.name != "Alamofire"))' "$BTDIR/ios.json" > "$BTDIR/ruby.json"
+bash "$LIB/normalize-sbom.sh" "$BTDIR/ios.json" >/dev/null 2>&1
+bash "$LIB/normalize-sbom.sh" "$BTDIR/ruby.json" >/dev/null 2>&1
+btios=$(jq -r '[.components[] | select(.name=="fastlane") | .properties[]? | select(.name=="bomlens:dependency-role") | .value] | join(",")' "$BTDIR/ios.json")
+[ "$btios" = "build-tool" ] && pass "a gem next to Swift components is marked build-tool" || fail "iOS gem role: '$btios'"
+btlib=$(jq -r '[.components[] | select(.name=="Alamofire") | .properties[]? | select(.name=="bomlens:dependency-role")] | length' "$BTDIR/ios.json")
+[ "$btlib" = "0" ] && pass "the Swift package itself is not marked" || fail "Swift package marked build-tool"
+btrb=$(jq -r '[.components[] | .properties[]? | select(.name=="bomlens:dependency-role")] | length' "$BTDIR/ruby.json")
+[ "$btrb" = "0" ] && pass "a gem in a Ruby-only project is an ordinary dependency" || fail "Ruby-only gem marked build-tool"
+
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[{"Target":"Gemfile.lock","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2024-3333","PkgName":"fastlane","InstalledVersion":"2.2","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:gem/fastlane@2.2"}}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
+    bash "$LIB/scan-security.sh" "$BTDIR/ios.json" "$BTDIR/sec" app >/dev/null 2>&1
+grep -q "fastlane (build tool)" "$BTDIR/sec_security.md" && grep -q "(build tool)" "$BTDIR/sec_security.html" \
+    && pass "a finding in a build-tool gem is tagged in the security report" || fail "build-tool tag missing in the security report"
+
 echo "== sec-advisory-ids: distribution advisory numbers become CVE ids or a separate advisory list =="
 # Trivy files some findings under a distribution advisory number (DLA-...,
 # SUSE-SU-...). One that names a CVE is reported under that CVE with the number

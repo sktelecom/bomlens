@@ -1,0 +1,21 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {"component": {"type": "application", "bom-ref": "root", "name": "petclinic", "version": "1.0"}},
+  "components": [
+    {"type": "library", "bom-ref": "web", "name": "spring-boot-starter-web", "version": "3.2.0", "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0"},
+    {"type": "library", "bom-ref": "tomcat-starter", "name": "spring-boot-starter-tomcat", "version": "3.2.0", "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0"},
+    {"type": "library", "bom-ref": "tomcat-core", "name": "tomcat-embed-core", "version": "10.1.16", "purl": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16"},
+    {"type": "library", "bom-ref": "snake", "name": "snakeyaml", "version": "1.33", "purl": "pkg:maven/org.yaml/snakeyaml@1.33"},
+    {"type": "library", "bom-ref": "orphan", "name": "orphan-lib", "version": "1.0", "purl": "pkg:maven/org.example/orphan-lib@1.0"}
+  ],
+  "dependencies": [
+    {"ref": "root", "dependsOn": ["web", "snake"]},
+    {"ref": "web", "dependsOn": ["tomcat-starter"]},
+    {"ref": "tomcat-starter", "dependsOn": ["tomcat-core"]},
+    {"ref": "tomcat-core", "dependsOn": []},
+    {"ref": "snake", "dependsOn": []},
+    {"ref": "orphan", "dependsOn": []}
+  ]
+}

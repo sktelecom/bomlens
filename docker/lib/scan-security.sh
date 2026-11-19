@@ -331,6 +331,46 @@ if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type 
     fi
 fi
 
+# --- Which direct dependency brings each finding in ----------------------------
+#
+# A vulnerable library is rarely something a developer chose; it arrives through
+# one of the few dependencies they did. The SBOM's dependency graph says which:
+# walk it from each vulnerable component toward the root and keep the direct
+# dependencies met on the way (introduced-by.jq, at most three, nearest first).
+# They are written onto each Vulnerabilities entry of _security.json as
+# `introducedBy`, and IntroducedBy.State records why the field is empty when it
+# is: "no-graph" (the SBOM has no dependency edges, as an SBOM from a fallback
+# that reads direct dependencies only has none) or "too-large".
+INTRO_STATE="ok"
+if [ -f "$SCRIPT_DIR/introduced-by.jq" ] && command -v jq >/dev/null 2>&1; then
+    INTRO_PURLS=$(jq -c '[ .Results[]?.Vulnerabilities[]? | ((.PkgIdentifier // {}).PURL // "") | select(. != "") ] | unique' "$JSON" 2>/dev/null || echo '[]')
+    [ -n "$INTRO_PURLS" ] || INTRO_PURLS='[]'
+    if [ "$INTRO_PURLS" != "[]" ]; then
+        INTRO_DOC=$(jq -c --argjson purls "$INTRO_PURLS" --argjson max 3 -f "$SCRIPT_DIR/introduced-by.jq" "$SBOM" 2>/dev/null || true)
+        if [ -n "$INTRO_DOC" ] && echo "$INTRO_DOC" | jq -e '.map' >/dev/null 2>&1; then
+            INTRO_STATE=$(echo "$INTRO_DOC" | jq -r 'if .graph | not then "no-graph" elif .skipped != "" then .skipped else "ok" end')
+            tmp_i="$(mktemp)"; tmp_m="$(mktemp)"
+            echo "$INTRO_DOC" | jq -c '.map' > "$tmp_m"
+            if jq --slurpfile d "$tmp_m" --arg st "$INTRO_STATE" '
+                    ($d[0]) as $m
+                    | .Results = [ (.Results // [])[]
+                        | if has("Vulnerabilities") and (.Vulnerabilities | type == "array")
+                          then .Vulnerabilities = [ .Vulnerabilities[]
+                                 | . + {introducedBy: ($m[((.PkgIdentifier // {}).PURL // "")] // [])} ]
+                          else . end ]
+                    | .IntroducedBy = {State: $st, Max: 3}' "$JSON" > "$tmp_i" 2>/dev/null; then
+                mv "$tmp_i" "$JSON"; rm -f "$tmp_m"
+            else
+                rm -f "$tmp_i" "$tmp_m"
+                INTRO_STATE="error"
+                echo "[security] WARN: could not record which direct dependency introduces each finding; the column is left out." >&2
+            fi
+        else
+            INTRO_STATE="error"
+        fi
+    fi
+fi
+
 # The Go vulnerability database is named beside Trivy when it was read for
 # this report, with the date of the snapshot.
 GOVULNDB_ENGINE=""
@@ -371,7 +411,9 @@ FINDINGS=$(jq -r '
       unverified: (.["bomlens:cpeVersionUnverified"] // false),
       # --reachability: govulncheck judgement (null when there is none).
       reach: ((.["bomlens:reachability"] // {}).state // null),
-      reach_detail: ((.["bomlens:reachability"] // {}).detail // "")
+      reach_detail: ((.["bomlens:reachability"] // {}).detail // ""),
+      # The direct dependencies that bring this component in (introduced-by.jq).
+      introducedBy: (.introducedBy // [])
     } ]
   # Dedup by (purl-or-name, CVE): when the deep-CVE grype pass and Trivy both
   # report the same finding they must count once. purl is the stable key across
@@ -530,6 +572,30 @@ count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
 KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
+# Whether any finding names the direct dependency behind it (the extra column).
+INTRO_ANY=$(echo "$FINDINGS" | jq 'any(.[]; (.introducedBy | length) > 0)')
+# Components marked as build tooling (normalize-sbom.sh: the gems of an iOS
+# project) are tagged on their findings, so they read apart from the app's own
+# dependencies.
+BUILD_TOOL_PURLS=$(jq -c '[ (.components // [])[] | select(any(.properties[]?; .name == "bomlens:dependency-role" and .value == "build-tool")) | (.purl // empty) ]' "$SBOM" 2>/dev/null || echo '[]')
+[ -n "$BUILD_TOOL_PURLS" ] || BUILD_TOOL_PURLS='[]'
+FINDINGS=$(echo "$FINDINGS" | jq --argjson bt "$BUILD_TOOL_PURLS" 'map(. + {buildTool: (.purl as $p | ($bt | index($p)) != null)})')
+BUILD_TOOL_ANY=$(echo "$FINDINGS" | jq 'any(.[]; .buildTool)')
+# Findings in operating-system packages of a scanned image: when they are most of
+# the list, the fix is the base image, not a dependency of the application.
+OS_FINDINGS=$(echo "$FINDINGS" | jq '[ .[] | select(.purl | test("^pkg:(deb|rpm|apk)/")) ] | length')
+BASE_IMAGE_HINT=false
+if [ "${MODE:-}" = "IMAGE" ] && [ "$OS_FINDINGS" -ge 10 ] && [ $((OS_FINDINGS * 2)) -ge "$TOTAL" ]; then
+    BASE_IMAGE_HINT=true
+fi
+# What a source scan leaves out by default (the same list the scan uses).
+SCOPE_DIRS=""
+if [ "${MODE:-}" = "SOURCE" ]; then
+    case "${BOMLENS_INCLUDE_NON_SHIPPED:-}" in
+        1|true) ;;
+        *) SCOPE_DIRS=$(sed -n 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/p' "$SCRIPT_DIR/source-detect.sh" 2>/dev/null | head -n 1 | tr ' ' ',' | sed 's/,/, /g') ;;
+    esac
+fi
 
 # ---------- Markdown ----------
 {
@@ -558,6 +624,11 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     if [ "$ENRICHED" = "true" ]; then
         echo "- Actively exploited (CISA KEV): **${KEV_COUNT}**"
         echo "- Priority order: KEV first, then severity, then EPSS (exploit probability)."
+        echo ""
+    fi
+    if [ "$BASE_IMAGE_HINT" = "true" ]; then
+        echo "- Base image: **${OS_FINDINGS}** of the ${TOTAL} findings are in operating-system packages."
+        echo "  Update or replace the base image rather than patching packages one by one."
         echo ""
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
@@ -589,14 +660,21 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     if [ "$TOTAL" -gt 0 ]; then
         echo "## Findings"
         echo ""
-        echo "| Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed |"
-        echo "|----------|-----|-----:|-----:|-----|---------|-----------|-------|"
-        echo "$FINDINGS" | jq -r '.[] |
+        if [ "$INTRO_ANY" = "true" ]; then
+            echo "| Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed | Introduced by |"
+            echo "|----------|-----|-----:|-----:|-----|---------|-----------|-------|---------------|"
+        else
+            echo "| Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed |"
+            echo "|----------|-----|-----:|-----:|-----|---------|-----------|-------|"
+        fi
+        echo "$FINDINGS" | jq -r --argjson intro "$INTRO_ANY" 'def cell: tostring | gsub("[|\n]"; " ");
+            .[] |
             "| \(.severity)" +
             " | \(if .kev then "⚠️ KEV" else "" end)" +
             " | \(.cvss // "")" +
             " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
-            " | \(.id)\(if .unverified then " †" else "" end)\(if .reach == "exploitable" then " ‡" else "" end) | \(.pkg) | \(.version) | \(.fixed) |"'
+            " | \(.id)\(if .unverified then " †" else "" end)\(if .reach == "exploitable" then " ‡" else "" end) | \(.pkg)\(if .buildTool then " (build tool)" else "" end) | \(.version) | \(.fixed) |" +
+            (if $intro then " \(.introducedBy | map((.name + (if .version != "" then " " + .version else "" end) + (if .direct then " (direct)" else "" end)) | cell) | join(", ")) |" else "" end)'
         # Footnote only when at least one finding is version-unverified.
         if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
             echo ""
@@ -681,6 +759,23 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
             "| \(.severity) | \(.cvss // "") | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
     fi
+    echo ""
+    echo "## Reading this report"
+    echo ""
+    echo "- A finding is a match between a component's name and version and a vulnerability database. Whether the vulnerable code is used by this product is not checked (except where a reachability result is shown), so some findings may not apply."
+    if [ "$INTRO_ANY" = "true" ]; then
+        echo "- Introduced by: the direct dependencies the vulnerable component is reached through (at most three, nearest first). Raising or replacing those is the fix; \"(direct)\" means the component itself is a direct dependency."
+    elif [ "$TOTAL" -gt 0 ] && [ "$INTRO_STATE" = "no-graph" ]; then
+        echo "- The SBOM has no dependency graph, so the findings cannot be traced to the direct dependency behind them."
+    elif [ "$TOTAL" -gt 0 ] && [ "$INTRO_STATE" = "too-large" ]; then
+        echo "- The SBOM is too large to trace each finding to the direct dependency behind it."
+    fi
+    if [ "$BUILD_TOOL_ANY" = "true" ]; then
+        echo "- (build tool): a Ruby gem listed by the project's Gemfile.lock. In an iOS project these are the build tooling (fastlane, CocoaPods) and do not ship in the app."
+    fi
+    if [ -n "$SCOPE_DIRS" ]; then
+        echo "- A source scan leaves out folders that do not ship with the product (${SCOPE_DIRS}), so nothing found there is listed. Set \`BOMLENS_INCLUDE_NON_SHIPPED=1\` to include them."
+    fi
 } > "$MD"
 
 # ---------- HTML ----------
@@ -727,6 +822,7 @@ NO_FIX="$(report_str no_fix)"
 R_NOVER="$(sec_s reason_no_version 'no version')"
 R_NOID="$(sec_s reason_no_identifier 'no package purl and no matched CPE')"
 R_REPO="$(sec_s reason_repository_purl 'repository purl (pkg:github, ...), which Trivy does not query')"
+TH_INTRO="$(sec_s th_introduced 'Introduced by')"
 R_UNSUP="$(sec_s reason_unsupported_ecosystem 'package ecosystem with no vulnerability data source (pkg:cocoapods)')"
 {
     cat <<HTMLHEAD
@@ -759,6 +855,9 @@ HTMLHEAD
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         NOTES="${NOTES}<p>$(sec_s kernel_note '<b>%s kernel advisories</b> are listed at the end of this report and are not included in the counts below. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.' "$(report_num "$KERNEL_TOTAL")")</p>"
     fi
+    if [ "$BASE_IMAGE_HINT" = "true" ]; then
+        NOTES="${NOTES}<p>$(sec_s base_image_note '<b>%s of the %s findings are in operating-system packages.</b> Update or replace the base image rather than patching packages one by one.' "$(report_num "$OS_FINDINGS")" "$(report_num "$TOTAL")")</p>"
+    fi
     if [ "$INCOMPLETE" = "true" ]; then
         # Its own banner, above the others: it bounds everything they say.
         report_completeness_html
@@ -775,15 +874,16 @@ HTMLHEAD
         # What KEV and EPSS mean and how the rows are ordered: a legend under the
         # head instead of a line of abbreviations above the table.
         [ "$ENRICHED" = "true" ] && echo "<p class=\"legend\"><span><b>KEV</b> $(sec_s legend_kev 'CISA known-exploited')</span><span><b>EPSS</b> $(sec_s legend_epss 'exploit probability (FIRST.org)')</span><span><b>$(sec_s legend_order_h 'Order')</b> $(sec_s legend_order 'KEV first, then severity, then EPSS')</span></p>"
-        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th>${TH_KEV}</th><th class=\"num\">${TH_CVSS}</th><th class=\"num\">${TH_EPSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th><th>${TH_TITLE}</th></tr></thead><tbody>"
-        echo "$FINDINGS" | jq -r --arg nofix "$NO_FIX" --arg cpeu "$(sec_s cpe_unverified_title 'CPE-matched; NVD version range not verified')" "$(report_jq_defs)"'.[] |
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th>${TH_KEV}</th><th class=\"num\">${TH_CVSS}</th><th class=\"num\">${TH_EPSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th>$([ "$INTRO_ANY" = "true" ] && printf '<th>%s</th>' "$TH_INTRO")<th>${TH_TITLE}</th></tr></thead><tbody>"
+        echo "$FINDINGS" | jq -r --argjson intro "$INTRO_ANY" --arg btlabel "$(sec_s build_tool_label 'build tool')" --arg dlabel "$(sec_s direct_label 'direct')" --arg nofix "$NO_FIX" --arg cpeu "$(sec_s cpe_unverified_title 'CPE-matched; NVD version range not verified')" "$(report_jq_defs)"'.[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
             "<td class=\"id\">" + (.id|strv|@html) + (if .unverified then " <span title=\"" + ($cpeu|@html) + "\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td>" +
-            "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
+            "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + (if .buildTool then " <span class=\"legend\">(" + ($btlabel | @html) + ")</span>" else "" end) + "</td>" +
             "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            (if $intro then "<td class=\"grow\">" + (.introducedBy | map(((.name + (if .version != "" then " " + .version else "" end)) | strv | @html) + (if .direct then " <span class=\"legend\">(" + ($dlabel | @html) + ")</span>" else "" end)) | join(", ")) + "</td>" else "" end) +
             "<td class=\"grow\">" + (.title_full // .title | cut(120)) + "</td></tr>"'
         echo "</tbody></table></div>"
         FOOT=""
@@ -883,6 +983,21 @@ HTMLHEAD
             "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td></tr>"'
         echo "</tbody></table></div></div>"
     fi
+    RNOTES="<span>$(sec_s note_fp 'A finding is a match between a component'"'"'s name and version and a vulnerability database. Whether the vulnerable code is used by this product is not checked (except where a reachability result is shown), so some findings may not apply.')</span>"
+    if [ "$INTRO_ANY" = "true" ]; then
+        RNOTES="${RNOTES}<span>$(sec_s note_introduced 'Introduced by: the direct dependencies the vulnerable component is reached through (at most three, nearest first). Raising or replacing those is the fix; "direct" means the component itself is a direct dependency.')</span>"
+    elif [ "$TOTAL" -gt 0 ] && [ "$INTRO_STATE" = "no-graph" ]; then
+        RNOTES="${RNOTES}<span>$(sec_s note_no_graph 'The SBOM has no dependency graph, so the findings cannot be traced to the direct dependency behind them.')</span>"
+    elif [ "$TOTAL" -gt 0 ] && [ "$INTRO_STATE" = "too-large" ]; then
+        RNOTES="${RNOTES}<span>$(sec_s note_too_large 'The SBOM is too large to trace each finding to the direct dependency behind it.')</span>"
+    fi
+    if [ "$BUILD_TOOL_ANY" = "true" ]; then
+        RNOTES="${RNOTES}<span>$(sec_s note_build_tool '(build tool): a Ruby gem listed by the project'"'"'s Gemfile.lock. In an iOS project these are the build tooling (fastlane, CocoaPods) and do not ship in the app.')</span>"
+    fi
+    if [ -n "$SCOPE_DIRS" ]; then
+        RNOTES="${RNOTES}<span>$(sec_s note_scope 'A source scan leaves out folders that do not ship with the product (%s), so nothing found there is listed. Set <code>BOMLENS_INCLUDE_NON_SHIPPED=1</code> to include them.' "$(esc "$SCOPE_DIRS")")</span>"
+    fi
+    echo "<p class=\"legend\">${RNOTES}</p>"
     echo "</body></html>"
 } > "$HTML"
 

@@ -68,7 +68,8 @@ if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
           version: .InstalledVersion,
           severity: (.Severity // "UNKNOWN"),
           fixed: (.FixedVersion // ""),
-          purl: ((.PkgIdentifier // {}).PURL // "")
+          purl: ((.PkgIdentifier // {}).PURL // ""),
+          introducedBy: (.introducedBy // [])
         } ]
       | sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)
     ' "$SEC" 2>/dev/null || echo '[]')
@@ -88,6 +89,21 @@ if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
 fi
 C=$(sev_count CRITICAL); H=$(sev_count HIGH); M=$(sev_count MEDIUM); L=$(sev_count LOW); U=$(sev_count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
+
+# Where to act first. A vulnerable library is reached through a direct dependency
+# (scan-security.sh records them as introducedBy): the ones that bring in the most
+# findings are what to raise or replace. When an image's findings are mostly in
+# operating-system packages, the fix is the base image instead.
+FIX_POINTS=$(echo "$FINDINGS" | jq -c '
+    [ .[] | .introducedBy[]? | {key: (.name + (if .version != "" then " " + .version else "" end))} ]
+    | group_by(.key) | map({name: .[0].key, count: length})
+    | sort_by(-.count, .name) | .[0:3]')
+[ -n "$FIX_POINTS" ] || FIX_POINTS='[]'
+OS_FINDINGS=$(echo "$FINDINGS" | jq '[ .[] | select(.purl | test("^pkg:(deb|rpm|apk)/")) ] | length')
+BASE_IMAGE_HINT=false
+if [ "$SCAN_MODE" = "IMAGE" ] && [ "$OS_FINDINGS" -ge 10 ] && [ $((OS_FINDINGS * 2)) -ge "$TOTAL" ]; then
+    BASE_IMAGE_HINT=true
+fi
 
 # Components proved present with no version recovered (bomlens:evidenceGrade).
 # They carry no version, purl or CPE, so no vulnerability database can be asked
@@ -395,6 +411,9 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_H2_NEXT=$(kstr risk.h2_next)
     P_NEXT1_PRE=$(kstr risk.next1_pre); P_NEXT1_BOLD=$(kstr risk.next1_bold); P_NEXT1_POST=$(kstr risk.next1_post)
     P_NEXT2_CONF=$(kstr risk.next2_conf)
+    P_NEXT_FIX_PRE=$(kstr risk.next_fix_pre); P_NEXT_FIX_UNIT=$(kstr risk.next_fix_unit)
+    P_NEXT_BASE=$(kstr risk.next_base_image)
+    P_NOTE_FP=$(kstr risk.note_fp); P_NOTE_LIC=$(kstr risk.note_lic)
     P_NEXT2_SELF_MD=$(tfmt risk.next2_self_md "$OUT_PREFIX" "$OUT_PREFIX")
     P_NEXT2_SELF_HTML=$(kstr risk.next2_self_html)
     P_META_FORMAT=$(kstr risk.meta_format)
@@ -483,6 +502,11 @@ else
     P_NEXT1_BOLD="remediation plan or risk justification"
     P_NEXT1_POST=" within the recommended deadlines above."
     P_NEXT2_CONF="If the conformance check failed, fill the missing items and regenerate the SBOM."
+    P_NEXT_FIX_PRE="Raise or replace the direct dependencies that bring in the most findings: "
+    P_NEXT_FIX_UNIT="%s finding(s)"
+    P_NEXT_BASE="Most findings are in the image's operating-system packages: update or replace the base image rather than patching packages one by one."
+    P_NOTE_FP="A finding is a match between a component's name and version and a vulnerability database; whether this product uses the vulnerable code is not checked, so some findings may not apply. A source scan also leaves out test, example and sample folders by default."
+    P_NOTE_LIC="Licenses are what each package declares. A declaration can be missing or wrong, and this is not a legal determination."
     P_NEXT2_SELF_MD="Keep and distribute the notice (\`${OUT_PREFIX}_NOTICE.{txt,html}\`) together with the SBOM (\`${OUT_PREFIX}_bom.json\`)."
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
     P_META_FORMAT="Input format:"
@@ -565,6 +589,10 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
         echo "${P_VULN_NOTE_MD}"
         echo ""
     fi
+    if [ "$TOTAL" -gt 0 ]; then
+        echo "${P_NOTE_FP}"
+        echo ""
+    fi
     echo "| Critical | High | Medium | Low | Unknown | Total |"
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
@@ -623,6 +651,10 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
         echo "${P_LIC_NO_NOTICE_MD}"
     else
         echo "${P_MD_LIC_COUNT}"
+    fi
+    if [ "$LIC_COUNT" != "N/A" ]; then
+        echo ""
+        echo "${P_NOTE_LIC}"
     fi
     if [ "$HAS_LIC_CLASS" = "true" ]; then
         echo ""
@@ -690,6 +722,11 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
     fi
     if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
         NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT1_PRE}**${P_NEXT1_BOLD}**${P_NEXT1_POST}"
+    fi
+    if [ "$BASE_IMAGE_HINT" = "true" ]; then
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT_BASE}"
+    elif [ "$FIX_POINTS" != "[]" ]; then
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT_FIX_PRE}$(echo "$FIX_POINTS" | jq -r --arg unit "$P_NEXT_FIX_UNIT" 'map(. as $f | "`" + ($f.name | gsub("`"; "")) + "` (" + ($unit | sub("%s"; ($f.count | tostring))) + ")") | join(", ")')."
     fi
     if [ "$HAS_CONF" = "true" ]; then
         NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT2_CONF}"
@@ -777,6 +814,9 @@ ${UNCHECKED_LI}
     if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
         echo "${P_VULN_NOTE_HTML}"
     fi
+    if [ "$TOTAL" -gt 0 ]; then
+        echo "<p class=\"legend\">$(esc "$P_NOTE_FP")</p>"
+    fi
 
     if [ "$TOTAL" -gt 0 ]; then
         # The severity labels sit in the head of the table they count.
@@ -811,6 +851,9 @@ ${UNCHECKED_LI}
         echo "<p><em>${P_LIC_NO_NOTICE_HTML}</em></p>"
     else
         echo "<p>${P_LIC_HTML_PRE} <b>$(report_num "$LIC_COUNT")</b>${P_LIC_HTML_POST}</p>"
+    fi
+    if [ "$LIC_COUNT" != "N/A" ]; then
+        echo "<p class=\"legend\">$(esc "$P_NOTE_LIC")</p>"
     fi
     if [ "$HAS_LIC_CLASS" = "true" ]; then
         echo "<h3>${P_H3_LICCLASS}</h3>"
@@ -890,6 +933,11 @@ ${UNCHECKED_LI}
     fi
     if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
         echo " <li>${P_NEXT1_PRE}<b>${P_NEXT1_BOLD}</b>${P_NEXT1_POST}</li>"
+    fi
+    if [ "$BASE_IMAGE_HINT" = "true" ]; then
+        echo " <li>$(esc "$P_NEXT_BASE")</li>"
+    elif [ "$FIX_POINTS" != "[]" ]; then
+        echo " <li>$(esc "$P_NEXT_FIX_PRE")$(echo "$FIX_POINTS" | jq -r --arg unit "$P_NEXT_FIX_UNIT" 'map(. as $f | "<code>" + ($f.name | @html) + "</code> (" + ($unit | sub("%s"; ($f.count | tostring)) | @html) + ")") | join(", ")').</li>"
     fi
     if [ "$HAS_CONF" = "true" ]; then
         echo " <li>${P_NEXT2_CONF}</li>"
