@@ -211,6 +211,9 @@ export function Sidebar({
               return (
                 <NavList.Item
                   key={s.id}
+                  // A plain id: the generated ones contain colons, and the accessibility
+                  // check cannot resolve the label references built from them.
+                  id={`nav-${s.id}`}
                   href={sectionHref(s.id)}
                   aria-current={current === s.id ? "page" : undefined}
                 >

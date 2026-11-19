@@ -332,8 +332,6 @@ for (const { kind, section } of SECTIONS) {
       if (section !== "overview") await expect(active).toHaveAttribute("href", new RegExp(`/${section}$`));
       // wcag22aa carries target-size (2.5.8), the rule the narrow severity-bar
       // segments break; the matrix above stops at 2.1 and could not see it.
-      const probe = JSON.stringify(await page.evaluate(() => Array.from(document.querySelectorAll('nav a[data-component="NavList.Item"]')).map((a) => ({ visible: (a as HTMLElement).innerText.replace(/\n/g, "|"), name: (a.getAttribute("aria-labelledby") || "").split(" ").map((id) => { const e = document.getElementById(id); return e ? JSON.stringify(e.textContent) : "MISSING"; }).join("+") }))));
-      if (key === "source/vulnerabilities/light/en") expect(probe).toBe("PROBE");
       const axe = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
         .analyze();
