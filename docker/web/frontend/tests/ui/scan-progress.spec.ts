@@ -59,6 +59,12 @@ async function start(page: Page, opts: { project?: string } = {}) {
   await page.fill("#project", opts.project ?? "demo-service");
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
+  // The form checks for a same-name scan before it starts the stream, so the
+  // stream exists a moment after the click.
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __emit?: unknown; __es?: unknown };
+    return !w.__emit || Boolean(w.__es);
+  });
 }
 
 async function setup(page: Page, theme: Theme = "light", lang: Lang = "en") {

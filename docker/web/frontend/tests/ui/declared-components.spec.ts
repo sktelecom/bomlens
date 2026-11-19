@@ -80,7 +80,7 @@ test("turning it off sends no_components=true", async ({ page }) => {
 
 test("it is offered for a directory, which may be a Yocto build directory", async ({ page }) => {
   await openForm(page);
-  await page.getByRole("radio", { name: /Directory \/ rootfs/i }).click();
+  await page.getByRole("radio", { name: /Choose folder/i }).click();
   await page.getByText("Result quality").click();
   await expect(page.getByRole("switch", { name: SWITCH })).toBeVisible();
 });
