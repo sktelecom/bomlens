@@ -835,13 +835,40 @@ _PROJECT_INFO_MAX_SUBS = 20
 _VERSION_OK_RE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$")
 
 
-def _read_small_file(path):
-    """The text of a regular file of at most _PROJECT_INFO_MAX_BYTES, else None.
-    A link is not followed."""
+def _trusted_path(path):
+    """`path` re-derived from an allowed scan root, or None when it resolves
+    outside every one. Resolve with realpath, then rebuild the path from the
+    root with os.path.join(base, os.path.relpath(real, base)) and test that it
+    starts with the root: only the rebuilt value is used for the filesystem
+    call, never the caller's string."""
     try:
-        if os.path.islink(path) or not os.path.isfile(path):
-            return None
-        if os.path.getsize(path) > _PROJECT_INFO_MAX_BYTES:
+        real = os.path.realpath(path)
+    except (OSError, ValueError):
+        return None
+    for root in ALLOWED_SCAN_ROOTS:
+        base = os.path.realpath(root)
+        if real == base:
+            return base
+        if not real.startswith(base + os.sep):
+            continue
+        rebuilt = os.path.join(base, os.path.relpath(real, base))
+        if rebuilt.startswith(base + os.sep):
+            return rebuilt
+    return None
+
+
+def _read_small_file(directory, name):
+    """The text of the regular file `name` directly in `directory`, of at most
+    _PROJECT_INFO_MAX_BYTES, else None. `name` is one of the fixed manifest
+    names. A link is not followed: the file must resolve to itself."""
+    base = _trusted_path(directory)
+    if base is None or name != os.path.basename(name):
+        return None
+    path = _trusted_path(os.path.join(base, name))
+    if path is None or path != os.path.join(base, name):
+        return None
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) > _PROJECT_INFO_MAX_BYTES:
             return None
         with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()
@@ -908,8 +935,11 @@ _VERSION_SOURCES = (
 
 
 def _has_manifest(directory):
+    base = _trusted_path(directory)
+    if base is None:
+        return False
     try:
-        names = os.listdir(directory)
+        names = os.listdir(base)
     except OSError:
         return False
     return any(n in _PROJECT_MANIFESTS or n.endswith(_PROJECT_MANIFEST_SUFFIXES) for n in names)
@@ -924,17 +954,20 @@ def project_info(scan_dir):
     link, and the version must look like a version."""
     out = {"version": "", "versionFrom": "", "hasManifest": _has_manifest(scan_dir),
            "subProjects": []}
+    if _trusted_path(scan_dir) is None:
+        return out
     for name, parse in _VERSION_SOURCES:
-        text = _read_small_file(os.path.join(scan_dir, name))
+        text = _read_small_file(scan_dir, name)
         if text is None:
             continue
         v = parse(text)
         if v and _VERSION_OK_RE.match(v):
             out["version"], out["versionFrom"] = v, name
             break
-    if not out["hasManifest"]:
+    base = _trusted_path(scan_dir)
+    if not out["hasManifest"] and base is not None:
         try:
-            entries = sorted(os.scandir(scan_dir), key=lambda e: e.name)
+            entries = sorted(os.scandir(base), key=lambda e: e.name)
         except OSError:
             entries = []
         for e in entries:
