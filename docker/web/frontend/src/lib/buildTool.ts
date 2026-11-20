@@ -42,3 +42,17 @@ export function buildToolToSend(shown: boolean, choice: BuildTool): BuildTool {
 export function builtWith(choice: string | null | undefined): "maven" | "gradle" | null {
   return choice === "maven" || choice === "gradle" ? choice : null;
 }
+
+/**
+ * The locale key for a known build-tool reason (the fixed phrases the build
+ * step writes), or null for anything else so the caller shows the raw text.
+ */
+export function buildToolWhyKey(why: string | null | undefined): string | null {
+  if (!why) return null;
+  if (why === "requested with --build-tool maven") return "overview.buildWhyRequestedMaven";
+  if (why === "requested with --build-tool gradle") return "overview.buildWhyRequestedGradle";
+  if (/^pom\.xml and build\.gradle both found; Gradle is the default/.test(why)) {
+    return "overview.buildWhyBothDefaultGradle";
+  }
+  return null;
+}

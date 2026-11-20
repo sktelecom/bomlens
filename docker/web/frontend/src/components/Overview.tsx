@@ -20,7 +20,7 @@ import { AiUsageCard } from "./AiUsageCard";
 import { AttentionBox } from "./overview/Attention";
 import { ComparisonBox } from "./overview/Comparison";
 import { FailureBanner, OverviewNotices } from "./overview/Notices";
-import { builtWith } from "@/lib/buildTool";
+import { builtWith, buildToolWhyKey } from "@/lib/buildTool";
 import { LicensePanel, RiskyBox, SeverityPanel } from "./overview/Risk";
 import { SectionsBox, YoctoVexNote } from "./overview/Sections";
 import { ResultsList } from "./ResultsList";
@@ -70,7 +70,11 @@ export function OverviewHeaderLines({ result }: { result: DoneEvent }) {
             ? t("overview.builtWithMaven")
             : t("overview.builtWithGradle")}
           {result.sbom?.buildToolChoiceWhy && (
-            <code title={result.sbom.buildToolChoiceWhy}>{result.sbom.buildToolChoiceWhy}</code>
+            <code title={result.sbom.buildToolChoiceWhy}>
+              {buildToolWhyKey(result.sbom.buildToolChoiceWhy)
+                ? t(buildToolWhyKey(result.sbom.buildToolChoiceWhy) as string)
+                : result.sbom.buildToolChoiceWhy}
+            </code>
           )}
         </span>
       )}
