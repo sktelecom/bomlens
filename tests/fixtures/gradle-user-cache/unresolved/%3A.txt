@@ -1,0 +1,6 @@
+P	:
+H	:
+R	:	com.google.guava:guava:32.1.3-jre
+U	:	com.google.guava:guava:32.1.3-jre
+R	:	org.slf4j:slf4j-api:2.0.9
+U	:	org.slf4j:slf4j-api:2.0.9

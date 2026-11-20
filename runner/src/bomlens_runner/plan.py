@@ -38,6 +38,7 @@ MOUNT_ROLES = (
     "source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle", "trivy-db",
     "maven-settings", "maven-settings-security", "maven-repository", "gradle-properties",
     "gradle-init-script", "gradle-init-script-kts", "gradle-init",
+    "gradle-cache", "gradle-wrapper",
 )
 # The user's own files and folders, given read-only. maven-repository is the
 # user's Maven local repository, which stage 1 only reads.
@@ -45,8 +46,12 @@ SETTINGS_ROLES = (
     "maven-settings", "maven-settings-security", "maven-repository", "gradle-properties",
     "gradle-init-script", "gradle-init-script-kts", "gradle-init",
 )
+# The user's own caches, read-only: the Gradle dependency cache (the folder
+# that holds modules-2) and the Gradle wrapper's distributions.
+GRADLE_USER_CACHE_ROLES = ("gradle-cache", "gradle-wrapper")
 STAGE_ROLES = {
-    1: frozenset(("source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle") + SETTINGS_ROLES),
+    1: frozenset(("source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle") + SETTINGS_ROLES
+                 + GRADLE_USER_CACHE_ROLES),
     2: frozenset(("source", "output", "trivy-db")),
 }
 # Roles the runner itself provides. Any other role is the caller's to give
@@ -63,7 +68,7 @@ RESERVED_TARGETS = ("/tmp", "/trivy-db")
 
 _BUILD_PREP = (
     "BOMLENS_KEEP_BUILD_OUTPUT", "BOMLENS_MAVEN_FULL_GRAPH", "BOMLENS_ANDROID_FULL_GRAPH",
-    "BOMLENS_GRADLE_FULL_GRAPH", "BOMLENS_NODE_FULL_GRAPH", "BOMLENS_PHP_FULL_GRAPH",
+    "BOMLENS_GRADLE_FULL_GRAPH", "BOMLENS_GRADLE_USER_CACHE", "BOMLENS_NODE_FULL_GRAPH", "BOMLENS_PHP_FULL_GRAPH",
     "BOMLENS_INCLUDE_NON_SHIPPED", "BOMLENS_INCLUDE_DEV_DEPENDENCIES", "BOMLENS_NO_COPYRIGHT",
     "BOMLENS_NO_CARGO_LICENSE", "BOMLENS_NO_AI_USAGE", "BOMLENS_AI_USAGE_TIMEOUT", "BOMLENS_PREP_TIMEOUT", "BOMLENS_BUILD_TOOL",
     "BOMLENS_LICENSE_PROBE_TIMEOUT", "BOMLENS_LICENSE_FETCH_TIMEOUT",
@@ -104,7 +109,7 @@ _TARGET_RE = re.compile(r"/[A-Za-z0-9._/-]{1,200}")
 _PLAN_FILE_RE = re.compile(rf"{PLAN_FILES_DIR}/[A-Za-z0-9][A-Za-z0-9._-]{{0,99}}")
 SHELLS = frozenset(("sh", "/bin/sh", "bash", "/bin/bash"))
 MAX_ARGS = 64
-MAX_MOUNTS = 16
+MAX_MOUNTS = 32
 MAX_VALUE = 4096
 
 
@@ -222,6 +227,8 @@ def _parse_mount(raw: object, stage: int) -> Mount:
     if role == "trivy-db" and mode != "ro":
         raise PlanRejected("trivy-db must be read-only")
     if role in SETTINGS_ROLES and mode != "ro":
+        raise PlanRejected(f"{role} must be read-only")
+    if role in GRADLE_USER_CACHE_ROLES and mode != "ro":
         raise PlanRejected(f"{role} must be read-only")
     if role == "source" and stage == 2 and mode != "ro":
         raise PlanRejected("stage 2 source must be read-only")

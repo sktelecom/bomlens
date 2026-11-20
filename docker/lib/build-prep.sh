@@ -1415,6 +1415,202 @@ if [ -f composer.json ] && ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
     PHP_SCOPE_FILTER=1
 fi
 
+# --- gradle user cache ---
+# The user's own Gradle dependency cache, mounted read-only (the gradle-cache
+# role: the host folder that holds modules-2, $GRADLE_USER_HOME/caches or
+# ~/.gradle/caches) at $GRADLE_USER_CACHE_DIR. Gradle reads it as its shared
+# read-only dependency cache (GRADLE_RO_DEP_CACHE), and so does cdxgen for jars,
+# hashes and POMs. A project the user built on this machine then resolves from
+# what that build downloaded. Gradle reads the metadata of the cache layout it
+# writes itself (modules-2/metadata-2.NNN), so a cache filled by a Gradle with
+# another layout gives it nothing but the jars.
+# --offline is added only when no repository the build names answers: the probe
+# below asks each once, with a short time limit. An online scan stays as it was
+# apart from the read-only cache. BOMLENS_GRADLE_USER_CACHE=false leaves the
+# mount unused (the launchers do not mount it then either). A GRADLE_RO_DEP_CACHE
+# the caller set is kept.
+# GRADLE_USER_CACHE_STATE is what the SBOM records (bomlens:gradle-user-cache):
+# online or offline, or empty when the cache was not read. GRADLE_OFFLINE_ARG
+# is --offline or empty, for the Gradle runs below.
+GRADLE_USER_CACHE_ROOT="${PREP_USER_CACHE_ROOT:-/bomlens-user-cache}"
+GRADLE_USER_CACHE_DIR="$GRADLE_USER_CACHE_ROOT/gradle"
+GRADLE_USER_WRAPPER_DIR="$GRADLE_USER_CACHE_ROOT/gradle-wrapper"
+GRADLE_USER_CACHE_STATE=""
+GRADLE_OFFLINE_ARG=""
+GRADLE_PROBE_TIMEOUT=5
+
+# The repositories the build names, one URL per line: a url or maven("...") in
+# the build and settings files (three folders deep, build output and
+# dependency folders left out) and in the user's init scripts, and the
+# well-known ones it calls by name (mavenCentral(), google(),
+# gradlePluginPortal(); a plugins block resolves from the plugin portal by
+# default). With none found, Maven Central and the plugin portal.
+gradle_repository_urls() {
+    command -v node >/dev/null 2>&1 || return 0
+    _gru_js=$(mktemp) || return 0
+    cat > "$_gru_js" <<'GRADLE_REPO_URLS_JS'
+const fs = require('fs');
+const path = require('path');
+const [root, settingsDir] = process.argv.slice(2);
+const SKIP = new Set(['.git', '.gradle', 'build', 'node_modules', 'out', 'target']);
+const files = [];
+const walk = (dir, depth) => {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) { if (depth < 3 && !SKIP.has(e.name)) walk(p, depth + 1); }
+    else if (/^(build|settings)\.gradle(\.kts)?$/.test(e.name)) files.push(p);
+  }
+};
+walk(root, 0);
+for (const f of ['init.gradle', 'init.gradle.kts']) files.push(path.join(settingsDir, f));
+try { for (const f of fs.readdirSync(path.join(settingsDir, 'init.d'))) files.push(path.join(settingsDir, 'init.d', f)); } catch (e) { /* none */ }
+const urls = new Set();
+let central = false, google = false, portal = false;
+for (const f of files.slice(0, 200)) {
+  let t = '';
+  try { t = fs.readFileSync(f, 'utf8'); } catch (e) { continue; }
+  t = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1');
+  const re = /\b(?:url\s*(?:=\s*)?(?:uri\s*)?\(?|maven\s*\(\s*(?:url\s*=\s*)?(?:uri\s*\(\s*)?)\s*["'](https?:\/\/[^"'\s$]+)["']/g;
+  let m;
+  while ((m = re.exec(t)) !== null) urls.add(m[1]);
+  if (/\bmavenCentral\s*\(/.test(t)) central = true;
+  if (/\bgoogle\s*\(\s*\)/.test(t)) google = true;
+  if (/\bgradlePluginPortal\s*\(/.test(t) || /\bplugins\s*\{[^}]*\bversion\b/.test(t)) portal = true;
+}
+if (central) urls.add('https://repo.maven.apache.org/maven2/');
+if (google) urls.add('https://dl.google.com/dl/android/maven2/');
+if (portal) urls.add('https://plugins.gradle.org/m2/');
+if (urls.size === 0) { urls.add('https://repo.maven.apache.org/maven2/'); urls.add('https://plugins.gradle.org/m2/'); }
+process.stdout.write([...urls].slice(0, 8).join('\n') + '\n');
+GRADLE_REPO_URLS_JS
+    node "$_gru_js" . "$SETTINGS_ROOT/gradle" 2>/dev/null
+    rm -f "$_gru_js"
+}
+
+# Ask each repository once (Node's fetch, so the CA bundle of extra_ca_trust and
+# the proxy variables apply, as for cdxgen). Any HTTP answer, an error status
+# included, counts as reachable. Returns 0 when one answers, or when it cannot
+# tell (no node, no fetch, no URL); 1, with "<host> <cause>" on stdout, when
+# none does.
+gradle_repository_probe() {
+    command -v node >/dev/null 2>&1 || return 0
+    _grp_urls=$(gradle_repository_urls)
+    [ -n "$_grp_urls" ] || return 0
+    _grp_js=$(mktemp) || return 0
+    cat > "$_grp_js" <<'GRADLE_REPO_PROBE_JS'
+const [limit, ...urls] = process.argv.slice(2);
+if (typeof fetch !== 'function' || typeof AbortSignal.timeout !== 'function') process.exit(0);
+const probe = async (url) => {
+  let host = url;
+  try { host = new URL(url).host; } catch (e) { return { host, why: 'not a URL' }; }
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(Number(limit) * 1000),
+      headers: { 'user-agent': 'bomlens-repository-probe' } });
+    try { await res.body?.cancel(); } catch (e) { /* nothing to read */ }
+    return null;
+  } catch (err) {
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) return { host, why: 'no answer within ' + limit + 's' };
+    let e = err;
+    while (e && e.cause && !e.code) e = e.cause;
+    return { host, why: String((e && e.code) || (e && e.message) || err) };
+  }
+};
+Promise.all(urls.map(probe)).then((results) => {
+  if (results.some((r) => r === null)) process.exit(0);
+  process.stdout.write(results.map((r) => r.host + ' (' + r.why + ')').join(', ') + '\n');
+  process.exit(1);
+});
+GRADLE_REPO_PROBE_JS
+    set -f
+    # shellcheck disable=SC2086  # one URL per word; none holds a space
+    _grp_out=$(NODE_USE_ENV_PROXY=1 node "$_grp_js" "$GRADLE_PROBE_TIMEOUT" $_grp_urls 2>/dev/null)
+    _grp_rc=$?
+    set +f
+    rm -f "$_grp_js"
+    [ "$_grp_rc" -eq 1 ] || return 0
+    printf '%s' "$_grp_out" | tr -cd 'A-Za-z0-9_ .:,()/-' | cut -c1-400
+    return 1
+}
+
+# Offline, a project's wrapper cannot download its Gradle. When BomLens's
+# Gradle home has no copy of the distribution it names, one from the user's
+# wrapper folder (the gradle-wrapper role, ~/.gradle/wrapper/dists, read-only)
+# is copied in: the wrapper takes a lock file beside the distribution, so it
+# cannot use a read-only folder as it is. The folder is the one the wrapper
+# looks in, the MD5 of the distribution URL in base 36 (Gradle's PathAssembler).
+# With neither, the image's Gradle runs instead of the wrapper (cdxgen too,
+# through CDXGEN_JVM_TOOL_PINNED), which can resolve differently from the
+# project's own Gradle.
+gradle_wrapper_offline() {
+    [ "$GRADLEW" = ./gradlew ] || return 0
+    _gwo_p=gradle/wrapper/gradle-wrapper.properties
+    [ -f "$_gwo_p" ] || return 0
+    _gwo_prop() { sed -n "s/^[[:space:]]*$1[[:space:]]*[=:][[:space:]]*//p" "$_gwo_p" | head -1 | sed 's/\\\(.\)/\1/g; s/[[:space:]]*$//' | tr -d '\r'; }
+    _gwo_url=$(_gwo_prop distributionUrl)
+    case "$(_gwo_prop distributionBase)" in ""|GRADLE_USER_HOME) ;; *) return 0 ;; esac
+    case "$(_gwo_prop distributionPath)" in ""|wrapper/dists) ;; *) return 0 ;; esac
+    _gwo_name=$(basename "$_gwo_url" .zip)
+    case "$_gwo_name" in gradle-*) ;; *) return 0 ;; esac
+    case "$_gwo_name$_gwo_url" in *[!A-Za-z0-9._:/%+@=?~-]*) return 0 ;; esac
+    _gwo_hash=$(node -e 'process.stdout.write(BigInt("0x" + require("crypto").createHash("md5").update(process.argv[1]).digest("hex")).toString(36))' "$_gwo_url" 2>/dev/null)
+    [ -n "$_gwo_hash" ] || return 0
+    _gwo_home="${GRADLE_USER_HOME:-}"
+    if [ -z "$_gwo_home" ]; then
+        _gwo_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        _gwo_home="${_gwo_acct:-/root}/.gradle"
+    fi
+    _gwo_own="$_gwo_home/wrapper/dists/$_gwo_name/$_gwo_hash"
+    if [ -f "$_gwo_own/$_gwo_name.zip.ok" ]; then
+        log "gradle: offline; the wrapper's $_gwo_name is in BomLens's Gradle cache"
+        return 0
+    fi
+    _gwo_user="$GRADLE_USER_WRAPPER_DIR/$_gwo_name/$_gwo_hash"
+    set -- "$_gwo_user"/gradle-*/
+    if [ -f "$_gwo_user/$_gwo_name.zip.ok" ] && [ "$#" -eq 1 ] && [ -d "$1/lib" ]; then
+        _gwo_tmp="$_gwo_home/wrapper/dists/$_gwo_name/.bomlens-copy.$$"
+        rm -rf "$_gwo_tmp"
+        # A copy left without its marker by an earlier scan is replaced; the
+        # wrapper itself would delete it and download again.
+        [ -f "$_gwo_own/$_gwo_name.zip.ok" ] || rm -rf "$_gwo_own"
+        if mkdir -p "$_gwo_tmp" 2>/dev/null && cp -R "${1%/}" "$_gwo_tmp/" 2>/dev/null \
+            && chmod -R u+w "$_gwo_tmp" 2>/dev/null \
+            && : > "$_gwo_tmp/$_gwo_name.zip.ok" && mv "$_gwo_tmp" "$_gwo_own" 2>/dev/null; then
+            log "gradle: offline; the wrapper's $_gwo_name copied from your Gradle wrapper folder into BomLens's Gradle cache"
+            return 0
+        fi
+        rm -rf "$_gwo_tmp"
+        [ ! -f "$_gwo_own/$_gwo_name.zip.ok" ] || return 0
+    fi
+    if command -v gradle >/dev/null 2>&1; then
+        GRADLEW=gradle; GRADLEW_SH=""
+        CDXGEN_JVM_TOOL_PINNED=true; export CDXGEN_JVM_TOOL_PINNED
+        log "gradle: [WARN] offline, and the wrapper's $_gwo_name is neither in BomLens's Gradle cache nor in your Gradle wrapper folder; the image's Gradle runs instead of the wrapper. Run ./gradlew once on this machine, or scan with network access, to use the project's own Gradle."
+    fi
+}
+
+if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } \
+    && [ "$BUILD_TOOL_CHOSEN" != maven ] && [ -d "$GRADLE_USER_CACHE_DIR/modules-2" ]; then
+    if [ "${BOMLENS_GRADLE_USER_CACHE:-}" = false ] || [ "${BOMLENS_GRADLE_USER_CACHE:-}" = 0 ]; then
+        log "gradle: your Gradle cache is mounted but not read (BOMLENS_GRADLE_USER_CACHE=${BOMLENS_GRADLE_USER_CACHE})"
+    elif [ -n "${GRADLE_RO_DEP_CACHE:-}" ]; then
+        log "gradle: GRADLE_RO_DEP_CACHE is already set ($GRADLE_RO_DEP_CACHE); your mounted Gradle cache is not used"
+    else
+        GRADLE_RO_DEP_CACHE="$GRADLE_USER_CACHE_DIR"; export GRADLE_RO_DEP_CACHE
+        if _gu_why=$(gradle_repository_probe); then
+            GRADLE_USER_CACHE_STATE=online
+            log "gradle: reading your Gradle cache as a read-only dependency cache (GRADLE_RO_DEP_CACHE)"
+        else
+            GRADLE_USER_CACHE_STATE=offline
+            GRADLE_OFFLINE_ARG=--offline
+            GRADLE_ARGS="${GRADLE_ARGS:+$GRADLE_ARGS }--offline"; export GRADLE_ARGS
+            log "gradle: no repository the build names answered: $_gu_why; Gradle runs --offline and resolves from your Gradle cache"
+        fi
+    fi
+fi
+# --- end gradle user cache ---
+
 # Gradle (java-gradle / Android) — resolve so cdxgen sees the full graph.
 # For Android, ANDROID_HOME is set in the android-sdk image, enabling AGP.
 #
@@ -1460,6 +1656,26 @@ function gradle_gav(line,    i, left, right, nl, l, nr, r, g, a, v) {
     if (g == "" || a == "" || v == "" || v ~ /[][{}(),]/) return ""
     return g ":" a ":" v
 }'
+
+# The entries a Gradle `dependencies` report marks FAILED (Gradle could not
+# resolve them, from no repository answering or none having them), one
+# requested coordinate per line, each once. Gradle still exits 0 for them.
+gradle_report_failed() {
+    grep -E '[+\\]--- .* FAILED$' "$1" 2>/dev/null | sed 's/^.*[+\\]--- //; s/ FAILED$//' | LC_ALL=C sort -u
+}
+
+# Record LABEL as failed when the file LIST (one unresolved entry per line)
+# is not empty, and name how many there were and the first few. A report that
+# looks complete otherwise (the direct dependencies are still listed, by what
+# was asked for) is short of everything they depend on.
+gradle_unresolved() {
+    [ -s "$2" ] || return 0
+    _gu_n=$(LC_ALL=C sort -u "$2" | wc -l | tr -d ' ')
+    _gu_first=$(LC_ALL=C sort -u "$2" | head -3 | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+    [ "$_gu_n" -le 3 ] || _gu_first="$_gu_first, ..."
+    echo "[build-prep] $1: [WARN] Gradle could not resolve $_gu_n dependency entries ($_gu_first); the SBOM lacks them and what they depend on. Check that the build's repositories can be reached from the scan, or build the project once on this machine so its Gradle cache holds them." >&2
+    mark_prep_failed "$1"
+}
 
 # java-gradle runtime classpath. cdxgen keeps every configuration's
 # components, so one only on a compile classpath (a compileOnly dependency, or
@@ -1570,10 +1786,13 @@ if (gradle.parent == null) {
                             lines << ("F\t" + path + "\t" + id.displayName)
                         }
                     }
-                    // A dependency that did not resolve is still named by what asked for it.
+                    // A dependency that did not resolve is still named by what asked for it,
+                    // and listed (U) so the step is recorded as failed: Gradle does not fail
+                    // the run for it, and what it depends on is missing.
                     res.allDependencies.each { d ->
                         if (d instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult) {
                             def s = d.requested
+                            lines << ("U\t" + path + "\t" + s.displayName)
                             if (s instanceof org.gradle.api.artifacts.component.ModuleComponentSelector && s.version) {
                                 found << (s.group + ':' + s.module + ':' + s.version)
                             }
@@ -1652,14 +1871,14 @@ GRADLE_INIT
         log "gradle: Isolated Projects is on in gradle.properties; the run keeps the configuration cache on"
     fi
     # shellcheck disable=SC2086  # _gr_cc is one option or nothing
-    prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
+    prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain \
         $_gr_cc --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
     _gr_rc=$?
     if [ "$_gr_rc" -ne 0 ] && [ -n "$_gr_cc" ] && grep -q 'Configuration Cache cannot be disabled' "$_gr_err" 2>/dev/null; then
         cat "$_gr_err" >&2
         log "gradle: the build requires the configuration cache (Isolated Projects); running again without --no-configuration-cache"
         unmark_prep_failed gradle-dependencies
-        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain \
             --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
         _gr_rc=$?
     fi
@@ -1687,6 +1906,9 @@ GRADLE_INIT
                 for (p in proj) if (!(p in hasrt) && other[p] != "") print substr(other[p], 2)
             }
         ' > "$_gr_set"
+        # U <project> <requested>: a dependency Gradle could not resolve.
+        cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '$1 == "U" { print $3 }' > "$_gr_dir/unresolved.txt"
+        gradle_unresolved gradle-dependencies "$_gr_dir/unresolved.txt"
         if [ -n "${GRADLE_INCLUDED_BUILDS:-}" ]; then
             log "gradle: GRADLE_INCLUDED_BUILDS is set; using full graph"
         elif grep -q '^!' "$_gr_set"; then
@@ -1704,8 +1926,10 @@ GRADLE_INIT
         log "gradle: no JDK matches the build's toolchain; the root project's dependencies would fail the same way (full graph)"
     elif [ "$_gr_rc" -ne 124 ]; then
         log "gradle: could not read every project's dependencies; resolving the root project only (full graph)"
-        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null \
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} dependencies > "$_gr_dir/report.txt" \
             && unmark_prep_failed gradle-dependencies
+        gradle_report_failed "$_gr_dir/report.txt" > "$_gr_dir/unresolved.txt"
+        gradle_unresolved gradle-dependencies "$_gr_dir/unresolved.txt"
     fi
     rm -rf "$_gr_dir"
 }
@@ -1738,6 +1962,8 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
     fi
     # The user's Gradle settings, before the first Gradle run.
     gradle_settings_copy
+    # Offline (see the gradle user cache above): the wrapper's Gradle.
+    [ -z "${GRADLE_OFFLINE_ARG:-}" ] || gradle_wrapper_offline
     # Which Gradle runs: the first "Gradle X.Y" line of --version.
     _gradle_v=$(run_supervised_timeout "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --version 2>/dev/null \
         | sed -n 's/^\(Gradle [0-9][^ ]*\).*/\1/p' | head -1)
@@ -1766,8 +1992,8 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
         # listing subprojects or resolving one module's dependencies.
         # Their output goes to a file, not $(...): prep_step records the label
         # in this shell, which a command substitution's subshell would lose.
-        _aout=$(mktemp); _atimeout=""
-        prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain projects > "$_aout"
+        _aout=$(mktemp); _atimeout=""; _aunres=$(mktemp)
+        prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain projects > "$_aout"
         [ "$?" -ne 124 ] || _atimeout=1
         _subs=$(sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p" "$_aout")
         # A project path outside those characters cannot be passed on here;
@@ -1777,7 +2003,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
         # Include the root ("") as a fallback for single-module projects.
         for _s in $_subs ""; do
             [ -z "$_aodd" ] || break
-            prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" > "$_aout"
+            prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain "${_s}:dependencies" > "$_aout"
             [ "$?" -ne 124 ] || _atimeout=1
             _dep=$(cat "$_aout")
             [ -n "$_dep" ] || continue
@@ -1798,12 +2024,16 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
             log "android: ${_s:-:} -> --configuration $_cfg"
             # Extract that config's subtree as resolved group:artifact:version
             # (gradle_gav above).
-            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" "$GRADLE_DEP_AWK"'
+            # Entries Gradle marks FAILED go to $_aunres.
+            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" -v unres="$_aunres" "$GRADLE_DEP_AWK"'
                 $0 ~ ("^" cfg " ") { insec=1; next }
                 insec && /^[[:space:]]*$/ { insec=0 }
+                insec && / FAILED$/ { u = $0; sub(/^.*[+\\]--- /, "", u); sub(/ FAILED$/, "", u); print u >> unres }
                 insec && /[+\\]--- / { gav = gradle_gav($0); if (gav != "") print gav }' >> "$_relset"
         done
         rm -f "$_aout"
+        gradle_unresolved android-release-classpath "$_aunres"
+        rm -f "$_aunres"
         if [ -s "$_relset" ]; then
             sort -u "$_relset" -o "$_relset"
             ANDROID_RELEASE_SET="$_relset"
@@ -1829,7 +2059,11 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
     else
         # Opted-out java-gradle or Android: resolve so cdxgen sees the full graph.
         log "gradle dependencies"
-        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null
+        _gd_rep=$(mktemp); _gd_unres=$(mktemp)
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} dependencies > "$_gd_rep"
+        gradle_report_failed "$_gd_rep" > "$_gd_unres"
+        gradle_unresolved gradle-dependencies "$_gd_unres"
+        rm -f "$_gd_rep" "$_gd_unres"
     fi
 fi
 
@@ -6710,6 +6944,25 @@ fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 BT_JS
     node "$_btjs" "$OUT" "$BUILD_TOOL_CHOSEN" "$BUILD_TOOL_WHY" || log "build tool: recording skipped (non-fatal)"
     rm -f "$_btjs"
+fi
+
+# Record that the user's Gradle cache was read, and whether Gradle ran online
+# or --offline (bomlens:gradle-user-cache = online | offline).
+if [ "${rc:-1}" -eq 0 ] && [ -n "$GRADLE_USER_CACHE_STATE" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _gucjs=$(mktemp).js
+    cat > "$_gucjs" <<'GUC_JS'
+const fs = require('fs');
+const [bomPath, state] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || []).filter(p => p.name !== 'bomlens:gradle-user-cache');
+props.push({ name: 'bomlens:gradle-user-cache', value: state });
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+GUC_JS
+    node "$_gucjs" "$OUT" "$GRADLE_USER_CACHE_STATE" || log "gradle user cache: recording skipped (non-fatal)"
+    rm -f "$_gucjs"
 fi
 
 # Record what the non-shipped exclusion left out: the patterns in
