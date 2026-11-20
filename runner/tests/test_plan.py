@@ -176,7 +176,7 @@ class ReviewFindings(unittest.TestCase):
         self.refuse(lambda d: mount(d, 1, "guard-state").update(target="/state//x"))
 
     def test_settings_roles_are_read_only(self):
-        for role in ("maven-settings", "gradle-init-script", "gradle-init"):
+        for role in ("maven-settings", "maven-repository", "gradle-init-script", "gradle-init"):
             self.refuse(lambda d, role=role: mount(d, 1, role).update(mode="rw"))
 
     def test_uid_over_int32(self):

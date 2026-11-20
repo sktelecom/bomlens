@@ -1351,6 +1351,9 @@ if [ "$UI_MODE" = "true" ]; then
     for _mf in settings.xml settings-security.xml; do
         [ -f "$HOME/.m2/$_mf" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.m2/$_mf"):/bomlens-settings/m2/$_mf:ro")
     done
+    # The user's Maven local repository, read-only, as for the CLI scan.
+    _mur="$(maven_user_repository)"
+    [ -z "$_mur" ] || MOUNT_FLAGS+=(-v "$(hostpath "$_mur"):$MAVEN_USER_REPOSITORY_TARGET:ro")
     for _gf in gradle.properties init.gradle init.gradle.kts; do
         [ -f "$HOME/.gradle/$_gf" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.gradle/$_gf"):/bomlens-settings/gradle/$_gf:ro")
     done
@@ -3574,6 +3577,13 @@ if [ "$MODE" = "SOURCE" ]; then
     for _mf in settings.xml settings-security.xml; do
         [ -f "$HOME/.m2/$_mf" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2/$_mf")\":/bomlens-settings/m2/$_mf:ro"
     done
+    # The user's own Maven local repository, read-only: a project built on
+    # this machine resolves from it when the repositories cannot be reached.
+    # BOMLENS_MAVEN_USER_REPOSITORY=false leaves it out (source-detect.sh).
+    _mur="$(maven_user_repository)"
+    if [ -n "$_mur" ]; then
+        CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$_mur")\":$MAVEN_USER_REPOSITORY_TARGET:ro"
+    fi
     if mkdir -p "$BOMLENS_CACHE_DIR/gradle" 2>/dev/null; then
         CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/gradle")\":/root/.gradle"
         for _gf in gradle.properties init.gradle init.gradle.kts; do

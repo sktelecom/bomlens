@@ -271,6 +271,46 @@ export function settingsMountArgs({
   return args;
 }
 
+// 사용자의 Maven 로컬 저장소를 UI 컨테이너에 읽기 전용으로 붙이는 docker run 인자(순수,
+// 단위 테스트 가능). scan-sbom.sh의 maven_user_repository(source-detect.sh)와 같은 규칙이다.
+// ~/.m2/settings.xml의 <localRepository>(주석 밖, ${user.home}은 홈으로 바꾼다)가 있으면
+// 그 폴더를, 없으면 ~/.m2/repository를 쓴다. 다른 속성을 쓰거나 절대 경로가 아니면 추측하지
+// 않는다. 폴더가 실제로 있을 때만 붙이고, BOMLENS_MAVEN_USER_REPOSITORY가 false나 0이면
+// 붙이지 않는다. 형제 cdxgen 컨테이너는 --volumes-from으로 이 마운트를 물려받고,
+// build-prep.sh가 Maven이 이 저장소를 읽기만 하도록 설정한다.
+export const MAVEN_USER_REPOSITORY_TARGET = `${SETTINGS_TARGET}/m2/repository`;
+export function mavenRepositoryMountArgs({
+  home = os.homedir(),
+  env = process.env,
+  readFile = (p) => {
+    try {
+      return fs.readFileSync(p, "utf8");
+    } catch {
+      return null;
+    }
+  },
+  isDir = (p) => fs.statSync(p, { throwIfNoEntry: false })?.isDirectory() === true,
+} = {}) {
+  if (["false", "0"].includes(String(env?.BOMLENS_MAVEN_USER_REPOSITORY ?? ""))) return [];
+  const base = String(home ?? "").trim();
+  if (!base) return [];
+  let repo = path.join(base, ".m2", "repository");
+  const settings = readFile(path.join(base, ".m2", "settings.xml"));
+  if (typeof settings === "string") {
+    const text = settings.replace(/<!--[\s\S]*?(-->|$)/g, "");
+    const m = /<localRepository>([^<]*)<\/localRepository>/.exec(text);
+    const value = m ? m[1].trim() : "";
+    if (value) {
+      const filled = value.split("${user.home}").join(base);
+      if (filled.includes("${")) return [];
+      if (!path.isAbsolute(filled) && !/^[A-Za-z]:[\\/]/.test(filled)) return [];
+      repo = filled;
+    }
+  }
+  if (!isDir(repo)) return [];
+  return ["-v", `${repo}:${MAVEN_USER_REPOSITORY_TARGET}:ro`];
+}
+
 // Android SDK 이미지의 빌드 파일(Dockerfile만 든 폴더)을 UI 컨테이너에 읽기 전용으로 붙인다.
 // 서버가 사용자 동의 뒤 호스트 Docker로 이미지를 만들 때 이 폴더를 빌드 컨텍스트로 쓴다.
 // 폴더가 없으면(개발 실행에서 못 찾은 경우 등) 아무것도 붙이지 않고, 서버는 빌드 불가로 답한다.
@@ -631,6 +671,8 @@ export class UiContainer {
       ...androidBuildArgs(this.androidBuildDir),
       // 사용자의 Maven, Gradle 설정(읽기 전용). 있는 파일만 붙는다.
       ...settingsMountArgs(),
+      // 사용자의 Maven 로컬 저장소(읽기 전용). 폴더가 있을 때만 붙는다.
+      ...mavenRepositoryMountArgs(),
       "-v",
       engineMount(),
       // 5-P PR 2: entrypoint.sh가 이 경로에서 이전 실행의 가드 기록을 찾는다.

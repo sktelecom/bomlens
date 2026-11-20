@@ -36,6 +36,7 @@ import {
   versionTagBefore1132,
   scanMountArgs,
   settingsMountArgs,
+  mavenRepositoryMountArgs,
   androidBuildArgs,
   defaultAndroidBuildDir,
   prepareAndroidBuildDir,
@@ -615,4 +616,53 @@ test("settingsMountArgs covers every file the CLI mounts and nothing when none e
   assert.ok(all.filter((_, i) => i % 2 === 1).every((v) => v.endsWith(":ro")));
   assert.deepEqual(settingsMountArgs({ home: "/h", isFile: () => false, isDir: () => false }), []);
   assert.deepEqual(settingsMountArgs({ home: "" }), []);
+});
+
+test("mavenRepositoryMountArgs mounts ~/.m2/repository read-only when it exists", () => {
+  const repo = path.join("/home/u", ".m2", "repository");
+  const args = mavenRepositoryMountArgs({
+    home: "/home/u",
+    env: {},
+    readFile: () => null,
+    isDir: (p) => p === repo,
+  });
+  assert.deepEqual(args, ["-v", `${repo}:/bomlens-settings/m2/repository:ro`]);
+  assert.deepEqual(mavenRepositoryMountArgs({ home: "/home/u", env: {}, readFile: () => null, isDir: () => false }), []);
+  assert.deepEqual(mavenRepositoryMountArgs({ home: "", env: {}, readFile: () => null, isDir: () => true }), []);
+});
+
+test("mavenRepositoryMountArgs follows <localRepository> outside comments and honours the opt-out", () => {
+  const settings = [
+    "<settings>",
+    "  <!-- <localRepository>/commented/out</localRepository> -->",
+    "  <localRepository>${user.home}/maven-repo</localRepository>",
+    "</settings>",
+  ].join("\n");
+  const seen = [];
+  const args = mavenRepositoryMountArgs({
+    home: "/home/u",
+    env: {},
+    readFile: () => settings,
+    isDir: (p) => (seen.push(p), true),
+  });
+  assert.deepEqual(args, ["-v", "/home/u/maven-repo:/bomlens-settings/m2/repository:ro"]);
+  assert.deepEqual(seen, ["/home/u/maven-repo"]);
+  for (const value of ["false", "0"]) {
+    assert.deepEqual(
+      mavenRepositoryMountArgs({ home: "/home/u", env: { BOMLENS_MAVEN_USER_REPOSITORY: value }, readFile: () => null, isDir: () => true }),
+      [],
+    );
+  }
+  // 다른 속성이나 상대 경로는 추측하지 않는다.
+  for (const value of ["${env.M2}/repo", "relative/repo"]) {
+    assert.deepEqual(
+      mavenRepositoryMountArgs({
+        home: "/home/u",
+        env: {},
+        readFile: () => `<settings><localRepository>${value}</localRepository></settings>`,
+        isDir: () => true,
+      }),
+      [],
+    );
+  }
 });
