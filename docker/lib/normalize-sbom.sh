@@ -37,6 +37,19 @@ TMP="$(mktemp)"
 # array. Apply this first so every later step receives an array.
 NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
 
+# Always: take the user and password out of a URL in any string of the SBOM
+# (scheme://user:password@host/ becomes scheme://host/). A lock file or a
+# registry setting can carry them, and they would be copied into purls,
+# externalReferences and properties. http, https and ftp lose any user part
+# (a token alone is a credential there); other schemes lose it only when it
+# has a password, so git+ssh://git@host/ stays. The percent-encoded form in a
+# purl repository_url qualifier is handled too.
+URL_CRED_FIX='walk(if type=="string" and (contains("@") or contains("%40")) then
+    gsub("(?<s>(?i:https?|ftp)://)[^/?#\\s]+@"; .s)
+    | gsub("(?<s>[A-Za-z][A-Za-z0-9+.-]*://)[^/?#\\s:@]+:[^/?#\\s]*@"; .s)
+    | gsub("(?<s>(?i:https?)%3A%2F%2F)(?:(?!%2F)[^/\\s@])+%40"; .s)
+    else . end)'
+
 # Always: drop empty file components. syft's SPDX->CycloneDX conversion turns each
 # SPDX file entry into a CycloneDX component of type "file" with NO name and NO
 # purl — an unidentifiable noise row (no CVE match, no license, no attribution).
@@ -652,6 +665,7 @@ if [ "$MODE" = "--stable" ]; then
         ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
+        | ${URL_CRED_FIX}
         | ${VERSION_EVR_CONTAMINATION_FIX}
         | ${DROP_EMPTY_FILES}
         | ${BINARY_FILE_DEDUP}
@@ -681,7 +695,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${BUILD_TOOL_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${URL_CRED_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${BUILD_TOOL_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
