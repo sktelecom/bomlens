@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildToolToSend, builtWith, hasBothBuildTools, normalizeBuildTool } from "./buildTool";
+import { buildToolToSend, buildToolWhyKey, builtWith, hasBothBuildTools, normalizeBuildTool } from "./buildTool";
 
 describe("buildTool", () => {
   it("shows the choice only when both build files exist", () => {
@@ -34,5 +34,15 @@ describe("buildTool", () => {
     expect(builtWith("maven")).toBe("maven");
     expect(builtWith("<b>")).toBeNull();
     expect(builtWith(null)).toBeNull();
+  });
+
+  it("maps the fixed build-tool reasons to locale keys and leaves others raw", () => {
+    expect(buildToolWhyKey("requested with --build-tool maven")).toBe("overview.buildWhyRequestedMaven");
+    expect(buildToolWhyKey("requested with --build-tool gradle")).toBe("overview.buildWhyRequestedGradle");
+    expect(
+      buildToolWhyKey("pom.xml and build.gradle both found; Gradle is the default (--build-tool maven reads pom.xml instead)"),
+    ).toBe("overview.buildWhyBothDefaultGradle");
+    expect(buildToolWhyKey("something else")).toBeNull();
+    expect(buildToolWhyKey(null)).toBeNull();
   });
 });
