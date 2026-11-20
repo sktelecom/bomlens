@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseMap } from "./aiDeclaration";
-import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO, releaseNotesUrl } from "./demo";
+import { companyNetworkGuideUrl, demoInstallUrl, demoRunAction, IS_STATIC_DEMO, releaseNotesUrl } from "./demo";
 import serverMap from "../../../../lib/spdx3-ai-map.json";
 
 describe("demoInstallUrl", () => {
@@ -38,6 +38,14 @@ describe("demoInstallUrl", () => {
     expect(demoInstallUrl(lang)).toBe(
       "https://sktelecom.github.io/bomlens/start/first-scan/",
     );
+  });
+});
+
+describe("companyNetworkGuideUrl", () => {
+  it("points at the company-network guide in the reader's language", () => {
+    expect(companyNetworkGuideUrl("en")).toBe("https://sktelecom.github.io/bomlens/guides/company-network/");
+    expect(companyNetworkGuideUrl("ko-KR")).toBe("https://sktelecom.github.io/bomlens/ko/guides/company-network/");
+    expect(companyNetworkGuideUrl(undefined)).toBe("https://sktelecom.github.io/bomlens/guides/company-network/");
   });
 });
 

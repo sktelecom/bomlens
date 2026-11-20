@@ -206,6 +206,10 @@
     "sbomDegradedRegistryAuth": "A package registry refused the login (HTTP 401 or 403), so this SBOM lists only direct dependencies. The scan container has no login for a company package repository. Scan the project folder where it builds, or in CI, or commit a complete lock file, then re-scan.",
     "sbomDegradedCrash": "The scan tool crashed while resolving this project's dependencies, so this SBOM was built from its manifests only instead, and some transitive dependencies may be missing. Check the scan log, and if this keeps happening, add a lock file and re-scan.",
     "sbomDegradedNotRun": "The dependency analysis for this project's language gave no result, so this SBOM was built from its manifests only and lists direct dependencies. The scan log gives the reason. If the scan could not reach Docker, make sure Docker is available and re-scan.",
+    "registryRefusedTitle": "Some dependencies may be missing (the package registry refused the login)",
+    "registryRefusedBodyRemote": "A package registry refused some downloads (HTTP 401 or 403) while dependencies were resolved, so some of them may be missing from this SBOM. The scan container has no login for your company's package repository. Scan the project folder on a machine where it builds, or in CI, or commit a complete lock file, then scan again.",
+    "registryRefusedBodyFolder": "A package registry refused some downloads (HTTP 401 or 403) while dependencies were resolved, so some of them may be missing from this SBOM. Logins for npm and pip registries are not passed to the scan container, so scan in CI, where the build has its settings, or use a complete lock file. Maven and Gradle projects built on this machine are read from the local repository and cache.",
+    "registryRefusedGuide": "Scanning on a company network",
     "sbomGraphEmptyTitle": "The dependency graph is empty",
     "sbomGraphEmptyBody": "The transitive-dependency analyzer ran successfully, but the dependency relationships appear to have been lost in a later processing step. If a re-scan still comes up empty, please report it as a defect.",
     "scanossUnavailableTitle": "SCANOSS search didn't complete",
@@ -996,6 +1000,10 @@
       "degraded": {
         "title": "Transitive dependencies were not resolved",
         "short": "The SBOM holds direct dependencies only."
+      },
+      "registryRefused": {
+        "title": "Some dependencies may be missing",
+        "short": "The package registry refused the login for some downloads."
       },
       "graph": {
         "title": "Dependency relationships are missing",
