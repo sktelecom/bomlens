@@ -353,6 +353,22 @@ test("failed pipeline steps and a submission judged as firmware are named", asyn
   await expect(page.getByTestId("conformance-judged-as")).toContainText("bomlens:scanMode=FIRMWARE");
 });
 
+test("a skipped registry license lookup alone is a note, not a warning", async ({ page }) => {
+  await stub(page, done({ ...CONFORMANCE, pipelineStepsFailed: ["license-fetch"] }));
+  await openScreen(page);
+  await expect(page.getByTestId("conformance-license-lookup-skipped")).toContainText("Licenses in this SBOM come from lock files");
+  await expect(page.getByTestId("conformance-pipeline-steps-failed")).toHaveCount(0);
+});
+
+test("other failed steps keep the warning without the skipped license lookup", async ({ page }) => {
+  await stub(page, done({ ...CONFORMANCE, pipelineStepsFailed: ["enrich-cpe", "license-fetch"] }));
+  await openScreen(page);
+  const warn = page.getByTestId("conformance-pipeline-steps-failed");
+  await expect(warn).toContainText("CPE identifier enrichment");
+  await expect(warn).not.toContainText("license lookup in the package registries");
+  await expect(page.getByTestId("conformance-license-lookup-skipped")).toBeVisible();
+});
+
 test("a pass with no license anywhere is downgraded and warned about", async ({ page }) => {
   await stub(page, done({ ...CONFORMANCE, licenseCoverage: { declared: 0, total: 5, pct: 0 } }));
   await openScreen(page);

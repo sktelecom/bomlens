@@ -973,6 +973,10 @@
     "details": "Details",
     "prevScanLink": "Opens in {{scan}}",
     "notice": {
+      "licenseLookup": {
+        "title": "The registry license lookup was skipped",
+        "short": "Licenses come from lock files and package metadata. No dependency is missing."
+      },
       "pipeline": {
         "title": "Some enrichment data may be missing",
         "short": "Steps that fill fields such as end-of-life dates did not finish."
@@ -1091,7 +1095,9 @@
     "titleConformance": "Some conformance checks may be based on incomplete data",
     "hintConformance": "The following analysis step(s) failed while this SBOM was generated, so this input may be incomplete.",
     "supplierHint": "Ask the supplier to regenerate this document.",
-    "more": "{{count}} more"
+    "more": "{{count}} more",
+    "licenseLookupTitle": "The license lookup in the package registries was skipped",
+    "licenseLookupBody": "Licenses in this SBOM come from lock files and package metadata, and no dependency is missing. The lookup runs when the scan can reach the package registries; behind a proxy that inspects HTTPS, give BomLens your company's CA as a PEM file in SBOM_EXTRA_CA_CERTS."
   },
   "models": {
     "loading": "Loading model details…",

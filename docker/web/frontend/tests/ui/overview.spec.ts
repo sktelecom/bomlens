@@ -240,6 +240,25 @@ test("a notice for a supplied SBOM asks the supplier, and the firmware note is n
   await expect(page.getByTestId("firmware-scope")).toHaveCount(0);
 });
 
+test("a skipped registry license lookup is a note, not a missing-data warning", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ pipelineStepsFailed: ["license-fetch"] }) });
+  await expect(page.getByTestId("pipeline-steps-failed")).toHaveCount(0);
+  await expect(page.getByText("Some data may be incomplete")).toHaveCount(0);
+  const note = page.getByTestId("license-lookup-skipped");
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("The license lookup in the package registries was skipped");
+  await expect(note).toContainText("SBOM_EXTRA_CA_CERTS");
+  await expect(page.getByText("Some steps failed", { exact: true })).toHaveCount(0);
+});
+
+test("with other failed steps the warning lists only those, and the license lookup stays a note", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ pipelineStepsFailed: ["enrich-eol", "license-fetch"] }) });
+  const warn = page.getByTestId("pipeline-steps-failed");
+  await expect(warn).toContainText("end-of-life data enrichment");
+  await expect(warn).not.toContainText("license lookup in the package registries");
+  await expect(page.getByTestId("license-lookup-skipped")).toBeVisible();
+});
+
 test("a scan with no components warns, and a failed scan never shares a banner", async ({ page }) => {
   await open(page, {
     ...DONE,
