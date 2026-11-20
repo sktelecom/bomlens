@@ -94,9 +94,9 @@ done
 # The message keys (M_...) are shared: the same set in both scripts, each defined
 # once per language, so a message added to one platform cannot be forgotten on the
 # other. Only keys that belong to one platform's mechanics are exempt
-# (M_PRESS is the .bat's "press any key" line before its window closes).
+# (M_O_PORT_OWN is the .sh's own-UI line; M_PRESS is the .bat's "press any key" line before its window closes).
 echo "2b) Setup-check messages (same keys, both languages)"
-PLATFORM_ONLY_KEYS=" M_PRESS "
+PLATFORM_ONLY_KEYS=" M_PRESS M_O_PORT_OWN "
 sh_defs="$(grep -oE '^[[:space:]]+M_[A-Z0-9_]+=' scripts/check-setup.sh | tr -d ' \t=' | sort)"
 bat_defs="$(grep -oE '^[[:space:]]*set "M_[A-Z0-9_]+=' scripts/check-setup.bat | sed -E 's/^[[:space:]]*set "//; s/=$//' | sort)"
 for name in sh bat; do

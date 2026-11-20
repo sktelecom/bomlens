@@ -92,6 +92,7 @@ if [ "$SBOM_LANG" = ko ]; then
     M_MEM_FIX="   Colima: colima stop && colima start --memory 4 / Docker Desktop: Settings > Resources > Memory / WSL2: %UserProfile%\\.wslconfig 의 memory=4GB 후 wsl --shutdown"
     M_MEM_NOTE="   4GB로 설정한 엔진은 약 3.8 GiB로 표시되며, 이 점검은 3.5 GiB부터 통과합니다."
     M_X_PORT="UI 포트가 이미 사용 중입니다:"
+    M_O_PORT_OWN="이 포트는 실행 중인 BomLens 웹 UI가 쓰고 있습니다(문제 아님):"
     M_PORT_FIX="   다른 포트로 실행하려면 UI_PORT를 바꾸세요. 예: UI_PORT=9090 으로 다시 실행"
     M_O_IMAGES="이 컴퓨터의 BomLens 이미지(디스크 차지 크기):"
     M_O_TOTAL="이 이미지들의 합계:"
@@ -131,6 +132,7 @@ else
     M_MEM_FIX="   Colima: colima stop && colima start --memory 4 / Docker Desktop: Settings > Resources > Memory / WSL2: memory=4GB in %UserProfile%\\.wslconfig, then wsl --shutdown"
     M_MEM_NOTE="   An engine set to 4 GB shows as about 3.8 GiB; this check passes from 3.5 GiB."
     M_X_PORT="The UI port is already in use:"
+    M_O_PORT_OWN="This port is used by BomLens's own web UI, which is running (not a problem):"
     M_PORT_FIX="   To run on another port, change UI_PORT. Example: run again with UI_PORT=9090"
     M_O_IMAGES="BomLens images on this machine (size on disk):"
     M_O_TOTAL="Total size of these images:"
@@ -306,8 +308,15 @@ elif command -v ss >/dev/null 2>&1; then
 elif command -v netstat >/dev/null 2>&1; then
     netstat -an 2>/dev/null | grep -q "[:.]${UI_PORT} .*LISTEN" && port_busy=1
 fi
+# A busy port may be BomLens's own web UI container: that is the UI working.
+own_ui=""
+if [ "$port_busy" -eq 1 ] && command -v docker >/dev/null 2>&1; then
+    own_ui=$(docker ps --filter "publish=$UI_PORT" --format '{{.Image}}' 2>/dev/null | grep -E 'bomlens|sbom-generator|sbom-scanner' | head -n 1)
+fi
 if [ "$port_busy" -eq 0 ]; then
     ok "$M_O_PORT $UI_PORT"
+elif [ -n "$own_ui" ]; then
+    ok "$M_O_PORT_OWN $UI_PORT ($own_ui)"
 else
     bad "$M_X_PORT $UI_PORT"
     note "$M_PORT_FIX"
