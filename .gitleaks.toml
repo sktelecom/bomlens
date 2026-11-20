@@ -23,4 +23,7 @@ regexes = [
 paths = [
   # docs/demo on main; demo/ at the root of the published demo site's branch.
   '''^(docs/)?demo/data/files/[^/]+/[^/]+_security\.json$''',
+  # Made-up npm tokens, pip passwords and Maven passwords that the masking
+  # test feeds to the log masker and checks are gone from its output.
+  '''^tests/test-credential-masking\.sh$''',
 ]
