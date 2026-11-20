@@ -2111,13 +2111,15 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
         # same project reads as 15 in one report and 96 in another.
         if [ "$FORMAT" = "CycloneDX" ]; then
             jq -r 'def kind: if .type == "file" then "file"
-                             elif .type == "operating-system" or ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
+                             elif .type == "operating-system" then "osrel"
+                             elif ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
                              else "lib" end;
                    [ .components[]? | kind ] as $k
                    | ([ $k[] | select(. == "os") ] | length) as $os
+                   | ([ $k[] | select(. == "osrel") ] | length) as $r
                    | ([ $k[] | select(. == "file") ] | length) as $f
-                   | if $os + $f == 0 then empty
-                     else "basis\t\($k | length - $os - $f) libraries, \($os) OS packages, \($f) files" end' "$SBOM" 2>/dev/null | head -n 1
+                   | if $os + $r + $f == 0 then empty
+                     else "basis\t\($k | length - $os - $r - $f) libraries, \($os) OS packages\(if $r > 0 then ", \($r) operating system" else "" end), \($f) files; \($k | length) entries in all, \($k | length - $r - $f) of them identified components" end' "$SBOM" 2>/dev/null | head -n 1
         fi
         # The verdict assess-completeness.sh already wrote (loaded above for a
         # CycloneDX document): the grade, the reason codes, and one fix sentence per
