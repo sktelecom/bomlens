@@ -5343,6 +5343,29 @@ else
     fail "scan kept running after client disconnect" "heartbeat $hb1 -> $hb2"
 fi
 
+# A running scan is listed for another tab, read-only, and gone once it ends.
+echo hang > "$STUB_MODE_FILE"
+curl -sN --max-time 2.5 "$BASE2/scan-stream?project=runlist&version=2.0&source=current-dir" >/dev/null 2>&1 &
+RUNLIST_PID=$!
+sleep 1
+running=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+wait "$RUNLIST_PID" 2>/dev/null || true
+sleep 1.5
+after=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+if echo "$running" | python3 -c "
+import sys, json
+rows = json.load(sys.stdin)
+r = [x for x in rows if x['project'] == 'runlist']
+assert r and r[0]['version'] == '2.0' and r[0]['id'] and r[0]['startedAt'] > 0, rows
+" && echo "$after" | python3 -c "
+import sys, json
+assert not [x for x in json.load(sys.stdin) if x['project'] == 'runlist']
+"; then
+    pass "/running-scans lists a scan while it runs and drops it when it ends"
+else
+    fail "/running-scans contract violated" "during: $running after: $after"
+fi
+
 # A scan that prints nothing: the closed tab is still noticed within seconds
 # (the watcher polls the connection), the scan stops, and the run folder with
 # its partial artifact is removed.

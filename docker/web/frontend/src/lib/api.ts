@@ -1862,6 +1862,33 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
+/** A scan running on the server now (GET /running-scans). Read-only: the
+ *  progress stream belongs to the tab that started it. */
+export interface RunningScan {
+  id: string;
+  project: string;
+  version: string;
+  startedAt: number;
+}
+
+/** The scans running now; empty on any failure. */
+export async function listRunningScans(): Promise<RunningScan[]> {
+  if (IS_STATIC_DEMO) return [];
+  try {
+    const res = await fetch(apiUrl("/running-scans"));
+    if (!res.ok) return [];
+    const j = (await res.json()) as unknown;
+    return Array.isArray(j)
+      ? j.filter(
+          (r): r is RunningScan =>
+            Boolean(r) && typeof r.id === "string" && typeof r.project === "string",
+        ).map((r) => ({ id: r.id, project: r.project, version: String(r.version ?? ""), startedAt: Number(r.startedAt) || 0 }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 /** What a folder says about itself (GET /project-info). */
 export interface ProjectInfo {
   /** The version the folder's manifest states, "" when it states none. */

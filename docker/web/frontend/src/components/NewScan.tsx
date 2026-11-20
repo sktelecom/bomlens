@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 
 import { ScreenHeader } from "@/components/primer";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
+import { runningLabel, useRunningScans } from "@/lib/runningScans";
 import { useScanForm } from "@/lib/useScanForm";
 
 import { StartConfirmDialog } from "./StartConfirmDialog";
@@ -143,6 +144,8 @@ export function NewScan({
 }: Props) {
   const { t } = useTranslation();
   const state = useScanForm({ running, capabilities, onRun, initialConfig });
+  // A scan another tab started cannot be joined from here, but it can be seen.
+  const runningScans = useRunningScans(!running);
 
   // The form reads `initialConfig` once (lazy state init). Tell the parent to
   // clear the pending config right after, so navigating to a plain New scan
@@ -253,6 +256,20 @@ export function NewScan({
             variant="info"
             title={t("newscan.rescanSeeded", { project: seeded.project, version: seeded.version })}
             description={t("newscan.rescanSeededBody")}
+          />
+        </div>
+      )}
+      {runningScans.length > 0 && (
+        <div className="bl-ns-banner" data-testid="running-scans">
+          <Banner
+            variant="info"
+            title={t("newscan.runningTitle", { count: runningScans.length })}
+            description={
+              <>
+                <span>{runningScans.map(runningLabel).join(", ")}. </span>
+                <span>{t("newscan.runningBody")}</span>
+              </>
+            }
           />
         </div>
       )}

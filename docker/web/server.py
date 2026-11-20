@@ -3806,6 +3806,21 @@ def _max_severity(security):
 SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 
 
+def running_scans():
+    """Scans running now, newest first: id, project, version and start time.
+    Read-only. The progress stream belongs to the tab that started the scan, so
+    another tab can say that a scan is running but cannot join it."""
+    with _scan_lock:
+        rows = [
+            {"id": rid, **_scan_started.get(rid, {"project": rid, "version": "", "startedAt": 0})}
+            for rid in _scan_active
+        ]
+        for stale in [k for k in _scan_started if k not in _scan_active]:
+            del _scan_started[stale]
+    rows.sort(key=lambda r: r.get("startedAt", 0), reverse=True)
+    return rows
+
+
 def list_scans():
     """Past scans in OUTPUT_DIR, newest first. Each scan is a run folder
     OUTPUT_DIR/<run_id>/ holding one *_bom.json (the id is the folder name); the
@@ -5825,6 +5840,10 @@ def build_android_image(api, on_log, on_progress=None, cancel=None):
 # product decision rather than a correctness one.
 _scan_lock = threading.Lock()
 _scan_active = set()
+# What each running scan is, for GET /running-scans: project, version and start
+# time by run id. Written when the scan claims its folder; a row is shown only
+# while its id is still in _scan_active, so it never needs its own release.
+_scan_started = {}
 # Upload tokens a scan is currently reading from, so the stale-upload sweep
 # (below) can skip them regardless of age. Claimed/released alongside
 # _scan_active, under the same lock -- an upload token has no lifecycle of its
@@ -6788,6 +6807,8 @@ class Handler(BaseHTTPRequestHandler):
             self._project_info(urllib.parse.parse_qs(parsed.query))
         elif path == "/scan-exists":
             self._scan_exists(urllib.parse.parse_qs(parsed.query))
+        elif path == "/running-scans":
+            self._send(200, json.dumps(running_scans()))
         elif path == "/scans":
             self._send(200, json.dumps(list_scans()))
             # After the response: this is the Recent-scans sidebar's own poll,
@@ -8100,6 +8121,10 @@ class Handler(BaseHTTPRequestHandler):
             run_id = claim_run_id(prefix, _scan_active,
                                   force_suffix=g("timestamp") == "true")
             _scan_active.add(run_id)
+            _scan_started[run_id] = {
+                "project": project[:120], "version": version[:60],
+                "startedAt": int(time.time()),
+            }
             if token:
                 _active_upload_tokens.add(token)
         scan_claimed = run_id
