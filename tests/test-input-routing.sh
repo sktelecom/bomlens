@@ -871,6 +871,13 @@ case "$1" in
     if grep -qxF "$name" "$d/names" 2>/dev/null; then echo "Conflict. The container name \"/$name\" is already in use" >&2; exit 125; fi
     echo "$name" >> "$d/names"
     if [ -z "${EP_NO_CID:-}" ]; then cid="cid$RANDOM"; echo "$cid" > "$cidf"; echo "$cid $name" >> "$d/cids"; fi
+    # The files handed over beside the prep file, as the sibling sees them.
+    for a in "$@"; do
+      case "$a" in
+        BOMLENS_CONDA_READER=*) cmp -s "${a#*=}" "$LIBDIR/identify-conda.py" && echo "conda ${a#*=}" >> "$d/handed" ;;
+        BOMLENS_PYTHON_VENV_READER=*) cmp -s "${a#*=}" "$LIBDIR/read-python-venv.py" && echo "venv ${a#*=}" >> "$d/handed" ;;
+      esac
+    done
     bom="${*: -2:1}"
     case "$img" in *"${EP_MARKER_IMG:-cdxgen-temurin-java21}"*)
       echo "[build-prep] gradle-dependencies: Gradle asked for a Java 25 toolchain, which this image does not have (java-toolchain-missing=25)" ;; esac
@@ -890,7 +897,7 @@ STUB
 chmod +x "$EPD/bin/docker"
 printf "plugins { id 'java' }\n" > "$EPD/src/build.gradle"
 ep_run() {  # ep_run [VAR=value...]: run generate_sbom_cdxgen once, results in $EPD
-    rm -f "$EPD/log" "$EPD/names" "$EPD/cids" "$EPD/out/b.json" "$EPD/src/b.json" "$EPD/res"
+    rm -f "$EPD/log" "$EPD/names" "$EPD/cids" "$EPD/out/b.json" "$EPD/src/b.json" "$EPD/res" "$EPD/handed"
     ( cd "$EPD/out" || exit 1
       set +u  # entrypoint.sh does not run under set -u
       export PROJECT_NAME=p PROJECT_VERSION=1 CDX_SPEC_VERSION=1.6 FETCH_LICENSE=false
@@ -920,6 +927,17 @@ ep_run EP_MOUNTINFO="$EPD/mountinfo.shared"
     && ! grep -q '^docker run.* -c ' "$EPD/log"; } \
     && pass "UI: a Java 25 toolchain failure reruns the sibling in the Java 25 image and keeps its SBOM" \
     || fail "UI: no rerun in the Java 25 image" "$(cat "$EPD/res" "$EPD/stdout")"
+# The sibling does not share this container's /tmp, where the CLI and the
+# execution plan mount identify-conda.py and read-python-venv.py: the web UI
+# copies both beside the prep file, names them to build-prep.sh, and removes
+# them afterwards.
+_handed_conda=$(awk '$1 == "conda" { print $2; exit }' "$EPD/handed" 2>/dev/null)
+_handed_venv=$(awk '$1 == "venv" { print $2; exit }' "$EPD/handed" 2>/dev/null)
+{ case "$_handed_conda" in "$EPD/state/"*-conda.py) true ;; *) false ;; esac \
+    && case "$_handed_venv" in "$EPD/state/"*-venv.py) true ;; *) false ;; esac \
+    && [ ! -e "$_handed_conda" ] && [ ! -e "$_handed_venv" ]; } \
+    && pass "UI: identify-conda.py and read-python-venv.py are handed to the sibling beside the prep file and removed after" \
+    || fail "UI: the conda or venv reader is not handed to the sibling" "$(cat "$EPD/handed" 2>&1; grep '^docker run' "$EPD/log")"
 ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_MARKER_IMG=cdxgen-temurin-java
 [ "$(ep_runs)" -eq 2 ] && pass "UI: the rerun with the forced image does not rerun again" \
     || fail "UI: the rerun recursed" "runs: $(ep_runs)"

@@ -2833,13 +2833,19 @@ fi
 # comes back empty (no environment.yml, or one that does not match the shape
 # identify-conda.py knows) leaves cdxgen's python step running exactly as
 # before, since an inaccurate python-derived SBOM still beats an empty one.
+# The CLI and the execution plan mount identify-conda.py at /tmp; the web UI
+# copies it beside this script, since this container does not share its /tmp,
+# and sets BOMLENS_CONDA_READER to that path.
+CONDA_READER="${BOMLENS_CONDA_READER:-/tmp/identify-conda.py}"
 CONDA_ENV_FILE=""
 [ -f "environment.yml" ] && CONDA_ENV_FILE="environment.yml"
 [ -z "$CONDA_ENV_FILE" ] && [ -f "environment.yaml" ] && CONDA_ENV_FILE="environment.yaml"
 if [ -n "$CONDA_ENV_FILE" ] && command -v python3 >/dev/null 2>&1; then
     CONDA_SBOM="${OUT%_bom.json}_conda.cdx.json"
     # Written at the version cdxgen is asked for below.
-    if CYCLONEDX_SPEC_VERSION="$SPEC" python3 /tmp/identify-conda.py "$SRC" "$CONDA_SBOM" "${PROJECT_VERSION:-unknown}"; then
+    if [ ! -f "$CONDA_READER" ]; then
+        log "conda: $CONDA_ENV_FILE present, but identify-conda.py was not handed to this container; leaving cdxgen's python cataloger as-is"
+    elif CYCLONEDX_SPEC_VERSION="$SPEC" python3 "$CONDA_READER" "$SRC" "$CONDA_SBOM" "${PROJECT_VERSION:-unknown}"; then
         CONDA_N=$(node -e '
             try { const d = require(process.argv[1]); process.stdout.write(String((d.components||[]).length)); }
             catch (e) { process.stdout.write("0"); }
