@@ -64,6 +64,26 @@ if [ -f pom.xml ] && { [ -f build.gradle ] || [ -f build.gradle.kts ]; }; then
     echo "[build-prep] build tool: pom.xml and build.gradle both found; reading $BUILD_TOOL_CHOSEN ($BUILD_TOOL_WHY)"
 fi
 
+# A Gradle root with no settings.gradle takes its project name from the folder
+# name, and Gradle refuses a name that starts or ends with a dot ("The project
+# name must not start or end with a '.'"). A scan of a copy named .srccopy-<hex>
+# then resolved the root project alone. A settings file naming the project after
+# the folder, without the dots, gives Gradle a name it accepts. Only that case is
+# touched: a project with its own settings file, or a folder name that is fine,
+# is left as it is.
+gradle_dot_root_settings() {
+    _gd_dir="${1:-.}"
+    [ -f "$_gd_dir/build.gradle" ] || [ -f "$_gd_dir/build.gradle.kts" ] || return 0
+    if [ -f "$_gd_dir/settings.gradle" ] || [ -f "$_gd_dir/settings.gradle.kts" ]; then return 0; fi
+    _gd_base="$(basename "$(cd "$_gd_dir" && pwd -P)")"
+    case "$_gd_base" in .*|*.) ;; *) return 0 ;; esac
+    _gd_name="$(printf '%s' "$_gd_base" | sed 's/^\.*//; s/\.*$//; s/[^A-Za-z0-9_-]/-/g')"
+    [ -n "$_gd_name" ] || _gd_name="project"
+    printf "rootProject.name = '%s'\n" "$_gd_name" > "$_gd_dir/settings.gradle" 2>/dev/null || return 0
+    log "Gradle: the folder name '$_gd_base' is not a valid project name; using '$_gd_name' (settings.gradle written in the scan copy)."
+}
+if [ "$BUILD_TOOL_CHOSEN" != maven ]; then gradle_dot_root_settings .; fi
+
 # ---------------------------------------------------------------------------
 # Source-tree guard — hand the scanned project back exactly as we found it.
 #
