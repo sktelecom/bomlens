@@ -879,7 +879,7 @@
     "failImageHostFix": "이미지 이름의 호스트 이름과 이 컴퓨터의 네트워크 또는 DNS 설정을 확인한 뒤 다시 스캔하세요.",
     "failImageMissingCause": "레지스트리가 이 이미지 또는 태그가 없다고 응답했습니다.",
     "failImageMissingFix": "이미지 이름과 태그(예: repository/name:1.2.3)를 확인한 뒤 다시 스캔하세요.",
-    "failImageAuthCause": "레지스트리가 이 이미지에 대한 접근을 거부했습니다. 비공개 이미지는 로그인이 필요합니다. Docker Hub는 이미지 이름이 틀렸을 때도 같은 응답을 줍니다.",
+    "failImageAuthCause": "레지스트리가 이 이미지에 대한 접근을 거부했습니다. 이미지가 없거나, 비공개라서 로그인이 필요한 경우입니다. Docker Hub와 ghcr.io는 두 경우에 같은 응답을 줍니다.",
     "failImageAuthFix": "먼저 이름을 확인하세요. 비공개 이미지라면 이 컴퓨터에서 해당 레지스트리에 docker login을 하거나, docker save로 이미지를 tar 파일로 저장해 그 파일을 스캔한 뒤 다시 스캔하세요.",
     "live": {
       "now": "지금: {{step}}",

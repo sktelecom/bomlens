@@ -4436,6 +4436,15 @@ case "$mode" in
         echo "Response: {\"secret\": \"do-not-leak-me\"}"
         exit 1
         ;;
+    # An image the registry would not hand over: the scanner's first line, then
+    # the provider listing the reader prints indented underneath.
+    error-image-denied)
+        echo "[ERROR] syft could not read the image acme/app:1.0: the registry refused access. Sign in with SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD."
+        echo "  unable to load image: unable to use OciRegistry source: ***"
+        echo "    - docker: could not get image: Error response from daemon: pull access denied for acme/app"
+        echo "    - podman: unavailable"
+        exit 1
+        ;;
     # Warnings and an error that carry exactly what a diagnostics summary must
     # not repeat: a home-directory user name, a Bearer token, a URL with
     # credentials, an Authorization header.
@@ -4719,6 +4728,25 @@ assert any(str(e['data']).startswith('Response:') for e in evs if e['event'] == 
     pass "a raw Response: body line never reaches errorMessage, only the [ERROR] line above it"
 else
     fail "a Response: line leaked into errorMessage" "$events"
+fi
+
+# An image failure reaches errorMessage as one plain sentence, not the raw
+# provider listing; the listing stays in the log events.
+echo error-image-denied > "$STUB_MODE_FILE"
+events=$(sse_events "project=imgdeny&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+dones = [e for e in evs if e['event'] == 'done']
+msg = dones[0]['data'].get('errorMessage')
+assert msg.startswith('Could not read the image acme/app:1.0: access was denied.'), msg
+assert 'does not exist' in msg and 'needs a login' in msg, msg
+assert '***' not in msg and 'podman' not in msg and '\n' not in msg, msg
+assert any('podman: unavailable' in str(e['data']) for e in evs if e['event'] == 'log'), 'raw listing missing from the log'
+"; then
+    pass "an image failure becomes one plain sentence naming both causes, with the raw text only in the log"
+else
+    fail "image failure errorMessage not summarised" "$events"
 fi
 
 echo "== /diagnostics: the Report-a-problem summary carries an allowlist only =="

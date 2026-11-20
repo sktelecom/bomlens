@@ -38,8 +38,9 @@ export function failureKeyForCode(code: string | undefined): string | undefined 
  *  registry answered. Docker Hub answers a repository that does not exist with
  *  the same "unauthorized" as one that needs a login, so that case says both. */
 const IMAGE_FAILED = /could not read the image|could not pull|pull access denied|failed to (?:pull|read) image/i;
-const IMAGE_HOST = /no such host|dial tcp: lookup|name resolution/i;
-const IMAGE_MISSING = /manifest[ _]unknown|name[ _]unknown|manifest for \S+ not found|not found: manifest/i;
+const IMAGE_HOST = /no such host|dial tcp: lookup|name resolution|registry host could not be found/i;
+const IMAGE_MISSING =
+  /manifest[ _]unknown|name[ _]unknown|manifest for \S+ not found|not found: manifest|no image has that name or tag/i;
 const IMAGE_AUTH = /unauthorized|denied|authentication required|requested access/i;
 
 /** Which image failure the scanner's message and the last log lines describe,

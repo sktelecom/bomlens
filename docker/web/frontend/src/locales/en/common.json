@@ -879,7 +879,7 @@
     "failImageHostFix": "Check the host name in the image name and the network or DNS settings of this machine, then scan again.",
     "failImageMissingCause": "The registry answered that this image or tag does not exist.",
     "failImageMissingFix": "Check the image name and the tag (for example repository/name:1.2.3), then scan again.",
-    "failImageAuthCause": "The registry refused access to this image. A private image needs a login. Docker Hub gives the same answer when the image name is wrong.",
+    "failImageAuthCause": "The registry refused access to this image. Either the image does not exist or it is private and needs a login. Docker Hub and ghcr.io give the same answer for both.",
     "failImageAuthFix": "Check the name first. For a private image, run docker login for that registry on this machine, or save the image with docker save and scan the tar file, then scan again.",
     "live": {
       "now": "Now: {{step}}",
