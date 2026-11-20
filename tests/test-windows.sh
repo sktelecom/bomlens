@@ -263,8 +263,14 @@ case "${1:-}" in
       case "$*" in *cdxgen-temurin-java21*build-prep*) from=java21 ;; *cdxgen-temurin-java25*build-prep*) from=java25 ;; esac
       # A stage 1 SBOM a test marked stays for post-processing to read.
       [ -n "$from" ] || ! grep -q 'stage1-from=java' "$dest/${spn}_${spv}_bom.json" 2>/dev/null || keep=1
-      [ -n "$keep" ] || printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"},"properties":[{"name":"stub","value":"stage1-from=%s"}]},"components":[]}\n' \
-        "$pn" "$pv" "$from" > "$dest/${spn}_${spv}_bom.json"
+      # DOCKER_STUB_STAGE1_FAILED: the preprocessing steps a stage 1 run
+      # records as failed (bomlens:pipeline-step-failed), space-separated.
+      failed_props=""
+      case "$*" in *build-prep*)
+        for st in ${DOCKER_STUB_STAGE1_FAILED:-}; do failed_props="$failed_props,{\"name\":\"bomlens:pipeline-step-failed\",\"value\":\"$st\"}"; done ;;
+      esac
+      [ -n "$keep" ] || printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"},"properties":[{"name":"stub","value":"stage1-from=%s"}%s]},"components":[]}\n' \
+        "$pn" "$pv" "$from" "$failed_props" > "$dest/${spn}_${spv}_bom.json"
       # DOCKER_STUB_CONFORMANCE_RESULT models validate-sbom.sh's bare pass/fail
       # sidecar (--fail-on-conformance reads it). Unset means this run produced
       # no conformance report, same as a mode/step that never generates one.
@@ -851,6 +857,21 @@ scan_in "$d" --project Done --version 2.0.0 --generate-only
 in_log "-e BOMLENS_RUN_INPUT=Done_2.0.0_bom.json" \
   && pass "POSTPROCESS is told this run's own SBOM filename (BOMLENS_RUN_INPUT)" \
   || { fail "BOMLENS_RUN_INPUT missing from the POSTPROCESS docker run"; show; }
+
+# A failed preprocessing step recorded on the stage 1 SBOM: one that resolves
+# dependencies warns that some may be missing; the skipped registry licence
+# lookup (license-fetch) only says where licences come from, and the kept
+# cdxgen log is named either way.
+DOCKER_STUB_STAGE1_FAILED="license-fetch" scan_in "$d" --project Lfetch --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[INFO] The registry license lookup was skipped; licenses come from lock files and package metadata." \
+    && ! in_out "may lack dependencies" && in_out "[INFO] cdxgen log (a diagnostic file"; } \
+  && pass "license-fetch alone: one [INFO] line, no missing-dependency warning, the log path" \
+  || { fail "license-fetch alone is still reported as missing dependencies" "rc=$RC"; show; }
+DOCKER_STUB_STAGE1_FAILED="pip-install license-fetch" scan_in "$d" --project Lfetch --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "a preprocessing step failed (pip-install); the SBOM may lack dependencies." \
+    && in_out "[INFO] The registry license lookup was skipped"; } \
+  && pass "license-fetch beside pip-install: the warning names pip-install only, and the [INFO] line follows" \
+  || { fail "license-fetch beside pip-install is reported wrongly" "rc=$RC"; show; }
 
 # Fail-closed on an empty host mount, in the DEFAULT (non --generate-only) path.
 # Regression: the "did the artifact reach the host?" guard used to run ONLY under
