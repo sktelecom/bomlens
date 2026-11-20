@@ -908,6 +908,12 @@ Environment:
                          Set to 1 to skip the free-disk check before an image
                          download (default: stop when the Docker engine has
                          less free than the image's size plus 2 GB)
+  BOMLENS_GRADLE_USER_CACHE
+                         Set to false to leave your Gradle cache out of source
+                         scans (default: ~/.gradle/caches, or the caches folder
+                         of GRADLE_USER_HOME, and the wrapper distributions are
+                         mounted read-only and read as Gradle's read-only
+                         dependency cache)
   SBOM_SCANNER_IMAGE     Override the scanner image
   CDXGEN_IMAGE_PREFIX    Where the cdxgen images come from (language and
                          all-in-one), everything before the image name (default
@@ -1285,6 +1291,23 @@ extra_ca_run() {
     printf ' --mount %q -e BOMLENS_EXTRA_CA_CERTS=%s' "$(extra_ca_mount_arg)" "$EXTRA_CA_TARGET"
 }
 
+# The user's own Gradle folders, read-only, for source scans: the dependency
+# cache (the folder that holds modules-2, $GRADLE_USER_HOME/caches or else
+# ~/.gradle/caches) at /bomlens-user-cache/gradle, and the wrapper's
+# distributions beside it (wrapper/dists) at /bomlens-user-cache/gradle-wrapper.
+# Only folders that exist, and none with BOMLENS_GRADLE_USER_CACHE=false.
+# Printed as "<host folder>|<container folder>" lines; build-prep.sh reads them
+# for a Gradle build only. Nothing in them is read here.
+gradle_user_cache_dirs() {
+    case "${BOMLENS_GRADLE_USER_CACHE:-}" in false|0) return 0 ;; esac
+    local home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+    [ -d "$home" ] || return 0
+    home="$(cd "$home" && pwd)" || return 0
+    if [ -d "$home/caches/modules-2" ]; then printf '%s|%s\n' "$home/caches" /bomlens-user-cache/gradle; fi
+    if [ -d "$home/wrapper/dists" ]; then printf '%s|%s\n' "$home/wrapper/dists" /bomlens-user-cache/gradle-wrapper; fi
+    return 0
+}
+
 # ========================================================
 # Web UI mode
 # ========================================================
@@ -1358,6 +1381,11 @@ if [ "$UI_MODE" = "true" ]; then
         [ -f "$HOME/.gradle/$_gf" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.gradle/$_gf"):/bomlens-settings/gradle/$_gf:ro")
     done
     [ -d "$HOME/.gradle/init.d" ] && MOUNT_FLAGS+=(-v "$(hostpath "$HOME/.gradle/init.d"):/bomlens-settings/gradle/init.d:ro")
+    # The user's Gradle cache and wrapper distributions, read-only, for the
+    # cdxgen sibling container the same way.
+    while IFS='|' read -r _gu_host _gu_target; do
+        if [ -n "$_gu_host" ]; then MOUNT_FLAGS+=(-v "$(hostpath "$_gu_host"):$_gu_target:ro"); fi
+    done < <(gradle_user_cache_dirs)
     # The address is printed only when the port is free: a busy port used to show
     # the address first and then Docker's raw "port is already allocated".
     case "$UI_PORT" in
@@ -3591,6 +3619,14 @@ if [ "$MODE" = "SOURCE" ]; then
         done
         [ -d "$HOME/.gradle/init.d" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle/init.d")\":/bomlens-settings/gradle/init.d:ro"
     fi
+    # The user's own Gradle cache and wrapper distributions, read-only
+    # (gradle_user_cache_dirs): a Gradle project built on this machine resolves
+    # from what that build downloaded.
+    while IFS='|' read -r _gu_host _gu_target; do
+        if [ -n "$_gu_host" ]; then CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$_gu_host")\":$_gu_target:ro"; fi
+    done <<GRADLE_USER_CACHE_EOF
+$(gradle_user_cache_dirs)
+GRADLE_USER_CACHE_EOF
     # Package downloads that every scan repeated because the container is thrown away
     # afterwards: the Cargo registry, the Go module and build caches, pip's and npm's
     # download caches. Each is a folder of its own under the BomLens cache, so a

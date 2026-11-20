@@ -311,6 +311,30 @@ export function mavenRepositoryMountArgs({
   return ["-v", `${repo}:${MAVEN_USER_REPOSITORY_TARGET}:ro`];
 }
 
+// 사용자의 Gradle 의존성 캐시(modules-2가 든 폴더, GRADLE_USER_HOME이 있으면 그 아래 caches,
+// 없으면 ~/.gradle/caches)와 래퍼 배포본 폴더(wrapper/dists)를 읽기 전용으로 붙이는 docker run
+// 인자(순수, 단위 테스트 가능). scan-sbom.sh의 gradle_user_cache_dirs와 같은 규칙이다. 있는 폴더만
+// 붙이고, BOMLENS_GRADLE_USER_CACHE가 false 또는 0이면 아무것도 붙이지 않는다. 형제 cdxgen
+// 컨테이너는 --volumes-from으로 물려받고, build-prep.sh가 Gradle 빌드일 때만 읽는다.
+export const GRADLE_USER_CACHE_TARGET = "/bomlens-user-cache/gradle";
+export const GRADLE_USER_WRAPPER_TARGET = "/bomlens-user-cache/gradle-wrapper";
+export function gradleUserCacheArgs({
+  home = os.homedir(),
+  env = process.env,
+  isDir = (p) => fs.statSync(p, { throwIfNoEntry: false })?.isDirectory() === true,
+} = {}) {
+  const optOut = String(env?.BOMLENS_GRADLE_USER_CACHE ?? "").trim();
+  if (optOut === "false" || optOut === "0") return [];
+  const gradleHome = String(env?.GRADLE_USER_HOME ?? "").trim() || (String(home ?? "").trim() && path.join(String(home).trim(), ".gradle"));
+  if (!gradleHome || !path.isAbsolute(gradleHome)) return [];
+  const args = [];
+  const caches = path.join(gradleHome, "caches");
+  if (isDir(path.join(caches, "modules-2"))) args.push("-v", `${caches}:${GRADLE_USER_CACHE_TARGET}:ro`);
+  const dists = path.join(gradleHome, "wrapper", "dists");
+  if (isDir(dists)) args.push("-v", `${dists}:${GRADLE_USER_WRAPPER_TARGET}:ro`);
+  return args;
+}
+
 // Android SDK 이미지의 빌드 파일(Dockerfile만 든 폴더)을 UI 컨테이너에 읽기 전용으로 붙인다.
 // 서버가 사용자 동의 뒤 호스트 Docker로 이미지를 만들 때 이 폴더를 빌드 컨텍스트로 쓴다.
 // 폴더가 없으면(개발 실행에서 못 찾은 경우 등) 아무것도 붙이지 않고, 서버는 빌드 불가로 답한다.
@@ -673,6 +697,8 @@ export class UiContainer {
       ...settingsMountArgs(),
       // 사용자의 Maven 로컬 저장소(읽기 전용). 폴더가 있을 때만 붙는다.
       ...mavenRepositoryMountArgs(),
+      // 사용자의 Gradle 캐시와 래퍼 배포본(읽기 전용). 있는 폴더만 붙는다.
+      ...gradleUserCacheArgs(),
       "-v",
       engineMount(),
       // 5-P PR 2: entrypoint.sh가 이 경로에서 이전 실행의 가드 기록을 찾는다.

@@ -137,7 +137,9 @@ jq -n \
             {role: "gradle-properties", target: "/bomlens-settings/gradle/gradle.properties", mode: "ro", optional: true},
             {role: "gradle-init-script", target: "/bomlens-settings/gradle/init.gradle", mode: "ro", optional: true},
             {role: "gradle-init-script-kts", target: "/bomlens-settings/gradle/init.gradle.kts", mode: "ro", optional: true},
-            {role: "gradle-init", target: "/bomlens-settings/gradle/init.d", mode: "ro", optional: true}
+            {role: "gradle-init", target: "/bomlens-settings/gradle/init.d", mode: "ro", optional: true},
+            {role: "gradle-cache", target: "/bomlens-user-cache/gradle", mode: "ro", optional: true},
+            {role: "gradle-wrapper", target: "/bomlens-user-cache/gradle-wrapper", mode: "ro", optional: true}
           ],
           input_fingerprint: $fp,
           on_kill: "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",

@@ -470,6 +470,13 @@ jobs:
       - name: Android Gradle resolution tests
         run: bash tests/test-android-gradle-resolution.sh
 
+      # No Docker: the user's Gradle cache in a source scan (the mounts, the
+      # read-only dependency cache, --offline only when no repository answers,
+      # the wrapper's Gradle offline) and unresolved Gradle entries recorded as
+      # a failed step.
+      - name: Gradle user cache tests
+        run: bash tests/test-gradle-user-cache.sh
+
       # No Docker: how npm, Ruby, PHP and .NET sources are read. The one npm
       # dependency that cannot be fetched, a Gemfile optional group, a vendored
       # package-lock.json and the .NET base assemblies.

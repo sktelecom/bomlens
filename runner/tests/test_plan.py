@@ -179,6 +179,20 @@ class ReviewFindings(unittest.TestCase):
         for role in ("maven-settings", "maven-repository", "gradle-init-script", "gradle-init"):
             self.refuse(lambda d, role=role: mount(d, 1, role).update(mode="rw"))
 
+    def test_gradle_user_cache_roles(self):
+        # Optional, read-only and stage 1 only; accepted as such.
+        for role, target in (("gradle-cache", "/bomlens-user-cache/gradle"),
+                             ("gradle-wrapper", "/bomlens-user-cache/gradle-wrapper")):
+            doc = copy.deepcopy(fixture())
+            stage(doc, 1)["mounts"].append({"role": role, "target": target, "mode": "ro", "optional": True})
+            self.assertTrue(parse_plan(doc).stage(1).mount(role).read_only)
+            self.refuse(lambda d, r=role, t=target: stage(d, 1)["mounts"].append(
+                {"role": r, "target": t, "mode": "rw", "optional": True}))
+            self.refuse(lambda d, r=role, t=target: stage(d, 1)["mounts"].append(
+                {"role": r, "target": t, "mode": "ro"}))
+            self.refuse(lambda d, r=role, t=target: stage(d, 2)["mounts"].append(
+                {"role": r, "target": t, "mode": "ro", "optional": True}))
+
     def test_uid_over_int32(self):
         self.refuse(lambda d: stage(d, 1).update(user="9999999999"))
         self.refuse(lambda d: stage(d, 1).update(user="0:4294967296"))

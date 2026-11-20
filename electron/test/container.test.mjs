@@ -37,6 +37,7 @@ import {
   scanMountArgs,
   settingsMountArgs,
   mavenRepositoryMountArgs,
+  gradleUserCacheArgs,
   androidBuildArgs,
   defaultAndroidBuildDir,
   prepareAndroidBuildDir,
@@ -600,6 +601,26 @@ test("settingsMountArgs mounts only the settings files that exist, read-only, at
     "-v", `${path.join("/home/u", ".gradle", "gradle.properties")}:/bomlens-settings/gradle/gradle.properties:ro`,
     "-v", `${path.join("/home/u", ".gradle", "init.d")}:/bomlens-settings/gradle/init.d:ro`,
   ]);
+});
+
+test("gradleUserCacheArgs mounts the Gradle cache and wrapper folders that exist, read-only", () => {
+  const caches = path.join("/home/u", ".gradle", "caches");
+  const dists = path.join("/home/u", ".gradle", "wrapper", "dists");
+  const both = new Set([path.join(caches, "modules-2"), dists]);
+  assert.deepEqual(gradleUserCacheArgs({ home: "/home/u", env: {}, isDir: (p) => both.has(p) }), [
+    "-v", `${caches}:/bomlens-user-cache/gradle:ro`,
+    "-v", `${dists}:/bomlens-user-cache/gradle-wrapper:ro`,
+  ]);
+  // GRADLE_USER_HOME wins over ~/.gradle.
+  const gh = path.join("/data", "gh");
+  assert.deepEqual(gradleUserCacheArgs({
+    home: "/home/u", env: { GRADLE_USER_HOME: gh }, isDir: (p) => p === path.join(gh, "caches", "modules-2"),
+  }), ["-v", `${path.join(gh, "caches")}:/bomlens-user-cache/gradle:ro`]);
+  // No modules-2: nothing; the opt-out: nothing.
+  assert.deepEqual(gradleUserCacheArgs({ home: "/home/u", env: {}, isDir: () => false }), []);
+  assert.deepEqual(gradleUserCacheArgs({
+    home: "/home/u", env: { BOMLENS_GRADLE_USER_CACHE: "false" }, isDir: (p) => both.has(p),
+  }), []);
 });
 
 test("settingsMountArgs covers every file the CLI mounts and nothing when none exist", () => {

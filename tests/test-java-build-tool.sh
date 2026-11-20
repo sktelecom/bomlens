@@ -59,7 +59,7 @@ check "pom.xml with build.gradle.kts counts as both" "$(choose "$WORK/kts" maven
 echo "== build-prep.sh reads the choice where it matters =="
 if grep -q 'BOMLENS_BUILD_TOOL' "$LIB/source-detect.sh"; then pass "BOMLENS_BUILD_TOOL is passed to the container by name"; else fail "BOMLENS_BUILD_TOOL is passed to the container by name"; fi
 check "Maven runs for a chosen maven" "$(grep -c '\[ "\$BUILD_TOOL_CHOSEN" = maven \]' "$LIB/build-prep.sh")" "1"
-check "Gradle steps are skipped for a chosen maven" "$(grep -c '\[ "\$BUILD_TOOL_CHOSEN" != maven \]' "$LIB/build-prep.sh")" "4"
+check "Gradle steps are skipped for a chosen maven" "$(grep -c '\[ "\$BUILD_TOOL_CHOSEN" != maven \]' "$LIB/build-prep.sh")" "5"
 
 echo "== bomlens:build-tool-choice on the SBOM =="
 sed -n "/<<'BT_JS'/,/^BT_JS\$/p" "$LIB/build-prep.sh" | sed '1d;$d' > "$WORK/bt.js"
