@@ -117,7 +117,7 @@ Environment variables adjust the behavior.
 | `AIBOM_DATASET_MAX_LOOKUPS` | `40` | With `--model`: the most datasets one scan reads, sources included. Datasets past the limit are recorded by name as not read |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `CYCLONEDX_SPEC_VERSION` | `1.6` | Same as `--spec-version`. Also read by the scanner image itself, for a `docker run` without the CLI |
-| `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
+| `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster. When the package registry does not answer within a few seconds (no network, or a proxy whose certificate the scan does not trust), the scan turns the lookup off by itself, says so in the log and records `license-fetch` in the SBOM's `bomlens:pipeline-step-failed`; licenses the lock file carries are still read |
 | `GOTOOLCHAIN` | `auto` | Go source scans: which Go toolchain resolves the modules. By default, when `go.mod` asks for a newer Go than the scanner image carries, that version is downloaded. Set `local` to use only the image's own Go; dependency resolution then fails for such a project |
 | `GOPROXY` | `https://proxy.golang.org,direct` | Go source scans: proxy for module and toolchain downloads, for a network that cannot reach `proxy.golang.org`. `GOSUMDB` is passed on the same way |
 | `PROJECT_LICENSE` | — | Same as `--license`. The outbound license the project is distributed under, as an SPDX id. Drives the `bomlens:licenseConflict` verdicts and the risk report's conflict section |

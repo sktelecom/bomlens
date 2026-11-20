@@ -844,7 +844,10 @@ Options:
 
 Environment:
   FETCH_LICENSE          Resolve dependency licenses in source scans
-                         (default: true; set false to skip and run faster)
+                         (default: true; set false to skip and run faster).
+                         Turned off for the scan, with a log line, when the
+                         package registry does not answer within a few
+                         seconds; lock file licenses are still read
   SECURITY_ENRICH        Enrich the security report with EPSS + CISA KEV
                          signals (default: true; set false for air-gapped)
   SBOM_TRIVY_CACHE       Host folder kept as Trivy's cache (database downloaded

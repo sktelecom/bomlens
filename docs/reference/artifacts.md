@@ -132,4 +132,4 @@ An analyzed supplier SBOM's own `compositions` declaration, if it has one, is ne
 
 The conformance check report's transitive-dependency check notes the declared value in its detail text (e.g. "12 edge(s), declared complete"), without changing the check's pass/fail status.
 
-A preprocessing label that ran, or was satisfied by an already-committed lockfile, is recorded in the `bomlens:prep-step-applied` property regardless of success or failure; `bomlens:pipeline-step-failed` records only the failures. `aggregate` above is decided from both together.
+A preprocessing label that ran, or was satisfied by an already-committed lockfile, is recorded in the `bomlens:prep-step-applied` property regardless of success or failure; `bomlens:pipeline-step-failed` records only the failures. `aggregate` above is decided from both together. `license-fetch` in `bomlens:pipeline-step-failed` means the registry license lookup was turned off for this scan because the registry did not answer, so only the licenses in lock files and package manifests are in the SBOM.
