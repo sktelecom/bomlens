@@ -2324,6 +2324,30 @@ license_lookup_probe() {
 PY_VENV_READER="${BOMLENS_PYTHON_VENV_READER:-/tmp/read-python-venv.py}"
 PY_VENV_DIR=""; PY_VENV_SITE=""; PY_VENV_USED=""; PY_VENV_REASON=""; PY_VENV_SBOM=""
 
+# An installed environment is not the project's code, so cdxgen is never
+# pointed at it, whether it is read here or not, and also with
+# BOMLENS_INCLUDE_NON_SHIPPED: its python cataloger takes every package's
+# METADATA in it for a requirement and, with the package index out of reach,
+# waits on the index for each one (measured: a .venv of 191 packages beside a
+# requirements.txt, --network none, no end after 25 minutes). Sets
+# PY_VENV_EXCLUDE to the top-level folders holding a pyvenv.cfg (.venv/,
+# venv/ and the others read-python-venv.py looks in), space-separated. A name
+# with a character outside letters, digits, dot, underscore and hyphen is
+# left alone: it would not survive as one glob.
+PY_VENV_EXCLUDE=""
+python_venv_exclude_find() {
+    PY_VENV_EXCLUDE=""
+    for _pvx in ./* ./.[!.]* ./..?*; do
+        [ -d "$_pvx" ] && [ -f "$_pvx/pyvenv.cfg" ] || continue
+        _pvx="${_pvx#./}"
+        case "$_pvx" in
+            -*|*[!A-Za-z0-9._-]*)
+                log "python: the installed environment $_pvx/ has a name that cannot be passed to cdxgen as an exclusion; cdxgen reads it" ;;
+            *) PY_VENV_EXCLUDE="${PY_VENV_EXCLUDE:+$PY_VENV_EXCLUDE }$_pvx" ;;
+        esac
+    done
+}
+
 # Sets PY_VENV_DIR (relative) and PY_VENV_SITE (its site-packages folders,
 # colon-separated) when the tree has an installed environment.
 python_venv_find() {
@@ -2864,6 +2888,10 @@ if [ -n "$PY_VENV_USED" ]; then
     log "python: cdxgen's python cataloger left out; the installed environment $PY_VENV_DIR/ is read instead"
     set -- "$@" --exclude-type python
 fi
+# Installed Python environments (see python_venv_exclude_find above).
+python_venv_exclude_find
+for _d in $PY_VENV_EXCLUDE; do set -- "$@" --exclude "$_d/**"; done
+[ -z "$PY_VENV_EXCLUDE" ] || log "python: the installed environment folder(s) $PY_VENV_EXCLUDE left out of cdxgen's search"
 # Non-shipped trees: leave out manifests under test, fixture, example,
 # benchmark and demo folders, the GitHub Actions workflows and the Gradle
 # wrapper -- none of it ships with the product. NON_SHIPPED_DIRS/EXCLUDE_NON_SHIPPED are defined
@@ -7148,24 +7176,38 @@ fi
 
 # Record what the non-shipped exclusion left out: the patterns in
 # bomlens:excluded-paths and the manifest files, capped at 50, in
-# bomlens:excluded-manifests.
-if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+# bomlens:excluded-manifests. An installed Python environment left out of
+# cdxgen's search is recorded as its pattern (.venv/**) only: the files in it
+# are installed packages, not the project's manifests.
+if [ "${rc:-1}" -eq 0 ] && { [ -n "$EXCLUDE_NON_SHIPPED" ] || [ -n "$PY_VENV_EXCLUDE" ]; } \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     _globs=""
     _re=""
-    for _d in $NON_SHIPPED_DIRS; do _globs="$_globs, **/$_d/**"; _re="$_re|$_d"; done
-    for _d in $NON_SHIPPED_PATHS; do _globs="$_globs, **/$_d/**"; done
-    for _d in $NON_SHIPPED_FILE_GLOBS; do _globs="$_globs, **/$_d"; done
-    _globs="${_globs#, }"
-    _re="(^|/)(${_re#|})/"
     _excl=$(mktemp)
-    find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null \
-        | sed 's#^\./##' \
-        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$_re" || true; } \
-        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
-        | LC_ALL=C sort > "$_excl"
-    # Lock files under vendor/ (NON_SHIPPED_FILE_GLOBS) are left out too.
-    find . \( -name node_modules -o -name .git \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null \
-        | sed 's#^\./##' | LC_ALL=C sort >> "$_excl"
+    # find's own prune list for the environments, rooted at the top (the
+    # names hold no space or glob character, see python_venv_exclude_find).
+    _vprune=""
+    for _d in $PY_VENV_EXCLUDE; do _vprune="$_vprune -o -path ./$_d"; done
+    set -f
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _d in $NON_SHIPPED_DIRS; do _globs="$_globs, **/$_d/**"; _re="$_re|$_d"; done
+        for _d in $NON_SHIPPED_PATHS; do _globs="$_globs, **/$_d/**"; done
+        for _d in $NON_SHIPPED_FILE_GLOBS; do _globs="$_globs, **/$_d"; done
+        _re="(^|/)(${_re#|})/"
+        # shellcheck disable=SC2086
+        find . \( -name node_modules -o -name .git $_vprune \) -prune -o -type f -print 2>/dev/null \
+            | sed 's#^\./##' \
+            | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$_re" || true; } \
+            | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
+            | LC_ALL=C sort > "$_excl"
+        # Lock files under vendor/ (NON_SHIPPED_FILE_GLOBS) are left out too.
+        # shellcheck disable=SC2086
+        find . \( -name node_modules -o -name .git $_vprune \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null \
+            | sed 's#^\./##' | LC_ALL=C sort >> "$_excl"
+    fi
+    set +f
+    for _d in $PY_VENV_EXCLUDE; do _globs="$_globs, $_d/**"; done
+    _globs="${_globs#, }"
     _js=$(mktemp).js
     cat > "$_js" <<'EXCL_JS'
 const fs = require('fs');

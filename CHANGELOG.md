@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A Gradle dependency that could not be resolved (no repository reachable, for example) left the `gradle-dependencies` step recorded as succeeded, because Gradle exits 0 for it and the SBOM then held only the direct dependencies. The step is now recorded as failed, with a log line that names how many entries were unresolved, so the result completeness is partial. The Android release classpath step counts them the same way.
 - A source scan from the web UI or the desktop app reads a conda `environment.yml`: `identify-conda.py` is copied beside the stage 1 script and its path passed in `BOMLENS_CONDA_READER`, as the CLI and the execution plan already mount it at `/tmp/identify-conda.py`. The language container does not share the web UI container's `/tmp`, so the conda step found no parser and cdxgen's python cataloger ran in its place without a message; a missing parser is now logged.
+- A source scan leaves an installed Python environment in the tree (`.venv/`, `venv/` or another top-level folder with a `pyvenv.cfg`) out of cdxgen's search, whether or not BomLens reads it and also with `BOMLENS_INCLUDE_NON_SHIPPED=1`, and adds its pattern (`.venv/**`) to `bomlens:excluded-paths`. cdxgen took every package installed there for a requirement and, with the package index out of reach, did not finish: a tree with a 191-package `.venv/` and no network finishes in 86 seconds with `BOMLENS_PYTHON_VENV=false`, where it had not finished after 25 minutes.
 
 ## [v1.15.0] - 2026-11-15
 

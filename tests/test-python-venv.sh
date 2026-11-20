@@ -20,6 +20,8 @@
 #   - the build-prep.sh gate: an index that answers leaves today's path, one
 #     that does not (or a failed pip install) reads the environment, and
 #     BOMLENS_PYTHON_VENV=false turns it off;
+#   - the environment folders are left out of cdxgen's search in every case,
+#     and recorded in bomlens:excluded-paths;
 #   - the licence evidence pass reads the environment's metadata;
 #   - the completeness grade of a result with unsettled parts.
 set -u
@@ -337,6 +339,53 @@ grep -q '^    set -- "$@" --exclude-type python$' "$PREP" \
     && grep -q '"\$PY_VENV_READER" merge "\$OUT" "\$PY_VENV_SBOM"' "$PREP" \
     && pass "build-prep.sh leaves cdxgen's python cataloger out and merges the environment" \
     || fail "build-prep.sh: the exclusion, the gate calls or the merge are missing"
+
+echo "== an installed environment is left out of cdxgen =="
+# Every top-level folder with a pyvenv.cfg, read or not, BOMLENS_PYTHON_VENV
+# and BOMLENS_INCLUDE_NON_SHIPPED aside; a nested one, a folder without
+# pyvenv.cfg and a name that would not survive as one glob are not.
+X="$WORK/exclude"
+for d in .venv venv env2 "my env" -x src/.venv; do mkdir -p "$X/$d"; : > "$X/$d/pyvenv.cfg"; done
+mkdir -p "$X/.venv2" "$X/tests" "$X/.venv/lib/python3.12/site-packages/pkg/tests"
+: > "$X/tests/requirements.txt"; : > "$X/.venv/lib/python3.12/site-packages/pkg/tests/requirements.txt"
+: > "$X/requirements.txt"
+_pvx_find() { ( cd "$X" && env "$@" sh -c 'log() { echo "[build-prep] $*"; }
+    '"$_pv_block"'
+    python_venv_exclude_find; echo "EXCLUDE=$PY_VENV_EXCLUDE"' ) 2>&1; }
+out="$(_pvx_find BOMLENS_PYTHON_VENV=true)"
+check "the top-level environments are found" "$(printf '%s\n' "$out" | sed -n 's/^EXCLUDE=//p')" "env2 venv .venv"
+{ printf '%s\n' "$out" | grep -qF "my env/ has a name that cannot be passed" \
+    && printf '%s\n' "$out" | grep -qF -- "-x/ has a name that cannot be passed"; } \
+    && pass "a name that is not one glob is named in the log and left alone" \
+    || fail "a name that is not one glob is named in the log and left alone" "$out"
+check "BOMLENS_PYTHON_VENV=false leaves them out all the same" \
+    "$(_pvx_find BOMLENS_PYTHON_VENV=false BOMLENS_INCLUDE_NON_SHIPPED=1 | sed -n 's/^EXCLUDE=//p')" "env2 venv .venv"
+grep -q '^for _d in \$PY_VENV_EXCLUDE; do set -- "\$@" --exclude "\$_d/\*\*"; done$' "$PREP" \
+    && grep -q '^python_venv_exclude_find$' "$PREP" \
+    && pass "build-prep.sh passes each one to cdxgen as --exclude <folder>/**" \
+    || fail "build-prep.sh does not pass the environments to cdxgen as exclusions"
+# The recorder: the pattern goes in bomlens:excluded-paths, and the files in
+# the environment are not listed as left-out manifests.
+_rec_block=$(sed -n '/^# Record what the non-shipped exclusion left out/,/^# --reachability (Go)/p' "$PREP" | sed '$d')
+if ! command -v node >/dev/null 2>&1; then
+    echo "  SKIP: node is not installed"
+elif [ -z "$_rec_block" ]; then
+    fail "the exclusion recorder could not be extracted from build-prep.sh"
+else
+    _rec() {  # <EXCLUDE_NON_SHIPPED> <PY_VENV_EXCLUDE>
+        printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"properties":[]},"components":[]}\n' > "$WORK/rec.json"
+        ( cd "$X" && sh -c 'log() { echo "[build-prep] $*"; }
+            rc=0; OUT="$1"; EXCLUDE_NON_SHIPPED="$2"; PY_VENV_EXCLUDE="$3"
+            '"$(grep -E '^NON_SHIPPED_[A-Z_]+=' "$PREP")"'
+            '"$_rec_block" _ "$WORK/rec.json" "$1" "$2" ) >/dev/null 2>&1
+        jq -c '[.metadata.properties[] | select(.name == "bomlens:excluded-paths" or .name == "bomlens:excluded-manifests") | .value]' "$WORK/rec.json"
+    }
+    out="$(_rec 1 ".venv venv")"
+    case "$out" in '["**/test/**, '*', **/vendor/**/package-lock.json, .venv/**, venv/**","tests/requirements.txt"]') pass "with the non-shipped folders: the environments' patterns follow theirs, and their files are not listed" ;;
+        *) fail "with the non-shipped folders: the environments' patterns follow theirs, and their files are not listed" "$out" ;; esac
+    check "with BOMLENS_INCLUDE_NON_SHIPPED: only the environments' patterns" "$(_rec "" ".venv")" '[".venv/**"]'
+    check "nothing left out: nothing recorded" "$(_rec "" "")" '[]'
+fi
 
 echo "== the licence evidence pass reads the environment =="
 _pylic=$(sed -n "/^    cat > \"\$_pylic\" <<'PY_LIC'\$/,/^PY_LIC\$/p" "$PREP" | sed '1d;$d')
