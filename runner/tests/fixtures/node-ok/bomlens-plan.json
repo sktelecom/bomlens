@@ -218,6 +218,12 @@
           "optional": true
         },
         {
+          "role": "maven-repository",
+          "target": "/bomlens-settings/m2/repository",
+          "mode": "ro",
+          "optional": true
+        },
+        {
           "role": "cache-gradle",
           "target": "/root/.gradle",
           "mode": "rw",

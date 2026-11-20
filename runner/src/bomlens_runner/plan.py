@@ -36,12 +36,14 @@ STAGE_ORDER = (("generate", 1), ("postprocess", 2))
 
 MOUNT_ROLES = (
     "source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle", "trivy-db",
-    "maven-settings", "maven-settings-security", "gradle-properties", "gradle-init-script",
-    "gradle-init-script-kts", "gradle-init",
+    "maven-settings", "maven-settings-security", "maven-repository", "gradle-properties",
+    "gradle-init-script", "gradle-init-script-kts", "gradle-init",
 )
+# The user's own files and folders, given read-only. maven-repository is the
+# user's Maven local repository, which stage 1 only reads.
 SETTINGS_ROLES = (
-    "maven-settings", "maven-settings-security", "gradle-properties", "gradle-init-script",
-    "gradle-init-script-kts", "gradle-init",
+    "maven-settings", "maven-settings-security", "maven-repository", "gradle-properties",
+    "gradle-init-script", "gradle-init-script-kts", "gradle-init",
 )
 STAGE_ROLES = {
     1: frozenset(("source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle") + SETTINGS_ROLES),
@@ -65,6 +67,7 @@ _BUILD_PREP = (
     "BOMLENS_INCLUDE_NON_SHIPPED", "BOMLENS_INCLUDE_DEV_DEPENDENCIES", "BOMLENS_NO_COPYRIGHT",
     "BOMLENS_NO_CARGO_LICENSE", "BOMLENS_NO_AI_USAGE", "BOMLENS_AI_USAGE_TIMEOUT", "BOMLENS_PREP_TIMEOUT", "BOMLENS_BUILD_TOOL",
     "BOMLENS_LICENSE_PROBE_TIMEOUT", "BOMLENS_LICENSE_FETCH_TIMEOUT",
+    "BOMLENS_MAVEN_USER_REPOSITORY",
 )
 PROXY_ENV_NAMES = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy")
 EXTRA_CA_ENV_NAMES = ("BOMLENS_EXTRA_CA_CERTS",)

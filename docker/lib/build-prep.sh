@@ -970,6 +970,179 @@ if [ -f "$SETTINGS_ROOT/m2/settings-security.xml" ]; then
     export MAVEN_OPTS
 fi
 
+# The user's own Maven local repository (the maven-repository role), mounted
+# read-only at $SETTINGS_ROOT/m2/repository: a machine that has built the
+# project holds every artifact there, so a project whose repositories the
+# container cannot reach (a company repository, no network) still resolves.
+# Maven 3.9 and later read it after this run's own repository
+# (-Dmaven.repo.local.tail) and never write to it; what they download goes to
+# the own repository as before. The property goes everywhere the settings file
+# goes above (an older Maven, as a project's mvnw may run, ignores it). cdxgen
+# reads POMs, licences and jars (the component hashes) from MAVEN_CACHE_DIR
+# first and then from the -Dmaven.repo.local in MAVEN_OPTS; the jar count
+# and the parent-POM licence step below look in both as well.
+#
+# Offline mode (-o) is added only when the repository Maven would use does
+# not answer (maven_repository_probe), so a scan that reaches it runs as
+# before. Without -o Maven would still try to download what the tail already
+# holds (it checks the remote for the metadata), and fail.
+# BOMLENS_MAVEN_USER_REPOSITORY=false leaves the mount unused. An empty mount
+# (a folder the Docker engine cannot see is mounted as an empty one) is not
+# used either.
+MAVEN_USER_REPO=""
+MAVEN_USER_REPO_OFFLINE=""
+MAVEN_PROBE_TIMEOUT="${BOMLENS_MAVEN_PROBE_TIMEOUT:-5}"
+case "$MAVEN_PROBE_TIMEOUT" in ""|*[!0-9]*|0) MAVEN_PROBE_TIMEOUT=5 ;; esac
+
+# The text of an XML file with its comments taken out, on one line.
+xml_without_comments() {
+    awk 'BEGIN { RS = "\001" }
+        {
+            s = $0; out = ""
+            while ((i = index(s, "<!--")) > 0) {
+                out = out substr(s, 1, i - 1); s = substr(s, i + 4)
+                j = index(s, "-->"); if (j == 0) { s = ""; break }
+                s = substr(s, j + 3)
+            }
+            gsub(/[\r\n\t]/, " ", out); gsub(/[\r\n\t]/, " ", s)
+            print out s
+        }' "$1" 2>/dev/null
+}
+
+# The text of a <tag> element in the given one-line XML (the last one when
+# there are several), trimmed. Called on one <mirror> or <proxy> at a time.
+xml_first() {
+    printf '%s\n' "$1" | sed -n "s|.*<$2>[[:space:]]*\([^<]*[^<[:space:]]\)[[:space:]]*</$2>.*|\1|p" | head -1
+}
+
+# The repository the Maven runs here would download from: the URL of the first
+# <mirror> in the mounted settings.xml (a company mirror, usually), else Maven
+# Central. With an active <proxy> in the same file, its address as
+# "protocol://host:port" on a second line (no credentials: any answer from the
+# proxy, a request for a login included, means it is there).
+maven_repository_target() {
+    _mrt_url=""; _mrt_proxy=""
+    if [ -f "$SETTINGS_ROOT/m2/settings.xml" ]; then
+        _mrt_xml="$(xml_without_comments "$SETTINGS_ROOT/m2/settings.xml")"
+        # The first <mirror> inside <mirrors>: the part up to its </mirror>.
+        _mrt_mirror="$(printf '%s\n' "$_mrt_xml" | sed -n 's|.*<mirrors>\(.*\)</mirrors>.*|\1|p' | sed 's|</mirror>.*||')"
+        [ -z "$_mrt_mirror" ] || _mrt_url="$(xml_first "$_mrt_mirror" url)"
+        _mrt_proxies="$(printf '%s\n' "$_mrt_xml" | sed -n 's|.*<proxies>\(.*\)</proxies>.*|\1|p')"
+        if [ -n "$_mrt_proxies" ]; then
+            # The first <proxy> that is not <active>false</active>.
+            _mrt_rest="$_mrt_proxies"
+            while :; do
+                case "$_mrt_rest" in *"<proxy>"*) ;; *) break ;; esac
+                _mrt_rest="${_mrt_rest#*<proxy>}"
+                _mrt_one="${_mrt_rest%%</proxy>*}"
+                _mrt_rest="${_mrt_rest#*</proxy>}"
+                [ "$(xml_first "$_mrt_one" active)" = "false" ] && continue
+                _mrt_host="$(xml_first "$_mrt_one" host)"
+                [ -n "$_mrt_host" ] || continue
+                _mrt_port="$(xml_first "$_mrt_one" port)"
+                _mrt_proto="$(xml_first "$_mrt_one" protocol)"
+                _mrt_proxy="${_mrt_proto:-http}://$_mrt_host:${_mrt_port:-8080}"
+                break
+            done
+        fi
+    fi
+    case "$_mrt_url" in http://*|https://*) ;; *) _mrt_url="https://repo.maven.apache.org/maven2/" ;; esac
+    printf '%s\n' "$_mrt_url"
+    [ -z "$_mrt_proxy" ] || printf '%s\n' "$_mrt_proxy"
+}
+
+# Ask the repository above once, within MAVEN_PROBE_TIMEOUT seconds. Prints
+# "host<TAB>why" and returns 1 when it cannot be reached: no name lookup, no
+# connection, no answer in time. Any HTTP answer, an error status or a login
+# request included, and a TLS certificate this probe does not trust, count as
+# reachable: Maven's Java has its own trust store and decides for itself, so
+# the probe never turns a scan offline that Maven could have run online. Node
+# trusts the CA bundle cdxgen trusts (NODE_EXTRA_CA_CERTS, extra_ca_trust
+# above) and the proxy variables (NODE_USE_ENV_PROXY); a <proxy> in
+# settings.xml takes their place, as it does for Maven. Without node (or a node
+# without fetch) nothing is decided and 0 is returned.
+maven_repository_probe() {
+    command -v node >/dev/null 2>&1 || return 0
+    _mrp_target="$(maven_repository_target)"
+    _mrp_url="$(printf '%s\n' "$_mrp_target" | sed -n 1p)"
+    _mrp_proxy="$(printf '%s\n' "$_mrp_target" | sed -n 2p)"
+    _mrp_js="$(mktemp)" || return 0
+    cat > "$_mrp_js" <<'MAVEN_PROBE_JS'
+const [limit, url] = process.argv.slice(2);
+if (typeof fetch !== "function" || typeof AbortSignal.timeout !== "function") process.exit(0);
+let host = url;
+try { host = new URL(url).host; } catch (e) { process.exit(0); }
+// No route to the repository; anything else (an HTTP answer, a TLS error) is a
+// repository that answered.
+const DOWN = new Set(["ENOTFOUND", "EAI_AGAIN", "EAI_FAIL", "EAI_NONAME", "ECONNREFUSED", "ECONNRESET",
+  "ENETUNREACH", "EHOSTUNREACH", "EHOSTDOWN", "ENETDOWN", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_SOCKET"]);
+fetch(url, { method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(Number(limit) * 1000),
+  headers: { "user-agent": "bomlens-maven-probe" } })
+  .then(async (res) => { try { await res.body?.cancel(); } catch (e) { /* nothing to read */ } process.exit(0); })
+  .catch((err) => {
+    if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      process.stdout.write(host + "\tit did not answer within " + limit + "s\n");
+      process.exit(1);
+    }
+    let e = err;
+    while (e && e.cause && !e.code) e = e.cause;
+    const code = (e && e.code) || "";
+    if (!DOWN.has(code)) process.exit(0);
+    process.stdout.write(host + "\tit could not be reached (" + code + ")\n");
+    process.exit(1);
+  });
+MAVEN_PROBE_JS
+    if [ -n "$_mrp_proxy" ]; then
+        _mrp_out="$(HTTPS_PROXY="$_mrp_proxy" HTTP_PROXY="$_mrp_proxy" https_proxy="$_mrp_proxy" http_proxy="$_mrp_proxy" \
+            NO_PROXY="" no_proxy="" NODE_USE_ENV_PROXY=1 node "$_mrp_js" "$MAVEN_PROBE_TIMEOUT" "$_mrp_url" 2>/dev/null)"
+    else
+        _mrp_out="$(NODE_USE_ENV_PROXY=1 node "$_mrp_js" "$MAVEN_PROBE_TIMEOUT" "$_mrp_url" 2>/dev/null)"
+    fi
+    _mrp_rc=$?
+    rm -f "$_mrp_js"
+    [ "$_mrp_rc" -eq 1 ] && [ -n "$_mrp_out" ] || return 0
+    printf '%s\n' "$_mrp_out" | tr -cd 'A-Za-z0-9_ .:()\t\n/-' | head -1
+    return 1
+}
+
+if [ -d "$SETTINGS_ROOT/m2/repository" ] \
+   && [ -n "$(find . \( -name .git -o -name node_modules \) -prune -o -type f -name pom.xml -print 2>/dev/null | head -1)" ]; then
+    _mur_off=""
+    case "${BOMLENS_MAVEN_USER_REPOSITORY:-}" in false|0) _mur_off=1 ;; esac
+    if [ -n "$_mur_off" ]; then
+        log "maven: BOMLENS_MAVEN_USER_REPOSITORY=${BOMLENS_MAVEN_USER_REPOSITORY}, so your Maven local repository is not read"
+    elif [ -z "$(ls -A "$SETTINGS_ROOT/m2/repository" 2>/dev/null | head -1)" ]; then
+        log "maven: the mounted Maven local repository is empty (the Docker engine may not share its folder), so it is not read"
+    else
+        MAVEN_USER_REPO="$SETTINGS_ROOT/m2/repository"
+        MAVEN_TAIL_ARG="-Dmaven.repo.local.tail=$MAVEN_USER_REPO"
+        MAVEN_SETTINGS_ARGS="${MAVEN_SETTINGS_ARGS:+$MAVEN_SETTINGS_ARGS }$MAVEN_TAIL_ARG"
+        MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }$MAVEN_TAIL_ARG"
+        MVN_ARGS="${MVN_ARGS:+$MVN_ARGS }$MAVEN_TAIL_ARG"
+        MAVEN_CACHE_DIR="$MAVEN_USER_REPO"
+        export MAVEN_ARGS MVN_ARGS MAVEN_CACHE_DIR
+        log "maven: reading your Maven local repository (read-only) after BomLens's own"
+        case " ${MAVEN_ARGS:-} ${MVN_ARGS:-} " in
+            *" -o "*|*" --offline "*) MAVEN_USER_REPO_OFFLINE=settings ;;
+        esac
+        if [ -z "$MAVEN_USER_REPO_OFFLINE" ] && [ -f "$SETTINGS_ROOT/m2/settings.xml" ] \
+           && grep -q '<offline>[[:space:]]*true[[:space:]]*</offline>' "$SETTINGS_ROOT/m2/settings.xml"; then
+            MAVEN_USER_REPO_OFFLINE=settings
+        fi
+        if [ -z "$MAVEN_USER_REPO_OFFLINE" ]; then
+            if ! _mur_why="$(maven_repository_probe)"; then
+                MAVEN_USER_REPO_OFFLINE=probe
+                MAVEN_SETTINGS_ARGS="$MAVEN_SETTINGS_ARGS -o"
+                MAVEN_ARGS="$MAVEN_ARGS -o"
+                MVN_ARGS="$MVN_ARGS -o"
+                export MAVEN_ARGS MVN_ARGS
+                log "maven: offline mode (-o): ${_mur_why%%	*}: ${_mur_why#*	}; dependencies resolve from your Maven local repository"
+            fi
+        fi
+    fi
+fi
+
 # Maven component hashes: cdxgen computes a component's hashes from its jar,
 # looked up only at $HOME/.m2/repository/<group>/<artifact>/<version>/, and
 # its dependency:tree run downloads poms, not jars. On a fresh repository every
@@ -1189,18 +1362,24 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
                 mark_prep_failed maven-dependency-tree
             fi
         fi
-        # Each resolved jar, as its path in the local repository:
-        # group:artifact:jar[:classifier]:version:scope.
-        _mvn_counts=$(awk -v repo="$MAVEN_REPO_LOCAL" '
+        # Each resolved jar, as its path in a local repository:
+        # group:artifact:jar[:classifier]:version:scope. A jar Maven took from
+        # the user's repository (the tail) stays there and is not copied.
+        _mvn_counts=$(awk '
             /^[[:space:]]+[^[:space:]:]+:[^[:space:]:]+:/ {
                 n = split($1, c, ":")
                 if (c[3] != "jar" || (n != 5 && n != 6)) next
                 v = (n == 6) ? c[5] : c[4]; cl = (n == 6) ? "-" c[4] : ""
                 g = c[1]; gsub(/\./, "/", g)
-                print repo "/" g "/" c[2] "/" v "/" c[2] "-" v cl ".jar"
+                print g "/" c[2] "/" v "/" c[2] "-" v cl ".jar"
             }' "$_mvn_list" 2>/dev/null | sort -u | {
                 _t=0; _h=0
-                while IFS= read -r _j; do _t=$((_t + 1)); [ -f "$_j" ] && _h=$((_h + 1)); done
+                while IFS= read -r _j; do
+                    _t=$((_t + 1))
+                    if [ -f "$MAVEN_REPO_LOCAL/$_j" ] || { [ -n "$MAVEN_USER_REPO" ] && [ -f "$MAVEN_USER_REPO/$_j" ]; }; then
+                        _h=$((_h + 1))
+                    fi
+                done
                 echo "$_t $_h"
             })
         _mvn_total=${_mvn_counts% *}; _mvn_have=${_mvn_counts#* }
@@ -2936,6 +3115,29 @@ process.stderr.write('[build-prep] recorded ' + list.length + ' applied preproce
 PREPAPPLIED_JS
     node "$_pa" "$OUT" "$PREP_APPLIED" || log "prep-applied: recording skipped (non-fatal)"
     rm -f "$_pa"
+fi
+
+# Record that Maven read the user's local repository (bomlens:maven-user-repository
+# = read-only) and whether it ran offline (bomlens:maven-offline: "probe" when
+# the repository did not answer and -o was added, "settings" when the user's
+# own settings or MVN_ARGS already asked for it, "false" otherwise).
+if [ "${rc:-1}" -eq 0 ] && [ -n "$MAVEN_USER_REPO" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _mu=$(mktemp).js
+    cat > "$_mu" <<'MAVEN_USER_REPO_JS'
+const fs = require('fs');
+const [bomPath, offline] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || [])
+  .filter(p => p.name !== 'bomlens:maven-user-repository' && p.name !== 'bomlens:maven-offline');
+props.push({ name: 'bomlens:maven-user-repository', value: 'read-only' });
+props.push({ name: 'bomlens:maven-offline', value: offline || 'false' });
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+MAVEN_USER_REPO_JS
+    node "$_mu" "$OUT" "$MAVEN_USER_REPO_OFFLINE" || log "maven: recording the user repository on the SBOM skipped (non-fatal)"
+    rm -f "$_mu"
 fi
 
 # Install-directory filter. cdxgen 13.3.x and later (the nightly-rebuilt v13
@@ -4947,7 +5149,7 @@ fi
 # whenever that does not resolve, including when relativePath is absent
 # entirely -- the parent's own group/artifact/version looked up in this run's
 # own local repository, populated as a side effect of cdxgen's own Maven
-# resolve above. Maven itself needs every ancestor's pom to compute an
+# resolve above, or in the user's Maven local repository when it is mounted. Maven itself needs every ancestor's pom to compute an
 # effective POM, so the chain is there to read, offline, no `mvn` invocation
 # needed either way.
 #
@@ -4967,7 +5169,9 @@ if [ "${rc:-1}" -eq 0 ] && [ -f pom.xml ] && [ -f "$OUT" ] && command -v node >/
     cat > "$_mlic" <<'MLIC_JS'
 const fs = require('fs');
 const path = require('path');
-const [bomPath, m2Root] = process.argv.slice(2);
+// The local repositories POMs are read from, in order: this run's own, then
+// the user's (read-only) when it is mounted.
+const [bomPath, ...m2Roots] = process.argv.slice(2);
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components)) process.exit(0);
@@ -5047,8 +5251,10 @@ const MAX_PARENT_DEPTH = 10;
 // deterministically: group with dots turned to path segments, then
 // artifact/version/artifact-version.pom, no classifier.
 function m2PomPath(gav) {
-  return path.join(m2Root, ...gav.group.split('.'), gav.artifact, gav.version,
+  const rel = path.join(...gav.group.split('.'), gav.artifact, gav.version,
     gav.artifact + '-' + gav.version + '.pom');
+  const found = m2Roots.map(root => path.join(root, rel)).find(p => fs.existsSync(p));
+  return found || path.join(m2Roots[0], rel);
 }
 function locationKey(loc) {
   return loc.dir ? 'dir:' + path.resolve(loc.dir)
@@ -5166,7 +5372,7 @@ if (filled) {
   process.stderr.write('[build-prep] maven: inherited a parent POM license for ' + filled + ' component(s)\n');
 }
 MLIC_JS
-    node "$_mlic" "$OUT" "$MAVEN_REPO_LOCAL" || log "maven: parent-POM license inheritance skipped (non-fatal)"
+    node "$_mlic" "$OUT" "$MAVEN_REPO_LOCAL" ${MAVEN_USER_REPO:+"$MAVEN_USER_REPO"} || log "maven: parent-POM license inheritance skipped (non-fatal)"
     rm -f "$_mlic"
 fi
 

@@ -7184,6 +7184,151 @@ STUB
         && pass "build-prep's first Gradle run sees the mounted gradle.properties, removed when the scan ends" \
         || fail "Gradle settings around build-prep's own Gradle run" "calls=[$(cat "$_sg/gradle-calls" 2>/dev/null)] $(grep gradle "$_sg/log" | head -5)"
 fi
+
+echo "== stage1-user-repository: the user's Maven local repository, read-only, offline only when needed =="
+# Which folder the CLI, the web UI and the plan's caller mount (source-detect.sh).
+_ur="$WORK/ur"; rm -rf "$_ur"; mkdir -p "$_ur/h1/.m2/repository" "$_ur/h2/.m2" "$_ur/h2/alt" "$_ur/h3/.m2/repository"
+printf '<settings>\n  <!-- <localRepository>/commented/out</localRepository> -->\n  <localRepository>\n    ${user.home}/alt\n  </localRepository>\n</settings>\n' > "$_ur/h2/.m2/settings.xml"
+mkdir -p "$_ur/h3/.m2"; printf '<settings><localRepository>/does/not/exist</localRepository></settings>\n' > "$_ur/h3/.m2/settings.xml"
+_ur_list() { env -u BOMLENS_MAVEN_USER_REPOSITORY bash -c '. "$1/docker/lib/source-detect.sh"; shift; "$@"' _ "$ROOT_DIR" "$@"; }
+{ [ "$(_ur_list maven_user_repository "$_ur/h1")" = "$_ur/h1/.m2/repository" ] \
+    && [ "$(_ur_list maven_user_repository "$_ur/h2")" = "$_ur/h2/alt" ] \
+    && [ -z "$(_ur_list maven_user_repository "$_ur/h3")" ] \
+    && [ -z "$(_ur_list maven_user_repository "$_ur/none")" ] \
+    && [ -z "$(BOMLENS_MAVEN_USER_REPOSITORY=false bash -c '. "$1/docker/lib/source-detect.sh"; maven_user_repository "$2"' _ "$ROOT_DIR" "$_ur/h1")" ]; } \
+    && pass "the mounted folder is <localRepository> from settings.xml (outside comments, \${user.home} filled in), else ~/.m2/repository; a missing folder or the opt-out mounts nothing" \
+    || fail "maven_user_repository" "h1=[$(_ur_list maven_user_repository "$_ur/h1")] h2=[$(_ur_list maven_user_repository "$_ur/h2")] h3=[$(_ur_list maven_user_repository "$_ur/h3")]"
+mkdir -p "$_ur/h4/.m2" "$_ur/h4/a\$b"; printf '<settings><localRepository>%s</localRepository></settings>\n' "$_ur/h4/a\$b" > "$_ur/h4/.m2/settings.xml"
+mkdir -p "$_ur/h5/.m2"; printf '<settings><localRepository>${env.M2}/repo</localRepository></settings>\n' > "$_ur/h5/.m2/settings.xml"
+{ [ -z "$(_ur_list maven_user_repository "$_ur/h4")" ] && [ -z "$(_ur_list maven_user_repository "$_ur/h5")" ]; } \
+    && pass "a <localRepository> holding \$ (spliced into an eval'd command) or another property is not mounted" \
+    || fail "maven_user_repository took a path it should refuse"
+grep -q 'maven_user_repository)"' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && [ "$(grep -c ':$MAVEN_USER_REPOSITORY_TARGET:ro' "$ROOT_DIR/scripts/scan-sbom.sh")" = 2 ] \
+    && grep -q 'role: "maven-repository", target: "/bomlens-settings/m2/repository", mode: "ro", optional: true' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && grep -q '^BUILD_PREP_ENV_NAMES=".* BOMLENS_MAVEN_USER_REPOSITORY[ "]' "$ROOT_DIR/docker/lib/source-detect.sh" \
+    && pass "the CLI scan and the web UI mount it read-only, the plan offers the maven-repository role, and the opt-out reaches stage 1" \
+    || fail "user repository mounts or env name"
+
+# build-prep.sh's settings block, with a stub node standing in for the probe:
+# it records its arguments and the proxy it was given, and answers as told.
+if [ -n "$_ss_block" ]; then
+    _ub="$WORK/ub"; rm -rf "$_ub"; mkdir -p "$_ub/root/m2/repository/com/x" "$_ub/bin" "$_ub/proj" "$_ub/empty/m2/repository"
+    : > "$_ub/proj/pom.xml"
+    cat > "$_ub/bin/node" <<'STUB'
+#!/bin/sh
+echo "args=$* proxy=${HTTPS_PROXY:-}" >> "$UB_CALLS"
+[ "$UB_PROBE" = down ] || exit 0
+echo "repo.example:443	it could not be reached (ENOTFOUND)"
+exit 1
+STUB
+    chmod +x "$_ub/bin/node"
+    _ub_run() {  # <settings root> <probe: up|down> [env...]
+        _ub_r="$1"; _ub_p="$2"; shift 2
+        : > "$_ub/calls"
+        (cd "$_ub/proj" && env "$@" PATH="$_ub/bin:$PATH" UB_CALLS="$_ub/calls" UB_PROBE="$_ub_p" PREP_SETTINGS_ROOT="$_ub_r" \
+            MAVEN_OPTS="-Dmaven.repo.local=/x" MAVEN_ARGS="" MVN_ARGS="" HTTPS_PROXY="" \
+            bash -c 'log() { echo "LOG $*"; }; '"$_ss_block"'; echo "ARGS=$MAVEN_ARGS"; echo "MVN=$MVN_ARGS"; echo "CMD=$MAVEN_SETTINGS_ARGS"; echo "CACHE=${MAVEN_CACHE_DIR:-}"; echo "OFF=$MAVEN_USER_REPO_OFFLINE"')
+    }
+    _ub_tail="-Dmaven.repo.local.tail=$_ub/root/m2/repository"
+    _ub_out=$(_ub_run "$_ub/root" up)
+    { printf '%s\n' "$_ub_out" | grep -qx "ARGS=$_ub_tail" && printf '%s\n' "$_ub_out" | grep -qx "MVN=$_ub_tail" \
+        && printf '%s\n' "$_ub_out" | grep -qx "CMD=$_ub_tail" && printf '%s\n' "$_ub_out" | grep -qx "CACHE=$_ub/root/m2/repository" \
+        && printf '%s\n' "$_ub_out" | grep -qx "OFF=" && grep -q 'https://repo.maven.apache.org/maven2/' "$_ub/calls"; } \
+        && pass "with the repository mounted every Maven gets maven.repo.local.tail, cdxgen MAVEN_CACHE_DIR, and no -o when Maven Central answers" \
+        || fail "user repository, repository reachable" "$_ub_out calls=$(cat "$_ub/calls")"
+    _ub_out=$(_ub_run "$_ub/root" down)
+    { printf '%s\n' "$_ub_out" | grep -qx "ARGS=$_ub_tail -o" && printf '%s\n' "$_ub_out" | grep -qx "MVN=$_ub_tail -o" \
+        && printf '%s\n' "$_ub_out" | grep -qx "CMD=$_ub_tail -o" && printf '%s\n' "$_ub_out" | grep -qx "OFF=probe" \
+        && printf '%s\n' "$_ub_out" | grep -q 'LOG maven: offline mode (-o): repo.example:443: it could not be reached (ENOTFOUND)'; } \
+        && pass "-o is added, with one log line naming the host and the cause, only when the repository does not answer" \
+        || fail "user repository, repository unreachable" "$_ub_out"
+    cp -R "$_ub/root" "$_ub/mirror"
+    cat > "$_ub/mirror/m2/settings.xml" <<'XML'
+<settings>
+  <!-- <mirrors><mirror><url>https://commented.example/</url></mirror></mirrors> -->
+  <mirrors>
+    <mirror><id>corp</id><mirrorOf>*</mirrorOf><url> https://nexus.corp.example/repository/maven-public/ </url></mirror>
+    <mirror><id>second</id><mirrorOf>x</mirrorOf><url>https://second.example/</url></mirror>
+  </mirrors>
+  <proxies>
+    <proxy><id>off</id><active>false</active><host>off.example</host><port>1</port></proxy>
+    <proxy><id>on</id><protocol>http</protocol><host>proxy.corp.example</host><port>3128</port></proxy>
+  </proxies>
+</settings>
+XML
+    _ub_out=$(_ub_run "$_ub/mirror" up)
+    grep -q 'https://nexus.corp.example/repository/maven-public/ proxy=http://proxy.corp.example:3128$' "$_ub/calls" \
+        && pass "the probe asks the first <mirror> of the mounted settings.xml through its active <proxy>" \
+        || fail "probe target" "calls=$(cat "$_ub/calls")"
+    printf '<settings><offline>true</offline></settings>\n' > "$_ub/mirror/m2/settings.xml"
+    _ub_out=$(_ub_run "$_ub/mirror" down)
+    { [ ! -s "$_ub/calls" ] && printf '%s\n' "$_ub_out" | grep -qx "OFF=settings" && ! printf '%s\n' "$_ub_out" | grep -q -- ' -o$'; } \
+        && pass "settings that already run Maven offline are not probed, and no second -o is added" \
+        || fail "offline settings" "$_ub_out calls=$(cat "$_ub/calls")"
+    _ub_out=$(_ub_run "$_ub/root" down BOMLENS_MAVEN_USER_REPOSITORY=false)
+    { printf '%s\n' "$_ub_out" | grep -qx "ARGS=" && printf '%s\n' "$_ub_out" | grep -qx "CACHE=" && [ ! -s "$_ub/calls" ] \
+        && printf '%s\n' "$_ub_out" | grep -q 'LOG maven: BOMLENS_MAVEN_USER_REPOSITORY=false'; } \
+        && pass "BOMLENS_MAVEN_USER_REPOSITORY=false leaves a mounted repository unused" \
+        || fail "opt-out in stage 1" "$_ub_out"
+    _ub_out=$(_ub_run "$_ub/empty" down)
+    { printf '%s\n' "$_ub_out" | grep -qx "ARGS=" && [ ! -s "$_ub/calls" ] && printf '%s\n' "$_ub_out" | grep -q 'LOG maven: the mounted Maven local repository is empty'; } \
+        && pass "an empty mount (a folder the engine does not share) is not used" \
+        || fail "empty user repository" "$_ub_out"
+    rm -f "$_ub/proj/pom.xml"
+    _ub_out=$(_ub_run "$_ub/root" down)
+    { printf '%s\n' "$_ub_out" | grep -qx "ARGS=" && [ ! -s "$_ub/calls" ]; } \
+        && pass "a tree without a pom.xml is left alone (no probe)" \
+        || fail "no pom.xml" "$_ub_out"
+fi
+
+# The whole script, offline: the jar count and the parent-POM licence step find
+# what only the user's repository holds, and the SBOM records both properties.
+if command -v node >/dev/null 2>&1; then
+    _uf="$WORK/uf"; rm -rf "$_uf"; mkdir -p "$_uf/bin" "$_uf/src" "$_uf/out" "$_uf/home" "$_uf/root/m2"
+    _uf_repo="$_uf/root/m2/repository"; mkdir -p "$_uf_repo/com/x/lib/1.0" "$_uf_repo/com/x/parent/1"
+    : > "$_uf_repo/com/x/lib/1.0/lib-1.0.jar"
+    printf '<project><parent><groupId>com.x</groupId><artifactId>parent</artifactId><version>1</version></parent><artifactId>lib</artifactId><version>1.0</version></project>\n' > "$_uf_repo/com/x/lib/1.0/lib-1.0.pom"
+    printf '<project><groupId>com.x</groupId><artifactId>parent</artifactId><version>1</version><licenses><license><name>Apache-2.0</name></license></licenses></project>\n' > "$_uf_repo/com/x/parent/1/parent-1.pom"
+    # A mirror nothing listens on: refused at once, so the run is offline.
+    printf '<settings><mirrors><mirror><id>m</id><mirrorOf>*</mirrorOf><url>http://127.0.0.1:59999/maven2/</url></mirror></mirrors></settings>\n' > "$_uf/root/m2/settings.xml"
+    printf '<project><groupId>com.app</groupId><artifactId>app</artifactId><version>1</version></project>\n' > "$_uf/src/pom.xml"
+    cat > "$_uf/bin/mvn" <<'STUB'
+#!/bin/sh
+echo "$*" >> "$UF_CALLS"
+for a in "$@"; do case "$a" in -DoutputFile=*) printf '   com.x:lib:jar:1.0:compile\n' > "${a#-DoutputFile=}" ;; esac; done
+exit 0
+STUB
+    cat > "$_uf/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+echo "MVN_ARGS=$MVN_ARGS MAVEN_CACHE_DIR=$MAVEN_CACHE_DIR" >> "$UF_CALLS"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"app","bom-ref":"pkg:maven/com.app/app@1"}},"components":[{"type":"library","group":"com.x","name":"lib","version":"1.0","purl":"pkg:maven/com.x/lib@1.0","bom-ref":"pkg:maven/com.x/lib@1.0","scope":"required"}],"dependencies":[{"ref":"pkg:maven/com.app/app@1","dependsOn":["pkg:maven/com.x/lib@1.0"]}]}\n' > "$out"
+STUB
+    chmod +x "$_uf/bin/mvn" "$_uf/bin/cdxgen"
+    env -u MAVEN_OPTS -u MAVEN_ARGS -u MVN_ARGS -u BOMLENS_MAVEN_USER_REPOSITORY -u HTTPS_PROXY -u https_proxy -u HTTP_PROXY -u http_proxy PATH="$_uf/bin:$PATH" HOME="$_uf/home" \
+        UF_CALLS="$_uf/calls" PREP_SETTINGS_ROOT="$_uf/root" BOMLENS_MAVEN_PROBE_TIMEOUT=3 FETCH_LICENSE=false \
+        sh "$PREP" "$_uf/src" "$_uf/out/bom.json" > "$_uf/log" 2>&1
+    _uf_tail="-Dmaven.repo.local.tail=$_uf_repo"
+    { grep -q -- "$_uf_tail -o" "$_uf/calls" && grep -q "MVN_ARGS=.*$_uf_tail -o MAVEN_CACHE_DIR=$_uf_repo" "$_uf/calls"; } \
+        && pass "the jar fetch and cdxgen run with the tail and -o when the mirror does not answer" \
+        || fail "Maven calls offline" "$(cat "$_uf/calls" 2>/dev/null)"
+    grep -q 'maven: fetched dependency jars for component hashes (1 of 1 in the local repository)' "$_uf/log" \
+        && pass "a jar only the user's repository holds counts as there" \
+        || fail "jar count" "$(grep 'maven:' "$_uf/log" | head -5)"
+    [ "$(jq -r '.components[] | select(.name=="lib") | .licenses[0].license.name' "$_uf/out/bom.json" 2>/dev/null)" = "Apache-2.0" ] \
+        && pass "the parent-POM licence step reads POMs from the user's repository" \
+        || fail "parent POM licence from the user repository" "$(jq -c '.components' "$_uf/out/bom.json" 2>/dev/null)"
+    [ "$(jq -c '[.metadata.properties[]? | select(.name|test("^bomlens:maven-(user-repository|offline)$")) | .value]' "$_uf/out/bom.json" 2>/dev/null)" = '["read-only","probe"]' ] \
+        && pass "the SBOM records bomlens:maven-user-repository=read-only and bomlens:maven-offline=probe" \
+        || fail "user repository properties" "$(jq -c '.metadata.properties' "$_uf/out/bom.json" 2>/dev/null)"
+    find "$_uf_repo" -newer "$_uf/root/m2/settings.xml" -type f | grep -q . \
+        && fail "build-prep wrote into the user's repository" "$(find "$_uf_repo" -newer "$_uf/root/m2/settings.xml" -type f)" \
+        || pass "nothing is written into the user's repository"
+else
+    echo "  SKIP: node unavailable, skipping the offline user-repository run"
+fi
 grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
     && pass "build-prep hands the mounted cache folders back to HOST_UID" \
     || fail "build-prep does not chown the cache mounts"

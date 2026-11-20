@@ -55,7 +55,7 @@ PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 EXTRA_CA_ENV_NAMES="BOMLENS_EXTRA_CA_CERTS"
 # shellcheck disable=SC2034  # read by scan-sbom.sh
 EXTRA_CA_TARGET="/bomlens-ca/extra.pem"
-BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_NO_AI_USAGE BOMLENS_AI_USAGE_TIMEOUT BOMLENS_PREP_TIMEOUT BOMLENS_LICENSE_PROBE_TIMEOUT BOMLENS_LICENSE_FETCH_TIMEOUT BOMLENS_BUILD_TOOL"
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_NO_AI_USAGE BOMLENS_AI_USAGE_TIMEOUT BOMLENS_PREP_TIMEOUT BOMLENS_LICENSE_PROBE_TIMEOUT BOMLENS_LICENSE_FETCH_TIMEOUT BOMLENS_BUILD_TOOL BOMLENS_MAVEN_USER_REPOSITORY"
 
 # Settings for the network the post-processing container reaches: the proxy,
 # where Trivy gets its vulnerability database (a mirror, or a cache with the
@@ -127,6 +127,61 @@ build_prep_env_args() {
     local n out=""
     for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES) $EXTRA_CA_ENV_NAMES; do out="$out -e $n"; done
     printf '%s' "${out# }"
+}
+
+# Where stage 1 finds this machine's Maven local repository (the
+# maven-repository mount role), read-only. build-prep.sh has Maven read it
+# after BomLens's own repository (maven.repo.local.tail), and never writes it.
+# shellcheck disable=SC2034  # read by scan-sbom.sh
+MAVEN_USER_REPOSITORY_TARGET="/bomlens-settings/m2/repository"
+
+# maven_user_repository [home]: this user's Maven local repository, for the
+# mount above. It is <localRepository> in <home>/.m2/settings.xml when that
+# names one (outside XML comments; ${user.home} is filled in), else
+# <home>/.m2/repository. Printed only when it is a folder that exists, and
+# nothing when BOMLENS_MAVEN_USER_REPOSITORY is false or 0. A
+# <localRepository> that uses another property or is not an absolute path is
+# not guessed at. A path holding a quote, $, ` or backslash is not printed
+# either: the CLI splices it into an eval'd docker command. On Git Bash a
+# Windows path (C:\...) is turned into its POSIX form with cygpath.
+maven_user_repository() {
+    local home="${1:-$HOME}" settings repo=""
+    case "${BOMLENS_MAVEN_USER_REPOSITORY:-}" in false|0) return 0 ;; esac
+    [ -n "$home" ] || return 0
+    settings="$home/.m2/settings.xml"
+    if [ -f "$settings" ]; then
+        repo="$(awk 'BEGIN { RS = "\001" }
+            {
+                s = $0; out = ""
+                while ((i = index(s, "<!--")) > 0) {
+                    out = out substr(s, 1, i - 1); s = substr(s, i + 4)
+                    j = index(s, "-->"); if (j == 0) { s = ""; break }
+                    s = substr(s, j + 3)
+                }
+                out = out s
+                if (match(out, /<localRepository>[^<]*<\/localRepository>/)) {
+                    v = substr(out, RSTART + 17, RLENGTH - 35)
+                    gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", v)
+                    print v
+                }
+            }' "$settings" 2>/dev/null)"
+    fi
+    if [ -n "$repo" ]; then
+        # shellcheck disable=SC2016  # a literal Maven property, not a shell one
+        repo="${repo//'${user.home}'/$home}"
+        case "$repo" in *'${'*) return 0 ;; esac
+        case "$repo" in
+            [A-Za-z]:[\\/]*)
+                command -v cygpath >/dev/null 2>&1 || return 0
+                repo="$(cygpath -u -- "$repo" 2>/dev/null)" || return 0 ;;
+        esac
+        case "$repo" in /*) ;; *) return 0 ;; esac
+    else
+        repo="$home/.m2/repository"
+    fi
+    case "$repo" in *[\"\$\`\\]*) return 0 ;; esac
+    [ -d "$repo" ] || return 0
+    printf '%s\n' "$repo"
 }
 
 # The SBOM_TRIVY_CACHE folder as "-v <host path>:/trivy-cache -e TRIVY_CACHE_DIR"
