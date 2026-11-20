@@ -54,6 +54,19 @@ find_named() {
         -o -type f -name "$1" -print 2>/dev/null | sort
 }
 
+# Xcode keeps the Package.resolved of a project that has a Package.swift in the
+# project or the workspace bundle (<name>.xcodeproj/project.xcworkspace/
+# xcshareddata/swiftpm/, <name>.xcworkspace/xcshareddata/swiftpm/), not beside
+# Package.swift. cdxgen and SwiftPM read it from there, so it is the lock file.
+xcode_lock() { # <dir> <lock name>: prints the first one found
+    local x
+    for x in "$1"/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/"$2" \
+             "$1"/*.xcworkspace/xcshareddata/swiftpm/"$2"; do
+        if [ -f "$x" ]; then printf '%s' "$x"; return 0; fi
+    done
+    return 1
+}
+
 # A manifest that declares dependencies, with no lock file next to it.
 check_pair() { # <manifest name> <lock name> <grep -E pattern showing a declared dependency>
     local f d
@@ -61,6 +74,7 @@ check_pair() { # <manifest name> <lock name> <grep -E pattern showing a declared
         [ -n "$f" ] || continue
         d="$(dirname "$f")"
         [ -f "$d/$2" ] && continue
+        if [ "$2" = Package.resolved ] && xcode_lock "$d" "$2" >/dev/null; then continue; fi
         grep -Eq "$3" "$f" 2>/dev/null || continue
         add_missing "$(rel "$f"): no $2"
     done <<EOF
@@ -79,6 +93,8 @@ while IFS= read -r f; do
     fi
 done <<EOF
 $(find_named Package.resolved)
+$(find "$SRC" -maxdepth 6 \( -name .git -o -name node_modules -o -name Pods -o -name Carthage -o -name vendor -o -name build -o -name .build -o -name DerivedData -o -name target \) -prune \
+    -o -type f -path '*.xc*/xcshareddata/swiftpm/Package.resolved' -print 2>/dev/null | sort)
 EOF
 for name in package-lock.json composer.lock; do
     while IFS= read -r f; do
