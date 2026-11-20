@@ -11107,8 +11107,10 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
 # mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
 # BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
+# BOMLENS_PYTHON_VENV_READER: the web UI path copies the venv reader next to
+# the prep file and sets its path itself.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
