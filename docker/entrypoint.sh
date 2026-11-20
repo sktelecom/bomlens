@@ -590,6 +590,18 @@ generate_sbom_cdxgen() {
     # See write_prep_file above: build-prep.sh runs by path from the
     # guard-state mount; without that mount the scan stops with an error.
     local prep_file; prep_file=$(write_prep_file "$prep")
+    # read-python-venv.py goes beside it, for the same reason: it lives only
+    # in this image, and build-prep.sh reads a project's installed Python
+    # environment with it when the package index cannot be used.
+    local venv_reader="" venv_env=()
+    if [ -n "$prep_file" ] && [ -f "$LIBDIR/read-python-venv.py" ]; then
+        venv_reader="${prep_file%.sh}-venv.py"
+        if cp "$LIBDIR/read-python-venv.py" "$venv_reader" 2>/dev/null; then
+            venv_env=(-e "BOMLENS_PYTHON_VENV_READER=$venv_reader")
+        else
+            venv_reader=""
+        fi
+    fi
     # --reachability on Go: the sibling has the Go toolchain this image lacks,
     # so govulncheck runs there (build-prep.sh). The binary is copied into a
     # new folder of its own under the guard-state mount, which the sibling
@@ -635,6 +647,7 @@ generate_sbom_cdxgen() {
             "${prep_env[@]}" \
             "${guard_env[@]}" \
             "${reach_env[@]}" \
+            "${venv_env[@]}" \
             --entrypoint sh "$img" \
             "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
       else
@@ -698,7 +711,7 @@ generate_sbom_cdxgen() {
         # By name as well: the id may never have been read.
         [ -z "$cid" ] || docker rm -f "$cid" >/dev/null 2>&1
         docker rm -f "$sibling_name" >/dev/null 2>&1
-        rm -f "$logf" "$cidf" "$prep_file"
+        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
         local first="" first_img="$img" retry_img="$JAVA_RETRY_IMAGE"
         if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
             first=$(mktemp) || first=""
@@ -752,13 +765,13 @@ generate_sbom_cdxgen() {
             registry_failure_advice "$CDXGEN_FAIL_REASON" "$(scan_input_kind)"
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-        rm -f "$logf" "$cidf" "$prep_file"
+        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
         return 1
     fi
     # An SBOM written although the registry refused some downloads.
     [ ! -s "$bom_path" ] || registry_auth_hint "cdxgen" "$logf" "$(scan_input_kind)"
     [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-    rm -f "$logf" "$cidf" "$prep_file"
+    rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
         mv "$bom_path" "$outdir/$out"
     fi
@@ -805,7 +818,7 @@ mark_compositions_aggregate() {
     fi
     case "$SCAN_MODE" in
         SOURCE|POSTPROCESS)
-            info=$(jq -r --arg labels "npm-production-set pip-install go-mod-tidy cargo-lockfile bundle-lock swift-package-resolve gradle-dependencies android-release-classpath composer-install composer-lock-committed dotnet-lock-committed" '
+            info=$(jq -r --arg labels "npm-production-set pip-install python-environment go-mod-tidy cargo-lockfile bundle-lock swift-package-resolve gradle-dependencies android-release-classpath composer-install composer-lock-committed dotnet-lock-committed" '
                 ($labels | split(" ")) as $known
                 | (.metadata.properties // []) as $props
                 | ([$props[] | select(.name=="bomlens:prep-step-applied") | .value]) as $applied
@@ -814,8 +827,10 @@ mark_compositions_aggregate() {
                 # entries left out) is missing dependencies by construction,
                 # and so is one whose pins could not be resolved further, and a
                 # Maven project whose dependency tree could not be built
-                # (only the dependencies written in pom.xml are listed).
-                | ((($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0)
+                # (only the dependencies written in pom.xml are listed). An
+                # installed Python environment read with something it could
+                # not settle (bomlens:python-environment-unsure) is the same.
+                | ((($props | map(select(.name=="bomlens:sbom-tool-degraded" or .name=="bomlens:python-environment-unsure")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
                    or ($failed | index("gradle-packages") != null)

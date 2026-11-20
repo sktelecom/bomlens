@@ -86,6 +86,13 @@
       "fixEn": "Create the lock file with the package manager (for example npm install, pod install or swift package resolve), keep it in the project folder and scan again.",
       "fixKo": "패키지 관리 도구로 락 파일을 만들고(예: npm install, pod install, swift package resolve) 프로젝트 폴더에 둔 뒤 다시 스캔하세요."
     },
+    "installed-environment-unsure": {
+      "grade": "partial",
+      "en": "The Python dependencies were read from the project's installed environment instead of being resolved, and some of it could not be settled ({detail}), so a dependency may be listed that the product does not use, or one may be missing.",
+      "ko": "Python 의존성을 해석하지 못해 프로젝트에 설치된 가상 환경에서 읽었는데, 일부를 확정하지 못해({detail}) 제품이 쓰지 않는 의존성이 들어 있거나 빠진 의존성이 있을 수 있습니다.",
+      "fixEn": "Install the project's dependencies into the virtual environment again on the platform you ship (pip install -r requirements.txt), or let the scan reach the package index (SBOM_EXTRA_CA_CERTS for a proxy that inspects HTTPS), then scan again.",
+      "fixKo": "배포하는 플랫폼에서 가상 환경에 의존성을 다시 설치하거나(pip install -r requirements.txt), 스캔이 패키지 저장소에 접속할 수 있게 한 뒤(HTTPS를 검사하는 프록시라면 SBOM_EXTRA_CA_CERTS) 다시 스캔하세요."
+    },
     "lockfile-corrupt": {
       "grade": "partial",
       "en": "A lock file could not be read ({detail}), so the dependencies it lists are not in this SBOM.",

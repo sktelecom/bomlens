@@ -43,6 +43,9 @@ BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
 # cdxgen runs (see docker/lib/identify-conda.py's own header for why this
 # has to happen before cdxgen, not only in the stage-2 post-process step).
 IDENTIFY_CONDA="$REPO_DIR/docker/lib/identify-conda.py"
+# The same for read-python-venv.py, which reads a project's installed Python
+# environment when its package index cannot be used (build-prep.sh).
+READ_PYTHON_VENV="$REPO_DIR/docker/lib/read-python-venv.py"
 # shellcheck source=docker/lib/cdx-version.sh
 . "$REPO_DIR/docker/lib/cdx-version.sh"
 
@@ -3743,6 +3746,12 @@ GRADLE_USER_CACHE_EOF
     STAGE1_LOG=$(mktemp)
     echo "      (live log: $STAGE1_LOG; it is deleted when this stage succeeds, and kept when it fails)"
     STAGE1_CONTAINER="$RUNNING_CONTAINER_NAME"
+    # Mounted only when the file is there: a bundle without it would make
+    # Docker create an empty folder at that path on this machine.
+    VENV_READER_MOUNT=""
+    if [ -f "$READ_PYTHON_VENV" ]; then
+        VENV_READER_MOUNT="-v \"$(hostpath "$READ_PYTHON_VENV")\":/tmp/read-python-venv.py:ro"
+    fi
     eval "$DOCKER_MSYS"docker run -u 0:0 \
         --name "\"$RUNNING_CONTAINER_NAME\"" \
         --label bomlens.scan=cli \
@@ -3750,6 +3759,7 @@ GRADLE_USER_CACHE_EOF
         -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
         -v "\"$(hostpath "$BUILD_PREP")\"":/tmp/build-prep.sh:ro \
         -v "\"$(hostpath "$IDENTIFY_CONDA")\"":/tmp/identify-conda.py:ro \
+        $VENV_READER_MOUNT \
         $CACHE_MOUNTS \
         $GUARD_STATE_ARGS \
         -e HOME=/tmp/sbomhome \
@@ -4056,6 +4066,7 @@ EOF
     case "$STAGE1_DIGEST" in sha256:*[!0-9a-f]*|sha256:) STAGE1_DIGEST="" ;; esac
     STAGE1_FINGERPRINT_ENV=" -e BOMLENS_STAGE1_DIGEST=$STAGE1_DIGEST -e BOMLENS_STAGE1_PREP_SHA256=$(_fp_sha256 "$BUILD_PREP" 2>/dev/null)"
     STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_STAGE1_CONDA_SHA256=$(_fp_sha256 "$IDENTIFY_CONDA" 2>/dev/null) -e BOMLENS_STAGE1_CLI_SHA256=$(_fp_sha256 "${BASH_SOURCE[0]}" 2>/dev/null)"
+    STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_STAGE1_VENV_SHA256=$(_fp_sha256 "$READ_PYTHON_VENV" 2>/dev/null)"
     STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_STAGE1_SPEC_VERSION=$CDX_SPEC_VERSION -e FETCH_LICENSE=\"$FETCH_LICENSE\" -e HOST_GOTOOLCHAIN=\"$HOST_GOTOOLCHAIN\""
     for _n in $BUILD_PREP_ENV_NAMES; do
         [ "$_n" = BOMLENS_INCLUDE_NON_SHIPPED ] || STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e $_n"

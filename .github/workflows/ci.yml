@@ -334,6 +334,11 @@ jobs:
       - name: AI usage unit tests
         run: bash tests/test-ai-usage.sh
 
+      # No Docker, no network: a project's installed Python environment read
+      # when the package index cannot be used (hand-written dist-info folders).
+      - name: Installed Python environment tests
+        run: bash tests/test-python-venv.sh
+
       # No Docker, no network: AI BOMs written by other tools (k8s-aibom,
       # AIsbom, Cisco AI BOM, AIBoMGen CLI) through the G7 check.
       - name: External AI BOM tests
