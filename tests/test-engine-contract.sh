@@ -849,6 +849,8 @@ PY
 [ "$runner_drift" = ok ] && pass "the engine runner reads the plan and drops no env name" \
     || fail "the engine runner: $runner_drift" "add the names to runner/src/bomlens_runner/plan.py"
 cmp -s "$P/bomlens-plan/build-prep.sh" "$ROOT_DIR/docker/lib/build-prep.sh" && [ -f "$P/bomlens-plan/identify-conda.py" ] \
+    && cmp -s "$P/bomlens-plan/read-python-venv.py" "$ROOT_DIR/docker/lib/read-python-venv.py" \
+    && jq -e 'any(.stages[0].mounts[]; .role == "plan-file" and .target == "/tmp/read-python-venv.py" and .mode == "ro")' "$P/bomlens-plan.json" >/dev/null \
     && pass "the files stage 1 mounts are copied next to the plan" || fail "bomlens-plan/ holds: $(ls "$P/bomlens-plan" 2>&1)"
 [ "$(jq -r '.stages[1] | .image + " " + .env.MODE + " " + .env.BOMLENS_RUN_INPUT' "$P/bomlens-plan.json")" = "ghcr.io/example/bomlens:1 POSTPROCESS demo_1.0_bom.json" ] \
     && pass "stage 2 is this image in POSTPROCESS mode on stage 1's SBOM" || fail "stage 2: $(jq -c '.stages[1] | [.image, .env]' "$P/bomlens-plan.json")"
@@ -1294,6 +1296,7 @@ want_s2=""
 for kv in "BOMLENS_STAGE1_DIGEST=$NODE_DIGEST" \
           "BOMLENS_STAGE1_PREP_SHA256=$(shasum -a 256 < "$ROOT_DIR/docker/lib/build-prep.sh" | cut -d' ' -f1)" \
           "BOMLENS_STAGE1_CONDA_SHA256=$(shasum -a 256 < "$ROOT_DIR/docker/lib/identify-conda.py" | cut -d' ' -f1)" \
+          "BOMLENS_STAGE1_VENV_SHA256=$(shasum -a 256 < "$ROOT_DIR/docker/lib/read-python-venv.py" | cut -d' ' -f1)" \
           "BOMLENS_STAGE1_CLI_SHA256=$(shasum -a 256 < "$ROOT_DIR/scripts/scan-sbom.sh" | cut -d' ' -f1)" \
           "BOMLENS_STAGE1_SPEC_VERSION=1.6"; do
     grep -qxF -- "$kv" "$CMP/argv.stage2" 2>/dev/null || want_s2="$want_s2 $kv"
@@ -2182,12 +2185,13 @@ run_engine "$P" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FPB" BOMLENS_STAGE1_EXIT=0 
 cli_env=(BOMLENS_STAGE1_DIGEST="$(jq -r '.stages[0].image_digest' "$PA/bomlens-plan.json")"
     BOMLENS_STAGE1_PREP_SHA256="$(shasum -a 256 < "$ROOT_DIR/docker/lib/build-prep.sh" | cut -d' ' -f1)"
     BOMLENS_STAGE1_CONDA_SHA256="$(shasum -a 256 < "$ROOT_DIR/docker/lib/identify-conda.py" | cut -d' ' -f1)"
+    BOMLENS_STAGE1_VENV_SHA256="$(shasum -a 256 < "$ROOT_DIR/docker/lib/read-python-venv.py" | cut -d' ' -f1)"
     BOMLENS_STAGE1_CLI_SHA256="$(shasum -a 256 < "$ROOT_DIR/scripts/scan-sbom.sh" | cut -d' ' -f1)"
     BOMLENS_STAGE1_SPEC_VERSION=1.6 FETCH_LICENSE=true)
 D="$(new_run fp-cli)"
 run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FPA" BOMLENS_STAGE1_EXIT=0 "${cli_env[@]}"
 g="$(jq -c '[.steps[] | select(.id == "generate")][0]' "$D/bomlens-result.json" 2>/dev/null)"
-[ "$(jq -c '[.input_fingerprint.reusable, .reused, ([.input_fingerprint.components[] | select(.kind == "engine") | .name] | sort)]' <<<"$g")" = '[true,false,["build-prep.sh","identify-conda.py","scan-sbom.sh"]]' ] \
+[ "$(jq -c '[.input_fingerprint.reusable, .reused, ([.input_fingerprint.components[] | select(.kind == "engine") | .name] | sort)]' <<<"$g")" = '[true,false,["build-prep.sh","identify-conda.py","read-python-venv.py","scan-sbom.sh"]]' ] \
     && [ "$(jq -r '.input_fingerprint.components[] | select(.kind == "engine" and .name == "build-prep.sh") | .sha256' <<<"$g")" = "${cli_env[1]#*=}" ] \
     && pass "the CLI path records the files and image the CLI says stage 1 ran, and reused is false" \
     || fail "CLI path: $(jq -c '.input_fingerprint | [.reusable, .reasons, [.components[] | select(.kind != "file")]]' <<<"$g")" "$(tail -5 "$D.log")"

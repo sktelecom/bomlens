@@ -2153,6 +2153,277 @@ GRADLE_SAME_NAME_JS
         export GRADLE_ARGS_DEPENDENCIES="$_gsame_args"
     fi
 fi
+
+# --- licence lookup probe ---
+# With FETCH_LICENSE on, cdxgen asks each package's registry for the licence,
+# description and repository a lock file left open. Without a route to the
+# registry, every request waits for its own time limit and is retried: measured
+# on a 143-package npm lock file with --network none, cdxgen had not finished
+# after 22 minutes (9 s with FETCH_LICENSE=false and the same components and
+# licences, which the lock file carries). So the registries this tree's
+# ecosystems use are asked once first, with a short time limit, and when one
+# does not answer cdxgen runs with FETCH_LICENSE=false: one switch covers every
+# ecosystem in cdxgen, so it cannot be turned off for the unreachable one alone.
+# Licences a lock file or package manifest carries are read either way.
+#
+# The hosts are the ones cdxgen 13.5 asks, with the override it reads
+# (ecosystems/ecosystems.js, docs/ENV.md). npm: an unscoped package is looked up
+# at NPM_URL, not at the registry an .npmrc names; a scope .npmrc maps to its own
+# registry is looked up there and is not probed here. Swift: the licence comes
+# from the GitHub repository API. The probe is Node's fetch, so the CA bundle
+# cdxgen trusts (NODE_EXTRA_CA_CERTS, set by extra_ca_trust above) applies to it
+# as well, and the proxy variables cdxgen honours (NODE_USE_ENV_PROXY). Any HTTP
+# answer, an error status included, counts as reachable.
+LICENSE_PROBE_TIMEOUT="${BOMLENS_LICENSE_PROBE_TIMEOUT:-6}"
+case "$LICENSE_PROBE_TIMEOUT" in ""|*[!0-9]*|0) LICENSE_PROBE_TIMEOUT=6 ;; esac
+
+# The registry URLs of the ecosystems found in the current directory, one per line.
+license_lookup_urls() {
+    _llu_found="$(find . \( -name .git -o -name node_modules -o -name Pods -o -name vendor -o -name .build \) -prune -o -type f \
+        \( -name package.json -o -name package-lock.json -o -name npm-shrinkwrap.json -o -name yarn.lock -o -name pnpm-lock.yaml \
+           -o -name 'bun.lock' -o -name 'bun.lockb' \
+           -o -name 'requirements*.txt' -o -name pyproject.toml -o -name Pipfile -o -name Pipfile.lock -o -name poetry.lock \
+           -o -name uv.lock -o -name setup.py -o -name setup.cfg \
+           -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name '*.sbt' \
+           -o -name go.mod -o -name Cargo.toml -o -name Cargo.lock \
+           -o -name Gemfile -o -name Gemfile.lock -o -name '*.gemspec' \
+           -o -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' -o -name packages.config -o -name packages.lock.json \
+           -o -name pubspec.yaml -o -name pubspec.lock -o -name Package.swift -o -name Package.resolved \) \
+        -print 2>/dev/null | sed 's|.*/||' | LC_ALL=C sort -u)"
+    [ -n "$_llu_found" ] || return 0
+    printf '%s\n' "$_llu_found" | while IFS= read -r _llu_f; do
+        case "$_llu_f" in
+            package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml|bun.lock|bun.lockb)
+                echo "${NPM_URL:-https://registry.npmjs.org/}" ;;
+            requirements*.txt|pyproject.toml|Pipfile|Pipfile.lock|poetry.lock|uv.lock|setup.py|setup.cfg)
+                echo "${PYPI_URL:-https://pypi.org/pypi/}" ;;
+            pom.xml|build.gradle|build.gradle.kts|*.sbt)
+                echo "${MAVEN_CENTRAL_URL:-https://repo1.maven.org/maven2/}" ;;
+            go.mod) echo "${GO_PKG_URL:-https://pkg.go.dev/}" ;;
+            Cargo.toml|Cargo.lock) echo "${RUST_CRATES_URL:-https://crates.io/api/v1/crates/}" ;;
+            Gemfile|Gemfile.lock|*.gemspec) echo "${RUBYGEMS_V1_URL:-https://rubygems.org/api/v1/gems/}" ;;
+            *.csproj|*.fsproj|*.vbproj|packages.config|packages.lock.json)
+                echo "${NUGET_URL:-https://api.nuget.org/v3/index.json}" ;;
+            pubspec.yaml|pubspec.lock) echo "${PUB_DEV_URL:-https://pub.dev}" ;;
+            Package.swift|Package.resolved) echo "${GITHUB_API_URL:-https://api.github.com}" ;;
+        esac
+    done | LC_ALL=C sort -u
+}
+
+# registry_probe <url>...: ask each URL once (HEAD, LICENSE_PROBE_TIMEOUT
+# seconds each, all at once). Returns 3 when one did not answer, with
+# REGISTRY_PROBE_HOST and REGISTRY_PROBE_WHY naming the first such host and the
+# cause in words; 0 when every one answered, and also when the probe cannot run
+# (no node, or a node without fetch), so a caller never acts on a guess.
+registry_probe() {
+    REGISTRY_PROBE_HOST=""; REGISTRY_PROBE_WHY=""
+    command -v node >/dev/null 2>&1 || return 0
+    [ "$#" -gt 0 ] || return 0
+    _rp_js="$(mktemp)" || return 0
+    cat > "$_rp_js" <<'LICENSE_PROBE_JS'
+const [limit, ...urls] = process.argv.slice(2);
+if (typeof fetch !== "function" || typeof AbortSignal.timeout !== "function") process.exit(0);
+const CERT = new Set(["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "UNABLE_TO_GET_ISSUER_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "CERT_UNTRUSTED", "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID", "ERR_TLS_CERT_ALTNAME_INVALID", "CERT_SIGNATURE_FAILURE"]);
+const cause = (err) => {
+  if (err && (err.name === "TimeoutError" || err.name === "AbortError")) return { kind: "timeout", code: "" };
+  let e = err;
+  while (e && e.cause && !e.code) e = e.cause;
+  const code = (e && e.code) || "";
+  if (CERT.has(code)) return { kind: "certificate", code };
+  return { kind: "unreachable", code: code || (e && e.message) || String(err) };
+};
+const probe = async (url) => {
+  let host = url;
+  try { host = new URL(url).host; } catch (e) { return null; }
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(Number(limit) * 1000),
+      headers: { "user-agent": "bomlens-license-probe" } });
+    try { await res.body?.cancel(); } catch (e) { /* nothing to read */ }
+    return null;
+  } catch (err) {
+    return { host, ...cause(err) };
+  }
+};
+Promise.all(urls.map(probe)).then((results) => {
+  const bad = results.find(Boolean);
+  if (!bad) process.exit(0);
+  process.stdout.write(bad.kind + "\t" + bad.host + "\t" + bad.code + "\n");
+  process.exit(3);
+});
+LICENSE_PROBE_JS
+    # Every request ends at its own limit (AbortSignal.timeout) and the script
+    # exits once all have, so node does not outlive the slowest of them.
+    _rp_out="$(NODE_USE_ENV_PROXY=1 node "$_rp_js" "$LICENSE_PROBE_TIMEOUT" "$@" 2>/dev/null)"
+    _rp_rc=$?
+    rm -f "$_rp_js"
+    if [ "$_rp_rc" -eq 0 ] || [ -z "$_rp_out" ]; then
+        return 0
+    fi
+    _rp_kind="$(printf '%s' "$_rp_out" | cut -f1)"
+    REGISTRY_PROBE_HOST="$(printf '%s' "$_rp_out" | cut -f2)"
+    _rp_code="$(printf '%s' "$_rp_out" | cut -f3 | tr -cd 'A-Za-z0-9_ .:-' | cut -c1-120)"
+    case "$_rp_kind" in
+        timeout) REGISTRY_PROBE_WHY="it did not answer within ${LICENSE_PROBE_TIMEOUT}s" ;;
+        certificate)
+            # The same advice as tls_trust_hint in source-detect.sh.
+            if [ -n "${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+                REGISTRY_PROBE_WHY="its TLS certificate was not trusted ($_rp_code) even with the CA bundle in SBOM_EXTRA_CA_CERTS; check that the bundle holds the root CA your proxy signs with"
+            else
+                REGISTRY_PROBE_WHY="its TLS certificate was not trusted ($_rp_code); if a proxy inspects HTTPS, set SBOM_EXTRA_CA_CERTS to its CA bundle (PEM)"
+            fi ;;
+        *) REGISTRY_PROBE_WHY="it could not be reached${_rp_code:+ ($_rp_code)}" ;;
+    esac
+    return 3
+}
+
+# Ask each registry once. On the first that does not answer, FETCH_LICENSE is
+# set to false (exported, so cdxgen sees it), the host and the cause are logged
+# and license-fetch is recorded as a failed step on the SBOM. Returns 0 in every
+# case: a scan is never stopped by the probe. No node, or a node without fetch,
+# leaves the lookup as it was.
+license_lookup_probe() {
+    case "${FETCH_LICENSE:-}" in true|1) ;; *) return 0 ;; esac
+    command -v node >/dev/null 2>&1 || return 0
+    _llp_urls="$(license_lookup_urls)"
+    [ -n "$_llp_urls" ] || return 0
+    # One URL per word: none of the defaults or the overrides holds a space.
+    set -f
+    # shellcheck disable=SC2086
+    registry_probe $_llp_urls
+    _llp_rc=$?
+    set +f
+    [ "$_llp_rc" -eq 0 ] && return 0
+    log "license-fetch: registry license lookup off (FETCH_LICENSE=false), $REGISTRY_PROBE_HOST: $REGISTRY_PROBE_WHY; licenses in lock files and package manifests are still read"
+    FETCH_LICENSE=false
+    export FETCH_LICENSE
+    mark_prep_failed license-fetch
+    return 0
+}
+# --- end licence lookup probe ---
+
+# --- installed python environment ---
+# A project that resolves from a company package index cannot be resolved here
+# (no credentials, a proxy that inspects TLS), but the developer's own build has
+# usually installed everything already, in .venv/ or venv/ beside the code (or
+# the one other top-level folder holding a pyvenv.cfg). Each installed package
+# keeps its name, version, licence fields and requirements in a *.dist-info
+# folder there. When such an environment is present and resolving cannot work,
+# because the package index does not answer the probe or `pip install` failed,
+# read-python-venv.py lists what the project's declared dependencies reach
+# through those requirements (a tool installed beside them, pytest for one,
+# drops out) and that is the Python part of the SBOM: cdxgen's python cataloger
+# is left out, so it does not try to install either. Otherwise nothing changes.
+# The environment is only read: nothing in it is run (its python may be a
+# macOS or Windows one) and nothing is written there. The SBOM records the
+# folder (bomlens:python-environment), why it was read
+# (bomlens:python-environment-reason: index-unreachable or pip-install-failed)
+# and what could not be settled (bomlens:python-environment-unsure).
+# BOMLENS_PYTHON_VENV=false (or 0) turns it off.
+PY_VENV_READER="${BOMLENS_PYTHON_VENV_READER:-/tmp/read-python-venv.py}"
+PY_VENV_DIR=""; PY_VENV_SITE=""; PY_VENV_USED=""; PY_VENV_REASON=""; PY_VENV_SBOM=""
+
+# Sets PY_VENV_DIR (relative) and PY_VENV_SITE (its site-packages folders,
+# colon-separated) when the tree has an installed environment.
+python_venv_find() {
+    case "${BOMLENS_PYTHON_VENV:-}" in
+        false|0)
+            if [ -f .venv/pyvenv.cfg ] || [ -f venv/pyvenv.cfg ]; then
+                log "python: the installed environment is not read (BOMLENS_PYTHON_VENV=false)"
+            fi
+            return 0 ;;
+    esac
+    command -v python3 >/dev/null 2>&1 || return 0
+    # conda takes the python cataloger's place below; the two are not mixed.
+    if [ -f environment.yml ] || [ -f environment.yaml ]; then return 0; fi
+    if [ ! -f "$PY_VENV_READER" ]; then
+        if [ -f .venv/pyvenv.cfg ] || [ -f venv/pyvenv.cfg ]; then
+            log "python: an installed environment is here, but read-python-venv.py was not handed to this container; it is not read"
+        fi
+        return 0
+    fi
+    _pvf="$(python3 -I "$PY_VENV_READER" find "$SRC" 2>/dev/null)" || return 0
+    PY_VENV_DIR="$(printf '%s\n' "$_pvf" | sed -n 1p)"
+    PY_VENV_SITE="$(printf '%s\n' "$_pvf" | sed -n '2,$p' | tr '\n' ':' | sed 's/:$//')"
+    [ -n "$PY_VENV_SITE" ] || PY_VENV_DIR=""
+}
+
+# The package index pip would use: an --index-url in requirements.txt, then
+# PIP_INDEX_URL, then index-url in a pip configuration file in this container,
+# else PyPI. A login in the URL is dropped: any answer counts as reachable, a
+# refusal included, so the probe never needs it.
+python_index_url() {
+    _piu=""
+    if [ -f requirements.txt ]; then
+        _piu="$(sed -n -E 's/^[[:space:]]*(-i|--index-url)[[:space:]=]+([^[:space:]]+).*/\2/p' requirements.txt 2>/dev/null | head -n 1)"
+    fi
+    [ -n "$_piu" ] || _piu="${PIP_INDEX_URL:-}"
+    if [ -z "$_piu" ]; then
+        for _pic in "${PIP_CONFIG_FILE:-}" "${HOME:-/root}/.config/pip/pip.conf" "${HOME:-/root}/.pip/pip.conf" /etc/pip.conf /etc/xdg/pip/pip.conf; do
+            [ -n "$_pic" ] && [ -f "$_pic" ] || continue
+            _piu="$(sed -n -E 's/^[[:space:]]*index[-_]url[[:space:]]*=[[:space:]]*([^[:space:]]+).*/\1/p' "$_pic" 2>/dev/null | head -n 1)"
+            [ -n "$_piu" ] && break
+        done
+    fi
+    case "$_piu" in http://*|https://*) ;; *) _piu="https://pypi.org/simple/" ;; esac
+    printf '%s\n' "$_piu" | sed -E 's#^(https?://)[^/@]*@#\1#'
+}
+
+# python_venv_use <reason> <why>: read the environment into PY_VENV_SBOM.
+# Returns 1, with one line saying why, when it holds nothing to use.
+python_venv_use() {
+    _pvu_dir="$(mktemp -d 2>/dev/null)" || return 1
+    PY_VENV_SBOM="$_pvu_dir/venv.cdx.json"
+    _pvu_ns=""
+    [ -n "$EXCLUDE_NON_SHIPPED" ] && _pvu_ns="$NON_SHIPPED_DIRS"
+    _pvu_out="$(BOMLENS_NON_SHIPPED_DIRS="$_pvu_ns" CYCLONEDX_SPEC_VERSION="$SPEC" \
+        python3 -I "$PY_VENV_READER" read "$SRC" "$PY_VENV_DIR" "$PY_VENV_SBOM" 2>"$_pvu_dir/err")"
+    _pvu_rc=$?
+    if [ "$_pvu_rc" -ne 0 ] || [ ! -s "$PY_VENV_SBOM" ]; then
+        log "python: $2, but the installed environment $PY_VENV_DIR/ is not used: $(head -n 1 "$_pvu_dir/err" 2>/dev/null)"
+        rm -rf "$_pvu_dir"
+        PY_VENV_SBOM=""
+        return 1
+    fi
+    _pvu_kept="$(printf '%s' "$_pvu_out" | cut -f1)"
+    _pvu_all="$(printf '%s' "$_pvu_out" | cut -f2)"
+    _pvu_unsure="$(printf '%s' "$_pvu_out" | cut -f4-)"
+    PY_VENV_USED=1
+    PY_VENV_REASON="$1"
+    BOMLENS_PYTHON_VENV_SITE="$PY_VENV_SITE"
+    export BOMLENS_PYTHON_VENV_SITE
+    log "python: reading the installed environment $PY_VENV_DIR/ ($2): kept $_pvu_kept of $_pvu_all installed package(s), the ones the declared dependencies reach${_pvu_unsure:+; not settled: $_pvu_unsure}"
+    mark_prep_applied python-environment
+    return 0
+}
+
+# Before pip install: find the environment and, when there is one, probe the
+# package index; one that does not answer means the environment is read.
+python_venv_before_pip() {
+    python_venv_find
+    [ -n "$PY_VENV_DIR" ] || return 0
+    if ! registry_probe "$(python_index_url)"; then
+        python_venv_use index-unreachable "the package index $REGISTRY_PROBE_HOST did not answer, $REGISTRY_PROBE_WHY"
+    fi
+    return 0
+}
+
+# After pip install: a failed install (pip-install in PREP_FAILED) means the
+# environment is read, and the failure is taken off the SBOM, since its Python
+# part no longer comes from that install.
+python_venv_after_pip() {
+    if [ -z "$PY_VENV_DIR" ] || [ -n "$PY_VENV_USED" ]; then return 0; fi
+    case " $PREP_FAILED " in
+        *" pip-install "*)
+            if python_venv_use pip-install-failed "pip install failed"; then
+                unmark_prep_failed pip-install
+            fi ;;
+    esac
+    return 0
+}
+# --- end installed python environment ---
+
 # Python — install the requirements so transitive deps are visible
 # (requirements.txt without a lockfile) and so the license-evidence pass near the
 # end of this script has real dist-info metadata to read.
@@ -2295,11 +2566,16 @@ PYEOF
     esac
 fi
 
-if [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
+# An installed environment is read instead when the package index does not
+# answer (pip is then not run: offline it retries every requirement) or when
+# pip install fails (see the installed python environment section above).
+python_venv_before_pip
+if [ -z "$PY_VENV_USED" ] && [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
     log "pip install requirements"
     prep_step pip-install "$PREP_TIMEOUT_DEFAULT" sh "$_pip_script"
 fi
 rm -f "$_pip_script"
+python_venv_after_pip
 
 # Swift / SPM — cdxgen reads Package.resolved for the resolved graph, and parses it
 # offline (verified: both the v1 `object.pins` and v2 top-level `pins` formats). Only run
@@ -2576,6 +2852,12 @@ if [ -n "$CONDA_ENV_FILE" ] && command -v python3 >/dev/null 2>&1; then
         fi
     fi
 fi
+# The installed Python environment stands in for the python cataloger (see
+# the installed python environment section above).
+if [ -n "$PY_VENV_USED" ]; then
+    log "python: cdxgen's python cataloger left out; the installed environment $PY_VENV_DIR/ is read instead"
+    set -- "$@" --exclude-type python
+fi
 # Non-shipped trees: leave out manifests under test, fixture, example,
 # benchmark and demo folders, the GitHub Actions workflows and the Gradle
 # wrapper -- none of it ships with the product. NON_SHIPPED_DIRS/EXCLUDE_NON_SHIPPED are defined
@@ -2716,139 +2998,8 @@ FIX_LIC_JS
 }
 fix_lic_mapping
 
-# --- licence lookup probe ---
-# With FETCH_LICENSE on, cdxgen asks each package's registry for the licence,
-# description and repository a lock file left open. Without a route to the
-# registry, every request waits for its own time limit and is retried: measured
-# on a 143-package npm lock file with --network none, cdxgen had not finished
-# after 22 minutes (9 s with FETCH_LICENSE=false and the same components and
-# licences, which the lock file carries). So the registries this tree's
-# ecosystems use are asked once first, with a short time limit, and when one
-# does not answer cdxgen runs with FETCH_LICENSE=false: one switch covers every
-# ecosystem in cdxgen, so it cannot be turned off for the unreachable one alone.
-# Licences a lock file or package manifest carries are read either way.
-#
-# The hosts are the ones cdxgen 13.5 asks, with the override it reads
-# (ecosystems/ecosystems.js, docs/ENV.md). npm: an unscoped package is looked up
-# at NPM_URL, not at the registry an .npmrc names; a scope .npmrc maps to its own
-# registry is looked up there and is not probed here. Swift: the licence comes
-# from the GitHub repository API. The probe is Node's fetch, so the CA bundle
-# cdxgen trusts (NODE_EXTRA_CA_CERTS, set by extra_ca_trust above) applies to it
-# as well, and the proxy variables cdxgen honours (NODE_USE_ENV_PROXY). Any HTTP
-# answer, an error status included, counts as reachable.
-LICENSE_PROBE_TIMEOUT="${BOMLENS_LICENSE_PROBE_TIMEOUT:-6}"
-case "$LICENSE_PROBE_TIMEOUT" in ""|*[!0-9]*|0) LICENSE_PROBE_TIMEOUT=6 ;; esac
-
-# The registry URLs of the ecosystems found in the current directory, one per line.
-license_lookup_urls() {
-    _llu_found="$(find . \( -name .git -o -name node_modules -o -name Pods -o -name vendor -o -name .build \) -prune -o -type f \
-        \( -name package.json -o -name package-lock.json -o -name npm-shrinkwrap.json -o -name yarn.lock -o -name pnpm-lock.yaml \
-           -o -name 'bun.lock' -o -name 'bun.lockb' \
-           -o -name 'requirements*.txt' -o -name pyproject.toml -o -name Pipfile -o -name Pipfile.lock -o -name poetry.lock \
-           -o -name uv.lock -o -name setup.py -o -name setup.cfg \
-           -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name '*.sbt' \
-           -o -name go.mod -o -name Cargo.toml -o -name Cargo.lock \
-           -o -name Gemfile -o -name Gemfile.lock -o -name '*.gemspec' \
-           -o -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' -o -name packages.config -o -name packages.lock.json \
-           -o -name pubspec.yaml -o -name pubspec.lock -o -name Package.swift -o -name Package.resolved \) \
-        -print 2>/dev/null | sed 's|.*/||' | LC_ALL=C sort -u)"
-    [ -n "$_llu_found" ] || return 0
-    printf '%s\n' "$_llu_found" | while IFS= read -r _llu_f; do
-        case "$_llu_f" in
-            package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml|bun.lock|bun.lockb)
-                echo "${NPM_URL:-https://registry.npmjs.org/}" ;;
-            requirements*.txt|pyproject.toml|Pipfile|Pipfile.lock|poetry.lock|uv.lock|setup.py|setup.cfg)
-                echo "${PYPI_URL:-https://pypi.org/pypi/}" ;;
-            pom.xml|build.gradle|build.gradle.kts|*.sbt)
-                echo "${MAVEN_CENTRAL_URL:-https://repo1.maven.org/maven2/}" ;;
-            go.mod) echo "${GO_PKG_URL:-https://pkg.go.dev/}" ;;
-            Cargo.toml|Cargo.lock) echo "${RUST_CRATES_URL:-https://crates.io/api/v1/crates/}" ;;
-            Gemfile|Gemfile.lock|*.gemspec) echo "${RUBYGEMS_V1_URL:-https://rubygems.org/api/v1/gems/}" ;;
-            *.csproj|*.fsproj|*.vbproj|packages.config|packages.lock.json)
-                echo "${NUGET_URL:-https://api.nuget.org/v3/index.json}" ;;
-            pubspec.yaml|pubspec.lock) echo "${PUB_DEV_URL:-https://pub.dev}" ;;
-            Package.swift|Package.resolved) echo "${GITHUB_API_URL:-https://api.github.com}" ;;
-        esac
-    done | LC_ALL=C sort -u
-}
-
-# Ask each registry once. On the first that does not answer, FETCH_LICENSE is
-# set to false (exported, so cdxgen sees it), the host and the cause are logged
-# and license-fetch is recorded as a failed step on the SBOM. Returns 0 in every
-# case: a scan is never stopped by the probe. No node, or a node without fetch,
-# leaves the lookup as it was.
-license_lookup_probe() {
-    case "${FETCH_LICENSE:-}" in true|1) ;; *) return 0 ;; esac
-    command -v node >/dev/null 2>&1 || return 0
-    _llp_urls="$(license_lookup_urls)"
-    [ -n "$_llp_urls" ] || return 0
-    _llp_js="$(mktemp)" || return 0
-    cat > "$_llp_js" <<'LICENSE_PROBE_JS'
-const [limit, ...urls] = process.argv.slice(2);
-if (typeof fetch !== "function" || typeof AbortSignal.timeout !== "function") process.exit(0);
-const CERT = new Set(["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "UNABLE_TO_GET_ISSUER_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
-  "SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "CERT_UNTRUSTED", "CERT_HAS_EXPIRED",
-  "CERT_NOT_YET_VALID", "ERR_TLS_CERT_ALTNAME_INVALID", "CERT_SIGNATURE_FAILURE"]);
-const cause = (err) => {
-  if (err && (err.name === "TimeoutError" || err.name === "AbortError")) return { kind: "timeout", code: "" };
-  let e = err;
-  while (e && e.cause && !e.code) e = e.cause;
-  const code = (e && e.code) || "";
-  if (CERT.has(code)) return { kind: "certificate", code };
-  return { kind: "unreachable", code: code || (e && e.message) || String(err) };
-};
-const probe = async (url) => {
-  let host = url;
-  try { host = new URL(url).host; } catch (e) { return null; }
-  try {
-    const res = await fetch(url, { method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(Number(limit) * 1000),
-      headers: { "user-agent": "bomlens-license-probe" } });
-    try { await res.body?.cancel(); } catch (e) { /* nothing to read */ }
-    return null;
-  } catch (err) {
-    return { host, ...cause(err) };
-  }
-};
-Promise.all(urls.map(probe)).then((results) => {
-  const bad = results.find(Boolean);
-  if (!bad) process.exit(0);
-  process.stdout.write(bad.kind + "\t" + bad.host + "\t" + bad.code + "\n");
-  process.exit(3);
-});
-LICENSE_PROBE_JS
-    # Every request ends at its own limit (AbortSignal.timeout) and the script
-    # exits once all have, so node does not outlive the slowest of them.
-    # One URL per word: none of the defaults or the overrides holds a space.
-    set -f
-    # shellcheck disable=SC2086
-    _llp_out="$(NODE_USE_ENV_PROXY=1 node "$_llp_js" "$LICENSE_PROBE_TIMEOUT" $_llp_urls 2>/dev/null)"
-    _llp_rc=$?
-    set +f
-    rm -f "$_llp_js"
-    if [ "$_llp_rc" -eq 0 ] || [ -z "$_llp_out" ]; then
-        return 0
-    fi
-    _llp_kind="$(printf '%s' "$_llp_out" | cut -f1)"
-    _llp_host="$(printf '%s' "$_llp_out" | cut -f2)"
-    _llp_code="$(printf '%s' "$_llp_out" | cut -f3 | tr -cd 'A-Za-z0-9_ .:-' | cut -c1-120)"
-    case "$_llp_kind" in
-        timeout) _llp_why="it did not answer within ${LICENSE_PROBE_TIMEOUT}s" ;;
-        certificate)
-            # The same advice as tls_trust_hint in source-detect.sh.
-            if [ -n "${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
-                _llp_why="its TLS certificate was not trusted ($_llp_code) even with the CA bundle in SBOM_EXTRA_CA_CERTS; check that the bundle holds the root CA your proxy signs with"
-            else
-                _llp_why="its TLS certificate was not trusted ($_llp_code); if a proxy inspects HTTPS, set SBOM_EXTRA_CA_CERTS to its CA bundle (PEM)"
-            fi ;;
-        *) _llp_why="it could not be reached${_llp_code:+ ($_llp_code)}" ;;
-    esac
-    log "license-fetch: registry license lookup off (FETCH_LICENSE=false), $_llp_host: $_llp_why; licenses in lock files and package manifests are still read"
-    FETCH_LICENSE=false
-    export FETCH_LICENSE
-    mark_prep_failed license-fetch
-    return 0
-}
-# --- end licence lookup probe ---
+# The licence lookup probe (defined ahead of the Python section, which probes
+# the package index with the same function).
 license_lookup_probe
 
 # A Swift tree (Package.swift, a committed Package.resolved or an Xcode project):
@@ -2916,6 +3067,23 @@ elif [ "$rc" -eq 124 ]; then
     log "cdxgen: stopped after ${PREP_TIMEOUT_DEFAULT}s on a Swift tree (a dependency clone that does not finish is the usual cause); raise BOMLENS_PREP_TIMEOUT to wait longer"
 fi
 
+# The installed Python environment read above: its packages and their graph
+# are added to cdxgen's SBOM, linked from the project root, with the folder and
+# the reason recorded on the SBOM.
+if [ -n "$PY_VENV_USED" ]; then
+    if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ]; then
+        if _pvm_n="$(python3 -I "$PY_VENV_READER" merge "$OUT" "$PY_VENV_SBOM" "$PY_VENV_DIR" "$PY_VENV_REASON")"; then
+            log "python: $_pvm_n package(s) from the installed environment $PY_VENV_DIR/ added to the SBOM"
+        else
+            log "python: the installed environment could not be added to the SBOM (non-fatal)"
+        fi
+    else
+        log "python: cdxgen wrote no SBOM (rc=${rc:-1}); the installed environment $PY_VENV_DIR/ is not added"
+    fi
+    rm -rf "$(dirname "$PY_VENV_SBOM")"
+    rm -f "$OUT.venv.tmp"
+fi
+
 # Poetry with no lock file, second half. With pyproject.toml present cdxgen
 # takes the Poetry route (`poetry install`, which this image lacks) and never
 # reads the requirements.txt written above for the dependency tree: the pins
@@ -2928,7 +3096,7 @@ fi
 # when that run fails or finds nothing (no network, for one) the SBOM stays as
 # the first run left it and poetry-graph is recorded as failed, so the graph is
 # not declared complete. Not when conda took over the python cataloger above.
-if [ -n "${POETRY_REQUIREMENTS_WRITTEN:-}" ] && [ "${CONDA_N:-0}" -eq 0 ] 2>/dev/null \
+if [ -n "${POETRY_REQUIREMENTS_WRITTEN:-}" ] && [ "${CONDA_N:-0}" -eq 0 ] 2>/dev/null && [ -z "$PY_VENV_USED" ] \
    && [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] \
    && [ -f requirements.txt ] && command -v node >/dev/null 2>&1; then
     mark_prep_applied poetry-graph
@@ -5964,9 +6132,13 @@ def decide(ev):
 # distributions() walks sys.path, so it finds what pip installed here and what
 # the image already had, in either metadata layout. Reading the site-packages
 # directories by hand missed both: a package the image ships can sit outside
-# them, and an older install records .egg-info rather than .dist-info.
+# them, and an older install records .egg-info rather than .dist-info. When the
+# project's own installed environment was read (BOMLENS_PYTHON_VENV_SITE, its
+# site-packages folders), its metadata comes first: those are the packages the
+# SBOM lists.
+venv_site = [p for p in os.environ.get("BOMLENS_PYTHON_VENV_SITE", "").split(":") if p]
 index = {}
-for dist in distributions():
+for dist in list(distributions(path=venv_site) if venv_site else []) + list(distributions()):
     ev = evidence(dist)
     if ev:
         index.setdefault((canon(ev["name"]), ev["version"]), ev)
@@ -6607,8 +6779,11 @@ def dist_files(dist):
         pass
     return found[:MAX_FILES]
 
+# The project's installed environment first, when it was read (see the
+# licence evidence pass above).
+venv_site = [p for p in os.environ.get("BOMLENS_PYTHON_VENV_SITE", "").split(":") if p]
 index = {}
-for dist in distributions():
+for dist in list(distributions(path=venv_site) if venv_site else []) + list(distributions()):
     try:
         name, version = dist.metadata.get("Name"), dist.metadata.get("Version")
     except Exception:

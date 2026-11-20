@@ -13,7 +13,8 @@
 # script decides everything about them that BomLens decides (which image, at
 # which digest, with which arguments, mounts and environment) and writes it to
 # <output-dir>/bomlens-plan.json; the caller only runs what it says. The files
-# stage 1 needs from this image (build-prep.sh, identify-conda.py) are copied
+# stage 1 needs from this image (build-prep.sh, identify-conda.py,
+# read-python-venv.py) are copied
 # to <output-dir>/bomlens-plan/ so the caller can mount them. The format is
 # schemas/engine-plan-1.json, documented in docs/reference/engine-contract.md.
 #
@@ -52,6 +53,7 @@ fi
 mkdir -p "$OUTDIR/bomlens-plan"
 cp "$LIBDIR/build-prep.sh" "$OUTDIR/bomlens-plan/build-prep.sh"
 cp "$LIBDIR/identify-conda.py" "$OUTDIR/bomlens-plan/identify-conda.py"
+cp "$LIBDIR/read-python-venv.py" "$OUTDIR/bomlens-plan/read-python-venv.py"
 
 # Byte-stable output asks for no network license lookup in stage 1, as the CLI
 # sets it. GOTOOLCHAIN reaches build-prep.sh as HOST_GOTOOLCHAIN (inside the
@@ -128,6 +130,7 @@ jq -n \
             {role: "output", target: "/out", mode: "rw"},
             {role: "plan-file", source: "bomlens-plan/build-prep.sh", target: "/tmp/build-prep.sh", mode: "ro"},
             {role: "plan-file", source: "bomlens-plan/identify-conda.py", target: "/tmp/identify-conda.py", mode: "ro"},
+            {role: "plan-file", source: "bomlens-plan/read-python-venv.py", target: "/tmp/read-python-venv.py", mode: "ro"},
             {role: "guard-state", target: "/bomlens-state", mode: "rw", optional: true},
             {role: "cache-maven", target: "/tmp/sbomhome/.m2", mode: "rw", optional: true},
             {role: "maven-settings", target: "/bomlens-settings/m2/settings.xml", mode: "ro", optional: true},

@@ -76,6 +76,7 @@ input_fingerprint_plan() {
     _fp_run "$1" "$2" "$4" plan-unsupported "$5" "$6" "$7" \
         --image "stage1=$3" --image "bomlens=${BOMLENS_IMAGE_DIGEST:-}" \
         --engine-file "build-prep.sh=$8/build-prep.sh" --engine-file "identify-conda.py=$8/identify-conda.py" \
+        --engine-file "read-python-venv.py=$8/read-python-venv.py" \
         --engine-file "make-plan.sh=$_FP_LIBDIR/make-plan.sh"
 }
 
@@ -89,7 +90,8 @@ input_fingerprint_plan() {
 #     result differs from the plan's own value, plan_mismatch is true.
 #   - Otherwise (the CLI's stage 2): what the CLI says it ran, in
 #     BOMLENS_STAGE1_DIGEST (the image's RepoDigest), BOMLENS_STAGE1_PREP_SHA256,
-#     BOMLENS_STAGE1_CONDA_SHA256, BOMLENS_STAGE1_CLI_SHA256 (scan-sbom.sh, which
+#     BOMLENS_STAGE1_CONDA_SHA256, BOMLENS_STAGE1_VENV_SHA256,
+#     BOMLENS_STAGE1_CLI_SHA256 (scan-sbom.sh, which
 #     sets stage 1's arguments there) and BOMLENS_STAGE1_SPEC_VERSION, with the
 #     run's own output folder inside the source left out of the tree
 #     (BOMLENS_FINGERPRINT_EXCLUDE; that makes the result not reusable, since
@@ -128,6 +130,7 @@ input_fingerprint_for_run() {
             --image "stage1=${BOMLENS_STAGE1_DIGEST:-}" --image "bomlens=${BOMLENS_IMAGE_DIGEST:-}" \
             --engine-sha "build-prep.sh=${BOMLENS_STAGE1_PREP_SHA256:-}" \
             --engine-sha "identify-conda.py=${BOMLENS_STAGE1_CONDA_SHA256:-}" \
+            --engine-sha "read-python-venv.py=${BOMLENS_STAGE1_VENV_SHA256:-}" \
             --engine-sha "scan-sbom.sh=${BOMLENS_STAGE1_CLI_SHA256:-}" \
             --exclude-dir "${BOMLENS_FINGERPRINT_EXCLUDE:-}")" || fp=""
         [ -n "$fp" ] || fp="$INPUT_FINGERPRINT_UNAVAILABLE"

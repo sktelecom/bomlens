@@ -209,7 +209,7 @@ jobs:
           tar -czf release-assets/bomlens-cli-linux.tar.gz \
             scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
             docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
-            docker/android/Dockerfile $LICENSE_FILES
+            docker/lib/read-python-venv.py docker/android/Dockerfile $LICENSE_FILES
 
           # Windows runtime bundle: both launchers, the orchestration script,
           # and the host-side lib files above. sbom-ui.bat is self-contained
@@ -223,7 +223,7 @@ jobs:
             scripts/check-setup.bat scripts/bomlens.settings.example.txt \
             docker/lib/source-detect.sh docker/lib/build-prep.sh \
             docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
-            docker/android/Dockerfile $LICENSE_FILES
+            docker/lib/read-python-venv.py docker/android/Dockerfile $LICENSE_FILES
 
           # Examples
           # shellcheck disable=SC2086

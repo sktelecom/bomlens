@@ -45,6 +45,9 @@
 #                                                 (resolution-failed)
 #   bomlens:lockfile-missing, bomlens:lockfile-corrupt (detect-lockfile-state.sh),
 #   bomlens:source:versionPinning=unpinned        (lockfile-missing, lockfile-corrupt)
+#   bomlens:python-environment-unsure             (installed-environment-unsure: the Python
+#                                                 part was read from an installed environment
+#                                                 and some of it could not be settled)
 #   components of a package ecosystem no vulnerability source covers
 #                                                 (unchecked-ecosystem)
 #
@@ -104,6 +107,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
             and (prop("bomlens:lockfile-missing") | length == 0)
           then ["락 파일 없이 버전 범위만 선언됨"] else [] end)) as $nolock_ko
   | ([ prop("bomlens:lockfile-corrupt")[] | clean(200) ]) as $corrupt
+  | (prop("bomlens:python-environment-unsure") | first // null) as $venv_unsure
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
   | ((.metadata.component.type // "") | IN("machine-learning-model", "data")) as $model_root
@@ -119,6 +123,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),
       (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200]), detailKo: ($nolock_ko | join("; ") | .[0:200])} else empty end),
       (if ($corrupt | length) > 0 then {code: "lockfile-corrupt", detail: ($corrupt | join("; ") | .[0:200])} else empty end),
+      (if $venv_unsure != null then {code: "installed-environment-unsure", detail: ($venv_unsure | clean(200))} else empty end),
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
     | map(. as $r | ($R.reasons[$r.code]) as $d
