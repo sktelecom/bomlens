@@ -606,6 +606,20 @@ gradle_settings_remove() {
     gradle_settings_unlock
 }
 
+# The lock files written for a Node.js tree installed with no lock file
+# committed ("Node.js installed on this machine" below), absolute paths, one per
+# line. Removed before the tree is handed back, and by the exit traps.
+NODE_INSTALLED_LOCKS=""
+NODE_INSTALLED_LOCK_SOURCES="" # the installed lock files read, relative to $SRC, one per line
+NODE_INSTALLED_ROOT=""         # npm or pnpm when the scan root's own lock is one of them
+node_installed_lock_remove() {
+    [ -n "$NODE_INSTALLED_LOCKS" ] || return 0
+    printf '%s\n' "$NODE_INSTALLED_LOCKS" | while IFS= read -r _nil_f; do
+        [ -n "$_nil_f" ] && rm -f "$_nil_f"
+    done
+    NODE_INSTALLED_LOCKS=""
+}
+
 mark_prep_applied() {
     case " $PREP_APPLIED " in
         *" $1 "*) ;;
@@ -776,9 +790,9 @@ guard_snapshot
 # gradle_settings_remove: the user's Gradle settings copied for this scan.
 # MAVEN_FALLBACK_DIR: the Maven unpacked for a refused pom.xml (Maven section).
 MAVEN_FALLBACK_DIR=""
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"' EXIT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 130' INT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 143' TERM
+trap 'stop_supervised; node_installed_lock_remove; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"' EXIT
+trap 'stop_supervised; node_installed_lock_remove; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 130' INT
+trap 'stop_supervised; node_installed_lock_remove; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
@@ -2620,6 +2634,184 @@ if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
     fi
 fi
 
+# --- node installed lock ---
+# Node.js installed on this machine with no lock file committed. npm 7 and later
+# write the lock file of what they installed to node_modules/.package-lock.json
+# (lockfile v2/v3 entries, without the root "" entry), and pnpm writes its lock
+# to node_modules/.pnpm/lock.yaml (the pnpm-lock.yaml format). cdxgen reads
+# neither: with no lock it runs `npm install` (which needs the registry) or, with
+# only node_modules, lists the installed packages with no dependency graph. So for
+# each package root with no lock file but one of those, a lock file is written
+# beside package.json for this run: a package-lock.json made of the installed
+# entries plus a root entry taken from package.json, or the pnpm lock copied as
+# pnpm-lock.yaml. It is removed again before the tree is handed back (and by the
+# exit trap). A lock that does not name every dependency package.json declares
+# (package.json changed after the install) is not used, and neither is one of a
+# workspace root (unverified). The installed lock records what was installed on
+# that machine, so the optional packages of other platforms (esbuild's and
+# rollup's per-platform builds) are not in it, unlike a committed lock.
+# BOMLENS_NODE_INSTALLED_LOCK=false (or 0) turns it off.
+# NODE_INSTALLED_LOCKS and node_installed_lock_remove are defined near the top of
+# this file, ahead of the exit traps.
+case "${BOMLENS_NODE_INSTALLED_LOCK:-}" in
+    false|0) _nil_on="" ; log "node: lock files written by npm or pnpm under node_modules are not read (BOMLENS_NODE_INSTALLED_LOCK=${BOMLENS_NODE_INSTALLED_LOCK})" ;;
+    *) _nil_on=1 ;;
+esac
+if [ -n "$_nil_on" ] && command -v node >/dev/null 2>&1 \
+   && [ -n "$(find . \( -name .git -o -name vendor \) -prune -o -type d -name node_modules -print -prune 2>/dev/null | head -n 1)" ]; then
+    _nil_js=$(mktemp).js
+    cat > "$_nil_js" <<'NODE_INSTALLED_LOCK_JS'
+// npm <package.json> <installed lock> <out>: writes a package-lock.json made of
+// the installed lock's entries and a root entry from package.json.
+// pnpm <package.json> <installed lock>: only checks the lock.
+// Exit 0 when done, 3 when the lock lacks a dependency package.json declares
+// (the names on stdout), 4 for a workspace lock, 5 when the lock file could not
+// be written, 1 for anything unreadable.
+const fs = require('fs');
+const [mode, pkgPath, lockPath, outPath] = process.argv.slice(2);
+const MAX = 64 * 1024 * 1024;
+let pkg, text;
+try {
+  pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  if (fs.statSync(lockPath).size > MAX) process.exit(1);
+  text = fs.readFileSync(lockPath, 'utf8');
+} catch (e) { process.exit(1); }
+if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) process.exit(1);
+const declared = Object.keys(pkg.dependencies && typeof pkg.dependencies === 'object' ? pkg.dependencies : {});
+const missing = names => {
+  const m = declared.filter(n => !names.has(n));
+  if (m.length) { process.stdout.write(m.join(' ') + '\n'); process.exit(3); }
+};
+if (mode === 'npm') {
+  let lock;
+  try { lock = JSON.parse(text); } catch (e) { process.exit(1); }
+  if (!lock || (lock.lockfileVersion !== 2 && lock.lockfileVersion !== 3)) process.exit(1);
+  const packages = lock.packages;
+  if (!packages || typeof packages !== 'object' || Array.isArray(packages)) process.exit(1);
+  // A workspace member is an entry outside node_modules (or a link to one).
+  for (const [k, v] of Object.entries(packages)) {
+    if (k === '') continue;
+    if (!k.startsWith('node_modules/') || (v && v.link)) process.exit(4);
+  }
+  missing(new Set(Object.keys(packages).filter(k => !k.slice(13).includes('node_modules/')).map(k => k.slice(13))));
+  const root = {};
+  for (const f of ['name', 'version', 'license', 'dependencies', 'devDependencies', 'optionalDependencies',
+                   'peerDependencies', 'peerDependenciesMeta', 'bin', 'engines', 'os', 'cpu']) {
+    if (pkg[f] !== undefined) root[f] = pkg[f];
+  }
+  const out = { lockfileVersion: lock.lockfileVersion, requires: true, packages: { '': root } };
+  if (typeof pkg.name === 'string') out.name = pkg.name;
+  if (typeof pkg.version === 'string') out.version = pkg.version;
+  for (const [k, v] of Object.entries(packages)) if (k !== '') out.packages[k] = v;
+  try { fs.writeFileSync(outPath, JSON.stringify(out, null, 2) + '\n', { flag: 'wx' }); } catch (e) { process.exit(5); }
+  process.exit(0);
+}
+if (mode === 'pnpm') {
+  const lines = text.split(/\r?\n/);
+  if (!lines.some(l => /^lockfileVersion:/.test(l))) process.exit(1);
+  // The project's own dependency names: under importers -> "." (lockfile 6 and
+  // later), else the top-level sections (lockfile 5).
+  const names = new Set();
+  const KEY = ind => new RegExp('^ {' + ind + '}([\'"]?)([^\'"\\s][^\'"]*?)\\1:(\\s|$)');
+  const SEC = ind => new RegExp('^ {' + ind + '}(dependencies|optionalDependencies|devDependencies):\\s*$');
+  const imp = lines.findIndex(l => /^importers:\s*$/.test(l));
+  let i = 0, end = lines.length, depth = 0;
+  if (imp >= 0) {
+    let j = imp + 1;
+    while (j < lines.length && !/^\S/.test(lines[j])) {
+      const m = KEY(2).exec(lines[j]);
+      if (m && m[2] !== '.') process.exit(4);
+      j++;
+    }
+    const dot = lines.findIndex((l, n) => n > imp && n < j && /^ {2}(['"]?)\.\1:\s*$/.test(l));
+    if (dot < 0) process.exit(1);
+    i = dot + 1; end = j; depth = 4;
+    for (let n = i; n < j; n++) if (/^ {2}\S/.test(lines[n])) { end = n; break; }
+  }
+  const secRe = SEC(depth), keyRe = KEY(depth + 2);
+  let inSec = false;
+  for (let n = i; n < end; n++) {
+    const l = lines[n];
+    if (secRe.test(l)) { inSec = true; continue; }
+    if (new RegExp('^ {0,' + depth + '}\\S').test(l)) { inSec = false; continue; }
+    if (!inSec) continue;
+    const m = keyRe.exec(l);
+    if (m) names.add(m[2]);
+  }
+  missing(names);
+  process.exit(0);
+}
+process.exit(1);
+NODE_INSTALLED_LOCK_JS
+    _nil_prune="-name .git -o -name node_modules -o -name vendor"
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _nil_d in $NON_SHIPPED_DIRS; do _nil_prune="$_nil_prune -o -name $_nil_d"; done
+    fi
+    _nil_roots=$(mktemp)
+    # shellcheck disable=SC2086  # _nil_prune is a list of find words with no glob characters
+    find . \( $_nil_prune \) -prune -o -type f -name package.json -print 2>/dev/null | LC_ALL=C sort > "$_nil_roots"
+    while IFS= read -r _nil_pj; do
+        [ -n "$_nil_pj" ] || continue
+        _nil_dir=$(dirname "$_nil_pj")
+        _nil_rel=${_nil_dir#./}; [ "$_nil_dir" = "." ] && _nil_rel=""
+        _nil_npm="$_nil_dir/node_modules/.package-lock.json"
+        _nil_pnpm="$_nil_dir/node_modules/.pnpm/lock.yaml"
+        [ -f "$_nil_npm" ] || [ -f "$_nil_pnpm" ] || continue
+        # A lock file here or in a folder above (a workspace root) is the authority.
+        _nil_locked=""
+        _nil_up="$_nil_dir"
+        while :; do
+            for _nil_lf in package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
+                [ -f "$_nil_up/$_nil_lf" ] && _nil_locked=1
+            done
+            [ -z "$_nil_locked" ] && [ "$_nil_up" != "." ] || break
+            _nil_up=$(dirname "$_nil_up")
+        done
+        [ -z "$_nil_locked" ] || continue
+        # Both present: the one written last is the install that counts.
+        _nil_kind=npm
+        if [ ! -f "$_nil_npm" ] || { [ -f "$_nil_pnpm" ] && [ "$_nil_pnpm" -nt "$_nil_npm" ]; }; then
+            _nil_kind=pnpm
+        fi
+        _nil_where="${_nil_rel:-the project root}"
+        _nil_rc=0
+        if [ "$_nil_kind" = npm ]; then
+            _nil_src="${_nil_rel:+$_nil_rel/}node_modules/.package-lock.json"
+            _nil_out="$_nil_dir/package-lock.json"
+            if node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(p && p.workspaces ? 0 : 1)' "$_nil_pj" 2>/dev/null; then
+                log "node: $_nil_where is an npm workspace root with no lock file; $_nil_src is not read (workspaces are not supported here)"
+                continue
+            fi
+            _nil_msg=$(node "$_nil_js" npm "$_nil_pj" "$_nil_npm" "$_nil_out" 2>/dev/null) || _nil_rc=$?
+        else
+            _nil_src="${_nil_rel:+$_nil_rel/}node_modules/.pnpm/lock.yaml"
+            _nil_out="$_nil_dir/pnpm-lock.yaml"
+            _nil_msg=$(node "$_nil_js" pnpm "$_nil_pj" "$_nil_pnpm" 2>/dev/null) || _nil_rc=$?
+        fi
+        case "$_nil_rc" in
+            0)
+                if [ "$_nil_kind" = pnpm ] && ! cp "$_nil_pnpm" "$_nil_out" 2>/dev/null; then
+                    rm -f "$_nil_out"
+                    log "node: could not place a lock file in $_nil_where; $_nil_src is not read"
+                    continue
+                fi
+                NODE_INSTALLED_LOCKS="${NODE_INSTALLED_LOCKS:+$NODE_INSTALLED_LOCKS
+}$SRC/${_nil_out#./}"
+                NODE_INSTALLED_LOCK_SOURCES="${NODE_INSTALLED_LOCK_SOURCES:+$NODE_INSTALLED_LOCK_SOURCES
+}$_nil_src"
+                [ -n "$_nil_rel" ] || NODE_INSTALLED_ROOT=$_nil_kind
+                mark_prep_applied "$_nil_kind-installed-lock"
+                log "node: no lock file in $_nil_where; reading the lock file $_nil_kind wrote at install ($_nil_src)" ;;
+            3) log "node: $_nil_src does not list $(printf '%s' "$_nil_msg" | cut -c1-200) from package.json (installed before package.json changed); not read. Run $_nil_kind install again, or commit the lock file" ;;
+            4) log "node: $_nil_src is the lock of a workspace; not read (workspaces are not supported here)" ;;
+            5) log "node: could not place a lock file in $_nil_where; $_nil_src is not read" ;;
+            *) log "node: $_nil_src could not be read; not used" ;;
+        esac
+    done < "$_nil_roots"
+    rm -f "$_nil_roots" "$_nil_js"
+fi
+# --- end node installed lock ---
+
 # Node (npm) — cdxgen reads package.json's devDependencies and pulls the whole dev
 # tree (jest/eslint/babel/prettier…) into the SBOM as if a deployed app shipped its
 # build/test tooling. It is the npm analogue of the Android over-scan and inflates a
@@ -2661,7 +2853,14 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     [ -f package-lock.json ] || _node_by_name=1
     _nodeset=$(mktemp)
     _npm_ok=""
-    if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
+    if [ "$NODE_INSTALLED_ROOT" = npm ] && [ -f "$_npmtmp/package-lock.json" ]; then
+        # The lock npm wrote at install already marks each package dev or not, and
+        # a re-resolve would ask the registry for the other platforms' optional
+        # packages it lacks (measured: no answer offline). Read it as it is.
+        mark_prep_applied npm-production-set
+        _npm_ok=1
+        log "node: production set read from the installed lock file (no npm resolve)"
+    elif prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
        && [ -f "$_npmtmp/package-lock.json" ]; then
         _npm_ok=1
     fi
@@ -3574,6 +3773,26 @@ fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 MAVEN_USER_REPO_JS
     node "$_mu" "$OUT" "$MAVEN_USER_REPO_OFFLINE" || log "maven: recording the user repository on the SBOM skipped (non-fatal)"
     rm -f "$_mu"
+fi
+
+# Record the lock files npm or pnpm wrote at install that this scan read in place
+# of a committed one (bomlens:node-lock-source, one per file, relative to the
+# scan root).
+if [ "${rc:-1}" -eq 0 ] && [ -n "$NODE_INSTALLED_LOCK_SOURCES" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _nls=$(mktemp).js
+    cat > "$_nls" <<'NODE_LOCK_SOURCE_JS'
+const fs = require('fs');
+const [bomPath, list] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || []).filter(p => p.name !== 'bomlens:node-lock-source');
+for (const f of list.split('\n').filter(Boolean)) props.push({ name: 'bomlens:node-lock-source', value: f });
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+NODE_LOCK_SOURCE_JS
+    node "$_nls" "$OUT" "$NODE_INSTALLED_LOCK_SOURCES" || log "node: recording the installed lock file on the SBOM skipped (non-fatal)"
+    rm -f "$_nls"
 fi
 
 # Install-directory filter. cdxgen 13.3.x and later (the nightly-rebuilt v13
@@ -7395,6 +7614,7 @@ fi
 # Put the scanned tree back before the ownership fix below, so anything we
 # restored is chown'd too (the trap only covers an abnormal exit).
 _rch_restored=""; [ -z "$GUARD_DIR" ] || _rch_restored=1
+node_installed_lock_remove
 guard_restore
 
 # --reachability: the modules with a vendor/ folder, on the tree as it was

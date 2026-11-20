@@ -482,6 +482,11 @@ jobs:
       - name: Gradle user cache tests
         run: bash tests/test-gradle-user-cache.sh
 
+      # No Docker: a Node.js tree installed with no lock file committed reads
+      # the lock npm or pnpm wrote under node_modules, and leaves nothing behind.
+      - name: Node.js installed lock tests
+        run: bash tests/test-node-installed-lock.sh
+
       # No Docker: how npm, Ruby, PHP and .NET sources are read. The one npm
       # dependency that cannot be fetched, a Gemfile optional group, a vendored
       # package-lock.json and the .NET base assemblies.
