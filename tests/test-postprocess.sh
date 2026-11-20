@@ -11380,6 +11380,13 @@ bash -c '. "$1"; mark_sbom_registry_refused "$2"' _ "$DETECT" "$WORK/rf-mark-bar
 { grep -q -- '-e _BOMLENS_REGISTRY_REFUSED=registry-auth' "$ROOT_DIR/scripts/scan-sbom.sh" \
     && grep -q '_BOMLENS_REGISTRY_REFUSED:-}" != "registry-auth"' "$ROOT_DIR/docker/entrypoint.sh"; } \
     && pass "the CLI passes _BOMLENS_REGISTRY_REFUSED and POSTPROCESS reads the same name" || fail "_BOMLENS_REGISTRY_REFUSED differs between scan-sbom.sh and entrypoint.sh"
+# The web UI's Java rerun removes the first run's log: the refusal it shows is
+# marked on the first SBOM before that, in the rerun branch.
+_rf_retry="$(sed -n '/^    if \[ -n "\$JAVA_RETRY_IMAGE" \]; then$/,/local first="" first_img/p' "$ROOT_DIR/docker/entrypoint.sh" | tail -n +2)"
+printf '%s\n' "$_rf_retry" | grep -q 'registry_auth_refused "\$logf"' \
+    && printf '%s\n' "$_rf_retry" | grep -q 'mark_sbom_registry_refused "\$bom_path" registry-auth' \
+    && pass "the Java rerun marks a refusal on the first SBOM before its log is removed" \
+    || fail "the Java rerun drops a refusal the first run's log showed"
 for _d in /tmp/bomlens-ca.*; do
     case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
 done

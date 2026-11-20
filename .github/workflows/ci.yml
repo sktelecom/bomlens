@@ -82,7 +82,11 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-logs
-          path: tests/test-workspace/failed-tests-logs/
+          # The kept cdxgen logs (credentials in URLs masked) say why a
+          # dependency step failed.
+          path: |
+            tests/test-workspace/failed-tests-logs/
+            tests/test-workspace/**/*_cdxgen.log
           retention-days: 7
       
       - name: Upload generated SBOMs
