@@ -191,6 +191,11 @@ export interface SbomSummary {
    *  failed on its own) | "cdxgen-unavailable" (cdxgen never ran at all).
    *  Drives a result banner. */
   sbomToolDegraded?: string | null;
+  /** "registry-auth" when cdxgen wrote this SBOM although the package registry
+   *  refused some downloads (HTTP 401/403, bomlens:registry-refused), so some
+   *  dependencies may be missing. Null or absent otherwise. Drives a notice
+   *  whose advice depends on `scanConfig.source`. */
+  registryRefused?: "registry-auth" | null;
   /** "static" when the scan read a lock file instead of building (the lock
    *  file's name in `detectionSource`); absent when it built. */
   detection?: string | null;

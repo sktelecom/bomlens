@@ -184,6 +184,41 @@ test("one notice is one banner with its own text", async ({ page }) => {
   await expect(page.getByTestId("merged-warning")).toHaveCount(0);
 });
 
+test("a registry that refused some downloads warns with advice for a folder and the company-network guide", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ registryRefused: "registry-auth" }), scanConfig: { source: "current-dir", target: "", project: "demo", version: "1.0" } });
+  const banner = page.getByTestId("registry-refused");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("Some dependencies may be missing");
+  await expect(banner).toContainText("npm and pip");
+  await expect(banner).toContainText("local repository and cache");
+  await expect(banner).not.toContainText("on a machine where it builds");
+  const guide = banner.getByTestId("registry-refused-guide");
+  await expect(guide).toHaveAttribute("href", "https://sktelecom.github.io/bomlens/guides/company-network/");
+  await expect(guide).toHaveAttribute("target", "_blank");
+});
+
+for (const source of ["git-url", "zip-upload"]) {
+  test(`for a ${source} scan the registry notice says the scan container has no login`, async ({ page }) => {
+    await open(page, { ...DONE, sbom: sbomWith({ registryRefused: "registry-auth" }), scanConfig: { source, target: "", project: "demo", version: "1.0" } });
+    const banner = page.getByTestId("registry-refused");
+    await expect(banner).toContainText("no login for your company's package repository");
+    await expect(banner).toContainText("complete lock file");
+    await expect(banner).not.toContainText("npm and pip");
+  });
+}
+
+test("the registry notice is in Korean with the Korean guide", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ registryRefused: "registry-auth" }), scanConfig: { source: "git-url", target: "", project: "demo", version: "1.0" } }, {}, "", "light", "ko");
+  const banner = page.getByTestId("registry-refused");
+  await expect(banner).toContainText("사내 패키지 저장소의 로그인 정보가 없습니다");
+  await expect(banner.getByTestId("registry-refused-guide")).toHaveAttribute("href", "https://sktelecom.github.io/bomlens/ko/guides/company-network/");
+});
+
+test("no registry notice without the property", async ({ page }) => {
+  await open(page, DONE);
+  await expect(page.getByTestId("registry-refused")).toHaveCount(0);
+});
+
 test("notices of one kind share one banner, with the full text of each under Details", async ({ page }) => {
   await open(page, {
     ...DONE,

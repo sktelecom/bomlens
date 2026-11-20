@@ -61,6 +61,12 @@ export function docsUrl(language: string | undefined): string {
   return `${DOCS_BASE}/${korean ? "ko/" : ""}`;
 }
 
+/** The guide to scanning on a company network (proxies, CA certificates,
+ *  package repositories that need a login), in the reader's language. */
+export function companyNetworkGuideUrl(language: string | undefined): string {
+  return `${docsUrl(language)}guides/company-network/`;
+}
+
 /** What changed in a version: its release page, or the list when the build
  *  carries no version stamp. */
 export function releaseNotesUrl(version: string | undefined): string {

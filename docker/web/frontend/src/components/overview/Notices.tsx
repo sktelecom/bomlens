@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { DownloadIcon, LinkExternalIcon } from "@primer/octicons-react";
-import { Banner, Button } from "@primer/react";
+import { Banner, Button, Link } from "@primer/react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type DoneEvent, fileUrl } from "@/lib/api";
 import { gradeLabel, isIncomplete } from "@/lib/completeness";
-import { IS_STATIC_DEMO } from "@/lib/demo";
+import { companyNetworkGuideUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { hasIncompleteSteps, pipelineStepLabelKey, splitFailedSteps } from "@/lib/pipelineSteps";
 import { inputSbomFileName, isAiScan } from "@/lib/results";
 import { scanWarningText } from "@/lib/scanWarnings";
@@ -37,6 +37,13 @@ export function sbomDegradedBodyKey(reason: string): string {
     default:
       return "result.sbomDegradedBody";
   }
+}
+
+/** Which advice goes with a registry that refused some downloads: a Git URL or
+ *  an uploaded archive was resolved in a container with no login to the
+ *  company's package repository; a folder may hold settings the scan reads. */
+export function registryRefusedBodyKey(source: string | undefined): string {
+  return source === "git-url" || source === "zip-upload" ? "result.registryRefusedBodyRemote" : "result.registryRefusedBodyFolder";
 }
 
 /**
@@ -138,7 +145,7 @@ export function FailureBanner({
 
 interface Notice {
   /** i18n id under `overview.notice.*` for the merged one-line form. */
-  id: "completeness" | "pipeline" | "licenseLookup" | "warnings" | "vendored" | "degraded" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
+  id: "completeness" | "pipeline" | "licenseLookup" | "warnings" | "vendored" | "degraded" | "registryRefused" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
   variant: "warning" | "info";
   title: string;
   testId?: string;
@@ -289,6 +296,27 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
       title: t("result.sbomDegradedTitle"),
       testId: "sbom-degraded",
       body: t(sbomDegradedBodyKey(sb.sbomToolDegraded)),
+    });
+
+  // cdxgen wrote the SBOM although the package registry refused some
+  // downloads, so some dependencies may be missing. What to do depends on how
+  // the source came in: a clone or an archive was never built here.
+  if (sb?.registryRefused === "registry-auth")
+    notices.push({
+      id: "registryRefused",
+      variant: "warning",
+      title: t("result.registryRefusedTitle"),
+      testId: "registry-refused",
+      body: (
+        <>
+          <p>{t(registryRefusedBodyKey(result.scanConfig?.source))}</p>
+          <p>
+            <Link href={companyNetworkGuideUrl(i18n.language)} target="_blank" rel="noreferrer noopener" data-testid="registry-refused-guide">
+              {t("result.registryRefusedGuide")}
+            </Link>
+          </p>
+        </>
+      ),
     });
 
   // An empty dependency graph is a pipeline defect (a later step dropped the
