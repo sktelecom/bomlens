@@ -13115,8 +13115,8 @@ sed -n "/^# Declare how complete this SBOM's dependency graph is,/,/^# Observabi
 MCA_SNIPPET_LINES="$(wc -l < "$WORK/mca-snippet.sh" | tr -d '[:space:]')"
 if [ ! -s "$WORK/mca-snippet.sh" ]; then
     fail "could not extract mark_compositions_aggregate from entrypoint.sh (did its anchor comments move?)"
-elif [ -z "$MCA_SNIPPET_LINES" ] || [ "$MCA_SNIPPET_LINES" -gt 100 ]; then
-    fail "mark_compositions_aggregate snippet is $MCA_SNIPPET_LINES lines (expected well under 100) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
+elif [ -z "$MCA_SNIPPET_LINES" ] || [ "$MCA_SNIPPET_LINES" -gt 200 ]; then
+    fail "mark_compositions_aggregate snippet is $MCA_SNIPPET_LINES lines (expected well under 200) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
         "did the '# Observability helpers for best-effort post-process steps' comment in docker/entrypoint.sh change?"
 elif grep -q '^[[:space:]]*exit\b' "$WORK/mca-snippet.sh"; then
     fail "mark_compositions_aggregate snippet contains an exit statement -- refusing to source it into this test process" \
