@@ -266,13 +266,15 @@ TOTAL_COMP=$(jq "$FIRST_PARTY_DEF"'[ ([.metadata.component // empty]
 # elsewhere: OS packages and file entries are counted next to libraries. Empty when
 # the SBOM holds only libraries.
 TOTAL_BASIS=$(jq -r "$FIRST_PARTY_DEF"'def kind: if .type == "file" then "file"
-        elif .type == "operating-system" or ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
+        elif .type == "operating-system" then "osrel"
+        elif ((.purl // "") | test("^pkg:(deb|rpm|apk|alpm)/")) then "os"
         else "lib" end;
     [ .components[]? | select(first_party | not) | kind ] as $k
     | ([ $k[] | select(. == "os") ] | length) as $os
+    | ([ $k[] | select(. == "osrel") ] | length) as $r
     | ([ $k[] | select(. == "file") ] | length) as $f
-    | if $os + $f == 0 then empty
-      else "\($k | length - $os - $f) libraries, \($os) OS packages, \($f) files" end' "$SBOM" 2>/dev/null || true)
+    | if $os + $r + $f == 0 then empty
+      else "\($k | length - $os - $r - $f) libraries, \($os) OS packages\(if $r > 0 then ", \($r) operating system" else "" end), \($f) files" end' "$SBOM" 2>/dev/null || true)
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -487,4 +489,4 @@ else
     echo "[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint)."
 fi
 
-echo "[notice] generated: $TXT, $HTML (${TOTAL_LIC} licenses, ${TOTAL_COMP} components)"
+echo "[notice] generated: $TXT, $HTML (${TOTAL_LIC} licenses, ${TOTAL_COMP} components${TOTAL_BASIS:+: $TOTAL_BASIS})"
