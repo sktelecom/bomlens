@@ -132,4 +132,4 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 적합성 검사 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
 
-전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다.
+전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다. `bomlens:pipeline-step-failed`의 `license-fetch`는 패키지 저장소가 응답하지 않아 이번 스캔에서 저장소 라이선스 조회를 껐다는 뜻이며, SBOM에는 lock 파일과 패키지 매니페스트에 든 라이선스만 들어 있습니다.

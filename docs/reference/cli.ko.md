@@ -117,7 +117,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `AIBOM_DATASET_MAX_LOOKUPS` | `40` | `--model`에서 스캔 한 번에 읽는 데이터셋의 최대 개수(원천 포함). 상한을 넘은 데이터셋은 이름만 기록하고 읽지 않았다고 표시한다 |
 | `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
 | `CYCLONEDX_SPEC_VERSION` | `1.6` | `--spec-version`과 같다. CLI 없이 `docker run`으로 스캐너 이미지를 실행할 때도 이 값을 읽는다 |
-| `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
+| `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임. 패키지 저장소가 몇 초 안에 응답하지 않으면(네트워크가 없거나, 스캔이 신뢰하지 않는 인증서를 쓰는 프록시가 있을 때) 스캔이 스스로 조회를 끄고 로그에 알리며 SBOM의 `bomlens:pipeline-step-failed`에 `license-fetch`를 기록함. lock 파일에 든 라이선스는 그대로 읽음 |
 | `GOTOOLCHAIN` | `auto` | Go 소스 스캔에서 모듈을 해석할 Go 툴체인. 기본값에서는 `go.mod`가 스캐너 이미지보다 새 Go를 요구하면 그 버전을 내려받는다. `local`이면 이미지에 든 Go만 쓰고, 이런 프로젝트는 의존성 해석이 실패한다 |
 | `GOPROXY` | `https://proxy.golang.org,direct` | Go 소스 스캔에서 모듈과 툴체인을 내려받을 프록시. `proxy.golang.org`에 접근할 수 없는 사내망에서 지정한다. `GOSUMDB`도 같은 방식으로 전달된다 |
 | `PROJECT_LICENSE` | — | `--license`와 같다. 프로젝트의 배포 라이선스를 SPDX 식별자로 지정한다. `bomlens:licenseConflict` 판정과 위험 보고서의 충돌 절을 만든다 |

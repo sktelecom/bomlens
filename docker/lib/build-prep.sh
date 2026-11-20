@@ -2303,6 +2303,141 @@ FIX_LIC_JS
 }
 fix_lic_mapping
 
+# --- licence lookup probe ---
+# With FETCH_LICENSE on, cdxgen asks each package's registry for the licence,
+# description and repository a lock file left open. Without a route to the
+# registry, every request waits for its own time limit and is retried: measured
+# on a 143-package npm lock file with --network none, cdxgen had not finished
+# after 22 minutes (9 s with FETCH_LICENSE=false and the same components and
+# licences, which the lock file carries). So the registries this tree's
+# ecosystems use are asked once first, with a short time limit, and when one
+# does not answer cdxgen runs with FETCH_LICENSE=false: one switch covers every
+# ecosystem in cdxgen, so it cannot be turned off for the unreachable one alone.
+# Licences a lock file or package manifest carries are read either way.
+#
+# The hosts are the ones cdxgen 13.5 asks, with the override it reads
+# (ecosystems/ecosystems.js, docs/ENV.md). npm: an unscoped package is looked up
+# at NPM_URL, not at the registry an .npmrc names; a scope .npmrc maps to its own
+# registry is looked up there and is not probed here. Swift: the licence comes
+# from the GitHub repository API. The probe is Node's fetch, so the CA bundle
+# cdxgen trusts (NODE_EXTRA_CA_CERTS, set by extra_ca_trust above) applies to it
+# as well, and the proxy variables cdxgen honours (NODE_USE_ENV_PROXY). Any HTTP
+# answer, an error status included, counts as reachable.
+LICENSE_PROBE_TIMEOUT="${BOMLENS_LICENSE_PROBE_TIMEOUT:-6}"
+case "$LICENSE_PROBE_TIMEOUT" in ""|*[!0-9]*|0) LICENSE_PROBE_TIMEOUT=6 ;; esac
+
+# The registry URLs of the ecosystems found in the current directory, one per line.
+license_lookup_urls() {
+    _llu_found="$(find . \( -name .git -o -name node_modules -o -name Pods -o -name vendor -o -name .build \) -prune -o -type f \
+        \( -name package.json -o -name package-lock.json -o -name npm-shrinkwrap.json -o -name yarn.lock -o -name pnpm-lock.yaml \
+           -o -name 'bun.lock' -o -name 'bun.lockb' \
+           -o -name 'requirements*.txt' -o -name pyproject.toml -o -name Pipfile -o -name Pipfile.lock -o -name poetry.lock \
+           -o -name uv.lock -o -name setup.py -o -name setup.cfg \
+           -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name '*.sbt' \
+           -o -name go.mod -o -name Cargo.toml -o -name Cargo.lock \
+           -o -name Gemfile -o -name Gemfile.lock -o -name '*.gemspec' \
+           -o -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' -o -name packages.config -o -name packages.lock.json \
+           -o -name pubspec.yaml -o -name pubspec.lock -o -name Package.swift -o -name Package.resolved \) \
+        -print 2>/dev/null | sed 's|.*/||' | LC_ALL=C sort -u)"
+    [ -n "$_llu_found" ] || return 0
+    printf '%s\n' "$_llu_found" | while IFS= read -r _llu_f; do
+        case "$_llu_f" in
+            package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml|bun.lock|bun.lockb)
+                echo "${NPM_URL:-https://registry.npmjs.org/}" ;;
+            requirements*.txt|pyproject.toml|Pipfile|Pipfile.lock|poetry.lock|uv.lock|setup.py|setup.cfg)
+                echo "${PYPI_URL:-https://pypi.org/pypi/}" ;;
+            pom.xml|build.gradle|build.gradle.kts|*.sbt)
+                echo "${MAVEN_CENTRAL_URL:-https://repo1.maven.org/maven2/}" ;;
+            go.mod) echo "${GO_PKG_URL:-https://pkg.go.dev/}" ;;
+            Cargo.toml|Cargo.lock) echo "${RUST_CRATES_URL:-https://crates.io/api/v1/crates/}" ;;
+            Gemfile|Gemfile.lock|*.gemspec) echo "${RUBYGEMS_V1_URL:-https://rubygems.org/api/v1/gems/}" ;;
+            *.csproj|*.fsproj|*.vbproj|packages.config|packages.lock.json)
+                echo "${NUGET_URL:-https://api.nuget.org/v3/index.json}" ;;
+            pubspec.yaml|pubspec.lock) echo "${PUB_DEV_URL:-https://pub.dev}" ;;
+            Package.swift|Package.resolved) echo "${GITHUB_API_URL:-https://api.github.com}" ;;
+        esac
+    done | LC_ALL=C sort -u
+}
+
+# Ask each registry once. On the first that does not answer, FETCH_LICENSE is
+# set to false (exported, so cdxgen sees it), the host and the cause are logged
+# and license-fetch is recorded as a failed step on the SBOM. Returns 0 in every
+# case: a scan is never stopped by the probe. No node, or a node without fetch,
+# leaves the lookup as it was.
+license_lookup_probe() {
+    case "${FETCH_LICENSE:-}" in true|1) ;; *) return 0 ;; esac
+    command -v node >/dev/null 2>&1 || return 0
+    _llp_urls="$(license_lookup_urls)"
+    [ -n "$_llp_urls" ] || return 0
+    _llp_js="$(mktemp)" || return 0
+    cat > "$_llp_js" <<'LICENSE_PROBE_JS'
+const [limit, ...urls] = process.argv.slice(2);
+if (typeof fetch !== "function" || typeof AbortSignal.timeout !== "function") process.exit(0);
+const CERT = new Set(["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "UNABLE_TO_GET_ISSUER_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "CERT_UNTRUSTED", "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID", "ERR_TLS_CERT_ALTNAME_INVALID", "CERT_SIGNATURE_FAILURE"]);
+const cause = (err) => {
+  if (err && (err.name === "TimeoutError" || err.name === "AbortError")) return { kind: "timeout", code: "" };
+  let e = err;
+  while (e && e.cause && !e.code) e = e.cause;
+  const code = (e && e.code) || "";
+  if (CERT.has(code)) return { kind: "certificate", code };
+  return { kind: "unreachable", code: code || (e && e.message) || String(err) };
+};
+const probe = async (url) => {
+  let host = url;
+  try { host = new URL(url).host; } catch (e) { return null; }
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(Number(limit) * 1000),
+      headers: { "user-agent": "bomlens-license-probe" } });
+    try { await res.body?.cancel(); } catch (e) { /* nothing to read */ }
+    return null;
+  } catch (err) {
+    return { host, ...cause(err) };
+  }
+};
+Promise.all(urls.map(probe)).then((results) => {
+  const bad = results.find(Boolean);
+  if (!bad) process.exit(0);
+  process.stdout.write(bad.kind + "\t" + bad.host + "\t" + bad.code + "\n");
+  process.exit(3);
+});
+LICENSE_PROBE_JS
+    # Every request ends at its own limit (AbortSignal.timeout) and the script
+    # exits once all have, so node does not outlive the slowest of them.
+    # One URL per word: none of the defaults or the overrides holds a space.
+    set -f
+    # shellcheck disable=SC2086
+    _llp_out="$(NODE_USE_ENV_PROXY=1 node "$_llp_js" "$LICENSE_PROBE_TIMEOUT" $_llp_urls 2>/dev/null)"
+    _llp_rc=$?
+    set +f
+    rm -f "$_llp_js"
+    if [ "$_llp_rc" -eq 0 ] || [ -z "$_llp_out" ]; then
+        return 0
+    fi
+    _llp_kind="$(printf '%s' "$_llp_out" | cut -f1)"
+    _llp_host="$(printf '%s' "$_llp_out" | cut -f2)"
+    _llp_code="$(printf '%s' "$_llp_out" | cut -f3 | tr -cd 'A-Za-z0-9_ .:-' | cut -c1-120)"
+    case "$_llp_kind" in
+        timeout) _llp_why="it did not answer within ${LICENSE_PROBE_TIMEOUT}s" ;;
+        certificate)
+            # The same advice as tls_trust_hint in source-detect.sh.
+            if [ -n "${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+                _llp_why="its TLS certificate was not trusted ($_llp_code) even with the CA bundle in SBOM_EXTRA_CA_CERTS; check that the bundle holds the root CA your proxy signs with"
+            else
+                _llp_why="its TLS certificate was not trusted ($_llp_code); if a proxy inspects HTTPS, set SBOM_EXTRA_CA_CERTS to its CA bundle (PEM)"
+            fi ;;
+        *) _llp_why="it could not be reached${_llp_code:+ ($_llp_code)}" ;;
+    esac
+    log "license-fetch: registry license lookup off (FETCH_LICENSE=false), $_llp_host: $_llp_why; licenses in lock files and package manifests are still read"
+    FETCH_LICENSE=false
+    export FETCH_LICENSE
+    mark_prep_failed license-fetch
+    return 0
+}
+# --- end licence lookup probe ---
+license_lookup_probe
+
 # A Swift tree (Package.swift, a committed Package.resolved or an Xcode project):
 # cdxgen resolves it with `swift package`, which clones every dependency, and a
 # clone that waits for a login or a server that does not answer used to hold the
@@ -2314,9 +2449,29 @@ if [ -n "$(find . \( -name .git -o -name node_modules -o -name Pods -o -name ven
     CDXGEN_SWIFT_TREE=1
     GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"; export GIT_TERMINAL_PROMPT
 fi
+# A registry that answered the probe can still stop answering. cdxgen bounds
+# each request (CDXGEN_HTTP_TIMEOUT_MS, 15 s by default, and its cdxrs helper
+# 120 s per request, 600 s per batch of 250) and retries each failure three
+# times, but has no limit for the lookup as a whole, so a registry that accepts
+# connections and then stalls costs minutes per package batch: about N/16 x 60 s
+# on the JavaScript path alone. The lookup cannot be timed apart from the rest
+# of the cdxgen run, so while it is on the run gets a limit sized well above a
+# long legitimate run (BOMLENS_LICENSE_FETCH_TIMEOUT, 1800 s, the same budget as
+# a first Gradle resolve; 0 turns it off). When it runs out, cdxgen runs again
+# with the lookup off rather than the scan failing: a slow scan that ends with
+# the lock file's licences beats one that does not end. A Swift tree keeps its
+# own, shorter limit.
+LICENSE_FETCH_TIMEOUT="${BOMLENS_LICENSE_FETCH_TIMEOUT:-1800}"
+case "$LICENSE_FETCH_TIMEOUT" in ""|*[!0-9]*) LICENSE_FETCH_TIMEOUT=1800 ;; esac
+CDXGEN_HTTP_TIMEOUT_MS="${CDXGEN_HTTP_TIMEOUT_MS:-15000}"; export CDXGEN_HTTP_TIMEOUT_MS
+CDXGEN_LOOKUP_LIMITED=""
 run_cdxgen() {
+    CDXGEN_LOOKUP_LIMITED=""
     if [ -n "$CDXGEN_SWIFT_TREE" ]; then
         run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$@"
+    elif [ "$LICENSE_FETCH_TIMEOUT" -gt 0 ] && { [ "${FETCH_LICENSE:-}" = "true" ] || [ "${FETCH_LICENSE:-}" = "1" ]; }; then
+        CDXGEN_LOOKUP_LIMITED=1
+        run_supervised_timeout "$LICENSE_FETCH_TIMEOUT" "$@"
     else
         run_supervised "$@"
     fi
@@ -2324,22 +2479,27 @@ run_cdxgen() {
 
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
 if command -v cdxgen >/dev/null 2>&1; then
-    log "cdxgen (PATH)"
-    run_cdxgen cdxgen "$@"
-    rc=$?
+    CDXGEN_WHERE="PATH"; set -- cdxgen "$@"
 elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
-    log "cdxgen (/opt/cdxgen/bin/cdxgen.js)"
-    run_cdxgen node /opt/cdxgen/bin/cdxgen.js "$@"
-    rc=$?
+    CDXGEN_WHERE="/opt/cdxgen/bin/cdxgen.js"; set -- node /opt/cdxgen/bin/cdxgen.js "$@"
 elif [ -f /opt/bin/cdxgen ]; then
-    log "cdxgen (/opt/bin/cdxgen)"
-    run_cdxgen /opt/bin/cdxgen "$@"
-    rc=$?
+    CDXGEN_WHERE="/opt/bin/cdxgen"; set -- /opt/bin/cdxgen "$@"
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
 fi
-if [ "${rc:-0}" -eq 124 ]; then
+log "cdxgen ($CDXGEN_WHERE)"
+run_cdxgen "$@"
+rc=$?
+if [ "$rc" -eq 124 ] && [ -n "$CDXGEN_LOOKUP_LIMITED" ]; then
+    log "license-fetch: cdxgen had not finished after ${LICENSE_FETCH_TIMEOUT}s with the registry license lookup on; running it again with FETCH_LICENSE=false (raise BOMLENS_LICENSE_FETCH_TIMEOUT to wait longer)"
+    FETCH_LICENSE=false
+    export FETCH_LICENSE
+    mark_prep_failed license-fetch
+    rm -f "$OUT"
+    run_cdxgen "$@"
+    rc=$?
+elif [ "$rc" -eq 124 ]; then
     log "cdxgen: stopped after ${PREP_TIMEOUT_DEFAULT}s on a Swift tree (a dependency clone that does not finish is the usual cause); raise BOMLENS_PREP_TIMEOUT to wait longer"
 fi
 

@@ -15408,6 +15408,131 @@ else
     fail "completeness/maven: the Maven block of the jar-fetch test is not available to this section"
 fi
 
+echo "== build-prep: the registry license lookup is turned off when its registry does not answer =="
+# The probe block of build-prep.sh run as it is, against local servers: one
+# that answers, one that accepts connections and never answers, and a closed
+# port. Then the cdxgen call: a run that outlives BOMLENS_LICENSE_FETCH_TIMEOUT
+# with the lookup on is run again with it off.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_lp_block=$(sed -n '/^# --- licence lookup probe ---$/,/^# --- end licence lookup probe ---$/p' "$PREP")
+_lp_run_block=$(sed -n '/^LICENSE_FETCH_TIMEOUT=/,/on a Swift tree (a dependency clone/{p;}' "$PREP"; echo 'fi')
+if ! command -v node >/dev/null 2>&1; then
+    echo "  SKIP: node not installed"
+elif [ -z "$_lp_block" ] || ! printf '%s' "$_lp_run_block" | grep -q 'run_cdxgen "\$@"'; then
+    fail "build-prep: the licence lookup probe or the cdxgen call block could not be extracted"
+else
+    cat > "$WORK/lp-server.js" <<'JS'
+const http = require("http");
+const fs = require("fs");
+const ok = http.createServer((req, res) => { res.writeHead(404); res.end(); });
+const stall = http.createServer(() => {});
+const closed = http.createServer();
+// A port that was free a moment ago and is closed again: connection refused.
+closed.listen(0, "127.0.0.1", () => { const shut = closed.address().port; closed.close(() =>
+  ok.listen(0, "127.0.0.1", () => stall.listen(0, "127.0.0.1", () =>
+    fs.writeFileSync(process.argv[2], ok.address().port + " " + stall.address().port + " " + shut)))); });
+setTimeout(() => process.exit(0), 120000);
+JS
+    node "$WORK/lp-server.js" "$WORK/lp-ports" &
+    _lp_srv=$!
+    _lp_n=0
+    while [ ! -s "$WORK/lp-ports" ] && [ "$_lp_n" -lt 50 ]; do sleep 0.1; _lp_n=$((_lp_n + 1)); done
+    read -r _lp_ok _lp_stall _lp_closed < "$WORK/lp-ports"
+    mkdir -p "$WORK/lp-npm" "$WORK/lp-none" "$WORK/lp-mixed/svc"
+    printf '{"name":"a","version":"1.0.0"}\n' > "$WORK/lp-npm/package.json"
+    printf 'hello\n' > "$WORK/lp-none/README.md"
+    : > "$WORK/lp-mixed/pom.xml"; printf 'module x\n' > "$WORK/lp-mixed/svc/go.mod"
+    # <dir> [VAR=value ...]: runs the block, then prints the outcome.
+    _lp_probe() {
+        _lp_d="$1"; shift
+        ( cd "$_lp_d" && env "$@" sh -c 'log() { echo "[build-prep] $*"; }
+            PREP_FAILED=""
+            mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }
+            '"$_lp_block"'
+            license_lookup_probe
+            echo "FETCH_LICENSE=${FETCH_LICENSE:-} PREP_FAILED=$PREP_FAILED"' ) 2>&1
+    }
+    _lp_out=$(_lp_probe "$WORK/lp-npm" FETCH_LICENSE=true NPM_URL="http://127.0.0.1:$_lp_ok/")
+    case "$_lp_out" in
+        "FETCH_LICENSE=true PREP_FAILED=") pass "probe: a registry that answers (an error status included) leaves the lookup on" ;;
+        *) fail "probe: an answering registry changed the lookup" "$_lp_out" ;;
+    esac
+    _lp_out=$(_lp_probe "$WORK/lp-npm" FETCH_LICENSE=true NPM_URL="http://127.0.0.1:$_lp_closed/")
+    if printf '%s' "$_lp_out" | grep -q "license-fetch: registry license lookup off (FETCH_LICENSE=false), 127.0.0.1:$_lp_closed: it could not be reached (ECONNREFUSED)" \
+       && printf '%s' "$_lp_out" | grep -q '^FETCH_LICENSE=false PREP_FAILED=license-fetch$'; then
+        pass "probe: a closed port turns the lookup off, names the host and records license-fetch"
+    else
+        fail "probe: a closed port did not turn the lookup off" "$_lp_out"
+    fi
+    _lp_t0=$(date +%s)
+    _lp_out=$(_lp_probe "$WORK/lp-npm" FETCH_LICENSE=1 BOMLENS_LICENSE_PROBE_TIMEOUT=1 NPM_URL="http://127.0.0.1:$_lp_stall/")
+    _lp_secs=$(( $(date +%s) - _lp_t0 ))
+    if printf '%s' "$_lp_out" | grep -q "127.0.0.1:$_lp_stall: it did not answer within 1s" \
+       && printf '%s' "$_lp_out" | grep -q '^FETCH_LICENSE=false PREP_FAILED=license-fetch$' && [ "$_lp_secs" -le 5 ]; then
+        pass "probe: a registry that never answers is given up after BOMLENS_LICENSE_PROBE_TIMEOUT (${_lp_secs}s)"
+    else
+        fail "probe: a stalled registry was not given up in time (${_lp_secs}s)" "$_lp_out"
+    fi
+    _lp_out=$(_lp_probe "$WORK/lp-npm" FETCH_LICENSE=false NPM_URL="http://127.0.0.1:1/")
+    case "$_lp_out" in
+        "FETCH_LICENSE=false PREP_FAILED=") pass "probe: FETCH_LICENSE=false asks no registry and records nothing" ;;
+        *) fail "probe: FETCH_LICENSE=false still probed" "$_lp_out" ;;
+    esac
+    _lp_out=$(_lp_probe "$WORK/lp-none" FETCH_LICENSE=true NPM_URL="http://127.0.0.1:1/")
+    case "$_lp_out" in
+        "FETCH_LICENSE=true PREP_FAILED=") pass "probe: a tree with no package manifest asks no registry" ;;
+        *) fail "probe: a tree with no manifest was probed" "$_lp_out" ;;
+    esac
+    _lp_urls=$(cd "$WORK/lp-mixed" && env -u MAVEN_CENTRAL_URL -u GO_PKG_URL sh -c "$_lp_block"'
+        license_lookup_urls' | sed '/^\[build-prep\]/d' | tr '\n' ' ')
+    case "$_lp_urls" in
+        "https://pkg.go.dev/ https://repo1.maven.org/maven2/ ") pass "probe: a Maven and Go tree asks Maven Central and pkg.go.dev" ;;
+        *) fail "probe: unexpected registries for a Maven and Go tree" "$_lp_urls" ;;
+    esac
+    kill "$_lp_srv" 2>/dev/null; wait "$_lp_srv" 2>/dev/null
+
+    # The cdxgen call: a stand-in cdxgen on PATH, run_supervised_timeout
+    # reports a timeout while the lookup is on.
+    mkdir -p "$WORK/lp-bin"
+    printf '#!/bin/sh\necho "cdxgen FETCH_LICENSE=$FETCH_LICENSE" >> "$LP_CALLS"\n' > "$WORK/lp-bin/cdxgen"
+    chmod +x "$WORK/lp-bin/cdxgen"
+    _lp_call() {  # <BOMLENS_LICENSE_FETCH_TIMEOUT> <FETCH_LICENSE>
+        : > "$WORK/lp-calls"
+        ( cd "$WORK/lp-npm" && PATH="$WORK/lp-bin:$PATH" LP_CALLS="$WORK/lp-calls" OUT="$WORK/lp-npm/bom.json" \
+            BOMLENS_LICENSE_FETCH_TIMEOUT="$1" FETCH_LICENSE="$2" sh -c 'log() { echo "[build-prep] $*"; }
+            PREP_FAILED=""; CDXGEN_SWIFT_TREE=""; PREP_TIMEOUT_DEFAULT=900
+            mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }
+            run_supervised() { "$@"; }
+            run_supervised_timeout() { echo "limit $1" >> "$LP_CALLS"; shift; "$@"; [ "$FETCH_LICENSE" = false ] || return 124; }
+            set -- -o bom.json .
+            '"$_lp_run_block"'
+            echo "rc=$rc PREP_FAILED=$PREP_FAILED"' ) 2>&1
+    }
+    _lp_out=$(_lp_call 1800 true)
+    _lp_calls=$(tr '\n' '|' < "$WORK/lp-calls")
+    if [ "$_lp_calls" = "limit 1800|cdxgen FETCH_LICENSE=true|cdxgen FETCH_LICENSE=false|" ] \
+       && printf '%s' "$_lp_out" | grep -q 'running it again with FETCH_LICENSE=false' \
+       && printf '%s' "$_lp_out" | grep -q '^rc=0 PREP_FAILED=license-fetch$'; then
+        pass "cdxgen call: a run past BOMLENS_LICENSE_FETCH_TIMEOUT is run again with the lookup off and recorded"
+    else
+        fail "cdxgen call: no rerun without the lookup after the limit" "$_lp_calls / $_lp_out"
+    fi
+    _lp_out=$(_lp_call 0 true)
+    _lp_calls=$(tr '\n' '|' < "$WORK/lp-calls")
+    if [ "$_lp_calls" = "cdxgen FETCH_LICENSE=true|" ] && printf '%s' "$_lp_out" | grep -q '^rc=0 PREP_FAILED=$'; then
+        pass "cdxgen call: BOMLENS_LICENSE_FETCH_TIMEOUT=0 runs cdxgen without a limit"
+    else
+        fail "cdxgen call: BOMLENS_LICENSE_FETCH_TIMEOUT=0 still limited the run" "$_lp_calls / $_lp_out"
+    fi
+    _lp_out=$(_lp_call 1800 false)
+    _lp_calls=$(tr '\n' '|' < "$WORK/lp-calls")
+    if [ "$_lp_calls" = "cdxgen FETCH_LICENSE=false|" ] && printf '%s' "$_lp_out" | grep -q '^rc=0 PREP_FAILED=$'; then
+        pass "cdxgen call: with the lookup off the run has no license-lookup limit"
+    else
+        fail "cdxgen call: a run with the lookup off was limited" "$_lp_calls / $_lp_out"
+    fi
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
