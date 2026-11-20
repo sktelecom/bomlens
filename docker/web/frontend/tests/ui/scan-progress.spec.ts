@@ -267,6 +267,29 @@ test("a missing image and a refused login are told apart", async ({ page }) => {
   await expect(failed).toContainText("Check the image name and the tag");
 });
 
+test("a refused pull names both causes, and the raw provider text stays in the log", async ({ page }) => {
+  await setup(page);
+  await fakeStream(page);
+  await start(page);
+  await emit(page, "log", "    - podman: unavailable");
+  await emit(page, "error", {
+    detail: "Could not read the image acme/app:1.0: access was denied. The registry gives the same answer when the image or repository does not exist (Docker Hub, ghcr.io) as when it is private and needs a login.",
+  });
+  const failed = page.getByTestId("run-failed");
+  await expect(failed).toContainText("Either the image does not exist or it is private and needs a login.");
+  await expect(failed).not.toContainText("podman");
+});
+
+test("valid JSON that is not an SBOM fails with a plain sentence about the file", async ({ page }) => {
+  await setup(page);
+  await fakeStream(page);
+  await start(page);
+  await emit(page, "error", { detail: "[ERROR] could not convert supplier SBOM to CycloneDX." });
+  const failed = page.getByTestId("run-failed");
+  await expect(failed).toContainText("valid JSON, but it is not a CycloneDX or SPDX SBOM");
+  await expect(failed).toContainText("Ask the supplier to send the SBOM again");
+});
+
 test("an unrecognised failure opens the run log and says to read it", async ({ page }) => {
   await setup(page);
   await page.route("**/scan-stream**", (r) =>

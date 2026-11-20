@@ -105,6 +105,12 @@ export function explainFailure(
   // A key this screen does not know: the server's own wording is the cause.
   if (key) return { causeKey: key, fixKey: "run.failGenericFix", vars: {}, recognised: false };
 
+  // A valid JSON file that is no SBOM is let through the upload on purpose and
+  // fails here, when the scanner cannot convert it.
+  if (/could not convert supplier SBOM/i.test(error ?? "")) {
+    return { causeKey: "run.failSbomNotSbomCause", fixKey: "run.failSbomFileFix", vars: {}, recognised: true };
+  }
+
   const image = imageFailureKind(error, logs);
   if (image) {
     const name = image === "host" ? "Host" : image === "missing" ? "Missing" : "Auth";

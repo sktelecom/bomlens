@@ -107,3 +107,12 @@ describe("image failures summarised by the server", () => {
     expect(explainFailure([], base + "the registry host could not be found.", null).causeKey).toBe("run.failImageHostCause");
   });
 });
+
+describe("valid JSON that is not an SBOM", () => {
+  it("is explained as a file problem", () => {
+    const e = explainFailure([], "[ERROR] could not convert supplier SBOM to CycloneDX.", null);
+    expect(e.causeKey).toBe("run.failSbomNotSbomCause");
+    expect(e.fixKey).toBe("run.failSbomFileFix");
+    expect(e.recognised).toBe(true);
+  });
+});

@@ -874,6 +874,7 @@
     "logFailed": "실패",
     "failTargetHiddenCause": "스캐너가 선택한 폴더를 볼 수 없습니다.",
     "failTargetHiddenFix": "Docker가 이 폴더를 공유하는지(Colima는 홈 폴더 아래만, Docker Desktop은 Settings > Resources > File sharing의 폴더만 공유합니다)와 폴더가 비어 있지 않은지 확인하세요. 프로젝트를 홈 폴더 아래로 옮기거나 그 위치를 공유한 뒤 다시 스캔하세요.",
+    "failSbomNotSbomCause": "올바른 JSON이지만 CycloneDX 또는 SPDX SBOM이 아니어서 읽을 수 없습니다.",
     "failSbomFileFix": "공급사에 SBOM을 다시 보내 달라고 요청한 뒤, 새 파일로 스캔을 다시 시작하세요.",
     "failImageHostCause": "이미지 이름에 적힌 레지스트리를 찾지 못했습니다.",
     "failImageHostFix": "이미지 이름의 호스트 이름과 이 컴퓨터의 네트워크 또는 DNS 설정을 확인한 뒤 다시 스캔하세요.",
