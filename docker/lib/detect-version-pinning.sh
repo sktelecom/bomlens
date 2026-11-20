@@ -46,6 +46,14 @@ for lock in poetry.lock Pipfile.lock uv.lock pdm.lock \
     fi
 done
 
+# Xcode keeps a Package.resolved in the project or workspace bundle.
+if [ -z "${VERDICT:-}" ]; then
+    for x in "$SRC"/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved \
+             "$SRC"/*.xcworkspace/xcshareddata/swiftpm/Package.resolved; do
+        if [ -f "$x" ]; then VERDICT="pinned"; break; fi
+    done
+fi
+
 # No lock file. Two ecosystems can still be judged from the manifest itself.
 if [ -z "${VERDICT:-}" ]; then
     if [ -f "$SRC/requirements.txt" ]; then
