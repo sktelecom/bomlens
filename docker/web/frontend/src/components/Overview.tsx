@@ -133,7 +133,7 @@ export function Overview({
           <AiUsageCard sbom={result.sbom} />
         </div>
         <div className="bl-ov-col">
-          {result.security && <SeverityPanel security={result.security} scanId={scanId} />}
+          {result.security && <SeverityPanel security={result.security} scanId={scanId} completeness={result.completeness} />}
           <LicensePanel result={result} scanId={scanId} />
           <SectionsBox result={result} scanId={scanId} hasDeps={hasDeps} />
         </div>
