@@ -779,8 +779,12 @@ generate_sbom_cdxgen() {
         rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
         return 1
     fi
-    # An SBOM written although the registry refused some downloads.
-    [ ! -s "$bom_path" ] || registry_auth_hint "cdxgen" "$logf" "$(scan_input_kind)"
+    # An SBOM written although the registry refused some downloads: the
+    # warning in the log, and bomlens:registry-refused on the SBOM.
+    if [ -s "$bom_path" ] && registry_auth_refused "$logf"; then
+        registry_auth_hint "cdxgen" "$logf" "$(scan_input_kind)"
+        mark_sbom_registry_refused "$bom_path" registry-auth
+    fi
     [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
     rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
@@ -840,8 +844,10 @@ mark_compositions_aggregate() {
                 # Maven project whose dependency tree could not be built
                 # (only the dependencies written in pom.xml are listed). An
                 # installed Python environment read with something it could
-                # not settle (bomlens:python-environment-unsure) is the same.
-                | ((($props | map(select(.name=="bomlens:sbom-tool-degraded" or .name=="bomlens:python-environment-unsure")) | length) > 0)
+                # not settle (bomlens:python-environment-unsure) is the same,
+                # and so is a stage 1 whose registry refused some downloads
+                # (bomlens:registry-refused).
+                | ((($props | map(select(.name=="bomlens:sbom-tool-degraded" or .name=="bomlens:python-environment-unsure" or .name=="bomlens:registry-refused")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
                    or ($failed | index("gradle-packages") != null)
@@ -1439,6 +1445,22 @@ EOF
             fi
             mark_sbom_degraded "$OUTPUT_FILE" "$_s1_reason"
             mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
+        elif [ -s "$OUTPUT_FILE" ] && [ "${BOMLENS_STAGE1_EXIT:-}" = "0" ]; then
+            # A stage 1 that wrote an SBOM although the registry refused some
+            # downloads (401/403). The CLI read its log already and passes
+            # _BOMLENS_REGISTRY_REFUSED; a caller running the plan passes the
+            # log, read here.
+            if [ -n "${_BOMLENS_CLI_FALLBACK:-}" ]; then
+                [ "${_BOMLENS_REGISTRY_REFUSED:-}" != "registry-auth" ] \
+                    || mark_sbom_registry_refused "$OUTPUT_FILE" registry-auth
+            else
+                _s1_log="${BOMLENS_STAGE1_LOG:-}"
+                case "$_s1_log" in ''|*/*|.*) _s1_log="" ;; esac
+                if [ -n "$_s1_log" ] && registry_auth_refused "$HOST_OUTPUT_DIR/$_s1_log"; then
+                    registry_auth_hint "cdxgen" "$HOST_OUTPUT_DIR/$_s1_log" "$(scan_input_kind)"
+                    mark_sbom_registry_refused "$OUTPUT_FILE" registry-auth
+                fi
+            fi
         fi
         if [ ! -s "$OUTPUT_FILE" ]; then
             echo "[ERROR] SBOM not found for post-processing: $OUTPUT_FILE" >&2

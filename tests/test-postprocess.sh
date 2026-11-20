@@ -11364,6 +11364,22 @@ _got="$(_BOMLENS_REGISTRY_HINT_SHOWN=1 bash -c '. "$1"; registry_auth_hint cdxge
 printf '[INFO] resolved 120 packages\nadded lodash@4.17.401\n' > "$WORK/rf-clean.log"
 _got="$(bash -c '. "$1"; registry_auth_hint cdxgen "$2" folder' _ "$DETECT" "$WORK/rf-clean.log" 2>&1)"
 [ -z "$_got" ] && pass "a clean stage 1 log prints no registry warning" || fail "registry warning without a refusal" "$_got"
+# The same case recorded on the SBOM (bomlens:registry-refused).
+bash -c '. "$1"; registry_auth_refused "$2" && ! registry_auth_refused "$3" && ! registry_auth_refused ""' _ "$DETECT" "$WORK/rf-partial.log" "$WORK/rf-clean.log" \
+    && pass "registry_auth_refused: true for a refused download, false for a clean or missing log" || fail "registry_auth_refused"
+printf '%s' '{"metadata":{"properties":[{"name":"bomlens:detection","value":"build"}]},"components":[]}' > "$WORK/rf-mark.json"
+bash -c '. "$1"; mark_sbom_registry_refused "$2" registry-auth; mark_sbom_registry_refused "$2" registry-auth' _ "$DETECT" "$WORK/rf-mark.json"
+_got="$(jq -c '[.metadata.properties[] | select(.name == "bomlens:registry-refused") | .value]' "$WORK/rf-mark.json")"
+{ [ "$_got" = '["registry-auth"]' ] && jq -e 'any(.metadata.properties[]; .name == "bomlens:detection")' "$WORK/rf-mark.json" >/dev/null; } \
+    && pass "mark_sbom_registry_refused records bomlens:registry-refused once and keeps the other properties" || fail "mark_sbom_registry_refused" "$(cat "$WORK/rf-mark.json")"
+printf '%s' '{"components":[]}' > "$WORK/rf-mark-bare.json"
+bash -c '. "$1"; mark_sbom_registry_refused "$2"' _ "$DETECT" "$WORK/rf-mark-bare.json"
+[ "$(jq -r '.metadata.properties[0].value' "$WORK/rf-mark-bare.json")" = registry-auth ] \
+    && pass "mark_sbom_registry_refused adds metadata when the SBOM has none" || fail "mark_sbom_registry_refused on a bare SBOM" "$(cat "$WORK/rf-mark-bare.json")"
+# The CLI hands the finding to stage 2 under the name POSTPROCESS reads.
+{ grep -q -- '-e _BOMLENS_REGISTRY_REFUSED=registry-auth' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && grep -q '_BOMLENS_REGISTRY_REFUSED:-}" != "registry-auth"' "$ROOT_DIR/docker/entrypoint.sh"; } \
+    && pass "the CLI passes _BOMLENS_REGISTRY_REFUSED and POSTPROCESS reads the same name" || fail "_BOMLENS_REGISTRY_REFUSED differs between scan-sbom.sh and entrypoint.sh"
 for _d in /tmp/bomlens-ca.*; do
     case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
 done
@@ -13230,6 +13246,19 @@ JSON
     [ "$(mca_agg "$WORK/mca-source-degraded-real.json")" = "incomplete" ] \
         && pass "the real mark_sbom_degraded stamp composes correctly with mark_compositions_aggregate" \
         || fail "expected incomplete" "$(mca_agg "$WORK/mca-source-degraded-real.json")"
+
+    # A stage 1 SBOM written although the registry refused some downloads
+    # (mark_sbom_registry_refused): incomplete, even with lock evidence and edges.
+    cat > "$WORK/mca-source-registry-refused.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    mark_sbom_registry_refused "$WORK/mca-source-registry-refused.json" registry-auth
+    SCAN_MODE=POSTPROCESS mark_compositions_aggregate "$WORK/mca-source-registry-refused.json"
+    [ "$(mca_agg "$WORK/mca-source-registry-refused.json")" = "incomplete" ] \
+        && pass "bomlens:registry-refused declares the graph incomplete" \
+        || fail "expected incomplete for bomlens:registry-refused" "$(mca_agg "$WORK/mca-source-registry-refused.json")"
 
     # The CLI's two-stage flow reads MODE=POSTPROCESS, not SOURCE: when stage 1
     # (the cdxgen sibling container) crashes, scan-sbom.sh's own syft-fallback

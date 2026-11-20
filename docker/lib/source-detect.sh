@@ -338,6 +338,13 @@ registry_failure_advice() {
     return 0
 }
 
+# registry_auth_refused <log>: true when the log of a stage 1 holds a package
+# manager's own 401/403 form (REGISTRY_AUTH_TOOL_RE).
+registry_auth_refused() {
+    [ -n "${1:-}" ] && [ -f "$1" ] || return 1
+    grep -qE -- "$REGISTRY_AUTH_TOOL_RE" "$1" 2>/dev/null
+}
+
 # registry_auth_hint <step> <log> [input kind]: a stage 1 that wrote an SBOM
 # although the registry refused some downloads (401/403) leaves a result short
 # of dependencies with nothing else to say so. One [WARN] plus the advice
@@ -348,8 +355,7 @@ REGISTRY_AUTH_HINT_SHOWN="${_BOMLENS_REGISTRY_HINT_SHOWN:-}"
 registry_auth_hint() {
     local step="$1" log="${2:-}" kind="${3:-}"
     [ -z "$REGISTRY_AUTH_HINT_SHOWN" ] || return 0
-    [ -n "$log" ] && [ -f "$log" ] || return 0
-    grep -qE -- "$REGISTRY_AUTH_TOOL_RE" "$log" 2>/dev/null || return 0
+    registry_auth_refused "$log" || return 0
     [ -n "$kind" ] || kind="$(scan_input_kind)"
     echo "[WARN] $step: the package registry refused the login for some downloads (HTTP 401/403), so some dependencies may be missing from the SBOM." >&2
     registry_failure_advice registry-auth "$kind"
@@ -851,6 +857,28 @@ mark_sbom_degraded() {
     if jq --arg r "$reason" \
         '(.metadata.properties) = ((.metadata.properties // []) + [{name:"bomlens:sbom-tool-degraded", value:$r}])' \
         "$file" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"
+    fi
+}
+
+# mark_sbom_registry_refused <file> [reason]: record on the SBOM that stage 1
+# wrote it although the package registry refused some downloads, as
+# bomlens:registry-refused (registry-auth, the stage1_fail_reason word for a
+# refused login). The web UI shows a notice for it, and
+# mark_compositions_aggregate declares the graph incomplete. An entry already
+# there is replaced, so the property appears once.
+mark_sbom_registry_refused() {
+    local file="$1" reason="${2:-registry-auth}" tmp
+    [ -f "$file" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    tmp="${file}.registry.tmp"
+    if jq --arg r "$reason" '
+        .metadata = (.metadata // {})
+        | .metadata.properties = (((.metadata.properties // [])
+              | map(select(.name != "bomlens:registry-refused")))
+            + [{name: "bomlens:registry-refused", value: $r}])' "$file" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$file"
     else
         rm -f "$tmp"

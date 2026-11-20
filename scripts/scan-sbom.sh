@@ -3883,8 +3883,12 @@ GRADLE_USER_CACHE_EOF
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         # An SBOM written although the registry refused some downloads
-        # (401/403): one [WARN] with the advice for this input, once per run.
-        registry_auth_hint "cdxgen" "$STAGE1_LOG" "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1
+        # (401/403): one [WARN] with the advice for this input, once per run,
+        # and stage 2 records it on the SBOM (bomlens:registry-refused).
+        if registry_auth_refused "$STAGE1_LOG"; then
+            registry_auth_hint "cdxgen" "$STAGE1_LOG" "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1
+            STAGE1_FALLBACK_ENV="$STAGE1_FALLBACK_ENV -e _BOMLENS_REGISTRY_REFUSED=registry-auth"
+        fi
         # A preprocessing step that failed (build-prep.sh records it on the
         # SBOM as bomlens:pipeline-step-failed, a Gradle build with no
         # resolved package included) leaves an SBOM that is short of what the
