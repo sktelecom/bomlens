@@ -874,6 +874,7 @@
     "logFailed": "Failed",
     "failTargetHiddenCause": "The scanner cannot see the folder you selected.",
     "failTargetHiddenFix": "Check that Docker shares this folder (Colima shares only your home folder; Docker Desktop shares the folders under Settings > Resources > File sharing) and that the folder is not empty. Move the project under your home folder or share its location, then scan again.",
+    "failSbomNotSbomCause": "The file is valid JSON, but it is not a CycloneDX or SPDX SBOM, so it could not be read.",
     "failSbomFileFix": "Ask the supplier to send the SBOM again, then start a new scan with the new file.",
     "failImageHostCause": "The registry in the image name could not be found.",
     "failImageHostFix": "Check the host name in the image name and the network or DNS settings of this machine, then scan again.",
