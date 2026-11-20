@@ -6656,11 +6656,11 @@ else
 fi
 
 echo "== cdxgen-log mask: the kept stage 1 log has credentials masked =="
-# Guards scripts/scan-sbom.sh's mask_log_secrets, used on the cdxgen log kept
+# Guards mask_log_secrets in docker/lib/source-detect.sh, used on the cdxgen log kept
 # as <prefix>_cdxgen.log. Extract the real function (no logic duplication).
-_mls_fn=$(sed -n '/^mask_log_secrets() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")
+_mls_fn=$(sed -n '/^mask_log_stream() {/,/^}/p;/^mask_log_secrets() {/,/^}/p' "$ROOT_DIR/docker/lib/source-detect.sh")
 if [ -z "$_mls_fn" ]; then
-    fail "could not extract mask_log_secrets from scan-sbom.sh"
+    fail "could not extract mask_log_secrets from source-detect.sh"
 else
     cat > "$WORK/mls-in.log" <<'LOG'
 Could not GET https://alice:s3cr3t@repo.internal.example/maven2/x.pom

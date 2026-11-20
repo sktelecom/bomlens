@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Log masking covers npm `_auth`, a password that holds an `@` in a URL, and `<password>`, `<passphrase>`, `<token>` and `<secret>` elements, and also applies to the web UI scan log and to the temporary cdxgen log a failed scan leaves. The SBOM carries no user or password from a URL (component URLs, `repository_url` in a package URL).
 - A supplier SBOM (`--analyze`) that lists no component now fails the conformance check's mandatory result-completeness row, so `--fail-on-conformance` exits 2 for it. A source scan with no component stays a warning.
 - The web UI names the running version at the foot of the left navigation, so the static demo shows which release it is a copy of. The demo's help menu no longer offers a link to itself.
 

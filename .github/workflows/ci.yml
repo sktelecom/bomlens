@@ -387,6 +387,10 @@ jobs:
       - name: CLI conventions tests
         run: bash tests/test-cli-conventions.sh
 
+      # No Docker: credentials in logs, console output and the SBOM are masked.
+      - name: Credential masking tests
+        run: bash tests/test-credential-masking.sh
+
       # No Docker (a fake docker answers): bash 3.2 syntax guards, the folders a
       # failed run removes, the long-scan progress line, a dot-named Gradle root,
       # the Xcode-held Package.resolved and check-setup's own-UI port.
