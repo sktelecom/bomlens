@@ -55,7 +55,7 @@ PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 EXTRA_CA_ENV_NAMES="BOMLENS_EXTRA_CA_CERTS"
 # shellcheck disable=SC2034  # read by scan-sbom.sh
 EXTRA_CA_TARGET="/bomlens-ca/extra.pem"
-BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_GRADLE_USER_CACHE BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_NO_AI_USAGE BOMLENS_AI_USAGE_TIMEOUT BOMLENS_PREP_TIMEOUT BOMLENS_LICENSE_PROBE_TIMEOUT BOMLENS_LICENSE_FETCH_TIMEOUT BOMLENS_BUILD_TOOL BOMLENS_MAVEN_USER_REPOSITORY BOMLENS_MAVEN_PROBE_TIMEOUT BOMLENS_PYTHON_VENV"
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_GRADLE_USER_CACHE BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_NO_AI_USAGE BOMLENS_AI_USAGE_TIMEOUT BOMLENS_PREP_TIMEOUT BOMLENS_LICENSE_PROBE_TIMEOUT BOMLENS_LICENSE_FETCH_TIMEOUT BOMLENS_BUILD_TOOL BOMLENS_MAVEN_USER_REPOSITORY BOMLENS_MAVEN_PROBE_TIMEOUT BOMLENS_PYTHON_VENV BOMLENS_NODE_INSTALLED_LOCK"
 
 # Settings for the network the post-processing container reaches: the proxy,
 # where Trivy gets its vulnerability database (a mirror, or a cache with the
@@ -419,7 +419,15 @@ static_detection_check() {
     case "$lang" in
         node)
             for l in $STATIC_NODE_LOCKS; do [ -f "$d/$l" ] && { found="$l"; break; }; done
-            [ -n "$found" ] || { STATIC_DETECTION_WHY="no package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml or bun.lock"; return 1; }
+            if [ -z "$found" ]; then
+                STATIC_DETECTION_WHY="no package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml or bun.lock"
+                # The lock npm or pnpm wrote at install is read by the build, not
+                # here: it records one machine's install, not a committed lock.
+                if [ -f "$d/node_modules/.package-lock.json" ] || [ -f "$d/node_modules/.pnpm/lock.yaml" ]; then
+                    STATIC_DETECTION_WHY="$STATIC_DETECTION_WHY (the lock file written at install under node_modules is read in a build)"
+                fi
+                return 1
+            fi
             ;;
         java)
             [ -f "$d/pom.xml" ] && { STATIC_DETECTION_WHY="a Maven project resolves in a build"; return 1; }
