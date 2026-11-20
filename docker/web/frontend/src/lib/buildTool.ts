@@ -56,3 +56,18 @@ export function buildToolWhyKey(why: string | null | undefined): string | null {
   }
   return null;
 }
+
+/**
+ * Whether the scan builds the folder (the launch folder, a git checkout, an
+ * unpacked archive, or a chosen folder scanned deep), so the build options,
+ * the low-memory advisory and the other-scan notice apply to it. A chosen
+ * folder scanned shallow is only read, not built.
+ */
+export function buildsTheFolder(source: string, effectiveSource: string): boolean {
+  return (
+    source === "current-dir" ||
+    source === "git-url" ||
+    source === "zip-upload" ||
+    effectiveSource === "scan-target-src"
+  );
+}

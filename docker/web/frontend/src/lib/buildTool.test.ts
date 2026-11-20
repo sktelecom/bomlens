@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildToolToSend, buildToolWhyKey, builtWith, hasBothBuildTools, normalizeBuildTool } from "./buildTool";
+import { buildsTheFolder, buildToolToSend, buildToolWhyKey, builtWith, hasBothBuildTools, normalizeBuildTool } from "./buildTool";
 
 describe("buildTool", () => {
   it("shows the choice only when both build files exist", () => {
@@ -44,5 +44,12 @@ describe("buildTool", () => {
     ).toBe("overview.buildWhyBothDefaultGradle");
     expect(buildToolWhyKey("something else")).toBeNull();
     expect(buildToolWhyKey(null)).toBeNull();
+  });
+
+  it("applies the build options to a chosen folder only when it is scanned deep", () => {
+    expect(buildsTheFolder("current-dir", "current-dir")).toBe(true);
+    expect(buildsTheFolder("rootfs-dir", "scan-target-src")).toBe(true);
+    expect(buildsTheFolder("rootfs-dir", "rootfs-dir")).toBe(false);
+    expect(buildsTheFolder("docker-image", "docker-image")).toBe(false);
   });
 });
