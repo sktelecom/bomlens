@@ -193,6 +193,24 @@ tls_trust_hint() {
     return 0
 }
 
+# tls_trust_wait_hint <step> <log>: for a step that is still running. npm and
+# others retry a refused certificate for a long time before they give up, so
+# the end-of-step hint would come late. When the live log already shows the
+# error, prints one [WARN] saying so (once per run, shared with tls_trust_hint).
+tls_trust_wait_hint() {
+    local step="$1" log="${2:-}"
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0
+    [ -n "$log" ] && [ -f "$log" ] || return 0
+    grep -qE -- "$TLS_TRUST_ERROR_RE" "$log" 2>/dev/null || return 0
+    TLS_TRUST_HINT_SHOWN=1
+    if [ -n "${SBOM_EXTRA_CA_CERTS:-}${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+        echo "[WARN] $step is still running, but its log shows a TLS certificate that was not trusted even with the CA bundle in SBOM_EXTRA_CA_CERTS. Check that the bundle holds the root CA your proxy signs with. Stop with Ctrl+C and scan again." >&2
+    else
+        echo "[WARN] $step is still running, but its log shows a TLS certificate that was not trusted, most likely by a proxy that inspects HTTPS. Stop with Ctrl+C, set SBOM_EXTRA_CA_CERTS to the proxy's CA bundle (PEM) and scan again." >&2
+    fi
+    return 0
+}
+
 # Folders whose manifests a source scan leaves out by default: test suites and
 # their fixtures, examples, benchmarks and demo playgrounds. The GitHub Actions
 # workflows under .github/workflows and the Gradle wrapper under gradle/wrapper
