@@ -1067,6 +1067,8 @@
     "androidReleaseClasspath": "Android release classpath 해석",
     "swiftPackageResolve": "Swift 패키지 해석",
     "npmProductionSet": "npm 프로덕션 의존성 해석",
+    "npmInstalledLock": "설치 때 생긴 npm lock 파일 읽기",
+    "pnpmInstalledLock": "설치 때 생긴 pnpm lock 파일 읽기",
     "pipInstall": "Python 의존성 설치",
     "poetryGraph": "Poetry 의존 그래프",
     "cargoWorkspaceMetadata": "Cargo 워크스페이스 멤버 탐지",
