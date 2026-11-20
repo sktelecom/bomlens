@@ -980,9 +980,10 @@ case "$SCAN_MODE" in
         SRC_ROOT="${SOURCE_ROOT:-/src}"
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT" >&2; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT" >&2; exit 1; fi
-        # The syft fallback leaves out the same non-shipped trees as the cdxgen
-        # path (see NON_SHIPPED_DIRS in source-detect.sh).
-        read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
+        # The syft fallback leaves out the same non-shipped trees and installed
+        # Python environments as the cdxgen path (see NON_SHIPPED_DIRS and
+        # python_venv_folders in source-detect.sh).
+        read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args "$SRC_ROOT")"
         # Static detection first, as the CLI does (scan-sbom.sh --detection): a lock
         # file that covers the whole tree is read as it is, with no language image
         # and no docker socket. This is also what lets the image run as a CI job
@@ -1428,7 +1429,7 @@ EOF
                 registry_failure_advice "$_s1_reason" "$(scan_input_kind)"
             fi
             rm -f "$OUTPUT_FILE"
-            read -ra _s1_exclude <<< "$(non_shipped_syft_args)"
+            read -ra _s1_exclude <<< "$(non_shipped_syft_args "${SOURCE_ROOT:-/src}")"
             if ! syft_source_scan "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" "${_s1_exclude[@]}" \
                || ! apply_node_fallback_quality_gate "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}" 2; then
                 rm -f "$OUTPUT_FILE"
