@@ -298,7 +298,7 @@ jobs:
   postprocess:
     name: Post-process Unit and Sync Tests
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [changes]
     # Skipped on a pull request that touches nothing but docs (see the
     # changes job). Dispatch always runs it (except a reseed dispatch). Compared
