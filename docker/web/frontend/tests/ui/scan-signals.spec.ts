@@ -168,6 +168,21 @@ test("a graded result shows the engine's reasons instead of the generic zero-com
   await expect(page.getByTestId("zero-components")).toHaveCount(0);
 });
 
+test("a graded empty result does not read as no vulnerabilities on the overview card", async ({ page }) => {
+  const done = {
+    ...EMPTY_SOURCE_GRADED,
+    security: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 0, vulnerabilities: [] },
+  };
+  await stub(page, { firmware: false, scanoss: false, docker: true }, done);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  const card = page.getByTestId("severity-incomplete");
+  await expect(card).toContainText("not a clean result");
+  await expect(card).toContainText("Unreliable");
+  await expect(page.getByText("No vulnerabilities found")).toHaveCount(0);
+});
+
 test("a scan that found components shows no such warning", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true }, NORMAL_SOURCE);
   await page.goto("/#/new");

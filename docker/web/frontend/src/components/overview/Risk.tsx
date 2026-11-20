@@ -6,7 +6,8 @@ import { useTranslation } from "react-i18next";
 
 import { LicenseTierMark, PackageCoordinate, SeverityLabel, severityFg, severityFill, severityShape, tierFill, TIER_LABEL_KEY } from "@/components/primer";
 import { Marker } from "@/components/ui/marker";
-import { SEVERITY_ORDER, type DoneEvent, type SecuritySummary, type Severity } from "@/lib/api";
+import { SEVERITY_ORDER, type Completeness, type DoneEvent, type SecuritySummary, type Severity } from "@/lib/api";
+import { gradeLabel, mayStateNoVulnerabilities } from "@/lib/completeness";
 import { useFormatNumber } from "@/lib/format";
 import { LICENSE_TIER_ORDER, type LicenseRiskTier, licenseRiskSummary } from "@/lib/licenses";
 import { riskyComponentCount, topRiskComponents } from "@/lib/overview";
@@ -70,8 +71,16 @@ export function RiskyBox({ result, scanId }: { result: DoneEvent; scanId: string
  * a few pixels wide, below the 24px target size), and under it one cell per grade
  * that links to the vulnerabilities of that grade. A grade with none is disabled.
  */
-export function SeverityPanel({ security, scanId }: { security: SecuritySummary; scanId: string | null }) {
-  const { t } = useTranslation();
+export function SeverityPanel({
+  security,
+  scanId,
+  completeness = null,
+}: {
+  security: SecuritySummary;
+  scanId: string | null;
+  completeness?: Completeness | null;
+}) {
+  const { t, i18n } = useTranslation();
   const fmt = useFormatNumber();
   const total = security.TOTAL;
   return (
@@ -82,8 +91,10 @@ export function SeverityPanel({ security, scanId }: { security: SecuritySummary;
     >
       <div className="bl-box-body">
         {total === 0 ? (
-          <p className="bl-muted bl-flat">
-            {security.uncheckedCount
+          <p className="bl-muted bl-flat" data-testid={completeness && !mayStateNoVulnerabilities(completeness) ? "severity-incomplete" : undefined}>
+            {completeness && !mayStateNoVulnerabilities(completeness)
+              ? t("result.noVulnsIncompleteShort", { grade: gradeLabel(completeness, i18n.language ?? "en") })
+              : security.uncheckedCount
               ? t("result.noVulnsSomeUnchecked", { count: security.uncheckedCount })
               : security.notReachableCount
                 ? t("result.noVulnsSomeNotReachable", { count: security.notReachableCount })

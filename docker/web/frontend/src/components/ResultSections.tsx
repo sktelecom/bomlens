@@ -130,6 +130,7 @@ export function ResultSection({
       return result.security ? (
         <VulnerabilitiesTable
           security={result.security}
+          completeness={result.completeness}
           scanId={scanId}
           query={query}
           onQueryChange={onQueryChange}

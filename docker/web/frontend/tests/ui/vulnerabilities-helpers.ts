@@ -54,6 +54,8 @@ export interface OpenOptions {
   /** The scan's security summary; null for a scan with no security report. */
   security?: Record<string, unknown> | null;
   scanId?: string;
+  /** The engine's completeness result for the scan. */
+  completeness?: Record<string, unknown> | null;
 }
 
 /** Open the Vulnerabilities section of a stubbed scan at `query` (no leading `?`). */
@@ -67,6 +69,7 @@ export async function openVulns(page: Page, query = "", opts: OpenOptions = {}) 
     results: [{ name: `${scanId}_bom.json`, size: 100 }],
     conformance: null,
     security: sec,
+    ...(opts.completeness ? { completeness: opts.completeness } : {}),
     sbom: { components: 1, componentList: [{ name: "urllib3", version: "2.1.0", group: "", type: "library", licenses: ["MIT"], purl: "pkg:pypi/urllib3@2.1.0" }] },
   };
   await page.route("**/capabilities", (r) =>

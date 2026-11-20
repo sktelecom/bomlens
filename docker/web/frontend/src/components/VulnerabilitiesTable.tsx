@@ -8,12 +8,15 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
+import { CompletenessReasons } from "@/components/CompletenessReasons";
 import { SortHeader } from "@/components/primer";
+import { gradeLabel, mayStateNoVulnerabilities } from "@/lib/completeness";
 import { useDensity } from "@/components/ui/density-toggle";
 import {
   exportVex,
   fileUrl,
   importVex,
+  type Completeness,
   type ResultFile,
   type SecuritySummary,
   type Severity,
@@ -52,6 +55,8 @@ export const VULN_ACTIONS_SLOT = "bl-vuln-actions";
 
 interface Props {
   security: SecuritySummary;
+  /** The engine's completeness result; a partial or unreliable grade keeps the empty state from reading as clean. */
+  completeness?: Completeness | null;
   /** The scan's id, so an export says which scan it came from. */
   scanId?: string | null;
   /** Filter, sort and view state from the URL: a shared link, a reload, or a
@@ -79,6 +84,7 @@ interface Props {
  */
 export function VulnerabilitiesTable({
   security,
+  completeness = null,
   scanId,
   query: urlState,
   onQueryChange,
@@ -86,7 +92,7 @@ export function VulnerabilitiesTable({
   onPickDependency,
   onResultsChange,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fmt = useFormatNumber();
   const { toast } = useToast();
   const items = useMemo(() => security.vulnerabilities ?? [], [security.vulnerabilities]);
@@ -321,6 +327,28 @@ export function VulnerabilitiesTable({
           <UncheckedComponents security={security} />
           <NotReachableFindings security={security} />
           <p className="bl-muted bl-flat">{t(unchecked ? "result.noVulnsInChecked" : "result.noReachableVulns")}</p>
+          <AdvisoriesWithoutCve security={security} />
+        </div>
+      );
+    }
+    // Zero findings over a result the engine graded partial or unreliable (for
+    // example nothing was resolved) is not clean either: lead with the grade
+    // and the reasons, never "No vulnerabilities found".
+    if (!mayStateNoVulnerabilities(completeness) && completeness) {
+      return (
+        <div className="bl-stack">
+          <div className="bl-box bl-v-state" data-testid="vulns-incomplete">
+            <Blankslate>
+              <Blankslate.Visual>
+                <ShieldIcon size={24} />
+              </Blankslate.Visual>
+              <Blankslate.Heading as="h2">
+                {t("result.noVulnsIncomplete", { grade: gradeLabel(completeness, i18n.language ?? "en") })}
+              </Blankslate.Heading>
+              <Blankslate.Description>{t("result.noVulnsIncompleteHint")}</Blankslate.Description>
+              <CompletenessReasons completeness={completeness} />
+            </Blankslate>
+          </div>
           <AdvisoriesWithoutCve security={security} />
         </div>
       );

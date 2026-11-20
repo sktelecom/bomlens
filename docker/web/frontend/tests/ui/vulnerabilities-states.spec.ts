@@ -40,6 +40,31 @@ test.describe("empty and error states", () => {
     await expect.poll(() => hashOf(page)).toBe(`#/scan/${ID}/components`);
   });
 
+  test("nothing found in an unreliable result is not called clean, and shows the grade and reasons", async ({ page }) => {
+    await openVulns(page, "", {
+      security: empty(),
+      completeness: {
+        grade: "unreliable",
+        gradeLabel: { en: "Unreliable", ko: "신뢰 불가" },
+        componentCount: 0,
+        reasons: [
+          {
+            code: "no-components",
+            grade: "unreliable",
+            detail: "",
+            message: { en: "The scan found no component.", ko: "컴포넌트를 찾지 못했습니다." },
+            fix: { en: "Check the scan log and scan again.", ko: "로그를 확인하고 다시 스캔하세요." },
+          },
+        ],
+      },
+    });
+    const box = page.getByTestId("vulns-incomplete");
+    await expect(box).toContainText("Not a clean result: completeness is Unreliable");
+    await expect(box).toContainText("The scan found no component.");
+    await expect(page.getByTestId("no-vulnerabilities")).toHaveCount(0);
+    await expect(page.getByText("No vulnerabilities found")).toHaveCount(0);
+  });
+
   test("nothing found but components not checked is not called clean, and lists them", async ({ page }) => {
     await openVulns(page, "", {
       security: empty({

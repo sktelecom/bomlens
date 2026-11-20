@@ -48,3 +48,12 @@ export function gradeLabel(c: Completeness, language: string): string {
 export function gradeVariant(grade: CompletenessGrade): "success" | "attention" | "danger" {
   return grade === "unreliable" ? "danger" : grade === "partial" ? "attention" : "success";
 }
+
+/**
+ * Whether "no vulnerabilities found" may be stated. A result the engine graded
+ * partial or unreliable (nothing resolved, a failed analyzer) proves nothing by
+ * having no findings; a result without the file keeps the wording it had.
+ */
+export function mayStateNoVulnerabilities(c: Completeness | null | undefined): boolean {
+  return !isIncomplete(c);
+}

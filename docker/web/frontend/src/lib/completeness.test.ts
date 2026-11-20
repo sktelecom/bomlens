@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { Completeness } from "./api";
-import { gradeLabel, gradeVariant, isIncomplete, reasonLines } from "./completeness";
+import { gradeLabel, gradeVariant, isIncomplete, mayStateNoVulnerabilities, reasonLines } from "./completeness";
 
 // The fixtures are the files the engine writes (tests/fixtures/completeness), so
 // this checks the screen's reading of the real format, not a hand-made shape.
@@ -54,5 +54,16 @@ describe("gradeLabel and gradeVariant", () => {
     expect(gradeVariant("complete")).toBe("success");
     expect(gradeVariant("partial")).toBe("attention");
     expect(gradeVariant("unreliable")).toBe("danger");
+  });
+});
+
+describe("mayStateNoVulnerabilities", () => {
+  it("allows the clean wording only for a missing file or a complete grade", () => {
+    expect(mayStateNoVulnerabilities(null)).toBe(true);
+    expect(mayStateNoVulnerabilities(undefined)).toBe(true);
+    const base = { gradeLabel: { en: "x", ko: "x" }, componentCount: 0, reasons: [] };
+    expect(mayStateNoVulnerabilities({ ...base, grade: "complete" })).toBe(true);
+    expect(mayStateNoVulnerabilities({ ...base, grade: "partial" })).toBe(false);
+    expect(mayStateNoVulnerabilities({ ...base, grade: "unreliable" })).toBe(false);
   });
 });
