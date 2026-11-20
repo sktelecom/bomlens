@@ -298,7 +298,7 @@ jobs:
   postprocess:
     name: Post-process Unit and Sync Tests
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [changes]
     # Skipped on a pull request that touches nothing but docs (see the
     # changes job). Dispatch always runs it (except a reseed dispatch). Compared
@@ -386,6 +386,10 @@ jobs:
       # No Docker (a fake docker answers): exit codes and output streams of the CLI.
       - name: CLI conventions tests
         run: bash tests/test-cli-conventions.sh
+
+      # No Docker: credentials in logs, console output and the SBOM are masked.
+      - name: Credential masking tests
+        run: bash tests/test-credential-masking.sh
 
       # No Docker (a fake docker answers): bash 3.2 syntax guards, the folders a
       # failed run removes, the long-scan progress line, a dot-named Gradle root,

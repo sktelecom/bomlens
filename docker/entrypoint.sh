@@ -643,7 +643,7 @@ generate_sbom_cdxgen() {
         # there is no shared place to put it.
         echo "[ERROR] the guard-state folder ($GUARD_STATE_DIR) is not mounted, so build-prep.sh cannot be handed to the cdxgen container. Start the web UI with scan-sbom.sh --ui or the desktop app, or mount a writable folder at $GUARD_STATE_DIR." >&2
         false
-      fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
+      fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" | mask_log_stream -u &
     local pipe_pid=$!
     # The cidfile appears as soon as the container is created, well before it
     # finishes, so a cancel arriving during the run still has a container id

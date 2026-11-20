@@ -1547,23 +1547,6 @@ fi
 # the container never wrote ("SBOM not found on host", and no result file found).
 container_safe() { printf '%s' "$1" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//'; }
 
-# mask_log_secrets <in> <out>: copy a tool log with what can identify a
-# credential masked, for a copy kept beside the outputs: the user and password
-# of a URL (scheme://user:pass@ becomes scheme://***@), the value of an
-# Authorization header, a Bearer or Basic credential, and a value given to a
-# token, password, secret or API key name. Returns non-zero (and writes
-# nothing) when sed fails.
-mask_log_secrets() {
-    local q="[\"']"
-    sed -E \
-        -e "s#([A-Za-z][A-Za-z0-9+.-]*://)[^/@[:space:]\"']+@#\\1***@#g" \
-        -e "s#([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]${q}?[[:space:]]*[:=][[:space:]]*${q}?)([A-Za-z]+[[:space:]]+)?[^[:space:]\"',;]+#\\1\\2***#g" \
-        -e "s#([Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])[[:space:]]+[A-Za-z0-9._~+/=-]{8,}#\\1 ***#g" \
-        -e "s#(([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])${q}?[[:space:]]*[:=][[:space:]]*${q}?)[^[:space:]\"',;&]+#\\1***#g" \
-        "$1" > "$2.tmp" 2>/dev/null && mv "$2.tmp" "$2" && return 0
-    rm -f "$2.tmp"
-    return 1
-}
 SAFE_PROJECT=$(container_safe "$PROJECT_NAME")
 SAFE_VERSION=$(container_safe "$PROJECT_VERSION")
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
@@ -1675,12 +1658,12 @@ docker_run_failure_code() {
     return "$1"
 }
 
-# wait_with_progress <pid> <what>: waits for a background job like `wait`, and
+# wait_with_progress <pid> <what> [log]: waits for a background job like `wait`, and
 # prints one line every BOMLENS_PROGRESS_SECS (default 60) while the job runs, so
 # a long build whose output goes to a log does not leave the terminal silent.
 # One line each time, with no cursor control, so a redirected log reads the same.
 wait_with_progress() {
-    local pid="$1" what="$2" every="${BOMLENS_PROGRESS_SECS:-60}" started tick=0 now
+    local pid="$1" what="$2" log="${3:-}" every="${BOMLENS_PROGRESS_SECS:-60}" started tick=0 now
     case "$every" in ''|*[!0-9]*|0) every=60 ;; esac
     started=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
@@ -1690,6 +1673,8 @@ wait_with_progress() {
             tick=0
             now=$(( (SECONDS - started) / 60 ))
             echo "[INFO] Still running: $what, $now min elapsed."
+            # A step whose live log already shows an untrusted certificate says so now.
+            [ -z "$log" ] || tls_trust_wait_hint "$what" "$log"
         fi
     done
     wait "$pid" || true
@@ -3733,12 +3718,15 @@ if [ "$MODE" = "SOURCE" ]; then
     # `wait` now returns ITS exit code -- a crash would trip `set -e` right
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
-    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (live log: $STAGE1_LOG)"
+    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (live log: $STAGE1_LOG)" "$STAGE1_LOG"
     drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    # The log stays in the temp folder when the scan fails, and its path is
+    # printed: mask it in place first.
+    if mask_log_secrets "$STAGE1_LOG" "$STAGE1_LOG.masked"; then mv -f "$STAGE1_LOG.masked" "$STAGE1_LOG"; chmod 600 "$STAGE1_LOG" 2>/dev/null || true; fi
     [ "$STAGE1_TRY" -eq 1 ] && [ "$LANG_DET" = java ] || break
     java_retry_image "$SCAN_INPUT_DIR" "$STAGE1_LOG" "$CDX_IMG"
     [ -n "$JAVA_RETRY_IMAGE" ] || break

@@ -94,6 +94,33 @@ _passable_names() {
     done
 }
 
+# mask_log_stream [-u]: copy standard input to standard output with what can
+# identify a credential masked: the user and password of a URL
+# (scheme://user:pass@ becomes scheme://***@, a password that holds an @
+# included), the value of an Authorization header, a Bearer or Basic
+# credential, the value given to a token, password, secret or API key name
+# (npmrc _authToken and _password too), the value of an npmrc _auth, and the
+# text of a <password>, <passphrase>, <token> or <secret> element (Maven
+# settings.xml). -u reads and writes a line at a time, for a live log.
+mask_log_stream() {
+    local q="[\"']" u=()
+    [ "${1:-}" = "-u" ] && u=(-u)
+    sed -E ${u[@]+"${u[@]}"} \
+        -e "s#([A-Za-z][A-Za-z0-9+.-]*://)[^/[:space:]\"']+@#\\1***@#g" \
+        -e "s#([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]${q}?[[:space:]]*[:=][[:space:]]*${q}?)([A-Za-z]+[[:space:]]+)?[^[:space:]\"',;]+#\\1\\2***#g" \
+        -e "s#([Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])[[:space:]]+[A-Za-z0-9._~+/=-]{8,}#\\1 ***#g" \
+        -e "s#(([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|_[Aa][Uu][Tt][Hh])${q}?[[:space:]]*[:=][[:space:]]*${q}?)[^[:space:]\"',;&]+#\\1***#g" \
+        -e "s#(<(password|passphrase|token|secret|Password|Passphrase|Token|Secret)>)[^<]+(</)#\\1***\\3#g"
+}
+
+# mask_log_secrets <in> <out>: mask_log_stream for a file kept beside the
+# outputs. Returns non-zero (and writes nothing) when sed fails.
+mask_log_secrets() {
+    mask_log_stream < "$1" > "$2.tmp" 2>/dev/null && mv "$2.tmp" "$2" && return 0
+    rm -f "$2.tmp"
+    return 1
+}
+
 # Prints "-e NAME" for each name above. Names only, never values, so the output
 # is safe to splice into the eval'd docker command in scan-sbom.sh.
 build_prep_env_args() {
@@ -271,6 +298,24 @@ registry_auth_hint() {
     [ -n "$kind" ] || kind="$(scan_input_kind)"
     echo "[WARN] $step: the package registry refused the login for some downloads (HTTP 401/403), so some dependencies may be missing from the SBOM." >&2
     registry_failure_advice registry-auth "$kind"
+}
+
+# tls_trust_wait_hint <step> <log>: for a step that is still running. npm and
+# others retry a refused certificate for a long time before they give up, so
+# the end-of-step hint would come late. When the live log already shows the
+# error, prints one [WARN] saying so (once per run, shared with tls_trust_hint).
+tls_trust_wait_hint() {
+    local step="$1" log="${2:-}"
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0
+    [ -n "$log" ] && [ -f "$log" ] || return 0
+    grep -qE -- "$TLS_TRUST_ERROR_RE" "$log" 2>/dev/null || return 0
+    TLS_TRUST_HINT_SHOWN=1
+    if [ -n "${SBOM_EXTRA_CA_CERTS:-}${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+        echo "[WARN] $step is still running, but its log shows a TLS certificate that was not trusted even with the CA bundle in SBOM_EXTRA_CA_CERTS. Check that the bundle holds the root CA your proxy signs with. Stop with Ctrl+C and scan again." >&2
+    else
+        echo "[WARN] $step is still running, but its log shows a TLS certificate that was not trusted, most likely by a proxy that inspects HTTPS. Stop with Ctrl+C, set SBOM_EXTRA_CA_CERTS to the proxy's CA bundle (PEM) and scan again." >&2
+    fi
+    return 0
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and

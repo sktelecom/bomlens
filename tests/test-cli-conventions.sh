@@ -122,6 +122,8 @@ extract_fn() {
         inside && $0 == "}" { exit }
     ' "$SCRIPT"
 }
+# shellcheck source=docker/lib/source-detect.sh
+. "$(dirname "$SCRIPT")/../docker/lib/source-detect.sh"
 for fn in log_warn log_error wait_with_progress docker_run_failure_code engine_stopped_during_scan remove_earlier_result windows_path_too_long; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1; fi
@@ -158,6 +160,23 @@ if [ "$(printf '%s\n' "$out" | grep -c '^\[INFO\] Still running: stage 1 test')"
 else
     fail "progress line" "out=$out"
 fi
+
+# A step still running whose live log shows an untrusted certificate says so once.
+printf 'npm ERR! code SELF_SIGNED_CERT_IN_CHAIN\n' > "$WORK/live.log"
+sleep 3 & _bg=$!
+out="$( unset SBOM_EXTRA_CA_CERTS BOMLENS_EXTRA_CA_CERTS; TLS_TRUST_HINT_SHOWN=""; BOMLENS_PROGRESS_SECS=1 wait_with_progress "$_bg" "stage 1 test" "$WORK/live.log" 2>&1)"
+wait "$_bg" 2>/dev/null
+if [ "$(printf '%s\n' "$out" | grep -c '^\[WARN\] stage 1 test is still running, but its log shows a TLS certificate')" = 1 ] \
+   && printf '%s\n' "$out" | grep -q 'SBOM_EXTRA_CA_CERTS'; then
+    pass "a running step with an untrusted certificate in its log prints one hint naming SBOM_EXTRA_CA_CERTS"
+else
+    fail "running-step TLS hint" "out=$out"
+fi
+printf 'fetching\n' > "$WORK/live.log"
+sleep 2 & _bg=$!
+out="$( unset SBOM_EXTRA_CA_CERTS BOMLENS_EXTRA_CA_CERTS; TLS_TRUST_HINT_SHOWN=""; BOMLENS_PROGRESS_SECS=1 wait_with_progress "$_bg" "stage 1 test" "$WORK/live.log" 2>&1)"
+wait "$_bg" 2>/dev/null
+if printf '%s\n' "$out" | grep -q '^\[WARN\]'; then fail "hint without a certificate error" "out=$out"; else pass "no hint when the log shows no certificate error"; fi
 
 SBOM_OUTPUT_FLAT=1 run_cli --project p --version 1 --target alpine:3.20 --timestamp --generate-only
 if grep -q '^\[WARN\] --timestamp only names the run subfolder' "$WORK/err"; then

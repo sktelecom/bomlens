@@ -1,0 +1,45 @@
+---
+description: Scan a project whose dependencies come from your company's package repository. Scan where the project already builds, read a lock file without a build, or analyze an SBOM your build made; the proxy and company CA settings are the fallback.
+---
+
+# How do I scan a project that needs my company's package repository?
+
+A source scan resolves dependencies by running the package managers inside a container. The exact versions a project uses come from the environment that builds it: its login to the internal repository, its mirror, its VPN. A scan container does not have all of that. So for a project that needs the company's repository, scan where the project already builds, and treat the proxy and certificate settings below as a fallback.
+
+## Where should I run the scan?
+
+Pick the first of these that fits.
+
+1. The project has a complete lock file. With `--detection static`, BomLens reads the lock file and runs no build, so it needs no access to your internal repository. `auto` does this by itself when one `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile` covers the whole tree. Licenses the lock file lacks are filled from the public registry, so the license of an internal package may stay empty.
+2. Your build already produces an SBOM, or can. Make it on the machine that builds the project, for example with the CycloneDX plugin for Maven (`mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom`) or `npx @cyclonedx/cyclonedx-npm --output-file bom.json`, then check and analyze it with `--analyze bom.json`. The [supplier SBOM guide](supplier-sbom.md) describes the checks and the reports this gives. BomLens does not change the SBOM you hand it.
+3. A CI runner or a build machine can run BomLens. Run the scan there, where the build already has its settings: see [CI/CD integration](ci-cd.md), including the case where the runner has no Docker.
+4. None of these is possible. Scan from your own machine with the proxy and certificate settings below. Maven and Gradle settings files are passed into the scan ([Maven guide](java-maven.md#does-my-private-repository-work)). npm and pip settings files and their mirror variables are not, so an npm or pip project that needs a login to resolve usually comes out short this way.
+
+Compare the component count with what your own build reports. A far lower number means resolution failed.
+
+## What do I set for a proxy?
+
+`HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. The desktop app does not pass proxy variables, so set the proxy in the Docker engine there.
+
+## How do I trust my company CA?
+
+A proxy that inspects HTTPS re-signs it with a company CA, and the scan containers do not trust that CA. Some hosts may be inspected while others are not, so one registry can fail while another works. Give BomLens the CA as a PEM file:
+
+```bash
+SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-project --generate-only
+```
+
+The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way. On Windows, the desktop app reads `SBOM_EXTRA_CA_CERTS` as an environment variable, and the batch launchers read it from `bomlens.settings.txt` ([Settings file](../start/no-cli.md#settings-file-no-command-line-needed)).
+
+## What about the Docker engine's own proxy and CA?
+
+Image downloads are made by the Docker engine, not by BomLens, so a proxy or CA you set in your shell has no effect on them. If the first scan stops at the image download, check these in order:
+
+- `docker pull hello-world` in your terminal. If it fails the same way, the problem is the engine's setting, not BomLens.
+- The proxy setting of your Docker product. Docker Desktop has it under `Settings > Resources > Proxies`, and Rancher Desktop under `Preferences > WSL > Proxy` on Windows.
+- Whether the engine trusts your company CA. A proxy that inspects HTTPS shows up as `x509: certificate signed by unknown authority` in the pull error. How to add a CA depends on the product and the host system, so follow that product's documentation. `SBOM_EXTRA_CA_CERTS` does not cover image downloads.
+- A host that cannot reach any registry can load the image from a file instead: see `SBOM_IMAGE_TAR` and `SBOM_PULL=never` in the [CLI reference](../reference/cli.md).
+
+## What is written to logs and result files?
+
+The console output of a scan, the web UI log and the cdxgen log kept as `{Project}_{Version}_cdxgen.log` have credentials masked: the user and password in a URL, the value after `Authorization`, `Bearer` and `Basic`, the value after a name such as `token`, `password`, `secret` or `api_key`, and the text of a `<password>` element. The SBOM carries no user or password from a URL. Masking works on patterns, so a credential written in a form none of them recognises, such as a bare token on a line with no name before it, is not masked. Read the cdxgen log before you send it to anyone.
