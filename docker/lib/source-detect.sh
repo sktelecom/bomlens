@@ -173,6 +173,15 @@ extra_ca_mount() {
 # unable to get local issuer certificate, SELF_SIGNED_CERT_IN_CHAIN).
 TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path building failed|CERTIFICATE_VERIFY_FAILED|UNABLE_TO_GET_ISSUER_CERT_LOCALLY|UNABLE_TO_VERIFY_LEAF_SIGNATURE|unable to get local issuer certificate|SELF_SIGNED_CERT_IN_CHAIN|self[- ]signed certificate in certificate chain'
 
+# What a package manager prints when the registry refused the login (HTTP 401
+# or 403): npm (code E401, a bare E403), pnpm (ERR_PNPM_FETCH_401), Yarn
+# (YN0041, or the status text below), pip (HTTP error 401, 403 Client Error),
+# Maven (status code: 401, Return code is: 403, Not authorized), Gradle
+# (Received status code 401) and the plain status lines. Each status number
+# comes with the words around it, so a version or file name holding 401 or
+# 403 does not match.
+REGISTRY_AUTH_ERROR_RE='code E40[13]([^0-9]|$)|(^|[[:space:]])E40[13]:?([[:space:]]|$)|ERR_PNPM_FETCH_40[13]([^0-9]|$)|YN0041|Invalid authentication|HTTP error 40[13]([^0-9]|$)|40[13] Client Error|status code:? 40[13]([^0-9]|$)|Return code is: 40[13]([^0-9]|$)|Not authorized|401 Unauthorized|403 Forbidden'
+
 # tls_trust_hint <step> <file|->...: when a file (or stdin, given as -) holds
 # one of those errors, prints a one-line [WARN] naming SBOM_EXTRA_CA_CERTS,
 # once per run. A step that fails this way most often sits behind a proxy
@@ -191,6 +200,71 @@ tls_trust_hint() {
         echo "[WARN] $step: a TLS certificate was not trusted, most likely by a proxy that inspects HTTPS. Set SBOM_EXTRA_CA_CERTS to the proxy's CA bundle (PEM) and scan again." >&2
     fi
     return 0
+}
+
+# scan_input_kind [scanmeta]: how the source of this scan came in, as folder,
+# git (a cloned URL) or archive (an extracted .zip or .tar.gz). The advice for
+# a refused registry depends on it: a clone or an archive was never built on
+# the user's machine, so its settings for the company's registry are not
+# there either. Read from the scan's .scanmeta.json, which the CLI and the web
+# UI both write into the output folder before the scan starts (source git-url
+# or zip-upload); anything else is a folder.
+scan_input_kind() {
+    local meta="${1:-${HOST_OUTPUT_DIR:-.}/.scanmeta.json}" src=""
+    if [ -f "$meta" ]; then
+        src="$(grep -Eo '"source": *"(git-url|zip-upload)"' "$meta" 2>/dev/null | head -n 1)" || src=""
+    fi
+    case "$src" in
+        *git-url*) echo git ;;
+        *zip-upload*) echo archive ;;
+        *) echo folder ;;
+    esac
+}
+
+# registry_failure_advice <reason> <input kind>: one or two [HINT] lines on
+# what to do when stage 1 could not use a package registry, for the reasons
+# tls-trust, registry-auth and network (stage1_fail_reason). Others print
+# nothing. The certificate advice is the one tls_trust_hint gives and is not
+# printed again once that has run.
+REGISTRY_GUIDE_URL="https://sktelecom.github.io/bomlens/guides/company-network/"
+registry_failure_advice() {
+    local reason="$1" kind="${2:-folder}"
+    case "$reason" in
+        registry-auth)
+            REGISTRY_AUTH_HINT_SHOWN=1
+            case "$kind" in
+                git|archive)
+                    echo "[HINT] Dependencies were resolved in a container that has no login to your company's package repository. Scan the project folder on a machine where it builds, or in CI; or commit a complete lock file and scan with --detection static." >&2 ;;
+                *)
+                    echo "[HINT] The scan container has no login for npm or pip registries (the CLI passes Maven's ~/.m2/settings.xml and Gradle's settings). Scan in CI, where the build has its settings, or use a complete lock file with --detection static." >&2 ;;
+            esac
+            echo "[HINT] Scanning on a company network: $REGISTRY_GUIDE_URL" >&2 ;;
+        tls-trust)
+            [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0
+            TLS_TRUST_HINT_SHOWN=1
+            echo "[HINT] Set SBOM_EXTRA_CA_CERTS to the CA bundle (PEM) of the proxy that inspects HTTPS, and scan again." >&2 ;;
+        network)
+            echo "[HINT] The package registry could not be reached from the Docker engine. Check the proxy variables (HTTP_PROXY, HTTPS_PROXY, NO_PROXY), and whether the registry's address only works through a VPN the engine does not use." >&2
+            echo "[HINT] Scanning on a company network: $REGISTRY_GUIDE_URL" >&2 ;;
+    esac
+    return 0
+}
+
+# registry_auth_hint <step> <log> [input kind]: a stage 1 that wrote an SBOM
+# although the registry refused some downloads (401/403) leaves a result short
+# of dependencies with nothing else to say so. One [WARN] plus the advice
+# above, once per run like tls_trust_hint (a failure classified registry-auth
+# has printed the advice already). _BOMLENS_REGISTRY_HINT_SHOWN=1 from the
+# caller keeps a later step quiet.
+REGISTRY_AUTH_HINT_SHOWN="${_BOMLENS_REGISTRY_HINT_SHOWN:-}"
+registry_auth_hint() {
+    local step="$1" log="${2:-}" kind="${3:-}"
+    [ -z "$REGISTRY_AUTH_HINT_SHOWN" ] || return 0
+    [ -n "$log" ] && [ -f "$log" ] || return 0
+    grep -qE -- "$REGISTRY_AUTH_ERROR_RE" "$log" 2>/dev/null || return 0
+    [ -n "$kind" ] || kind="$(scan_input_kind)"
+    echo "[WARN] $step: the package registry refused the login for some downloads (HTTP 401/403), so some dependencies may be missing from the SBOM." >&2
+    registry_failure_advice registry-auth "$kind"
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and
@@ -400,8 +474,10 @@ source_manifests() {
 # killed for memory, or Gradle reports its build daemon disappeared),
 # cdxgen-unavailable (exit 127, the shell's "command not
 # found": stage 1 never started, or a caller of an unsupported plan says it
-# did not run), disk-space, network, or cdxgen-crash. The CLI and the
-# post-processing step both classify with this.
+# did not run), disk-space, tls-trust (a registry's certificate was not
+# trusted), registry-auth (a registry refused the login, HTTP 401/403),
+# network, or cdxgen-crash. The CLI, the web UI and the post-processing step
+# all classify with this.
 stage1_fail_reason() {
     if [ "${1:-}" = "true" ]; then echo oom; return; fi
     if [ "${3:-}" = "127" ]; then echo cdxgen-unavailable; return; fi
@@ -413,6 +489,11 @@ stage1_fail_reason() {
         # container's own kill flag is not set when only the daemon, a child, is
         # killed), so it is reported as oom, which names the memory fix.
         if grep -qEi "gradle build daemon disappeared unexpectedly|daemon (process )?(was )?killed" "$log"; then echo oom; return; fi
+        # Before network: a refused certificate or login is often retried
+        # until the client gives up with a timeout, and the fix is a
+        # different one.
+        if grep -qE -- "$TLS_TRUST_ERROR_RE" "$log"; then echo tls-trust; return; fi
+        if grep -qE -- "$REGISTRY_AUTH_ERROR_RE" "$log"; then echo registry-auth; return; fi
         if grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$log"; then
             echo network; return
         fi

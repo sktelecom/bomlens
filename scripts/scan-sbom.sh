@@ -3810,6 +3810,10 @@ if [ "$MODE" = "SOURCE" ]; then
                 log_warn "cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG" ;;
             disk-space)
                 log_warn "cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG" ;;
+            tls-trust)
+                log_warn "cdxgen could not download dependencies: a package registry's TLS certificate was not trusted (rc=$STAGE1_RC). Full cdxgen log: $STAGE1_LOG" ;;
+            registry-auth)
+                log_warn "cdxgen could not download dependencies: the package registry refused the login (HTTP 401/403, rc=$STAGE1_RC). Full cdxgen log: $STAGE1_LOG" ;;
             network)
                 log_warn "cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG" ;;
             cdxgen-unavailable)
@@ -3821,11 +3825,15 @@ if [ "$MODE" = "SOURCE" ]; then
                     log_warn "cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)."
                 fi ;;
         esac
+        registry_failure_advice "$STAGE1_FAIL_REASON" "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
         STAGE1_FALLBACK_ENV="$STAGE1_FALLBACK_ENV -e BOMLENS_STAGE1_REASON=$STAGE1_FAIL_REASON"
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
+        # An SBOM written although the registry refused some downloads
+        # (401/403): one [WARN] with the advice for this input, once per run.
+        registry_auth_hint "cdxgen" "$STAGE1_LOG" "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1
         # A preprocessing step that failed (build-prep.sh records it on the
         # SBOM as bomlens:pipeline-step-failed, a Gradle build with no
         # resolved package included) leaves an SBOM that is short of what the
@@ -4347,6 +4355,8 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                         disk-space)  sum_why="the scan ran out of disk space" ;;
                         oom)         sum_why="the build ran out of memory" ;;
                         network)     sum_why="a dependency download failed" ;;
+                        tls-trust)   sum_why="a package registry's certificate was not trusted" ;;
+                        registry-auth) sum_why="the package registry refused the login" ;;
                         cdxgen-crash) sum_why="the dependency analyzer failed" ;;
                         *)           sum_why="the dependency analyzer could not run" ;;
                     esac

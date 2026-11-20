@@ -718,31 +718,45 @@ generate_sbom_cdxgen() {
         return 0
     fi
     if [ "$rc" -ne 0 ]; then
-        if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
-            CDXGEN_FAIL_REASON="oom"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies." >&2
-        elif grep -qi "no space left on device" "$logf"; then
-            CDXGEN_FAIL_REASON="disk-space"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies." >&2
-        elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$logf"; then
-            # Build tools resolve the real dependency tree by reaching Maven
-            # Central / npmjs / PyPI etc. from inside the sibling container;
-            # a proxy, firewall or offline host breaks that even though the
-            # scan's own network access (cloning the repo) already worked.
-            CDXGEN_FAIL_REASON="network"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies." >&2
-        else
-            # Not a resource/network failure this container could see: cdxgen
-            # ran and exited non-zero on its own, most often an internal
-            # exception or its own schema validator rejecting the document
-            # (raw Node stack trace or validation errors, both in $logf only).
-            CDXGEN_FAIL_REASON="cdxgen-crash"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)." >&2
+        # The same rules as the CLI and POSTPROCESS (stage1_fail_reason), with
+        # docker inspect's own OOMKilled flag as the memory signal.
+        local oom_killed=""
+        [ -z "$cid" ] || oom_killed="$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null || true)"
+        CDXGEN_FAIL_REASON="$(stage1_fail_reason "$oom_killed" "$logf" "$rc")"
+        if [ -z "$quiet" ]; then
+            case "$CDXGEN_FAIL_REASON" in
+                oom)
+                    echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies." >&2 ;;
+                disk-space)
+                    echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies." >&2 ;;
+                tls-trust)
+                    echo "[WARN] cdxgen could not download dependencies: a package registry's TLS certificate was not trusted (rc=$rc)." >&2 ;;
+                registry-auth)
+                    echo "[WARN] cdxgen could not download dependencies: the package registry refused the login (HTTP 401/403, rc=$rc)." >&2 ;;
+                network)
+                    # Build tools resolve the real dependency tree by reaching
+                    # Maven Central / npmjs / PyPI etc. from inside the sibling
+                    # container; a proxy, firewall or offline host breaks that
+                    # even though the scan's own network access (cloning the
+                    # repo) already worked.
+                    echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies." >&2 ;;
+                cdxgen-unavailable)
+                    echo "[WARN] cdxgen could not be started in $img (rc=$rc, command not found)." >&2 ;;
+                *)
+                    # cdxgen ran and exited non-zero on its own, most often an
+                    # internal exception or its own schema validator rejecting
+                    # the document (raw Node stack trace or validation errors,
+                    # both in $logf only).
+                    echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)." >&2 ;;
+            esac
+            registry_failure_advice "$CDXGEN_FAIL_REASON" "$(scan_input_kind)"
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
         rm -f "$logf" "$cidf" "$prep_file"
         return 1
     fi
+    # An SBOM written although the registry refused some downloads.
+    [ ! -s "$bom_path" ] || registry_auth_hint "cdxgen" "$logf" "$(scan_input_kind)"
     [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
     rm -f "$logf" "$cidf" "$prep_file"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
@@ -1378,13 +1392,15 @@ EOF
             # never ran stage 1 (an unsupported plan) passes cdxgen-unavailable,
             # or exit code 127.
             case "${BOMLENS_STAGE1_REASON:-}" in
-                oom|disk-space|network|cdxgen-crash|cdxgen-unavailable) _s1_reason="$BOMLENS_STAGE1_REASON" ;;
+                oom|disk-space|tls-trust|registry-auth|network|cdxgen-crash|cdxgen-unavailable) _s1_reason="$BOMLENS_STAGE1_REASON" ;;
                 *) _s1_reason="$(stage1_fail_reason "${BOMLENS_STAGE1_OOM:-}" "${_s1_log:+$HOST_OUTPUT_DIR/$_s1_log}" "$BOMLENS_STAGE1_EXIT")" ;;
             esac
             [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || [ -z "$_s1_log" ] || tls_trust_hint "cdxgen" "$HOST_OUTPUT_DIR/$_s1_log"
             # The CLI prints its own guidance for this, before and after.
-            [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
+            if [ -z "${_BOMLENS_CLI_FALLBACK:-}" ]; then
                 echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)." >&2
+                registry_failure_advice "$_s1_reason" "$(scan_input_kind)"
+            fi
             rm -f "$OUTPUT_FILE"
             read -ra _s1_exclude <<< "$(non_shipped_syft_args)"
             if ! syft_source_scan "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" "${_s1_exclude[@]}" \

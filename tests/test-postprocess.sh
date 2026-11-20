@@ -11141,6 +11141,81 @@ _eca_hint=$(bash -c '. "$1"; tls_trust_hint cdxgen - <<< "connection refused"' _
 # Stage 2 of a CLI run whose stage 1 already printed it stays quiet.
 _eca_hint=$(_BOMLENS_TLS_HINT_SHOWN=1 bash -c '. "$1"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" 2>&1)
 [ -z "$_eca_hint" ] && pass "_BOMLENS_TLS_HINT_SHOWN=1 keeps the hint to one per run" || fail "the hint was repeated in stage 2" "$_eca_hint"
+
+echo "== stage 1: a registry that refused the certificate or the login =="
+_rf_reason() { printf '%b' "$1" > "$WORK/rf.log"; bash -c '. "$1"; stage1_fail_reason false "$2" 1' _ "$DETECT" "$WORK/rf.log"; }
+for _rf in \
+    'npm error code E401\nnpm error Unable to authenticate' \
+    'npm ERR! code E403\nnpm ERR! 403 Forbidden - GET https://npm.example.invalid/left-pad' \
+    ' ERR_PNPM_FETCH_401  GET https://npm.example.invalid/left-pad: Unauthorized - 401' \
+    'error An unexpected error occurred: "https://npm.example.invalid/x: Request failed \\"401 Unauthorized\\"".' \
+    'YN0041: | left-pad@npm:1.3.0: Invalid authentication (as an anonymous user)' \
+    'ERROR: HTTP error 403 while getting https://pypi.example.invalid/simple/requests/' \
+    'requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://pypi.example.invalid/simple/x/' \
+    '[ERROR] Failed to collect dependencies: status code: 401, reason phrase: Unauthorized (401)' \
+    '[ERROR] Could not transfer artifact a:b:pom:1.0 from/to corp: Return code is: 403, ReasonPhrase: Forbidden.' \
+    '[ERROR] Not authorized , ReasonPhrase:Unauthorized.' \
+    "> Could not GET 'https://repo.example.invalid/a/b/1.0/b-1.0.pom'. Received status code 401 from server: Unauthorized"; do
+    _got="$(_rf_reason "$_rf")"
+    [ "$_got" = registry-auth ] && pass "registry-auth: $(printf '%b' "$_rf" | head -n 1 | cut -c1-60)" \
+        || fail "not registry-auth ($_got)" "$_rf"
+done
+[ "$(_rf_reason 'PKIX path building failed: unable to find valid certification path\nConnect timed out')" = tls-trust ] \
+    && pass "an untrusted certificate is tls-trust, ahead of the timeout that follows it" || fail "tls-trust order" "$(_rf_reason 'PKIX path building failed\nConnect timed out')"
+[ "$(_rf_reason 'npm error code E401\nnpm error ETIMEDOUT')" = registry-auth ] \
+    && pass "a refused login is registry-auth, ahead of the timeout that follows it" || fail "registry-auth order" ""
+[ "$(_rf_reason 'getaddrinfo ENOTFOUND registry.npmjs.org')" = network ] \
+    && pass "a name that does not resolve stays network" || fail "network changed" ""
+[ "$(_rf_reason 'added lodash@4.17.401\nDownloading foo-403.tar.gz (E4010 bytes)\nchecksum 401403e4013\nbuild 401 of 403 done')" = cdxgen-crash ] \
+    && pass "a version or file name holding 401/403 is not registry-auth" || fail "an ordinary line matched" ""
+[ "$(bash -c '. "$1"; printf "npm error code E401\n" > "$2"; stage1_fail_reason true "$2" 1' _ "$DETECT" "$WORK/rf.log")" = oom ] \
+    && pass "the OOM kill flag still comes first" || fail "oom no longer first" ""
+# How the source came in, from .scanmeta.json.
+_rf_meta="$WORK/rf-meta"; mkdir -p "$_rf_meta"
+for _rf in 'git-url git' 'zip-upload archive' 'current-dir folder' 'scan-target-src folder'; do
+    printf '{"source": "%s", "target": ""}' "${_rf% *}" > "$_rf_meta/.scanmeta.json"
+    _got="$(bash -c '. "$1"; scan_input_kind "$2"' _ "$DETECT" "$_rf_meta/.scanmeta.json")"
+    [ "$_got" = "${_rf#* }" ] && pass "scan_input_kind: ${_rf% *} is ${_rf#* }" || fail "scan_input_kind ${_rf% *}: $_got" ""
+done
+_got="$(HOST_OUTPUT_DIR="$WORK/rf-none" bash -c '. "$1"; scan_input_kind' _ "$DETECT")"
+[ "$_got" = folder ] && pass "scan_input_kind: no .scanmeta.json is a folder" || fail "scan_input_kind without meta: $_got" ""
+# The advice per reason and input kind.
+_rf_adv() { env -u SBOM_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_CERTS bash -c '. "$1"; registry_failure_advice "$2" "$3"' _ "$DETECT" "$1" "$2" 2>&1; }
+for _k in git archive; do
+    _got="$(_rf_adv registry-auth "$_k")"
+    { printf '%s' "$_got" | grep -q "no login to your company's package repository" \
+        && printf '%s' "$_got" | grep -q -- '--detection static' \
+        && printf '%s' "$_got" | grep -q 'guides/company-network/' \
+        && [ "$(printf '%s\n' "$_got" | grep -c '^\[HINT\]')" = 2 ]; } \
+        && pass "registry-auth advice for $_k: scan where it builds, or a lock file, plus the guide" || fail "registry-auth advice for $_k" "$_got"
+done
+_got="$(_rf_adv registry-auth folder)"
+{ printf '%s' "$_got" | grep -q 'no login for npm or pip registries' && printf '%s' "$_got" | grep -q 'guides/company-network/'; } \
+    && pass "registry-auth advice for a folder names npm and pip" || fail "registry-auth advice for a folder" "$_got"
+_got="$(_rf_adv network git)"
+{ printf '%s' "$_got" | grep -q 'HTTPS_PROXY' && printf '%s' "$_got" | grep -q 'VPN' && printf '%s' "$_got" | grep -q 'guides/company-network/'; } \
+    && pass "network advice names the proxy variables, the VPN and the guide" || fail "network advice" "$_got"
+_got="$(_rf_adv tls-trust archive)"
+printf '%s' "$_got" | grep -q 'SBOM_EXTRA_CA_CERTS' && pass "tls-trust advice names SBOM_EXTRA_CA_CERTS" || fail "tls-trust advice" "$_got"
+_got="$(env -u SBOM_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_CERTS bash -c '. "$1"; tls_trust_hint cdxgen - <<< "PKIX path building failed"; registry_failure_advice tls-trust folder' _ "$DETECT" 2>&1)"
+[ "$(printf '%s\n' "$_got" | grep -c 'SBOM_EXTRA_CA_CERTS')" = 1 ] \
+    && pass "the certificate advice is not repeated after tls_trust_hint" || fail "certificate advice printed twice" "$_got"
+[ -z "$(_rf_adv cdxgen-crash folder)" ] && pass "another reason prints no advice" || fail "advice for cdxgen-crash" "$(_rf_adv cdxgen-crash folder)"
+# A stage 1 that wrote an SBOM although some downloads were refused.
+printf '[INFO] resolved 120 packages\nnpm warn tarball: 403 Forbidden - GET https://npm.example.invalid/private-pkg\n' > "$WORK/rf-partial.log"
+_got="$(bash -c '. "$1"; registry_auth_hint cdxgen "$2" archive; registry_auth_hint cdxgen "$2" archive' _ "$DETECT" "$WORK/rf-partial.log" 2>&1)"
+{ [ "$(printf '%s\n' "$_got" | grep -c '^\[WARN\] cdxgen: the package registry refused the login')" = 1 ] \
+    && printf '%s' "$_got" | grep -q 'may be missing' \
+    && [ "$(printf '%s\n' "$_got" | grep -c "no login to your company's package repository")" = 1 ]; } \
+    && pass "a partial result with a refused download warns once, with the advice for an archive" || fail "partial-result warning" "$_got"
+_got="$(bash -c '. "$1"; registry_failure_advice registry-auth git; registry_auth_hint cdxgen "$2" git' _ "$DETECT" "$WORK/rf-partial.log" 2>&1)"
+[ "$(printf '%s\n' "$_got" | grep -c '^\[WARN\]')" = 0 ] \
+    && pass "the partial-result warning is not added after the failure advice" || fail "partial warning after advice" "$_got"
+_got="$(_BOMLENS_REGISTRY_HINT_SHOWN=1 bash -c '. "$1"; registry_auth_hint cdxgen "$2" folder' _ "$DETECT" "$WORK/rf-partial.log" 2>&1)"
+[ -z "$_got" ] && pass "_BOMLENS_REGISTRY_HINT_SHOWN=1 keeps the warning to one per run" || fail "the warning was repeated" "$_got"
+printf '[INFO] resolved 120 packages\nadded lodash@4.17.401\n' > "$WORK/rf-clean.log"
+_got="$(bash -c '. "$1"; registry_auth_hint cdxgen "$2" folder' _ "$DETECT" "$WORK/rf-clean.log" 2>&1)"
+[ -z "$_got" ] && pass "a clean stage 1 log prints no registry warning" || fail "registry warning without a refusal" "$_got"
 for _d in /tmp/bomlens-ca.*; do
     case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
 done
