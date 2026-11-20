@@ -50,7 +50,8 @@ check "a vendored Pods/ folder does not count" "$(detect_lang "$WORK/pods2")" "u
 echo "== build-prep.sh =="
 PREP="$LIB/build-prep.sh"
 check "SWIFT_SIGNING_KEY is unset before anything runs" "$(grep -c '^unset SWIFT_SIGNING_KEY$' "$PREP")" "1"
-check "the cdxgen run goes through run_cdxgen (3 images)" "$(grep -c '^    run_cdxgen ' "$PREP")" "3"
+check "each of the 3 image layouts only names the cdxgen command" "$(grep -cE '^    CDXGEN_WHERE=.*; set -- .*"\$@"$' "$PREP")" "3"
+check "the cdxgen run goes through run_cdxgen" "$(grep -c '^run_cdxgen "\$@"$' "$PREP")" "1"
 check "a Swift tree uses the resolver time limit" "$(grep -c '^        run_supervised_timeout "\$PREP_TIMEOUT_DEFAULT" "\$@"$' "$PREP")" "1"
 check "git is told not to prompt on a Swift tree" "$(grep -c 'GIT_TERMINAL_PROMPT="\${GIT_TERMINAL_PROMPT:-0}"' "$PREP")" "1"
 if sh -n "$PREP" 2>/dev/null; then pass "build-prep.sh is valid sh"; else fail "build-prep.sh is valid sh"; fi
