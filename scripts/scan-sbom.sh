@@ -908,6 +908,10 @@ Environment:
                          Set to 1 to skip the free-disk check before an image
                          download (default: stop when the Docker engine has
                          less free than the image's size plus 2 GB)
+  BOMLENS_MAVEN_USER_REPOSITORY
+                         Set to false to leave your Maven local repository out
+                         of source scans (default: <localRepository> in
+                         ~/.m2/settings.xml, else ~/.m2/repository, read-only)
   BOMLENS_GRADLE_USER_CACHE
                          Set to false to leave your Gradle cache out of source
                          scans (default: ~/.gradle/caches, or the caches folder
