@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A release publishes the engine runner to PyPI as `bomlens-runner`, with the release's version and the digests of its engine, deep-license and deep-CVE images, and adds the published files' SHA-256 and those image references to the release notes.
 - When the dependency analysis in the language container fails because a package registry could not be used, the scan names the cause: `tls-trust` (the registry's certificate was not trusted) or `registry-auth` (the registry refused the login, HTTP 401 or 403), ahead of `network`, in `bomlens:sbom-tool-degraded` too. The advice depends on how the source came in (a folder, a cloned Git URL, an archive). A run whose SBOM was written although the registry refused some downloads prints one `[WARN]` that dependencies may be missing. The web UI classifies the failure with the same rules as the CLI.
 - A Maven source scan reads your Maven local repository (`<localRepository>` in `~/.m2/settings.xml`, else `~/.m2/repository`) read-only, so a project you have built on this machine resolves without a company repository or network; Maven runs offline (`-o`) only when the repository it would use does not answer. The SBOM records `bomlens:maven-user-repository` and `bomlens:maven-offline`, the execution plan offers the optional `maven-repository` mount, and `BOMLENS_MAVEN_USER_REPOSITORY=false` turns it off.
+- A Gradle source scan reads your own Gradle cache: the CLI, `--ui`, the desktop app and the execution plan (new optional roles `gradle-cache` and `gradle-wrapper`) mount the folder that holds `modules-2` and the wrapper distributions read-only, and Gradle reads the cache as its read-only dependency cache (`GRADLE_RO_DEP_CACHE`). Gradle runs `--offline` only when none of the build's repositories answers, and offline a wrapper's distribution is copied from your wrapper folder. The SBOM records `bomlens:gradle-user-cache` (`online` or `offline`). `BOMLENS_GRADLE_USER_CACHE=false` turns it off.
 
 ### Changed
 
@@ -25,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A supplier SBOM (`--analyze`) that lists no component now fails the conformance check's mandatory result-completeness row, so `--fail-on-conformance` exits 2 for it. A source scan with no component stays a warning.
 - The web UI names the running version at the foot of the left navigation, so the static demo shows which release it is a copy of. The demo's help menu no longer offers a link to itself.
 - A source scan with `FETCH_LICENSE` on first checks that each package registry it will ask answers within a few seconds (`BOMLENS_LICENSE_PROBE_TIMEOUT`, default 6), and turns the license lookup off for that scan when one does not, naming the host and the cause in the log and recording `license-fetch` in `bomlens:pipeline-step-failed`; a cdxgen run with the lookup on that passes `BOMLENS_LICENSE_FETCH_TIMEOUT` (default 1800 seconds) is run again with it off. Licenses in lock files and package manifests are kept.
+
+### Fixed
+
+- A Gradle dependency that could not be resolved (no repository reachable, for example) left the `gradle-dependencies` step recorded as succeeded, because Gradle exits 0 for it and the SBOM then held only the direct dependencies. The step is now recorded as failed, with a log line that names how many entries were unresolved, so the result completeness is partial. The Android release classpath step counts them the same way.
 
 ## [v1.15.0] - 2026-11-15
 

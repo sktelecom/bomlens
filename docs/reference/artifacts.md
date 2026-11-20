@@ -118,6 +118,8 @@ A component's `supplier.name` comes from what its package metadata already says,
 
 A source scan also records on `metadata.component.properties` whether the project pinned its versions: `bomlens:source:versionPinning` is `pinned` when a lock file exists, or every line of `requirements.txt` has an exact version, and `unpinned` when a `requirements.txt`, `package.json`, `pyproject.toml`, `setup.py` or `setup.cfg` has no lock file next to it and does not fix every version. For `unpinned`, the versions in the SBOM are what a fresh install resolved on the day of the scan, not necessarily the ones you ran. The web UI shows a notice, and the risk report states it under the vulnerability counts. The property is absent when the scan could not tell.
 
+A Gradle source scan that read your own Gradle cache records `bomlens:gradle-user-cache` on `metadata.properties`: `online` when a repository the build names answered and Gradle ran as usual, `offline` when none did and Gradle ran `--offline` from the caches. The property is absent when the cache was not mounted, not a Gradle build, or `BOMLENS_GRADLE_USER_CACHE=false` was set ([Java (Gradle)](ecosystems.md#java-gradle)).
+
 ## Dependency-graph completeness
 
 A generated SBOM carries a `compositions[0].aggregate` entry stating how complete its dependency graph is:
