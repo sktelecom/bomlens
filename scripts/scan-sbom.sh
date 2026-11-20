@@ -1005,6 +1005,17 @@ docker_check() {
     fi
 }
 
+# A failure before post-processing could start (the image is missing or cannot
+# be pulled) leaves what stage 1 wrote under a name no one reads as a finished
+# SBOM, the same name a failed post-processing run uses.
+park_unprocessed_sbom() {
+    [ -n "${OUTPUT_HOST_DIR:-}" ] && [ -n "${OUTPUT_FILE:-}" ] || return 0
+    [ -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ] || return 0
+    if mv -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$OUTPUT_HOST_DIR/${OUTPUT_FILE%_bom.json}_bom.unprocessed.json" 2>/dev/null; then
+        log_warn "Post-processing did not run; the SBOM stage 1 wrote is kept as ${OUTPUT_FILE%_bom.json}_bom.unprocessed.json (no notice, security or conformance step ran on it)."
+    fi
+}
+
 # `docker run` only auto-pulls an image that is entirely ABSENT locally; once a
 # floating tag like `:latest` has been pulled once, it is reused forever even
 # after the registry publishes a newer image. That is what broke a real demo:
@@ -1026,6 +1037,7 @@ ensure_image_fresh() {
                 log_error "Image not found and SBOM_PULL=never (no network is touched): $img"
                 echo "        Pull it once first, or unset SBOM_PULL to let this run pull it:" >&2
                 echo "          docker pull $img" >&2
+                park_unprocessed_sbom
                 exit 1
             fi
             return 0
@@ -1033,7 +1045,8 @@ ensure_image_fresh() {
         always)
             echo "[INFO] Pulling $img (SBOM_PULL=always)..."
             if ! docker pull "$img"; then
-                log_error "Failed to pull $img."
+                log_error "Failed to pull $img. Check the image name, the network and the registry sign-in, then run again."
+                park_unprocessed_sbom
                 exit 1
             fi
             return 0
@@ -1436,7 +1449,7 @@ if [ "$UI_MODE" = "true" ]; then
         "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
         "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" "${UI_CA_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" -e SBOM_UI_OUTPUT_HOST_DIR="$(hostpath "$UI_OUT")" \
+        -e MODE=UI -e UI_PORT=8080 -e BOMLENS_HOST_UI_PORT="$UI_PORT" -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" -e SBOM_UI_OUTPUT_HOST_DIR="$(hostpath "$UI_OUT")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
         "$POSTPROCESS_IMAGE"
 fi
@@ -1577,6 +1590,8 @@ fi
 # leftover and may go.
 OUTPUT_DIR_OURS=1
 if [ -d "$OUTPUT_HOST_DIR" ] && [ ! -e "$OUTPUT_HOST_DIR/.scanmeta.json" ]; then OUTPUT_DIR_OURS=0; fi
+OUTPUT_BASE_CREATED=0
+if [ ! -d "$OUTPUT_BASE" ]; then OUTPUT_BASE_CREATED=1; fi
 mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
@@ -1644,13 +1659,17 @@ remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.unprocess
 # not the scan's. They leave this script as 1, the code for a failed scan, so a
 # caller sees one failure code. <rc> <what ran>; returns the code to exit with.
 docker_run_failure_code() {
+    local _reason
     case "$1" in
         125|126|127)
-            log_error "Docker could not run $2 (docker exit code $1: $(case "$1" in
-                125) echo 'the engine refused to start the container' ;;
-                126) echo 'the command in the image could not be run' ;;
-                *)   echo 'the command was not found in the image' ;;
-            esac)). Run docker info, and check the image and the folders it mounts."
+            # The reason is computed here, not inside the message string:
+            # macOS's default bash 3.2 cannot parse a case in a quoted substitution.
+            case "$1" in
+                125) _reason='the engine refused to start the container' ;;
+                126) _reason='the command in the image could not be run' ;;
+                *)   _reason='the command was not found in the image' ;;
+            esac
+            log_error "Docker could not run $2 (docker exit code $1: ${_reason}). Run docker info, and check the image and the folders it mounts."
             return 1 ;;
     esac
     return "$1"
@@ -1676,6 +1695,34 @@ wait_with_progress() {
     wait "$pid" || true
 }
 
+# start_progress_ticker <what> / stop_progress_ticker: the same one-line-a-minute
+# message as wait_with_progress, for a container that runs in the foreground (so
+# Ctrl+C still reaches it) and prints nothing while it downloads or reads an
+# image. The ticker is a background loop; cleanup stops it too.
+PROGRESS_TICKER_PID=""
+start_progress_ticker() {
+    local what="$1" every="${BOMLENS_PROGRESS_SECS:-60}"
+    case "$every" in ''|*[!0-9]*|0) every=60 ;; esac
+    (
+        tick=0; started=$SECONDS
+        while :; do
+            sleep 1
+            tick=$((tick + 1))
+            if [ "$tick" -ge "$every" ]; then
+                tick=0
+                echo "[INFO] Still running: $what, $(( (SECONDS - started) / 60 )) min elapsed."
+            fi
+        done
+    ) &
+    PROGRESS_TICKER_PID=$!
+}
+stop_progress_ticker() {
+    [ -z "$PROGRESS_TICKER_PID" ] && return 0
+    kill "$PROGRESS_TICKER_PID" 2>/dev/null || true
+    wait "$PROGRESS_TICKER_PID" 2>/dev/null || true
+    PROGRESS_TICKER_PID=""
+}
+
 # The Docker engine stopped under a running scan (Docker Desktop quit or was
 # restarted, the VM ran out of memory): the client reports it in the container's
 # log, and cdxgen's own failure messages are not the cause. <rc> <log>
@@ -1691,6 +1738,7 @@ engine_stopped_during_scan() {
 # to clearing those via a throwaway container so nothing lingers.
 cleanup() {
     local d _rc=$?
+    stop_progress_ticker 2>/dev/null || true
     # RUNNING_CONTAINER_NAME is set only while stage 1 (SOURCE mode) is
     # waiting on its cdxgen container, so a Ctrl+C or `kill` reaching this
     # script here still stops that container instead of leaving it to run
@@ -1721,9 +1769,13 @@ cleanup() {
     if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
        && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
        && [ "${OUTPUT_DIR_OURS:-0}" = "1" ] \
-       && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json 2>/dev/null | head -n 1)" ]; then
-        rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
+       && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json -not -name bomlens-result.json 2>/dev/null | head -n 1)" ]; then
+        rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" "$OUTPUT_HOST_DIR/bomlens-result.json" 2>/dev/null || true
         rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true
+    fi
+    # An -o folder this run created and nothing was written to goes too.
+    if [ "$_rc" -ne 0 ] && [ "${OUTPUT_BASE_CREATED:-0}" = "1" ] && [ -n "${OUTPUT_BASE:-}" ] && [ -d "$OUTPUT_BASE" ]; then
+        rmdir "$OUTPUT_BASE" 2>/dev/null || true
     fi
     # The folder of the govulncheck copy --reachability hands stage 1
     # (removed right after it, too).
@@ -3651,7 +3703,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # before it is gone, and the exit code itself comes from `docker wait`,
     # not the backgrounded command's own status.
     STAGE1_LOG=$(mktemp)
-    echo "      (log: $STAGE1_LOG)"
+    echo "      (live log: $STAGE1_LOG; it is deleted when this stage succeeds, and kept when it fails)"
     STAGE1_CONTAINER="$RUNNING_CONTAINER_NAME"
     eval "$DOCKER_MSYS"docker run -u 0:0 \
         --name "\"$RUNNING_CONTAINER_NAME\"" \
@@ -3681,7 +3733,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # `wait` now returns ITS exit code -- a crash would trip `set -e` right
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
-    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (log: $STAGE1_LOG)"
+    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (live log: $STAGE1_LOG)"
     drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
@@ -4129,11 +4181,19 @@ else
     # there is no stage-1 handoff the sweep could mistake for stale output.
     export_scan_secrets
     _run_rc=0
+    # An image read is quiet while the engine downloads a large image: say it is
+    # still going. Other modes are short, but a minute of silence reads the same.
+    if [ "$MODE" = "IMAGE" ]; then
+        start_progress_ticker "image scan (the engine downloads a large image first)"
+    else
+        start_progress_ticker "$MODE scan"
+    fi
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(binary_kb_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\"" || _run_rc=$?
+    stop_progress_ticker
     if [ "$_run_rc" -ne 0 ]; then
         docker_run_failure_code "$_run_rc" "the scan container" || exit $?
     fi

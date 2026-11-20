@@ -387,6 +387,12 @@ jobs:
       - name: CLI conventions tests
         run: bash tests/test-cli-conventions.sh
 
+      # No Docker (a fake docker answers): bash 3.2 syntax guards, the folders a
+      # failed run removes, the long-scan progress line, a dot-named Gradle root,
+      # the Xcode-held Package.resolved and check-setup's own-UI port.
+      - name: CLI portability tests
+        run: bash tests/test-cli-portability.sh
+
       # No Docker (a fake docker answers): the image size notes, the free-disk
       # check that stops a scan before a download, and check-setup's image list.
       - name: Disk check tests
