@@ -1067,6 +1067,8 @@
     "androidReleaseClasspath": "Android release classpath resolution",
     "swiftPackageResolve": "Swift package resolution",
     "npmProductionSet": "npm production dependency resolution",
+    "npmInstalledLock": "npm lock file written at install",
+    "pnpmInstalledLock": "pnpm lock file written at install",
     "pipInstall": "Python dependency installation",
     "poetryGraph": "Poetry dependency graph",
     "cargoWorkspaceMetadata": "Cargo workspace member detection",

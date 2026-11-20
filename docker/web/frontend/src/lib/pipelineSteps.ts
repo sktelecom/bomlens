@@ -51,6 +51,8 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "android-release-classpath": "pipelineSteps.androidReleaseClasspath",
   "swift-package-resolve": "pipelineSteps.swiftPackageResolve",
   "npm-production-set": "pipelineSteps.npmProductionSet",
+  "npm-installed-lock": "pipelineSteps.npmInstalledLock",
+  "pnpm-installed-lock": "pipelineSteps.pnpmInstalledLock",
   "pip-install": "pipelineSteps.pipInstall",
   "poetry-graph": "pipelineSteps.poetryGraph",
   "cargo-workspace-metadata": "pipelineSteps.cargoWorkspaceMetadata",
