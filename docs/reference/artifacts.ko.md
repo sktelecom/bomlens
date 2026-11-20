@@ -122,6 +122,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 사용자의 Gradle 캐시를 읽은 Gradle 소스 스캔은 `metadata.properties`에 `bomlens:gradle-user-cache`를 기록합니다. 빌드가 쓰는 저장소가 응답해 Gradle이 평소대로 실행했으면 `online`, 하나도 응답하지 않아 Gradle이 `--offline`으로 캐시에서만 해석했으면 `offline`입니다. 캐시를 붙이지 않았거나, Gradle 빌드가 아니거나, `BOMLENS_GRADLE_USER_CACHE=false`로 두었으면 이 속성은 없습니다([Java (Gradle)](ecosystems.ko.md#java-gradle)).
 
+패키지 저장소가 응답하지 않거나 `pip install`이 실패해 프로젝트에 설치된 가상 환경을 읽은 Python 소스 스캔은 `metadata.properties`에 `bomlens:python-environment`(스캔 루트 기준 환경 폴더, 예: `.venv`)와 `bomlens:python-environment-reason`(`index-unreachable` 또는 `pip-install-failed`)을 기록합니다. `bomlens:python-environment-unsure`는 확정하지 못한 것이 있을 때만 붙고 그 내용을 적습니다(판정하지 못한 환경 마커, 선언했지만 설치되지 않은 패키지, 선언한 고정 버전과 다른 설치 버전 등). 이때 결과는 `installed-environment-unsure` 사유의 부분 결과이고 `compositions[0].aggregate`는 `incomplete`입니다. 환경을 읽지 않았거나 `BOMLENS_PYTHON_VENV=false`로 두었으면 세 속성 모두 없습니다([Python](ecosystems.ko.md#python)). 환경 폴더 자체는 읽었든 아니든 스캔의 탐색에서 빠지고, 그 패턴(`.venv/**`)은 `BOMLENS_INCLUDE_NON_SHIPPED=1`일 때도 `bomlens:excluded-paths`에 들어갑니다.
+
 ## 의존성 그래프 완전성
 
 생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.
@@ -129,11 +131,11 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 | 값 | 의미 |
 |----|------|
 | `complete` | 그래프가 완전히 해석됐다는 적극적인 근거를 찾았습니다. 생태계의 lock/resolve 단계가 성공했거나 lock 파일이 이미 커밋돼 있었고, 의존 엣지가 하나 이상 있는 경우입니다. |
-| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, `poetry.lock`이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못한 경우입니다. |
+| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, `poetry.lock`이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못했거나, 설치된 Python 환경을 읽었는데 확정하지 못한 것이 있는(`bomlens:python-environment-unsure`) 경우입니다. |
 | `unknown` | 그래프가 완전하다고 확인해 주는 근거가 SBOM에 없습니다. 어느 쪽으로도 적극적인 근거가 없을 때의 기본값이며, 예를 들면 image/rootfs/firmware/binary 스캔(syft 혼자서는 패키지 사이 의존 관계를 못 봄), AI 모델·데이터셋·병합 SBOM, Maven 소스 스캔(해석이 됐는지 저하됐는지 가릴 신뢰할 수 있는 신호가 없음)이 여기 해당합니다. `unknown`은 결함이 아닙니다. 도구가 판단할 근거를 찾지 못했다는 뜻일 뿐, 뭔가 잘못됐다는 뜻이 아닙니다. |
 
 분석 대상 공급사 SBOM이 자체 `compositions` 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.
 
 적합성 검사 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
 
-전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다. `bomlens:pipeline-step-failed`의 `license-fetch`는 패키지 저장소가 응답하지 않아 이번 스캔에서 저장소 라이선스 조회를 껐다는 뜻이며, SBOM에는 lock 파일과 패키지 매니페스트에 든 라이선스만 들어 있습니다.
+전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다. `bomlens:pipeline-step-failed`의 `license-fetch`는 패키지 저장소가 응답하지 않아 이번 스캔에서 저장소 라이선스 조회를 껐다는 뜻이며, SBOM에는 lock 파일과 패키지 매니페스트에 든 라이선스만 들어 있습니다. 빠지는 의존성은 없고 완전성 판정도 바뀌지 않습니다. CLI는 이를 `[INFO]` 한 줄로 알리고, 웹 UI는 불완전한 데이터가 아니라 안내 메모로 보여 줍니다.

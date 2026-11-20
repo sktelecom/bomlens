@@ -41,6 +41,8 @@ jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 
 소스 스캔은 기본으로 테스트, 테스트 데이터, 예제, 벤치마크, 데모 폴더(`test`, `tests`, `spec`, `fixtures`, `testdata`, `__tests__`, `e2e`, `example`, `examples`, `sample`, `samples`, `bench`, `benches`, `benchmark`, `benchmarks`, `demo`, `demos`, `playground`) 아래의 매니페스트, `.github/workflows`의 GitHub Actions 워크플로, `gradle/wrapper`의 Gradle 래퍼(`gradle-wrapper.jar`)를 제외합니다. 모두 제품과 함께 배포되지 않기 때문입니다. SBOM에는 적용한 패턴이 `bomlens:excluded-paths` 속성에, 제외한 파일이 `bomlens:excluded-manifests` 속성에 기록됩니다. 포함하려면 `BOMLENS_INCLUDE_NON_SHIPPED=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
 
+설치된 Python 가상 환경은 소스 스캔이 프로젝트로 읽는 대상에서 항상 빠집니다. `pyvenv.cfg`가 든 최상위 폴더(`.venv/`, `venv/` 또는 다른 이름)는 모두 cdxgen의 탐색, syft 폴백, lock 파일 정적 읽기에서 제외되며, `BOMLENS_INCLUDE_NON_SHIPPED=1`이나 `BOMLENS_PYTHON_VENV=false`를 설정해도 같습니다. 그 안에 설치된 패키지는 프로젝트 자체의 매니페스트가 아니고, 네트워크가 없으면 cdxgen이 패키지마다 패키지 저장소의 응답을 기다리게 되기 때문입니다. 이 폴더의 패턴(`.venv/**`)은 `bomlens:excluded-paths`에 기록되고, 그 안의 파일은 `bomlens:excluded-manifests`에 나열하지 않습니다. 패키지 저장소를 쓸 수 없을 때 BomLens가 이 환경을 직접 읽는 동작은 그대로입니다([Python](#python) 참고). 트리 더 깊은 곳에 있는 가상 환경이나, 이름에 영문자, 숫자, `.`, `_`, `-` 외의 문자(예: 공백이나 글롭 문자)가 든 가상 환경은 제외되지 않습니다.
+
 소스 스캔은 cdxgen이 개발 전용으로 표시한 컴포넌트도 뺍니다. 대상은 npm, pnpm, yarn, bun의 개발 패키지, uv와 Poetry에서 `main`이 아닌 의존성 그룹, Cargo의 dev-dependencies, sbt, Crystal, Gleam의 개발 의존성입니다. Ruby는 BomLens가 `Gemfile`의 그룹을 직접 읽습니다([Ruby](#ruby) 참고). cdxgen이 한 컴포넌트에 같은 표시를 여러 번 붙였으면 모든 값이 개발용일 때만 개발 전용으로 봅니다. 표시된 컴포넌트와 표시된 컴포넌트만 필요로 하는 의존성은 의존성 그래프의 다른 어떤 컴포넌트도 닿지 않을 때만 빠집니다. 표시가 없는 컴포넌트는 루트에서 닿지 않더라도 자신이 의존하는 컴포넌트를 남기고, 워크스페이스 멤버도 자신의 의존성을 남깁니다. 그래서 Cargo 워크스페이스 멤버 크레이트의 dev-dependencies와 uv 워크스페이스 멤버의 의존성 그룹은 남습니다. npm 개발 패키지는 예외입니다. cdxgen 13.5.0은 이 표시를 워크스페이스 전체를 기준으로 붙이므로, 표시가 붙은 패키지는 어느 멤버의 운영 의존성에서도 닿지 않는 패키지이고 멤버가 적어 두었더라도 빠집니다. 뺀 컴포넌트는 SBOM의 `bomlens:excluded-components` 속성에 기록됩니다. 그대로 두려면 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)). 생태계별로 달라지는 점은 아래 언어별 절에 적었습니다.
 
 npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키지에 들어 있는 라이선스 파일(`LICENSE`, `LICENCE`, `COPYING`, `NOTICE`, `COPYRIGHT`)에서 저작권 문구를 읽어 컴포넌트의 `copyright`를 채웁니다. 고지문에 저작권 표기 줄이 나오게 하려는 것입니다. `Copyright` 바로 뒤에 `(c)`, 저작권 기호, 연도, `by` 중 하나가 오거나 `(c)`나 저작권 기호 뒤에 연도가 오면서 권리자 이름이 있는 줄만 사용합니다. `Copyright Acme, Inc.`처럼 연도가 없는 표기는 가져오지 않습니다. 읽는 곳은 패키지 자신의 폴더뿐이고(pip은 `.dist-info` 폴더, Go는 `go list`가 알려 주는 폴더로 모듈 캐시, `replace`한 모듈은 대체본 폴더, 또는 `vendor/`이며, Rust는 `cargo metadata`가 알려 주는 폴더로 cargo registry, git 체크아웃, 경로 의존성입니다), 파일은 최대 6개, 파일마다 앞 64KiB와 400줄까지, 컴포넌트당 문구는 최대 5개이며 `; `로 이어 붙입니다. 채우지 않은 서식(`<year>`, `[fullname]`)이나 라이선스 문서 자체의 문구(예: GNU 라이선스에 든 Free Software Foundation의 줄)는 제외하고, 패키지 밖을 가리키는 링크 파일도 읽지 않습니다. 이미 저작권 값이 있는 컴포넌트는 바꾸지 않고, 그런 줄이 없는 패키지는 비워 둡니다. 채운 값에는 `bomlens:copyrightSource` 속성이 붙습니다. `BOMLENS_NO_COPYRIGHT=1`로 끌 수 있습니다. Java(Maven)는 지원하지 않습니다. Maven은 소스 폴더가 아니라 jar 파일을 내려받으므로 의존성의 라이선스 파일이 디스크에 없습니다. `replace`한 Go 모듈에는 실제로 빌드되는 코드의 문구가 들어가므로 컴포넌트가 가리키는 버전과 다를 수 있습니다. 스캔 대상 자신의 Go 모듈과 Rust 워크스페이스 크레이트는 채우지 않습니다. Rust 단계는 이미 디스크에 있는 크레이트 소스만 읽고 네트워크로 내려받지 않으므로, `FETCH_LICENSE=false`나 `--byte-stable`에서는 내려받지 않은 크레이트가 비어 있습니다. 폴더가 디스크에 없는 Go와 Rust 컴포넌트(예: 내려받기 실패)도 비어 있습니다. 한 생태계의 폴더를 하나도 조회하지 못하면 SBOM의 `bomlens:copyrightUnread` 메타데이터 속성(`golang`, `cargo`)에 기록하므로, 저작권이 없는 것과 단계가 실행되지 않은 것을 구분할 수 있습니다.
@@ -181,6 +183,14 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 > 참고: `uv.lock`은 읽습니다(cdxgen 13.5.0이 그 패키지를 나열합니다). 런타임 의존성이 없는 프로젝트라서 `uv.lock`에 `dev`나 `tests` 같은 의존성 그룹의 패키지만 있으면 컴포넌트가 하나도 남지 않습니다. 이때 스캔은 결과를 해석 실패로도, 완전으로도 보고하지 않고 `only-excluded-dependencies` 사유의 부분 결과로 보고합니다. 제품에 런타임 의존성이 실제로 없다면 이 결과가 맞습니다. 제외된 패키지는 SBOM 속성 `bomlens:excluded-components`에 있고, `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`로 목록에 넣을 수 있습니다.
 
+> 참고: 이 컴퓨터에서 가상 환경에 설치까지 마친 프로젝트는 스캔이 패키지 저장소를 쓰지 못해도 해석됩니다. 스캔 대상 폴더에 `.venv/`, `venv/`, 또는 `pyvenv.cfg`가 든 다른 최상위 폴더 하나가 있고 그 `site-packages`에 `*.dist-info` 폴더가 있으면, 스캔은 먼저 pip이 쓸 패키지 저장소에 짧은 제한 시간을 두고 응답을 요청합니다. 저장소는 `requirements.txt`의 `-i`나 `--index-url`, 없으면 `PIP_INDEX_URL`이나 스캔 컨테이너 안 pip 설정 파일의 `index-url`, 그것도 없으면 `https://pypi.org/simple/`입니다. 저장소가 응답하지 않거나(사유 `index-unreachable`) `pip install`이 실패하면(사유 `pip-install-failed`) SBOM의 Python 부분은 설치된 패키지의 메타데이터에서 의존성 그래프, 라이선스와 함께 가져오고, cdxgen의 Python 단계는 빼고 실행합니다. 환경은 읽기만 하며, 그 안의 어떤 것도 실행하지 않고 그 폴더에 아무것도 쓰지 않습니다. 저장소에 접속되는 스캔은 달라지지 않습니다.
+>
+> 목록은 선언된 의존성에서 시작합니다. 요구 사항 파일(소스 스캔이 제외하는 폴더 밖의 `requirements*.txt`이며 `requirements-dev.txt`도 포함), `pyproject.toml`의 `[project].dependencies`와 Poetry 기본 의존성, `setup.cfg`의 `install_requires`가 대상입니다. Poetry나 uv의 의존성 그룹은 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`일 때만 포함합니다. 여기서부터 각 패키지의 `Requires-Dist`를 따라가므로, 어디에도 선언되지 않은 채 옆에 설치된 도구(예: pytest)는 빠집니다. 환경 마커(`; python_version < "3.11"`)는 그 환경의 Python 버전(`pyvenv.cfg`)과 플랫폼(설치된 wheel의 태그)으로 판정하고, 판정하지 못한 마커가 붙은 요구 사항은 남기되 미확정으로 셉니다. 라이선스는 각 패키지의 `License-Expression`, 없으면 `License` 필드, 그것도 없으면 라이선스 분류자(classifier)에서 가져옵니다.
+>
+> SBOM에는 폴더가 `bomlens:python-environment`(스캔 루트 기준 상대 경로)에, 사유가 `bomlens:python-environment-reason`에, 단계 `python-environment`가 `bomlens:prep-step-applied`에 기록됩니다. 확정하지 못한 것이 있으면(판정하지 못한 마커, 선언했지만 설치되지 않은 패키지, 선언한 고정 버전과 다른 설치 버전, 한 패키지의 설치 버전이 둘 이상인 경우, 시스템 `site-packages`도 함께 쓰는 환경) `bomlens:python-environment-unsure`에 그 내용을 적고, 결과는 `installed-environment-unsure` 사유의 부분 결과가 됩니다. 이때 SBOM에 제품이 쓰지 않는 의존성이 들어 있거나 빠진 의존성이 있을 수 있습니다. 배포하는 플랫폼에서 의존성을 다시 설치하거나 스캔이 패키지 저장소에 접속할 수 있게 한 뒤 다시 스캔하면 이 사유가 없어집니다. 끄려면 `BOMLENS_PYTHON_VENV=false`(또는 `0`)를 설정하세요.
+>
+> conda `environment.yml`이 있는 프로젝트는 이 방식으로 읽지 않고 환경 파일을 읽습니다([Conda](#conda) 참고). 의존성을 `setup.py`에만 선언한 프로젝트는 시작점이 될 선언이 없어 환경을 쓰지 않습니다. 환경 옆의 lock 파일(`poetry.lock`, `uv.lock`, `pdm.lock`)과는 대조하지 않습니다. 환경을 읽으면 Python 부분은 환경에서만 가져옵니다.
+
 ---
 
 ## Go
@@ -304,7 +314,7 @@ annotation(uses(Modelica(version="4.0.0"), Buildings(version="13.0.0")));
 
 감지 파일: 스캔 대상 폴더 최상위의 `environment.yml` 또는 `environment.yaml`
 
-cdxgen에는 Conda 카탈로거가 없어 BomLens가 환경 파일의 `dependencies:` 목록을 직접 읽습니다. conda 항목은 `pkg:conda/...` 컴포넌트가 되고, `pip:` 항목 아래에 적힌 패키지는 `pkg:pypi/...` 컴포넌트가 됩니다.
+cdxgen에는 Conda 카탈로거가 없어 BomLens가 환경 파일의 `dependencies:` 목록을 직접 읽습니다. CLI, 웹 UI, 데스크톱 앱, 실행 계획 어느 쪽으로 스캔해도 같습니다. conda 항목은 `pkg:conda/...` 컴포넌트가 되고, `pip:` 항목 아래에 적힌 패키지는 `pkg:pypi/...` 컴포넌트가 됩니다.
 
 ```yaml
 dependencies:
