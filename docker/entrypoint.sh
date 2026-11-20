@@ -74,7 +74,11 @@ extra_ca_trust
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
-    echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
+    if [ -n "${BOMLENS_HOST_UI_PORT:-}" ] && [ "$BOMLENS_HOST_UI_PORT" != "${UI_PORT:-8080}" ]; then
+        echo "[INFO] Starting BomLens Web UI on port ${BOMLENS_HOST_UI_PORT} of this computer (port ${UI_PORT:-8080} inside the container)..."
+    else
+        echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
+    fi
     exec python3 /usr/local/lib/sbom-web/server.py
 fi
 
@@ -112,7 +116,7 @@ trap 'exit 143' TERM
 # no SBOM at all, so there is nothing for normalize/notice/security/sign to do.
 if [ "$SCAN_MODE" = "DIFF" ]; then
     if [ -z "$DIFF_OLD" ] || [ -z "$DIFF_NEW" ]; then
-        echo "[ERROR] DIFF_OLD and DIFF_NEW are required for DIFF mode."
+        echo "[ERROR] DIFF_OLD and DIFF_NEW are required for DIFF mode." >&2
         exit 1
     fi
     OUT="/host-output/${DIFF_OUT_NAME:-model-diff.json}"
@@ -121,7 +125,7 @@ if [ "$SCAN_MODE" = "DIFF" ]; then
 fi
 
 if [ -z "$PROJECT_NAME" ] || [ -z "$PROJECT_VERSION" ]; then
-    echo "[ERROR] PROJECT_NAME and PROJECT_VERSION are required."
+    echo "[ERROR] PROJECT_NAME and PROJECT_VERSION are required." >&2
     exit 1
 fi
 
@@ -408,17 +412,17 @@ setup_guard_state() {
         owner=$(cat "$owner_file" 2>/dev/null)
         recorded_path=$(cat "$GUARD_STATE_DIR/$key/path" 2>/dev/null)
         if [ -z "$owner" ] || [ "$recorded_path" != "$SOURCE_ROOT_HOST" ] || ! command -v docker >/dev/null 2>&1; then
-            echo "[WARN] found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place."
+            echo "[WARN] found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place." >&2
             return 0
         fi
         ps_out=$(docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null)
         ps_rc=$?
         if [ "$ps_rc" -ne 0 ]; then
-            echo "[WARN] could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time."
+            echo "[WARN] could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time." >&2
             return 0
         fi
         if [ -n "$ps_out" ]; then
-            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
+            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers." >&2
             return 0
         fi
         recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
@@ -432,7 +436,7 @@ setup_guard_state() {
             fi
         fi
         if [ -z "$cleanup_image" ]; then
-            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place." >&2
             return 0
         fi
         echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
@@ -445,7 +449,7 @@ setup_guard_state() {
                 "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
             rm -f "$cleanup_prep_file"
         else
-            echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place."
+            echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place." >&2
         fi
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
@@ -513,7 +517,7 @@ generate_sbom_cdxgen() {
     self=$(self_container_id)
     if [ -z "$self" ]; then
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        echo "[WARN] cdxgen sibling: could not determine this container's id for --volumes-from."
+        echo "[WARN] cdxgen sibling: could not determine this container's id for --volumes-from." >&2
         return 1
     fi
     lang=$(detect_lang "$src")
@@ -610,7 +614,7 @@ generate_sbom_cdxgen() {
             reach_env=(-e BOMLENS_REACHABILITY=true -e "BOMLENS_GOVULNCHECK=$REACH_TOOLS_DIR/govulncheck"
                        -e "BOMLENS_REACHABILITY_NONCE=$REACHABILITY_NONCE")
         else
-            echo "[WARN] --reachability: no folder outside the run folder to hand govulncheck to the cdxgen container (the launcher mounts none at $GUARD_STATE_DIR); the Go call analysis is skipped."
+            echo "[WARN] --reachability: no folder outside the run folder to hand govulncheck to the cdxgen container (the launcher mounts none at $GUARD_STATE_DIR); the Go call analysis is skipped." >&2
             remove_reach_tools
         fi
     fi
@@ -637,7 +641,7 @@ generate_sbom_cdxgen() {
         # build-prep.sh is larger than the kernel's single-argument limit, so
         # it cannot be handed over as `sh -c`. Without the guard-state mount
         # there is no shared place to put it.
-        echo "[ERROR] the guard-state folder ($GUARD_STATE_DIR) is not mounted, so build-prep.sh cannot be handed to the cdxgen container. Start the web UI with scan-sbom.sh --ui or the desktop app, or mount a writable folder at $GUARD_STATE_DIR."
+        echo "[ERROR] the guard-state folder ($GUARD_STATE_DIR) is not mounted, so build-prep.sh cannot be handed to the cdxgen container. Start the web UI with scan-sbom.sh --ui or the desktop app, or mount a writable folder at $GUARD_STATE_DIR." >&2
         false
       fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
     local pipe_pid=$!
@@ -684,7 +688,7 @@ generate_sbom_cdxgen() {
         trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 130' INT
         trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 143' TERM
         if ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
-            echo "[WARN] $JAVA_RETRY_IMAGE is not here ($([ "${SBOM_PULL:-missing}" = never ] && echo "SBOM_PULL=never" || echo "could not be pulled")); keeping the result from $img."
+            echo "[WARN] $JAVA_RETRY_IMAGE is not here ($([ "${SBOM_PULL:-missing}" = never ] && echo "SBOM_PULL=never" || echo "could not be pulled")); keeping the result from $img." >&2
             JAVA_RETRY_IMAGE=""
         fi
         trap 'exit 130' INT
@@ -708,7 +712,7 @@ generate_sbom_cdxgen() {
             return 0
         fi
         [ -n "$first" ] || return 1
-        echo "[WARN] The rerun in $retry_img left no SBOM (${CDXGEN_FAIL_REASON:-no output}); keeping the result from $first_img."
+        echo "[WARN] The rerun in $retry_img left no SBOM (${CDXGEN_FAIL_REASON:-no output}); keeping the result from $first_img." >&2
         CDXGEN_FAIL_REASON=""
         mv -f "$first" "$outdir/$out"
         return 0
@@ -716,24 +720,24 @@ generate_sbom_cdxgen() {
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies." >&2
         elif grep -qi "no space left on device" "$logf"; then
             CDXGEN_FAIL_REASON="disk-space"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies." >&2
         elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$logf"; then
             # Build tools resolve the real dependency tree by reaching Maven
             # Central / npmjs / PyPI etc. from inside the sibling container;
             # a proxy, firewall or offline host breaks that even though the
             # scan's own network access (cloning the repo) already worked.
             CDXGEN_FAIL_REASON="network"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies." >&2
         else
             # Not a resource/network failure this container could see: cdxgen
             # ran and exited non-zero on its own, most often an internal
             # exception or its own schema validator rejecting the document
             # (raw Node stack trace or validation errors, both in $logf only).
             CDXGEN_FAIL_REASON="cdxgen-crash"
-            [ -n "$quiet" ] || echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)." >&2
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
         rm -f "$logf" "$cidf" "$prep_file"
@@ -746,7 +750,7 @@ generate_sbom_cdxgen() {
     fi
     if [ ! -f "$outdir/$out" ]; then
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        [ -n "$quiet" ] || echo "[WARN] cdxgen produced no SBOM at $bom_path."
+        [ -n "$quiet" ] || echo "[WARN] cdxgen produced no SBOM at $bom_path." >&2
         return 1
     fi
     return 0
@@ -918,7 +922,7 @@ case "$SCAN_MODE" in
 esac
 if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] \
    && ! bash "$LIBDIR/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
-    echo "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written."
+    echo "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written." >&2
     exit 1
 fi
 unset _lic_mode
@@ -934,8 +938,8 @@ case "$SCAN_MODE" in
         # socket/CLI/signal is missing we fall back to syft, which parses package
         # manifests (package.json/go.mod/pom.xml/Gemfile/…) without building — direct deps.
         SRC_ROOT="${SOURCE_ROOT:-/src}"
-        if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
-        if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
+        if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT" >&2; exit 1; fi
+        if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT" >&2; exit 1; fi
         # The syft fallback leaves out the same non-shipped trees as the cdxgen
         # path (see NON_SHIPPED_DIRS in source-detect.sh).
         read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
@@ -968,7 +972,7 @@ case "$SCAN_MODE" in
                 [ "${BYTE_STABLE:-false}" = "true" ] || [ "${FETCH_LICENSE:-true}" = "false" ] || LICENSE_REGISTRY=true
             else
                 rm -f "$OUTPUT_FILE"
-                echo "[WARN] static detection could not read the lock file; continuing without it."
+                echo "[WARN] static detection could not read the lock file; continuing without it." >&2
             fi
         fi
         if [ "$_static_ok" = "true" ]; then
@@ -992,8 +996,8 @@ case "$SCAN_MODE" in
                 _disk_rc=0
                 disk_check_verdict "$_disk_img" || _disk_rc=$?
                 case "$_disk_rc" in
-                    1) echo "[WARN] Low disk space: ${DISK_FREE_MB} MB free in the Docker engine, but $_disk_img needs about ${DISK_NEED_MB} MB plus 2 GB to work in; the download may fail. Free space with 'docker image prune -a', or set BOMLENS_SKIP_DISK_CHECK=1 to silence this." ;;
-                    2) echo "[WARN] Could not read the free disk space of the Docker engine; $_disk_img needs about ${DISK_NEED_MB} MB." ;;
+                    1) echo "[WARN] Low disk space: ${DISK_FREE_MB} MB free in the Docker engine, but $_disk_img needs about ${DISK_NEED_MB} MB plus 2 GB to work in; the download may fail. Free space with 'docker image prune -a', or set BOMLENS_SKIP_DISK_CHECK=1 to silence this." >&2 ;;
+                    2) echo "[WARN] Could not read the free disk space of the Docker engine; $_disk_img needs about ${DISK_NEED_MB} MB." >&2 ;;
                 esac
             fi
             unset _disk_lang _disk_img _disk_rc
@@ -1003,9 +1007,9 @@ case "$SCAN_MODE" in
                 # project finds nothing, so stop with the guidance (already
                 # printed, code ANDROID_SDK_IMAGE_MISSING) instead of falling back.
                 [ "${CDXGEN_FAIL_REASON:-}" != "android-sdk-image" ] || exit 1
-                echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
+                echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)." >&2
                 syft_source_scan "$SRC_ROOT" "$OUTPUT_FILE" "${SYFT_EXCLUDE[@]}" \
-                    || { echo "[ERROR] syft source scan failed."; exit 1; }
+                    || { echo "[ERROR] syft source scan failed." >&2; exit 1; }
                 apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
                 mark_sbom_degraded "$OUTPUT_FILE" "${CDXGEN_FAIL_REASON:-cdxgen-unavailable}"
                 mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
@@ -1021,10 +1025,10 @@ case "$SCAN_MODE" in
             # makes every report grade the result as incomplete, instead of
             # presenting it as a normal scan.
             if [ "$(detect_lang "$SRC_ROOT")" = "android" ]; then
-                echo "[WARN] Android Gradle project: without a Docker socket and the Android SDK image, a manifest-only read finds none of its Gradle dependencies. The result is incomplete; run the scan where Docker is available."
+                echo "[WARN] Android Gradle project: without a Docker socket and the Android SDK image, a manifest-only read finds none of its Gradle dependencies. The result is incomplete; run the scan where Docker is available." >&2
             fi
             syft_source_scan "$SRC_ROOT" "$OUTPUT_FILE" "${SYFT_EXCLUDE[@]}" \
-                || { echo "[ERROR] syft source scan failed."; exit 1; }
+                || { echo "[ERROR] syft source scan failed." >&2; exit 1; }
             apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
             mark_sbom_degraded "$OUTPUT_FILE" "cdxgen-unavailable"
             mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
@@ -1050,10 +1054,10 @@ case "$SCAN_MODE" in
         ;;
 
     IMAGE)
-        if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode."; exit 1; fi
+        if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode." >&2; exit 1; fi
         # syft, Trivy and docker would read a name starting with - as an option.
         case "$TARGET_IMAGE" in
-            -*) echo "[ERROR] TARGET_IMAGE '$TARGET_IMAGE' starts with '-': an image name cannot, and the scan tools would read it as an option. Give the image reference itself, for example alpine:3.20."; exit 1 ;;
+            -*) echo "[ERROR] TARGET_IMAGE '$TARGET_IMAGE' starts with '-': an image name cannot, and the scan tools would read it as an option. Give the image reference itself, for example alpine:3.20." >&2; exit 1 ;;
         esac
         # With the Docker socket mounted syft reads the image from the daemon;
         # without it, straight from the registry (no daemon needed, as in a
@@ -1102,15 +1106,15 @@ case "$SCAN_MODE" in
         if [ "$_img_rc" -ne 0 ]; then
             case "$TARGET_IMAGE" in
                 docker-archive:*|oci-archive:*|oci-dir:*)
-                    echo "[ERROR] syft could not read the image archive $TARGET_IMAGE: check that the path is mounted into the container and holds an image in that format." ;;
+                    echo "[ERROR] syft could not read the image archive $TARGET_IMAGE: check that the path is mounted into the container and holds an image in that format." >&2 ;;
                 *)
                     # Not found and refused are different problems with different fixes.
                     if grep -qiE 'unauthorized|authentication required|pull access denied|denied:|requires authentication|\b40[13]\b' "$IMAGE_SYFT_LOG" 2>/dev/null; then
-                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: the registry refused access. Sign in with SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG. With the CLI, running docker login and docker pull first also works."
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: the registry refused access. Sign in with SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG. With the CLI, running docker login and docker pull first also works." >&2
                     elif grep -qiE 'manifest unknown|not found|no such (image|host)|name unknown|MANIFEST_UNKNOWN|repository does not exist' "$IMAGE_SYFT_LOG" 2>/dev/null; then
-                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: no image has that name or tag. Check the spelling, the tag and the registry host."
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: no image has that name or tag. Check the spelling, the tag and the registry host." >&2
                     else
-                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works."
+                        echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works." >&2
                     fi ;;
             esac
             [ -s "$IMAGE_SYFT_LOG" ] && tail -5 "$IMAGE_SYFT_LOG" >&2
@@ -1154,13 +1158,13 @@ case "$SCAN_MODE" in
         ;;
 
     BINARY)
-        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
+        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE" >&2; exit 1; fi
         echo "[1/2] syft: binary $TARGET_FILE"
         # syft's own messages (an update check that cannot reach the network,
         # for one) go to a log, not into the SBOM it writes on standard output.
         BINARY_SYFT_LOG=$(mktemp)
         if ! syft "file:$TARGET_FILE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>"$BINARY_SYFT_LOG"; then
-            echo "[WARN] syft binary scan failed; emitting minimal SBOM."
+            echo "[WARN] syft binary scan failed; emitting minimal SBOM." >&2
             [ -s "$BINARY_SYFT_LOG" ] && tail -5 "$BINARY_SYFT_LOG" >&2
             FILE_INFO=$(file "$TARGET_FILE")
             cat > "$OUTPUT_FILE" <<EOF
@@ -1177,7 +1181,7 @@ EOF
         ;;
 
     ROOTFS)
-        if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR"; exit 1; fi
+        if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR" >&2; exit 1; fi
         echo "[1/2] syft: RootFS $TARGET_DIR"
         # Skip pseudo filesystems: a live host / mounted via `--ui --mount /`
         # brings /proc, /sys, /dev and /run along (docker bind mounts recurse
@@ -1192,7 +1196,7 @@ EOF
                 --exclude './proc/**' --exclude './sys/**' \
                 --exclude './dev/**' --exclude './run/**' \
                 > "$OUTPUT_FILE" 2>"$ROOTFS_SYFT_LOG"; then
-            echo "[ERROR] syft directory scan failed."
+            echo "[ERROR] syft directory scan failed." >&2
             [ -s "$ROOTFS_SYFT_LOG" ] && cat "$ROOTFS_SYFT_LOG" >&2
             rm -f "$ROOTFS_SYFT_LOG"
             exit 1
@@ -1203,7 +1207,7 @@ EOF
     FIRMWARE)
         # TARGET_FILE may name a folder: a tree already unpacked, such as a root
         # filesystem with no package database (scan-firmware.sh copies it).
-        if [ -z "$TARGET_FILE" ] || { [ ! -f "$TARGET_FILE" ] && [ ! -d "$TARGET_FILE" ]; }; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
+        if [ -z "$TARGET_FILE" ] || { [ ! -f "$TARGET_FILE" ] && [ ! -d "$TARGET_FILE" ]; }; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE" >&2; exit 1; fi
         echo "[1/2] firmware: unpack + identify $TARGET_FILE"
         # scan-firmware.sh is best-effort (always emits a valid SBOM); the empty-file
         # guard below still catches a hard failure.
@@ -1225,7 +1229,7 @@ EOF
         # caller passes one in, is consumed implicitly by huggingface_hub inside
         # the generator and the enrich step — it looks unused from this file, but
         # removing it from the environment would break private/gated models.
-        if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode."; exit 1; fi
+        if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode." >&2; exit 1; fi
         echo "[1/2] aibom: generate AI SBOM for $MODEL_ID"
         bash "$LIBDIR/scan-aibom.sh" "$MODEL_ID" "$OUTPUT_FILE" "$PROJECT_VERSION"
         # Enrich the generated ML-BOM before normalize/validate: LFS SHA-256
@@ -1256,7 +1260,7 @@ EOF
         # A HuggingFace dataset (hf:<owner>/<name>, as scan-sbom.sh and the web
         # UI normalize it) is read the way a model scan reads each dataset its
         # card names, sources included, by the same module.
-        if [ -z "$DATASET_REF" ]; then echo "[ERROR] DATASET_REF required for DATASET mode."; exit 1; fi
+        if [ -z "$DATASET_REF" ]; then echo "[ERROR] DATASET_REF required for DATASET mode." >&2; exit 1; fi
         case "$DATASET_REF" in
             hf:*)
                 echo "[1/2] huggingface: describe dataset ${DATASET_REF#hf:}"
@@ -1278,11 +1282,11 @@ EOF
         # and a field the file does not declare is left empty rather than
         # guessed. A file it cannot identify is refused (exit 3) instead of
         # becoming a model component nobody could read.
-        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
+        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE" >&2; exit 1; fi
         echo "[1/2] modelfile: read $(basename "$TARGET_FILE")"
         if ! python3 "$LIBDIR/identify-model-file.py" \
                 "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION" "$PROJECT_NAME"; then
-            echo "[ERROR] could not identify the model file: $(basename "$TARGET_FILE")"
+            echo "[ERROR] could not identify the model file: $(basename "$TARGET_FILE")" >&2
             exit 1
         fi
         # Does loading this file run code? pickle weights do, and no Hub scan
@@ -1302,12 +1306,12 @@ EOF
         # assessment and G7 run as for any AI scan. The declared values
         # themselves go into the SPDX 3.0.1 document below, not into this SBOM.
         if [ -z "${AI_DECLARATION_FILE:-}" ] || [ ! -f "$AI_DECLARATION_FILE" ]; then
-            echo "[ERROR] AI_DECLARATION_FILE required for AIDECLARE mode."; exit 1
+            echo "[ERROR] AI_DECLARATION_FILE required for AIDECLARE mode." >&2; exit 1
         fi
         echo "[1/2] declaration: describe $PROJECT_NAME $PROJECT_VERSION"
         if ! python3 "$LIBDIR/declare-ai-model.py" "$AI_DECLARATION_FILE" "$OUTPUT_FILE" \
                 "$PROJECT_NAME" "$PROJECT_VERSION"; then
-            echo "[ERROR] The AI declaration could not be read (reason above). Fix the file and run again."
+            echo "[ERROR] The AI declaration could not be read (reason above). Fix the file and run again." >&2
             exit 1
         fi
         ;;
@@ -1318,11 +1322,11 @@ EOF
         # MERGE_FILES is a space-separated list of container paths (read-only
         # mounts set up by scan-sbom.sh). merge-sbom.sh writes its own root
         # component from PROJECT_NAME/VERSION, so no stamp pass is needed below.
-        if [ -z "$MERGE_FILES" ]; then echo "[ERROR] MERGE_FILES required for MERGE mode."; exit 1; fi
+        if [ -z "$MERGE_FILES" ]; then echo "[ERROR] MERGE_FILES required for MERGE mode." >&2; exit 1; fi
         echo "[1/2] Merging layered SBOMs -> $OUTPUT_FILE"
         # shellcheck disable=SC2086
         if ! bash "$LIBDIR/merge-sbom.sh" "$OUTPUT_FILE" "$PROJECT_NAME" "$PROJECT_VERSION" $MERGE_FILES; then
-            echo "[ERROR] SBOM merge failed."; exit 1
+            echo "[ERROR] SBOM merge failed." >&2; exit 1
         fi
         ;;
 
@@ -1356,7 +1360,7 @@ EOF
         if [ "${BOMLENS_DETECTION:-}" = "static" ] && [ ! -s "$OUTPUT_FILE" ]; then
             echo "[1/2] static: source dir ${SOURCE_ROOT:-/src} (lock file, no build)"
             if ! generate_sbom_static "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE"; then
-                echo "[ERROR] static detection failed (the lock file could not be read into an SBOM)."
+                echo "[ERROR] static detection failed (the lock file could not be read into an SBOM)." >&2
                 exit 3
             fi
             mark_sbom_detection "$OUTPUT_FILE" static "${BOMLENS_DETECTION_WHY:-}"
@@ -1380,21 +1384,21 @@ EOF
             [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || [ -z "$_s1_log" ] || tls_trust_hint "cdxgen" "$HOST_OUTPUT_DIR/$_s1_log"
             # The CLI prints its own guidance for this, before and after.
             [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
-                echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)."
+                echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)." >&2
             rm -f "$OUTPUT_FILE"
             read -ra _s1_exclude <<< "$(non_shipped_syft_args)"
             if ! syft_source_scan "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" "${_s1_exclude[@]}" \
                || ! apply_node_fallback_quality_gate "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}" 2; then
                 rm -f "$OUTPUT_FILE"
                 [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
-                    echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded."
+                    echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded." >&2
                 exit 1
             fi
             mark_sbom_degraded "$OUTPUT_FILE" "$_s1_reason"
             mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
         fi
         if [ ! -s "$OUTPUT_FILE" ]; then
-            echo "[ERROR] SBOM not found for post-processing: $OUTPUT_FILE"
+            echo "[ERROR] SBOM not found for post-processing: $OUTPUT_FILE" >&2
             echo "        (stage 1 — cdxgen language image — may have failed)"
             exit 1
         fi
@@ -1413,19 +1417,19 @@ EOF
         # package's recipe and files (YOCTO_FILES_OUT) for the
         # declared-components step below.
         if [ -n "${DECLARED_COMPONENTS_FILES:-}" ] && [ "$YOCTO_FROM_BUILD" != true ]; then
-            echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") was passed with --analyze, and a received SBOM is not changed."
-            echo "[ERROR] Scan the Yocto build directory itself (--target <build dir>), or drop --components."
+            echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") was passed with --analyze, and a received SBOM is not changed." >&2
+            echo "[ERROR] Scan the Yocto build directory itself (--target <build dir>), or drop --components." >&2
             exit 1
         fi
         [ -z "${DECLARED_COMPONENTS_FILES:-}" ] || YOCTO_FILES_LIST="$(mktemp)"
         if [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; then
             if [ ! -d "$YOCTO_BUILD_DIR" ]; then
-                echo "[ERROR] YOCTO_BUILD_DIR not found: $YOCTO_BUILD_DIR"; exit 1
+                echo "[ERROR] YOCTO_BUILD_DIR not found: $YOCTO_BUILD_DIR" >&2; exit 1
             fi
             echo "[1/2] Reading the Yocto build's own records (no SPDX in this build)..."
             if ! YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-manifests.py" \
                     "$YOCTO_BUILD_DIR" "$OUTPUT_FILE" "$OUT_PREFIX"; then
-                echo "[ERROR] this build directory holds no image package manifest to read."
+                echo "[ERROR] this build directory holds no image package manifest to read." >&2
                 exit 1
             fi
             YOCTO_SBOM=true
@@ -1433,7 +1437,7 @@ EOF
         # Supplier-submitted SBOM (CycloneDX or SPDX). Validate the ORIGINAL for
         # conformance, then convert to CycloneDX so the common pipeline is reused.
         if [ -z "$ANALYZE_SBOM" ] || [ ! -f "$ANALYZE_SBOM" ]; then
-            echo "[ERROR] ANALYZE_SBOM not found: $ANALYZE_SBOM"; exit 1
+            echo "[ERROR] ANALYZE_SBOM not found: $ANALYZE_SBOM" >&2; exit 1
         fi
         # An SPDX 2.x archive is not a document: it is a bundle of them, and the
         # image document inside is an index listing one package. Measuring either
@@ -1489,7 +1493,7 @@ EOF
             # has nothing to try; it would only report an unrecognized format and
             # bury the reason the archive could not be read (zstd missing, or a
             # bundle with no image document in it).
-            echo "[ERROR] could not read the Yocto SPDX archive: $(basename "$ANALYZE_SBOM")"
+            echo "[ERROR] could not read the Yocto SPDX archive: $(basename "$ANALYZE_SBOM")" >&2
             echo "        See the [yocto-spdx] message above for what stopped it."
             exit 1
         fi
@@ -1500,7 +1504,7 @@ EOF
         if [ "$YOCTO_RC" != 0 ]; then
             [ "$YOCTO_RC" = 3 ] || echo "[analyze] WARN: Yocto SPDX parser failed (rc=$YOCTO_RC); using the generic converter." >&2
             if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
-                echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+                echo "[ERROR] could not convert supplier SBOM to CycloneDX." >&2; exit 1
             fi
         fi
         fi
@@ -1522,14 +1526,14 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/AIDECLARE/ANALYZE/MERGE/POSTPROCESS/UI/DIFF)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/AIDECLARE/ANALYZE/MERGE/POSTPROCESS/UI/DIFF)" >&2
         exit 1
         ;;
 esac
 
 # The JSON copy of a CycloneDX XML input (sbom-detect.sh) is scratch, not a result.
 rm -f "$(dirname "$OUTPUT_FILE")"/.sbom-xml.*.json* "$(dirname "$OUT_PREFIX")"/.sbom-xml.*.json* 2>/dev/null || true
-if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE"; exit 1; fi
+if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE" >&2; exit 1; fi
 echo "[INFO] SBOM ready: $OUTPUT_FILE"
 _gen_count="$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
 _gen_degraded="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:sbom-tool-degraded") | .value] | first // empty' "$OUTPUT_FILE" 2>/dev/null)"
@@ -1603,7 +1607,7 @@ esac
 if command -v jq >/dev/null 2>&1; then
     COMP_COUNT=$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${COMP_COUNT:-0}" -eq 0 ]; then
-        echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)."
+        echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)." >&2
         # The npm production set was resolved, so the project declares no
         # runtime dependencies; its development-only ones are left out.
         if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set")' "$OUTPUT_FILE" >/dev/null 2>&1; then
@@ -1857,11 +1861,11 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "${SOURCE_ROOT:-/src}" ] \
         # that are not deployed): the dependencies were resolved, then dropped.
         _empty_excluded="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:excluded-components") | .value | strings | select(length > 0)] | first // ""' "$OUTPUT_FILE" 2>/dev/null)"
         if [ -n "$_empty_excluded" ]; then
-            echo "[WARN] every dependency the source declares ($_empty_manifests) was left out as development-only or not deployed, so the SBOM has no components. List them with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (left out: $_empty_excluded)."
+            echo "[WARN] every dependency the source declares ($_empty_manifests) was left out as development-only or not deployed, so the SBOM has no components. List them with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (left out: $_empty_excluded)." >&2
             mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-all-excluded" "$_empty_manifests"
             er_record generate degraded no_components "all declared dependencies were left out as development-only or not deployed; manifests found: $_empty_manifests" "" "" "{\"components\":0}"
         else
-            echo "[WARN] the source declares dependencies ($_empty_manifests) but the SBOM has no components; the scan did not resolve them."
+            echo "[WARN] the source declares dependencies ($_empty_manifests) but the SBOM has no components; the scan did not resolve them." >&2
             mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-with-manifests" "$_empty_manifests"
             # The resolver steps that failed, which are most often why (a Gradle
             # or pip step that could not run), from the SBOM build-prep stamped.
@@ -1880,7 +1884,7 @@ fi
 # ========================================================
 if [ "$SCAN_MODE" != "ANALYZE" ] && [ "$SCAN_MODE" != "MERGE" ] \
    && jq -e 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" and .value == "gradle-packages")' "$OUTPUT_FILE" >/dev/null 2>&1; then
-    echo "[WARN] the Gradle build declares dependencies but cdxgen resolved no Gradle package, so the SBOM lacks them. Run './gradlew dependencies' for each subproject to see what Gradle reports."
+    echo "[WARN] the Gradle build declares dependencies but cdxgen resolved no Gradle package, so the SBOM lacks them. Run './gradlew dependencies' for each subproject to see what Gradle reports." >&2
 fi
 
 # ========================================================
@@ -1906,7 +1910,7 @@ sync_artifacts() {
             elif cp "$art" "$HOST_OUTPUT_DIR/" 2>/dev/null; then
                 echo "[SUCCESS] copied: $dest"
             else
-                echo "[WARN] copy failed for $art (available in container at: $art)"
+                echo "[WARN] copy failed for $art (available in container at: $art)" >&2
                 continue
             fi
             if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
@@ -1914,7 +1918,7 @@ sync_artifacts() {
             fi
         done
     elif [ -z "${_WARNED_NO_HOST_OUTPUT:-}" ]; then
-        echo "[WARN] HOST_OUTPUT_DIR not set/accessible. Artifacts at: $(pwd)"
+        echo "[WARN] HOST_OUTPUT_DIR not set/accessible. Artifacts at: $(pwd)" >&2
         _WARNED_NO_HOST_OUTPUT=1
     fi
 }
@@ -2021,8 +2025,8 @@ if [ "$SCAN_MODE" = ANALYZE ] && [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
     if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
         _dc_mode=YOCTO
     else
-        echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote."
-        echo "[ERROR] Drop --components, or point --target at a Yocto build directory whose SPDX or manifests can be read."
+        echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote." >&2
+        echo "[ERROR] Drop --components, or point --target at a Yocto build directory whose SPDX or manifests can be read." >&2
         exit 1
     fi
 fi
@@ -2076,11 +2080,11 @@ case "$_dc_mode" in
                 ARTIFACTS=("$_dc_refused")
                 sync_artifacts
                 if [ "$_dc_rc" -eq 3 ]; then
-                    echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again."
+                    echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again." >&2
                 else
-                    echo "[ERROR] the declared components could not be added to the SBOM (see above)."
+                    echo "[ERROR] the declared components could not be added to the SBOM (see above)." >&2
                 fi
-                echo "[ERROR] The SBOM without them is kept as $_dc_refused, not as $OUTPUT_FILE."
+                echo "[ERROR] The SBOM without them is kept as $_dc_refused, not as $OUTPUT_FILE." >&2
                 exit 1
             fi
             rm -f "$_dc_err"
@@ -2537,16 +2541,16 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -
             # no scancode), which a caller that does not run the licence scan
             # first leaves without it.
             if [ -n "${BOMLENS_DEEP_LICENSE_FALLBACK:-}" ]; then
-                echo "[WARN] --deep-license: the scancode image ${BOMLENS_DEEP_LICENSE_FALLBACK} was not available, so the licence scan did not run."
+                echo "[WARN] --deep-license: the scancode image ${BOMLENS_DEEP_LICENSE_FALLBACK} was not available, so the licence scan did not run." >&2
                 er_record deep-license skipped fallback "the scancode image was not available: ${BOMLENS_DEEP_LICENSE_FALLBACK}" "$_dl_started" "$_dl_ended"
             elif [ -n "$_dl_handed" ]; then
-                echo "[WARN] --deep-license: scancode was not in the image the licence scan ran on, so it did not run."
+                echo "[WARN] --deep-license: scancode was not in the image the licence scan ran on, so it did not run." >&2
                 er_record deep-license skipped not_installed "scancode was not in the image the licence scan ran on" "$_dl_started" "$_dl_ended"
             elif command -v grype >/dev/null 2>&1; then
-                echo "[WARN] --deep-license: this stage runs on the deep-cve image, which has grype but not scancode, so the licence scan did not run. Run it in the bomlens-deep-license image before this stage and pass its exit code as BOMLENS_DEEP_LICENSE_RC (the CLI does this with --deep-cve)."
+                echo "[WARN] --deep-license: this stage runs on the deep-cve image, which has grype but not scancode, so the licence scan did not run. Run it in the bomlens-deep-license image before this stage and pass its exit code as BOMLENS_DEEP_LICENSE_RC (the CLI does this with --deep-cve)." >&2
                 er_record deep-license skipped not_installed "scancode is not in this image: the deep-cve image has grype only" "$_dl_started" "$_dl_ended"
             else
-                echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
+                echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)." >&2
                 er_record deep-license skipped not_installed "scancode is not in this image" "$_dl_started" "$_dl_ended"
             fi ;;
         4)
@@ -2554,7 +2558,7 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -
         5)
             er_record deep-license failed timeout "stopped after ${DEEP_LICENSE_TIMEOUT:-600}s" "$_dl_started" "$_dl_ended" ;;
         *)
-            echo "[WARN] scancode run failed."
+            echo "[WARN] scancode run failed." >&2
             er_record deep-license failed failed "" "$_dl_started" "$_dl_ended" ;;
     esac
 elif [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ]; then
@@ -3065,7 +3069,7 @@ SBOM_SIZE_CAP="${SBOM_SIZE_CAP_BYTES:-$((100 * 1024 * 1024))}"   # 100 MB defaul
 # "integer expression expected" and skip the cap rather than fail the scan.
 SBOM_BYTES="$(wc -c < "$OUTPUT_FILE" 2>/dev/null | tr -d '[:space:]')"
 if [ -n "$SBOM_BYTES" ] && [ "$SBOM_BYTES" -gt "$SBOM_SIZE_CAP" ]; then
-    echo "[WARN] SBOM is $SBOM_BYTES bytes, over the $SBOM_SIZE_CAP-byte budget the web UI expects."
+    echo "[WARN] SBOM is $SBOM_BYTES bytes, over the $SBOM_SIZE_CAP-byte budget the web UI expects." >&2
     mark_document_status "$OUTPUT_FILE" "bomlens:sbom-oversized" "${SBOM_BYTES} bytes"
 fi
 
@@ -3080,7 +3084,7 @@ if [ "${GENERATE_SPDX:-false}" = "true" ]; then
     if bash "$LIBDIR/convert-to-spdx.sh" "${SPDX_ARGS[@]}"; then
         ARTIFACTS+=("$SPDX_FILE")
     else
-        echo "[WARN] SPDX export failed; the CycloneDX SBOM and other artifacts are unaffected."
+        echo "[WARN] SPDX export failed; the CycloneDX SBOM and other artifacts are unaffected." >&2
     fi
 fi
 
@@ -3145,7 +3149,7 @@ if [ "$AI_MODEL_SCAN" = "true" ] && [ "${GENERATE_SPDX3:-true}" != "false" ]; th
                 && ARTIFACTS+=("${OUT_PREFIX}_ai-declaration.json")
         fi
     else
-        echo "[WARN] SPDX 3.0.1 AI document failed; the CycloneDX SBOM and other artifacts are unaffected."
+        echo "[WARN] SPDX 3.0.1 AI document failed; the CycloneDX SBOM and other artifacts are unaffected." >&2
     fi
 fi
 
@@ -3167,14 +3171,14 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
                --output-signature "${OUTPUT_FILE}.sig" "$OUTPUT_FILE"; then
             ARTIFACTS+=("${OUTPUT_FILE}.sig")
         else
-            echo "[ERROR] cosign could not sign the SBOM (check COSIGN_KEY / COSIGN_PASSWORD)."; SIGN_FAILED=1
+            echo "[ERROR] cosign could not sign the SBOM (check COSIGN_KEY / COSIGN_PASSWORD)." >&2; SIGN_FAILED=1
         fi
         if [ -f "$SPDX_FILE" ]; then
             if cosign sign-blob "${COSIGN_SIGN_FLAGS[@]}" --key "$COSIGN_KEY" \
                    --output-signature "${SPDX_FILE}.sig" "$SPDX_FILE"; then
                 ARTIFACTS+=("${SPDX_FILE}.sig")
             else
-                echo "[ERROR] cosign could not sign the SPDX SBOM."; SIGN_FAILED=1
+                echo "[ERROR] cosign could not sign the SPDX SBOM." >&2; SIGN_FAILED=1
             fi
         fi
         # A draft is signed too: the signature says this file came from this
@@ -3184,7 +3188,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
                    --output-signature "${SPDX3_FILE}.sig" "$SPDX3_FILE"; then
                 ARTIFACTS+=("${SPDX3_FILE}.sig")
             else
-                echo "[ERROR] cosign could not sign the SPDX 3.0.1 AI document."; SIGN_FAILED=1
+                echo "[ERROR] cosign could not sign the SPDX 3.0.1 AI document." >&2; SIGN_FAILED=1
             fi
         fi
         # The conformance sidecar files (generated earlier, before signing could
@@ -3206,7 +3210,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         # SBOM is signed when no .sig exists.
         if [ "$SIGN_FAILED" != "0" ]; then
             er_record sign failed failed "" "$_sign_started"
-            echo "[ERROR] --sign was requested but a signature could not be produced. The SBOM and other artifacts were still written."
+            echo "[ERROR] --sign was requested but a signature could not be produced. The SBOM and other artifacts were still written." >&2
             # The refreshed conformance report above only lives in the container;
             # the next sync_artifacts pass (near the end of this script) is what
             # copies it to the host, and exit below skips straight past that.
@@ -3219,10 +3223,10 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         fi
         er_record sign ok "" "" "$_sign_started"
     elif ! command -v cosign >/dev/null 2>&1; then
-        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping." >&2
         er_record sign skipped not_installed "cosign is not in this image"
     else
-        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping." >&2
         er_record sign skipped no_input "COSIGN_KEY is not set"
     fi
 else
@@ -3281,7 +3285,7 @@ fi
 report_unreachable_upload() {
     local rc="$1" url="$2"
     [ "$rc" -eq 0 ] && return 0
-    echo "[ERROR] Upload to $url did not complete (curl exit $rc: no response)."
+    echo "[ERROR] Upload to $url did not complete (curl exit $rc: no response)." >&2
     echo "[INFO] The artifacts listed above are complete and were saved."
     echo "[INFO] Use --generate-only to skip the upload, or set API_URL to a server that is up."
     exit 1
@@ -3290,7 +3294,7 @@ report_unreachable_upload() {
 if [ "${UPLOAD_TARGET:-dependency-track}" = "trusca" ]; then
     echo "[2/2] Uploading to TRUSCA..."
     if [ -z "$API_URL" ] || [ -z "$API_KEY" ] || [ -z "${TRUSCA_PROJECT_ID:-}" ]; then
-        echo "[ERROR] TRUSCA upload needs API_URL, API_KEY (Bearer token), and TRUSCA_PROJECT_ID."; exit 1
+        echo "[ERROR] TRUSCA upload needs API_URL, API_KEY (Bearer token), and TRUSCA_PROJECT_ID." >&2; exit 1
     fi
     # The ingest endpoint accepts the already-generated CycloneDX SBOM and runs
     # the back half of TRUSCA's scan pipeline (components + trivy + findings).
@@ -3311,18 +3315,18 @@ if [ "${UPLOAD_TARGET:-dependency-track}" = "trusca" ]; then
         echo "[SUCCESS] Accepted by TRUSCA (HTTP 202). scan id: ${SCAN_ID:-unknown}"
         [ -n "$SCAN_ID" ] && echo "[INFO] Track status: $API_URL/v1/scans/$SCAN_ID"
     else
-        echo "[ERROR] TRUSCA ingest failed (HTTP $HTTP_CODE)"; echo "Response: $BODY"; exit 1
+        echo "[ERROR] TRUSCA ingest failed (HTTP $HTTP_CODE)" >&2; echo "Response: $BODY"; exit 1
     fi
     exit 0
 fi
 
 echo "[2/2] Uploading to Dependency Track..."
 if [ -z "$API_KEY" ] || [ -z "$API_URL" ]; then
-    echo "[ERROR] API_KEY and API_URL are required for upload."; exit 1
+    echo "[ERROR] API_KEY and API_URL are required for upload." >&2; exit 1
 fi
 DT_VERSION_JSON=""
 if ! DT_VERSION_JSON="$(curl -s --max-time 5 "$API_URL/api/version" 2>/dev/null)"; then
-    echo "[WARN] Cannot reach Dependency Track at $API_URL."
+    echo "[WARN] Cannot reach Dependency Track at $API_URL." >&2
 fi
 # The server's version, when /api/version gives one in the x.y.z form.
 DT_VERSION="$(printf '%s' "$DT_VERSION_JSON" | jq -r '.version // empty' 2>/dev/null \
@@ -3368,19 +3372,19 @@ if [ "$HTTP_CODE" = "400" ] && [ "$(jq -r '.specVersion // ""' "$OUTPUT_FILE" 2>
     DT_READS_17=0
     dt_reads_17 || DT_READS_17=$?
     if [ "$DT_READS_17" = 0 ]; then
-        echo "[WARN] Dependency-Track $DT_VERSION reads CycloneDX 1.7, so the refusal (HTTP 400) is not about the version; the SBOM is not sent again."
+        echo "[WARN] Dependency-Track $DT_VERSION reads CycloneDX 1.7, so the refusal (HTTP 400) is not about the version; the SBOM is not sent again." >&2
     else
         DT_COPY="$(mktemp)"
         if bash "$LIBDIR/cdx-copy-as-1.6.sh" "$OUTPUT_FILE" "$DT_COPY" 2>/dev/null; then
             if [ "$DT_READS_17" = 1 ]; then
-                echo "[WARN] Dependency-Track $DT_VERSION refused the CycloneDX 1.7 SBOM (HTTP 400); it reads 1.7 from 4.14.4 and 5.1.0 on. Sending a CycloneDX 1.6 copy instead (delivered SBOM unchanged)."
+                echo "[WARN] Dependency-Track $DT_VERSION refused the CycloneDX 1.7 SBOM (HTTP 400); it reads 1.7 from 4.14.4 and 5.1.0 on. Sending a CycloneDX 1.6 copy instead (delivered SBOM unchanged)." >&2
             else
-                echo "[WARN] Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400) and its version is not known; servers before 4.14.4 and 5.1.0 do not read 1.7. Sending a CycloneDX 1.6 copy once (delivered SBOM unchanged)."
+                echo "[WARN] Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400) and its version is not known; servers before 4.14.4 and 5.1.0 do not read 1.7. Sending a CycloneDX 1.6 copy once (delivered SBOM unchanged)." >&2
             fi
             DT_FIRST_BODY="$BODY"
             dt_upload "$DT_COPY"
             if ! { [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; }; then
-                echo "[ERROR] The CycloneDX 1.6 copy was refused too (HTTP $HTTP_CODE)."
+                echo "[ERROR] The CycloneDX 1.6 copy was refused too (HTTP $HTTP_CODE)." >&2
                 echo "Response to the 1.7 SBOM: $DT_FIRST_BODY"
             fi
         fi
@@ -3390,10 +3394,10 @@ fi
 # A response that is not a status line at all (proxy banner, truncated body)
 # would make the numeric comparison below abort the script instead of reporting.
 if ! [[ "$HTTP_CODE" =~ ^[0-9]+$ ]]; then
-    echo "[ERROR] Upload to $API_URL returned no status code."; echo "Response: $BODY"; exit 1
+    echo "[ERROR] Upload to $API_URL returned no status code." >&2; echo "Response: $BODY"; exit 1
 fi
 if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] && echo "$BODY" | grep -q "token"; then
     echo "[SUCCESS] Upload complete!"
 else
-    echo "[ERROR] Upload failed (HTTP $HTTP_CODE)"; echo "Response: $BODY"; exit 1
+    echo "[ERROR] Upload failed (HTTP $HTTP_CODE)" >&2; echo "Response: $BODY"; exit 1
 fi
