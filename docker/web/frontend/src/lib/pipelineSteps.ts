@@ -73,6 +73,36 @@ export function pipelineStepLabelKey(step: string): string | undefined {
 }
 
 /**
+ * Failed steps that leave no data missing. `license-fetch` records that the
+ * package registries' license lookup was skipped: licenses still come from lock
+ * files and package metadata, and the completeness grade does not count it
+ * (docker/lib/completeness-reasons.json resolutionSteps).
+ */
+const NOTE_ONLY_STEPS: ReadonlySet<string> = new Set(["license-fetch"]);
+
+export interface FailedStepSplit {
+  /** Steps whose failure may leave data incomplete. */
+  incomplete: string[];
+  /** True when the registry license lookup was skipped. */
+  licenseLookupSkipped: boolean;
+}
+
+/** Splits bomlens:pipeline-step-failed into steps that may leave data
+ *  incomplete and the skipped license lookup, which is only a note. */
+export function splitFailedSteps(steps: readonly string[] | undefined): FailedStepSplit {
+  const list = steps ?? [];
+  return {
+    incomplete: list.filter((s) => !NOTE_ONLY_STEPS.has(s)),
+    licenseLookupSkipped: list.includes("license-fetch"),
+  };
+}
+
+/** Whether the failed steps (plus `more` past the listed cap) may leave data incomplete. */
+export function hasIncompleteSteps(steps: readonly string[] | undefined, more = 0): boolean {
+  return more > 0 || splitFailedSteps(steps).incomplete.length > 0;
+}
+
+/**
  * What a running scan is doing right now, read from the live log. The scanner
  * prefixes the lines of each stage with a marker; the last marker seen is the
  * current step. The server adds two of its own before the scanner starts (the

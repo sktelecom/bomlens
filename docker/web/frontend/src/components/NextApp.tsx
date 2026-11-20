@@ -46,6 +46,7 @@ import { androidSdkNeed, canReplayScan, type AndroidSdkNeed } from "@/lib/androi
 import { conformanceReports } from "@/lib/conformance";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type LicenseRiskTier } from "@/lib/licenses";
+import { hasIncompleteSteps } from "@/lib/pipelineSteps";
 import {
   type RecentScanLink,
   type SectionId,
@@ -923,7 +924,7 @@ export function NextApp() {
             status={
               !result.ok
                 ? "failed"
-                : (result.sbom?.pipelineStepsFailed?.length ?? 0) > 0
+                : hasIncompleteSteps(result.sbom?.pipelineStepsFailed, result.sbom?.pipelineStepsFailedMore)
                   ? "partial"
                   : "ok"
             }

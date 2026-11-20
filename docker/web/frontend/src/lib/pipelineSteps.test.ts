@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { currentLiveStep, formatElapsed, pipelineStepLabelKey } from "./pipelineSteps";
+import { currentLiveStep, formatElapsed, hasIncompleteSteps, pipelineStepLabelKey, splitFailedSteps } from "./pipelineSteps";
 
 describe("currentLiveStep", () => {
   it("is null before any marker", () => {
@@ -100,5 +100,29 @@ describe("pipelineStepLabelKey", () => {
     expect(ids).toContain("firmware-extra-roots");
     const unlabelled = [...ids].filter((id) => pipelineStepLabelKey(id) === undefined);
     expect(unlabelled).toEqual([]);
+  });
+});
+
+describe("splitFailedSteps", () => {
+  it("treats a skipped license lookup as a note, not incomplete data", () => {
+    expect(splitFailedSteps(["license-fetch"])).toEqual({ incomplete: [], licenseLookupSkipped: true });
+    expect(hasIncompleteSteps(["license-fetch"])).toBe(false);
+  });
+
+  it("keeps the other steps as incomplete", () => {
+    expect(splitFailedSteps(["enrich-cpe", "license-fetch", "some-future-step"])).toEqual({
+      incomplete: ["enrich-cpe", "some-future-step"],
+      licenseLookupSkipped: true,
+    });
+    expect(hasIncompleteSteps(["enrich-cpe", "license-fetch"])).toBe(true);
+  });
+
+  it("counts steps past the listed cap as incomplete", () => {
+    expect(hasIncompleteSteps(["license-fetch"], 2)).toBe(true);
+  });
+
+  it("handles no steps", () => {
+    expect(splitFailedSteps(undefined)).toEqual({ incomplete: [], licenseLookupSkipped: false });
+    expect(hasIncompleteSteps([])).toBe(false);
   });
 });

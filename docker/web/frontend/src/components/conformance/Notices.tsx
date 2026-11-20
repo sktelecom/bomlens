@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import type { Completeness, ConformanceSummary } from "@/lib/api";
 import { gradeLabel, isIncomplete } from "@/lib/completeness";
 import type { ResultQuality } from "@/lib/conformance";
-import { pipelineStepLabelKey } from "@/lib/pipelineSteps";
+import { hasIncompleteSteps, pipelineStepLabelKey, splitFailedSteps } from "@/lib/pipelineSteps";
 
 import { CompletenessReasons } from "../CompletenessReasons";
 import "./conformance.css";
@@ -26,10 +26,25 @@ function StepList({ steps, more }: { steps: string[]; more: number }) {
   );
 }
 
+/** The skipped registry license lookup: no data is missing, so it is a note. */
+export function LicenseLookupNote({ steps }: { steps: string[] }) {
+  const { t } = useTranslation();
+  if (!splitFailedSteps(steps).licenseLookupSkipped) return null;
+  return (
+    <Banner
+      variant="info"
+      data-testid="conformance-license-lookup-skipped"
+      title={t("pipelineNote.licenseLookupTitle")}
+      description={t("pipelineNote.licenseLookupBody")}
+    />
+  );
+}
+
 /**
  * Best-effort post-process steps that failed while the SBOM was generated. In
  * this report they may belong to a document the reader did not generate, so a
- * supplied one is pointed back at its supplier.
+ * supplied one is pointed back at its supplier. A skipped registry license
+ * lookup is left out of the warning and shown as its own note.
  */
 export function PipelineNote({
   steps,
@@ -41,20 +56,24 @@ export function PipelineNote({
   supplied?: boolean;
 }) {
   const { t } = useTranslation();
-  if (steps.length === 0) return null;
+  const lookup = <LicenseLookupNote steps={steps} />;
+  if (!hasIncompleteSteps(steps, more)) return lookup;
   return (
-    <Banner
-      variant="warning"
-      data-testid="conformance-pipeline-steps-failed"
-      title={t("pipelineNote.titleConformance")}
-      description={
-        <>
-          <StepList steps={steps} more={more} />
-          <p className="bl-flat">{t("pipelineNote.hintConformance")}</p>
-          {supplied && <p className="bl-flat" style={{ marginTop: "var(--base-size-4)" }}>{t("pipelineNote.supplierHint")}</p>}
-        </>
-      }
-    />
+    <>
+      <Banner
+        variant="warning"
+        data-testid="conformance-pipeline-steps-failed"
+        title={t("pipelineNote.titleConformance")}
+        description={
+          <>
+            <StepList steps={splitFailedSteps(steps).incomplete} more={more} />
+            <p className="bl-flat">{t("pipelineNote.hintConformance")}</p>
+            {supplied && <p className="bl-flat" style={{ marginTop: "var(--base-size-4)" }}>{t("pipelineNote.supplierHint")}</p>}
+          </>
+        }
+      />
+      {lookup}
+    </>
   );
 }
 
@@ -122,47 +141,51 @@ export function EmptyNotices({
 }) {
   const { t, i18n } = useTranslation();
   const steps = conformance.pipelineStepsFailed ?? [];
+  const more = conformance.pipelineStepsFailedMore ?? 0;
   const warnQuality = quality.empty || quality.noLicenses;
-  if (steps.length === 0 || !warnQuality) {
+  if (!hasIncompleteSteps(steps, more) || !warnQuality) {
     return (
       <>
-        <PipelineNote steps={steps} more={conformance.pipelineStepsFailedMore ?? 0} supplied={supplied} />
+        <PipelineNote steps={steps} more={more} supplied={supplied} />
         <QualityNote quality={quality} supplied={supplied} completeness={completeness} />
       </>
     );
   }
   const graded = quality.empty && isIncomplete(completeness);
   return (
-    <Banner
-      variant="warning"
-      data-testid="conformance-notices"
-      title={t("conf.notices", { count: 2 })}
-      description={
-        <ol className="bl-cf-steps">
-          <li data-testid="conformance-pipeline-steps-failed" style={{ marginBottom: "var(--base-size-8)" }}>
-            <span className="bl-strong">{t("pipelineNote.titleConformance")}</span>
-            <StepList steps={steps} more={conformance.pipelineStepsFailedMore ?? 0} />
-            <span>{t("pipelineNote.hintConformance")}</span>
-            {supplied && <span> {t("pipelineNote.supplierHint")}</span>}
-          </li>
-          <li data-testid={quality.empty ? "conformance-empty-result" : "conformance-no-licenses"}>
-            <span className="bl-strong">
-              {graded
-                ? t("completeness.bannerTitle", { grade: gradeLabel(completeness!, i18n.language ?? "en") })
-                : quality.empty
-                  ? t("conf.qualityEmptyTitle")
-                  : t("conf.qualityLicenseTitle")}
-            </span>
-            <span style={{ display: "block" }}>
-              {graded
-                ? <CompletenessReasons completeness={completeness!} />
-                : quality.empty
-                ? t(supplied ? "conf.qualityEmptyBodySupplied" : "conf.qualityEmptyBody")
-                : t("conf.qualityLicenseBody", quality.license ?? {})}
-            </span>
-          </li>
-        </ol>
-      }
-    />
+    <>
+      <Banner
+        variant="warning"
+        data-testid="conformance-notices"
+        title={t("conf.notices", { count: 2 })}
+        description={
+          <ol className="bl-cf-steps">
+            <li data-testid="conformance-pipeline-steps-failed" style={{ marginBottom: "var(--base-size-8)" }}>
+              <span className="bl-strong">{t("pipelineNote.titleConformance")}</span>
+              <StepList steps={splitFailedSteps(steps).incomplete} more={more} />
+              <span>{t("pipelineNote.hintConformance")}</span>
+              {supplied && <span> {t("pipelineNote.supplierHint")}</span>}
+            </li>
+            <li data-testid={quality.empty ? "conformance-empty-result" : "conformance-no-licenses"}>
+              <span className="bl-strong">
+                {graded
+                  ? t("completeness.bannerTitle", { grade: gradeLabel(completeness!, i18n.language ?? "en") })
+                  : quality.empty
+                    ? t("conf.qualityEmptyTitle")
+                    : t("conf.qualityLicenseTitle")}
+              </span>
+              <span style={{ display: "block" }}>
+                {graded
+                  ? <CompletenessReasons completeness={completeness!} />
+                  : quality.empty
+                  ? t(supplied ? "conf.qualityEmptyBodySupplied" : "conf.qualityEmptyBody")
+                  : t("conf.qualityLicenseBody", quality.license ?? {})}
+              </span>
+            </li>
+          </ol>
+        }
+      />
+      <LicenseLookupNote steps={steps} />
+    </>
   );
 }

@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { type DoneEvent, fileUrl } from "@/lib/api";
 import { gradeLabel, isIncomplete } from "@/lib/completeness";
 import { IS_STATIC_DEMO } from "@/lib/demo";
-import { pipelineStepLabelKey } from "@/lib/pipelineSteps";
+import { hasIncompleteSteps, pipelineStepLabelKey, splitFailedSteps } from "@/lib/pipelineSteps";
 import { inputSbomFileName, isAiScan } from "@/lib/results";
 import { scanWarningText } from "@/lib/scanWarnings";
 import { formatBytes } from "@/lib/utils";
@@ -138,7 +138,7 @@ export function FailureBanner({
 
 interface Notice {
   /** i18n id under `overview.notice.*` for the merged one-line form. */
-  id: "completeness" | "pipeline" | "warnings" | "vendored" | "degraded" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
+  id: "completeness" | "pipeline" | "licenseLookup" | "warnings" | "vendored" | "degraded" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
   variant: "warning" | "info";
   title: string;
   testId?: string;
@@ -185,8 +185,11 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
       body: t(sb.sbomToolDegraded ? "result.zeroComponentsBodyDegraded" : "result.zeroComponentsBody"),
     });
 
-  // A fact recorded in the document outranks this run's own log.
-  if ((sb?.pipelineStepsFailed?.length ?? 0) > 0)
+  // A fact recorded in the document outranks this run's own log. A skipped
+  // registry license lookup leaves no data missing, so it is a note of its own
+  // and never counts toward the incomplete-data warning.
+  const failed = splitFailedSteps(sb?.pipelineStepsFailed);
+  if (hasIncompleteSteps(sb?.pipelineStepsFailed, sb?.pipelineStepsFailedMore))
     notices.push({
       id: "pipeline",
       variant: "warning",
@@ -195,7 +198,7 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
       body: (
         <>
           <ul>
-            {sb!.pipelineStepsFailed!.map((s) => {
+            {failed.incomplete.map((s) => {
               const k = pipelineStepLabelKey(s);
               return <li key={s}>{k ? t(k) : <span className="bl-mono">{s}</span>}</li>;
             })}
@@ -204,6 +207,14 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
           <p>{inputSbomFileName(result) ? t("pipelineNote.supplierHint") : t("pipelineNote.hintScan")}</p>
         </>
       ),
+    });
+  if (failed.licenseLookupSkipped)
+    notices.push({
+      id: "licenseLookup",
+      variant: "info",
+      title: t("pipelineNote.licenseLookupTitle"),
+      testId: "license-lookup-skipped",
+      body: t("pipelineNote.licenseLookupBody"),
     });
 
   // Firmware only: the parts of the image the unpacker could not open. Worded
