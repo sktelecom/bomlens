@@ -10880,7 +10880,7 @@ python3 "$LIB/identify-conda.py" "$CONDADIR/normal" "$CONDADIR/normal/out.json" 
 [ "$(jq -r .specVersion "$CONDADIR/normal/out.json")" = "1.6" ] \
     && CYCLONEDX_SPEC_VERSION=1.7 python3 "$LIB/identify-conda.py" "$CONDADIR/normal" "$CONDADIR/normal/out17.json" "1.0" >/dev/null 2>&1 \
     && [ "$(jq -r .specVersion "$CONDADIR/normal/out17.json")" = "1.7" ] \
-    && grep -q 'CYCLONEDX_SPEC_VERSION="$SPEC" python3 /tmp/identify-conda.py' "$LIB/build-prep.sh" \
+    && grep -q 'CYCLONEDX_SPEC_VERSION="$SPEC" python3 "$CONDA_READER"' "$LIB/build-prep.sh" \
     && pass "conda: the sidecar is 1.6 by default and 1.7 when build-prep.sh is asked for 1.7" \
     || fail "conda: spec version $(jq -r .specVersion "$CONDADIR/normal/out.json" "$CONDADIR/normal/out17.json" 2>&1 | tr '\n' ' ')"
 
@@ -11107,10 +11107,11 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
 # mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
 # BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
-# BOMLENS_PYTHON_VENV_READER: the web UI path copies the venv reader next to
-# the prep file and sets its path itself.
+# BOMLENS_PYTHON_VENV_READER, BOMLENS_CONDA_READER: the web UI path copies
+# the venv reader and identify-conda.py next to the prep file and sets their
+# paths itself.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER|CONDA_READER)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \

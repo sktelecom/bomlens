@@ -590,16 +590,26 @@ generate_sbom_cdxgen() {
     # See write_prep_file above: build-prep.sh runs by path from the
     # guard-state mount; without that mount the scan stops with an error.
     local prep_file; prep_file=$(write_prep_file "$prep")
-    # read-python-venv.py goes beside it, for the same reason: it lives only
-    # in this image, and build-prep.sh reads a project's installed Python
-    # environment with it when the package index cannot be used.
-    local venv_reader="" venv_env=()
+    # read-python-venv.py and identify-conda.py go beside it, for the same
+    # reason: they live only in this image, and the sibling does not share
+    # this container's /tmp. build-prep.sh reads a project's installed Python
+    # environment with the first when the package index cannot be used, and
+    # environment.yml with the second.
+    local venv_reader="" venv_env=() conda_reader="" conda_env=()
     if [ -n "$prep_file" ] && [ -f "$LIBDIR/read-python-venv.py" ]; then
         venv_reader="${prep_file%.sh}-venv.py"
         if cp "$LIBDIR/read-python-venv.py" "$venv_reader" 2>/dev/null; then
             venv_env=(-e "BOMLENS_PYTHON_VENV_READER=$venv_reader")
         else
             venv_reader=""
+        fi
+    fi
+    if [ -n "$prep_file" ] && [ -f "$LIBDIR/identify-conda.py" ]; then
+        conda_reader="${prep_file%.sh}-conda.py"
+        if cp "$LIBDIR/identify-conda.py" "$conda_reader" 2>/dev/null; then
+            conda_env=(-e "BOMLENS_CONDA_READER=$conda_reader")
+        else
+            conda_reader=""
         fi
     fi
     # --reachability on Go: the sibling has the Go toolchain this image lacks,
@@ -648,6 +658,7 @@ generate_sbom_cdxgen() {
             "${guard_env[@]}" \
             "${reach_env[@]}" \
             "${venv_env[@]}" \
+            "${conda_env[@]}" \
             --entrypoint sh "$img" \
             "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
       else
@@ -711,7 +722,7 @@ generate_sbom_cdxgen() {
         # By name as well: the id may never have been read.
         [ -z "$cid" ] || docker rm -f "$cid" >/dev/null 2>&1
         docker rm -f "$sibling_name" >/dev/null 2>&1
-        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
+        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
         local first="" first_img="$img" retry_img="$JAVA_RETRY_IMAGE"
         if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
             first=$(mktemp) || first=""
@@ -765,13 +776,13 @@ generate_sbom_cdxgen() {
             registry_failure_advice "$CDXGEN_FAIL_REASON" "$(scan_input_kind)"
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
+        rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
         return 1
     fi
     # An SBOM written although the registry refused some downloads.
     [ ! -s "$bom_path" ] || registry_auth_hint "cdxgen" "$logf" "$(scan_input_kind)"
     [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-    rm -f "$logf" "$cidf" "$prep_file" "$venv_reader"
+    rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
         mv "$bom_path" "$outdir/$out"
     fi
