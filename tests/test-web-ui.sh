@@ -3364,6 +3364,34 @@ else
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
 
+echo "== registry-refused property (sbom_summary) =="
+# A stage 1 SBOM written although the registry refused some downloads carries
+# bomlens:registry-refused; the summary passes on only the value the scanner
+# writes (drives the Overview notice), and None otherwise.
+cat > "$OUT/rref_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"rref","version":"1.0"},"properties":[{"name":"bomlens:registry-refused","value":"registry-auth"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/rrefodd_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"rrefodd","version":"1.0"},"properties":[{"name":"bomlens:registry-refused","value":"<script>"}]},"components":[]}
+JSON
+cat > "$OUT/rrefclean_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"rrefclean","version":"1.0"}},"components":[]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server.sbom_summary("rref_1.0")["registryRefused"] == "registry-auth"
+assert server.sbom_summary("rrefodd_1.0")["registryRefused"] is None
+assert server.sbom_summary("rrefclean_1.0")["registryRefused"] is None
+PY
+then
+    pass "registryRefused surfaced from metadata (only registry-auth, None otherwise)"
+else
+    fail "registryRefused not surfaced correctly"
+fi
+rm -f "$OUT"/rref_1.0_* "$OUT"/rrefodd_1.0_* "$OUT"/rrefclean_1.0_*
+
 echo "== credential masking: a long input without a closing @ stays fast, the same strings are masked =="
 # The userinfo pattern backtracked over every colon of a long input (16,000 colons
 # took two seconds). It must stay linear, and it must still mask what it did before.
