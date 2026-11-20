@@ -126,6 +126,8 @@ A Python source scan that read the project's installed virtual environment, beca
 
 A Node.js source scan that read the lock file npm or pnpm wrote at install, in place of a committed one, records `bomlens:node-lock-source` on `metadata.properties`, one per file read, with the path relative to the scan root (for example `node_modules/.package-lock.json` or `web/node_modules/.pnpm/lock.yaml`). `bomlens:prep-step-applied` then lists `npm-installed-lock` or `pnpm-installed-lock`. The property is absent when every folder had its own lock file, when the lock was not read, or when `BOMLENS_NODE_INSTALLED_LOCK=false` was set ([Node.js](ecosystems.md#nodejs)).
 
+A source scan whose dependency analysis wrote an SBOM although the package registry refused the login for some downloads (HTTP 401 or 403) records `bomlens:registry-refused` with the value `registry-auth` on `metadata.properties`. Some dependencies may be missing, so `compositions[0].aggregate` is `incomplete`. The result completeness grade does not change for it, because the scan cannot tell whether a refusal found in the log left a dependency out. The web UI shows a notice on the Overview ([Company network](../guides/company-network.md)). When the dependency analysis failed outright, `bomlens:sbom-tool-degraded` records `registry-auth` instead.
+
 ## Dependency-graph completeness
 
 A generated SBOM carries a `compositions[0].aggregate` entry stating how complete its dependency graph is:
@@ -133,7 +135,7 @@ A generated SBOM carries a `compositions[0].aggregate` entry stating how complet
 | Value | Meaning |
 |-------|---------|
 | `complete` | The scan found positive evidence the graph was fully resolved: an ecosystem's lock/resolve step succeeded, or a lockfile was already committed, plus at least one dependency edge. |
-| `incomplete` | A known failure affected the scan: the syft fallback ran instead of cdxgen, a firmware package-cataloging step failed, a Poetry project with no `poetry.lock` was converted only in part or its dependencies could not be resolved, or an installed Python environment was read with something it could not settle (`bomlens:python-environment-unsure`). |
+| `incomplete` | A known failure affected the scan: the syft fallback ran instead of cdxgen, a firmware package-cataloging step failed, a Poetry project with no `poetry.lock` was converted only in part or its dependencies could not be resolved, an installed Python environment was read with something it could not settle (`bomlens:python-environment-unsure`), or the package registry refused some downloads (`bomlens:registry-refused`). |
 | `unknown` | Nothing in the SBOM confirms the graph is complete. This is the default whenever there is no positive evidence either way, for example an image/rootfs/firmware/binary scan (syft alone cannot see inter-package dependencies), an AI-model, dataset or merged SBOM, or a Maven source scan (no reliable signal tells a resolved graph apart from a degraded one). `unknown` is not a defect; it means the tool found no basis to judge, not that something went wrong. |
 
 An analyzed supplier SBOM's own `compositions` declaration, if it has one, is never overwritten.

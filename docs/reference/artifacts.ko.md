@@ -126,6 +126,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 커밋한 lock 파일 대신 npm이나 pnpm이 설치할 때 써 둔 lock 파일을 읽은 Node.js 소스 스캔은 `metadata.properties`에 `bomlens:node-lock-source`를 기록합니다. 읽은 파일마다 하나씩 남고, 값은 스캔 루트 기준 상대 경로입니다(예: `node_modules/.package-lock.json`, `web/node_modules/.pnpm/lock.yaml`). 이때 `bomlens:prep-step-applied`에는 `npm-installed-lock` 또는 `pnpm-installed-lock`이 들어갑니다. 모든 폴더에 자체 lock 파일이 있었거나, lock을 읽지 않았거나, `BOMLENS_NODE_INSTALLED_LOCK=false`로 두었으면 이 속성은 없습니다([Node.js](ecosystems.ko.md#nodejs)).
 
+의존성 분석이 SBOM을 만들었지만 그동안 패키지 저장소가 일부 다운로드의 로그인을 거부했으면(HTTP 401 또는 403) 소스 스캔은 `metadata.properties`에 `bomlens:registry-refused`를 `registry-auth` 값으로 기록합니다. 일부 의존성이 빠졌을 수 있다는 뜻이므로 `compositions[0].aggregate`는 `incomplete`입니다. 결과 완전성 등급은 이 속성 때문에 바뀌지 않습니다. 로그에서 찾은 거부가 빠진 의존성으로 이어졌는지는 스캔이 확인할 수 없기 때문입니다. 웹 UI는 개요에 안내를 보입니다([사내 네트워크에서 스캔하기](../guides/company-network.ko.md)). 의존성 분석이 아예 실패한 경우는 이 속성 대신 `bomlens:sbom-tool-degraded`의 `registry-auth`로 기록됩니다.
+
 ## 의존성 그래프 완전성
 
 생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.
@@ -133,7 +135,7 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 | 값 | 의미 |
 |----|------|
 | `complete` | 그래프가 완전히 해석됐다는 적극적인 근거를 찾았습니다. 생태계의 lock/resolve 단계가 성공했거나 lock 파일이 이미 커밋돼 있었고, 의존 엣지가 하나 이상 있는 경우입니다. |
-| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, `poetry.lock`이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못했거나, 설치된 Python 환경을 읽었는데 확정하지 못한 것이 있는(`bomlens:python-environment-unsure`) 경우입니다. |
+| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, `poetry.lock`이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못했거나, 설치된 Python 환경을 읽었는데 확정하지 못한 것이 있거나(`bomlens:python-environment-unsure`), 패키지 저장소가 일부 다운로드를 거부한(`bomlens:registry-refused`) 경우입니다. |
 | `unknown` | 그래프가 완전하다고 확인해 주는 근거가 SBOM에 없습니다. 어느 쪽으로도 적극적인 근거가 없을 때의 기본값이며, 예를 들면 image/rootfs/firmware/binary 스캔(syft 혼자서는 패키지 사이 의존 관계를 못 봄), AI 모델·데이터셋·병합 SBOM, Maven 소스 스캔(해석이 됐는지 저하됐는지 가릴 신뢰할 수 있는 신호가 없음)이 여기 해당합니다. `unknown`은 결함이 아닙니다. 도구가 판단할 근거를 찾지 못했다는 뜻일 뿐, 뭔가 잘못됐다는 뜻이 아닙니다. |
 
 분석 대상 공급사 SBOM이 자체 `compositions` 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.

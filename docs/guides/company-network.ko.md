@@ -15,7 +15,7 @@ description: 사내 패키지 저장소에서 의존성을 받는 프로젝트�
 3. CI 러너나 빌드 기계에서 BomLens를 실행할 수 있는 경우입니다. 빌드가 이미 설정을 갖춘 그 자리에서 스캔합니다. Docker가 없는 러너를 포함한 방법은 [CI/CD 연동](ci-cd.ko.md)을 참고합니다.
 4. 위 방법을 모두 쓸 수 없는 경우입니다. 본인 기계에서 아래의 프록시와 인증서 설정으로 스캔합니다. Maven과 Gradle 설정 파일은 스캔에 전달됩니다([Maven 가이드](java-maven.ko.md#사내-저장소도-되나요)). 이 컴퓨터에서 빌드한 Maven 프로젝트는 스캔이 사내 저장소에 접속하지 못해도 사용자의 Maven 로컬 저장소(`~/.m2/repository`, 또는 `settings.xml`의 `<localRepository>`, 읽기 전용)에서 해석합니다([Java (Maven)](../reference/ecosystems.ko.md#java-maven)). 이 컴퓨터에서 빌드한 Gradle 프로젝트는 스캔이 사내 저장소에 접속하지 못해도 사용자의 Gradle 캐시(`~/.gradle/caches`, 읽기 전용)에서 해석합니다([Java (Gradle)](../reference/ecosystems.ko.md#java-gradle)). 이 컴퓨터의 가상 환경(`.venv/`, `venv/`)에 의존성을 설치해 둔 Python 프로젝트는 스캔이 패키지 저장소를 쓰지 못하면 그 환경을 읽기 전용으로 읽어 해석합니다([Python](../reference/ecosystems.ko.md#python)). npm과 pip 설정 파일, 그리고 미러 변수는 전달되지 않으므로, 로그인이 있어야 해석되는 npm 프로젝트와 가상 환경이 폴더에 없는 pip 프로젝트는 이 방식에서 결과가 적게 나오는 것이 보통입니다.
 
-구성요소 개수를 본인 빌드가 보고하는 개수와 비교합니다. 훨씬 적으면 해석이 실패한 것입니다.
+구성요소 개수를 본인 빌드가 보고하는 개수와 비교합니다. 훨씬 적으면 해석이 실패한 것입니다. 패키지 저장소가 일부 다운로드의 로그인을 거부한 채 SBOM이 만들어졌으면 스캔 로그에 `[WARN]` 한 줄이 나오고, SBOM에 `bomlens:registry-refused`가 기록되며, 웹 UI 개요에 "일부 의존성이 빠졌을 수 있습니다" 경고가 나타납니다([산출물](../reference/artifacts.ko.md)).
 
 ## 프록시는 어떻게 설정하나요?
 
