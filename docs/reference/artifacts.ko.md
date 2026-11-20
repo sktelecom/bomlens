@@ -118,6 +118,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 소스 스캔은 프로젝트가 버전을 고정했는지도 `metadata.component.properties`에 기록합니다. `bomlens:source:versionPinning` 값이 `pinned`이면 lock 파일이 있거나 `requirements.txt`의 모든 줄에 정확한 버전이 있는 것이고, `unpinned`이면 `requirements.txt`, `package.json`, `pyproject.toml`, `setup.py`, `setup.cfg` 옆에 lock 파일이 없고 모든 버전이 고정되어 있지 않은 것입니다. `unpinned`일 때 SBOM의 버전은 스캔한 날 새로 설치하면 받게 될 버전이어서, 실제로 실행한 버전과 다를 수 있습니다. 웹 UI가 안내를 보이고, 위험 보고서는 취약점 집계 아래에 같은 내용을 적습니다. 스캔이 판단하지 못했으면 이 속성은 없습니다.
 
+사용자의 Maven 로컬 저장소를 읽은 Maven 소스 스캔은 `metadata.properties`에 속성 두 개를 기록합니다. `bomlens:maven-user-repository`는 `read-only`입니다. `bomlens:maven-offline`은 Maven이 내려받을 저장소가 응답하지 않아 BomLens가 `-o`를 더했으면 `probe`, 사용자의 설정이 이미 Maven을 오프라인으로 실행하게 했으면(`<offline>true</offline>` 또는 `-o`) `settings`, 그 밖에는 `false`입니다. 저장소를 붙이지 않았거나 비어 있었으면, 트리에 `pom.xml`이 없으면, `BOMLENS_MAVEN_USER_REPOSITORY=false`로 두었으면 두 속성 모두 없습니다([Java (Maven)](ecosystems.ko.md#java-maven)).
+
 사용자의 Gradle 캐시를 읽은 Gradle 소스 스캔은 `metadata.properties`에 `bomlens:gradle-user-cache`를 기록합니다. 빌드가 쓰는 저장소가 응답해 Gradle이 평소대로 실행했으면 `online`, 하나도 응답하지 않아 Gradle이 `--offline`으로 캐시에서만 해석했으면 `offline`입니다. 캐시를 붙이지 않았거나, Gradle 빌드가 아니거나, `BOMLENS_GRADLE_USER_CACHE=false`로 두었으면 이 속성은 없습니다([Java (Gradle)](ecosystems.ko.md#java-gradle)).
 
 ## 의존성 그래프 완전성

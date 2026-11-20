@@ -31,6 +31,8 @@ Yes, if the credentials are in your Maven settings. BomLens passes these files i
 
 The CLI, `--ui` and the desktop app all do this. The double-click `sbom-ui.bat` does not, so use the desktop app on Windows when the build needs them. A `settings.xml` that holds your mirror address and server credentials is used as it is. If your passwords are encrypted, `settings-security.xml` must be next to it. A Maven scan logs `maven: using the mounted settings.xml` when it found one.
 
+A project you have built on this machine resolves even when the scan cannot reach your repository. BomLens also mounts your Maven local repository read-only (the `<localRepository>` in `settings.xml`, else `~/.m2/repository`), and Maven reads it after BomLens's own repository without writing to it. When the repository Maven would download from does not answer, Maven runs offline (`-o`) and the log says so in one line. This needs Maven 3.9 or later; a project's `mvnw` that runs an older Maven does not read your repository. Set `BOMLENS_MAVEN_USER_REPOSITORY=false` to leave it out. The details are in [Ecosystems](../reference/ecosystems.md#java-maven).
+
 Three things to check when a private dependency is still missing:
 
 - The mirror address in `settings.xml` must be reachable from inside a container. An address that only works through your VPN client or as `localhost` does not.
