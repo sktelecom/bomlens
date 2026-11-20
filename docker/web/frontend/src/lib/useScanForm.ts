@@ -28,6 +28,7 @@ import {
   type UsageContext,
 } from "@/lib/api";
 import {
+  buildsTheFolder,
   buildToolToSend,
   hasBothBuildTools,
   normalizeBuildTool,
@@ -352,10 +353,11 @@ export function useScanForm({
   // The CPE index match is for a submitted SBOM only (--analyze-cpe-index).
   const showAnalyzeCpeIndex = isAnalyze;
   // Only a source tree has a lock file to read in place of a build.
-  const showDetection = isSourceScan;
+  const buildsFolder = buildsTheFolder(source, effectiveSource);
+  const showDetection = buildsFolder;
   // Offered only when the chosen folder holds both pom.xml and build.gradle(.kts).
-  const showBuildTool = isSourceScan && hasBothBuildTools(projectInfo?.buildTools);
-  const advisory = isSourceScan ? buildAdvisory(projectInfo) : null;
+  const showBuildTool = buildsFolder && hasBothBuildTools(projectInfo?.buildTools);
+  const advisory = buildsFolder ? buildAdvisory(projectInfo) : null;
   // A declaration file sits at the root of a source tree, or of a Yocto build
   // directory picked with the folder input (the server reads it there).
   const showReadDeclared =

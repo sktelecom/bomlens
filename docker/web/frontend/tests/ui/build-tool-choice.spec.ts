@@ -68,3 +68,41 @@ test("the choice is hidden and auto is sent when only one build file exists", as
   await page.getByRole("button", { name: /Run scan/i }).click();
   expect(new URL((await scanReq).url()).searchParams.get("build_tool")).toBe("auto");
 });
+
+test("a chosen folder scanned deep gets the build-tool choice and the advisory too", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        firmware: false,
+        scanoss: false,
+        docker: true,
+        hostDir: "/Users/dev/sbom-output",
+        outputHostDir: "/Users/dev/sbom-output",
+        launchIsOutput: true,
+        scanRoots: [{ path: "/scan-targets/acme", hostPath: "/Users/dev/acme" }],
+      }),
+    }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/project-info**", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        version: "",
+        versionFrom: "",
+        hasManifest: true,
+        subProjects: [],
+        buildTools: { maven: true, gradle: true },
+        engineMemoryLowGb: 3,
+        otherScanRunning: true,
+      }),
+    }),
+  );
+  await page.goto("/#/new");
+  await expect(page.getByTestId("source-rootfs-dir")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("build-advisory")).toContainText("Another scan is running now");
+  await page.getByText("Result quality").click();
+  await expect(page.getByLabel("Build tool for Maven and Gradle files")).toBeVisible();
+});
