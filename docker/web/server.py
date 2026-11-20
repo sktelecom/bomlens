@@ -3094,6 +3094,19 @@ def sbom_summary(run_id):
         ),
         None,
     )
+    # registry-refused: set by entrypoint.sh when cdxgen wrote an SBOM although
+    # the package registry refused some downloads (HTTP 401/403), so some
+    # dependencies may be missing. Supplier-controlled on an analyzed SBOM, so
+    # only the one value the scanner writes is passed on. Drives a result notice.
+    registry_refused = next(
+        (
+            p.get("value")
+            for p in meta_props
+            if p.get("name") == "bomlens:registry-refused"
+        ),
+        None,
+    )
+    registry_refused = "registry-auth" if registry_refused == "registry-auth" else None
     # detection: "static" when the scan read a lock file instead of building
     # (bomlens:detection, with the lock file's name in bomlens:detection-source).
     # The property can come from a supplier's SBOM, so only the one value this
@@ -3225,6 +3238,7 @@ def sbom_summary(run_id):
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
         "sbomToolDegraded": degraded,
+        "registryRefused": registry_refused,
         "detection": detection,
         "detectionSource": detection_source,
         "buildToolChoice": build_tool_choice,
