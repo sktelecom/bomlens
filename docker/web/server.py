@@ -758,10 +758,52 @@ class _ScanErrorTracker:
         self._flush()
         if not self._blocks:
             return None
-        joined = "\n".join(self._blocks)
+        joined = "\n".join(summarize_image_error_block(b) for b in self._blocks)
         if len(joined) > _SCAN_ERROR_MAX_CHARS:
             joined = "..." + joined[-(_SCAN_ERROR_MAX_CHARS - 3):]
         return joined
+
+
+_IMAGE_READ_FAILED_RE = re.compile(r"^\[ERROR\]\s+syft could not read the image( archive)? (\S+?):\s", re.I)
+
+
+def summarize_image_error_block(block):
+    """One plain sentence for a scanner "could not read the image" block, which
+    otherwise carries the reader's raw output (a list of the image providers that
+    were tried, with their messages) after the first line. The raw text stays in
+    the run log; the failure message keeps only the cause. Any other block is
+    returned unchanged. Docker Hub and ghcr.io answer a missing repository and a
+    refused login the same way, so that answer names both causes."""
+    first = block.split("\n", 1)[0]
+    m = _IMAGE_READ_FAILED_RE.match(first.strip())
+    if not m:
+        return block
+    ref = m.group(2)
+    if m.group(1):
+        return ("Could not read the image archive %s: check that the path is mounted "
+                "and holds an image in that format." % ref)
+    if "the registry refused access" in first:
+        kind = "auth"
+    elif "no image has that name or tag" in first:
+        kind = "notfound"
+    else:
+        kind = classify_pull_failure(block, "exit")
+    prefix = "Could not read the image %s: " % ref
+    if kind == "auth":
+        return (prefix + "access was denied. The registry gives the same answer when the "
+                "image or repository does not exist (Docker Hub, ghcr.io) as when it is "
+                "private and needs a login.")
+    if kind == "notfound":
+        return prefix + "no image has that name or tag."
+    if kind == "dns":
+        return prefix + "the registry host could not be found."
+    if kind == "proxy":
+        return prefix + "a proxy or certificate check blocked the connection."
+    if kind == "disk":
+        return prefix + "there is no space left on the disk."
+    if kind == "timeout":
+        return prefix + "the registry did not answer in time."
+    return prefix + "the image does not exist, or the registry needs a login."
 
 
 def check_uploaded_sbom(path, lower_name):

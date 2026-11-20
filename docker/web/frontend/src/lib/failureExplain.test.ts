@@ -98,3 +98,12 @@ describe("explainFailure", () => {
     expect(e.recognised).toBe(false);
   });
 });
+
+describe("image failures summarised by the server", () => {
+  it("reads the one-sentence messages the same way as the raw ones", () => {
+    const base = "Could not read the image acme/app:1.0: ";
+    expect(explainFailure([], base + "access was denied. The registry gives the same answer.", null).causeKey).toBe("run.failImageAuthCause");
+    expect(explainFailure([], base + "no image has that name or tag.", null).causeKey).toBe("run.failImageMissingCause");
+    expect(explainFailure([], base + "the registry host could not be found.", null).causeKey).toBe("run.failImageHostCause");
+  });
+});
