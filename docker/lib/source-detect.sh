@@ -440,7 +440,12 @@ static_detection_check() {
     # cover, and in a workspace the members' own dependencies come into a static read
     # that a build leaves out (a real monorepo read statically had 231 packages
     # against 26 built). Both stay on the build.
-    nested="$(cd "$d" 2>/dev/null && find . -mindepth 2 -maxdepth 5 \( -name .git -o -name node_modules -o -name vendor -o -name build -o -name target \) -prune -o -type f \
+    # An installed Python environment's files are not a second project. (A
+    # filter, not a prune: -mindepth 2 keeps a top-level folder from being
+    # pruned.)
+    local venv venv_skip=()
+    for venv in $(python_venv_folders "$d"); do venv_skip+=(! -path "./$venv/*"); done
+    nested="$(cd "$d" 2>/dev/null && find . -mindepth 2 -maxdepth 5 \( -name .git -o -name node_modules -o -name vendor -o -name build -o -name target \) -prune -o -type f "${venv_skip[@]}" \
         \( -name package.json -o -name pom.xml -o -name 'build.gradle*' -o -name requirements.txt -o -name pyproject.toml -o -name go.mod -o -name Cargo.toml -o -name Gemfile -o -name composer.json \) -print -quit 2>/dev/null)"
     if [ -n "$nested" ]; then
         STATIC_DETECTION_WHY="another manifest below the root ($nested)"; return 1
@@ -454,13 +459,37 @@ static_detection_check() {
     return 0
 }
 
+# python_venv_folders <root>: the installed Python environments at the top of
+# a source tree, one name per line: every top-level folder that holds a
+# pyvenv.cfg (.venv/, venv/ and the others read-python-venv.py looks in). A
+# source scan never reads them as the project's code, whether or not
+# BOMLENS_INCLUDE_NON_SHIPPED is set: syft lists every package installed there,
+# and cdxgen does not finish with the package index out of reach. A name with
+# a character outside letters, digits, dot, underscore and hyphen, or one
+# starting with a hyphen, is left out of the list: it would not survive as one
+# glob. The same rule as python_venv_exclude_find in build-prep.sh, which runs
+# alone in the cdxgen container; tests/test-python-venv.sh checks they agree.
+python_venv_folders() {
+    local root="$1" d n
+    [ -n "$root" ] && [ -d "$root" ] || return 0
+    for d in "$root"/* "$root"/.[!.]* "$root"/..?*; do
+        [ -d "$d" ] && [ -f "$d/pyvenv.cfg" ] || continue
+        n="${d##*/}"
+        case "$n" in -*|*[!A-Za-z0-9._-]*) continue ;; esac
+        printf '%s\n' "$n"
+    done
+}
+
 # trivy --skip-dirs flags for the folders a source scan leaves out, plus the
-# installed packages: the lock file is the authority in a static read.
+# installed packages: the lock file is the authority in a static read. With
+# <root>, the installed Python environments at its top as well (trivy reads a
+# requirements file inside one).
 non_shipped_trivy_args() {
     local d out="--skip-dirs **/node_modules"
     if non_shipped_enabled; then
         for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out --skip-dirs **/$d"; done
     fi
+    for d in $(python_venv_folders "${1:-}"); do out="$out --skip-dirs $d"; done
     printf '%s' "$out"
 }
 
@@ -607,11 +636,16 @@ stage1_fail_reason() {
     echo cdxgen-crash
 }
 
-# The glob patterns applied, relative to the scan root, joined with ", ".
+# The glob patterns applied, relative to the scan root, joined with ", ". With
+# <root>, the installed Python environments at its top follow (.venv/**); they
+# are left out even when BOMLENS_INCLUDE_NON_SHIPPED keeps the rest.
 non_shipped_globs() {
     local d out=""
-    for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out, **/$d/**"; done
-    for d in $NON_SHIPPED_FILE_GLOBS; do out="$out, **/$d"; done
+    if non_shipped_enabled; then
+        for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out, **/$d/**"; done
+        for d in $NON_SHIPPED_FILE_GLOBS; do out="$out, **/$d"; done
+    fi
+    for d in $(python_venv_folders "${1:-}"); do out="$out, $d/**"; done
     printf '%s' "${out#, }"
 }
 
@@ -629,28 +663,35 @@ non_shipped_any_case() {
 # syft --exclude flags for the same patterns; empty when the option keeps them.
 # syft's globs are case-sensitive, so the folder names go in as character
 # classes. Read the output with `read -ra`, which does not expand the globs.
+# With <root>, the installed Python environments at its top are excluded in
+# every case (syft lists each package installed in one).
 non_shipped_syft_args() {
-    non_shipped_enabled || return 0
     local d out=""
-    for d in $NON_SHIPPED_DIRS; do out="$out --exclude ./**/$(non_shipped_any_case "$d")/**"; done
-    for d in $NON_SHIPPED_PATHS; do out="$out --exclude ./**/$d/**"; done
-    for d in $NON_SHIPPED_FILE_GLOBS; do out="$out --exclude ./**/$d"; done
+    if non_shipped_enabled; then
+        for d in $NON_SHIPPED_DIRS; do out="$out --exclude ./**/$(non_shipped_any_case "$d")/**"; done
+        for d in $NON_SHIPPED_PATHS; do out="$out --exclude ./**/$d/**"; done
+        for d in $NON_SHIPPED_FILE_GLOBS; do out="$out --exclude ./**/$d"; done
+    fi
+    for d in $(python_venv_folders "${1:-}"); do out="$out --exclude ./$d/**"; done
     printf '%s' "${out# }"
 }
 
 # Manifest files under the non-shipped folders, and workflow files, relative to
-# the scan root and sorted. Names match in any letter case, as in cdxgen.
+# the scan root and sorted. Names match in any letter case, as in cdxgen. The
+# installed Python environments are not walked: their files are installed
+# packages, recorded as the folder's pattern only.
 non_shipped_manifests() {
-    local root="$1" d re=""
+    local root="$1" d re="" venv_prune=()
     for d in $NON_SHIPPED_DIRS; do re="$re|$d"; done
     re="(^|/)(${re#|})/"
-    (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null) \
+    for d in $(python_venv_folders "$root"); do venv_prune+=(-o -path "./$d"); done
+    (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git "${venv_prune[@]}" \) -prune -o -type f -print 2>/dev/null) \
         | sed 's#^\./##' \
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$re" || true; } \
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort
     # Lock files under vendor/ (NON_SHIPPED_FILE_GLOBS) are left out too.
-    (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null) \
+    (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git "${venv_prune[@]}" \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null) \
         | sed 's#^\./##' | LC_ALL=C sort
 }
 
@@ -716,7 +757,7 @@ static_drop_project_package() {
 generate_sbom_static() {
     local root="$1" out="$2" tmp="$2.static.tmp" skip=() have
     command -v trivy >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
-    read -ra skip <<< "$(non_shipped_trivy_args)"
+    read -ra skip <<< "$(non_shipped_trivy_args "$root")"
     if ! trivy fs --quiet --scanners license --format cyclonedx --offline-scan "${skip[@]}" -o "$tmp" "$root" 2>/dev/null \
        || ! jq -e '.bomFormat == "CycloneDX"' "$tmp" >/dev/null 2>&1; then
         rm -f "$tmp"; return 1
@@ -759,15 +800,18 @@ mark_sbom_detection() {
 }
 
 # Record the patterns and the manifest files left out, in the two properties
-# build-prep.sh writes on the cdxgen path. The file list is capped at 50.
+# build-prep.sh writes on the cdxgen path. The file list is capped at 50. An
+# installed Python environment at the top of <root> is recorded as its pattern
+# even when BOMLENS_INCLUDE_NON_SHIPPED keeps the rest.
 mark_sbom_excluded() {
-    local file="$1" root="$2" list tmp
+    local file="$1" root="$2" list="" globs tmp
     [ -f "$file" ] || return 0
-    non_shipped_enabled || return 0
     command -v jq >/dev/null 2>&1 || return 0
-    list=$(non_shipped_manifests "$root")
+    globs=$(non_shipped_globs "$root")
+    [ -n "$globs" ] || return 0
+    if non_shipped_enabled; then list=$(non_shipped_manifests "$root"); fi
     tmp="${file}.excluded.tmp"
-    if jq --arg globs "$(non_shipped_globs)" --arg list "$list" '
+    if jq --arg globs "$globs" --arg list "$list" '
         ($list | split("\n") | map(select(length > 0))) as $f
         | .metadata = (.metadata // {})
         | .metadata.properties = (((.metadata.properties // [])

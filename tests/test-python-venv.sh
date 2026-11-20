@@ -20,8 +20,9 @@
 #   - the build-prep.sh gate: an index that answers leaves today's path, one
 #     that does not (or a failed pip install) reads the environment, and
 #     BOMLENS_PYTHON_VENV=false turns it off;
-#   - the environment folders are left out of cdxgen's search in every case,
-#     and recorded in bomlens:excluded-paths;
+#   - the environment folders are left out of cdxgen's search, the syft
+#     fallback and the static read in every case, and recorded in
+#     bomlens:excluded-paths;
 #   - the licence evidence pass reads the environment's metadata;
 #   - the completeness grade of a result with unsettled parts.
 set -u
@@ -385,6 +386,68 @@ else
         *) fail "with the non-shipped folders: the environments' patterns follow theirs, and their files are not listed" "$out" ;; esac
     check "with BOMLENS_INCLUDE_NON_SHIPPED: only the environments' patterns" "$(_rec "" ".venv")" '[".venv/**"]'
     check "nothing left out: nothing recorded" "$(_rec "" "")" '[]'
+fi
+
+echo "== the syft fallback and the static read leave it out too =="
+# source-detect.sh holds the same rule for the paths that run in the scanner
+# image: the syft fallback (cdxgen failed or cannot run), the static read of a
+# lock file (trivy) and the recorder those paths share.
+DETECT="$LIB/source-detect.sh"
+sd() { env "${@:2}" bash -c '. "$1"; shift; "$@"' _ "$DETECT" $1; }
+check "source-detect.sh finds the same folders as build-prep.sh" \
+    "$(sd "python_venv_folders $X" | tr '\n' ' ')" "env2 venv .venv "
+case "$(sd "non_shipped_syft_args $X")" in
+    *"--exclude ./**/vendor/**/package-lock.json --exclude ./env2/** --exclude ./venv/** --exclude ./.venv/**") pass "syft: the environments follow the non-shipped excludes" ;;
+    *) fail "syft: the environments follow the non-shipped excludes" "$(sd "non_shipped_syft_args $X")" ;;
+esac
+check "syft: with BOMLENS_INCLUDE_NON_SHIPPED only the environments" \
+    "$(sd "non_shipped_syft_args $X" BOMLENS_INCLUDE_NON_SHIPPED=true)" "--exclude ./env2/** --exclude ./venv/** --exclude ./.venv/**"
+check "syft: without a root, as before" "$(sd non_shipped_syft_args BOMLENS_INCLUDE_NON_SHIPPED=true)" ""
+check "trivy: the environments are skipped" \
+    "$(sd "non_shipped_trivy_args $X" BOMLENS_INCLUDE_NON_SHIPPED=true)" "--skip-dirs **/node_modules --skip-dirs env2 --skip-dirs venv --skip-dirs .venv"
+check "the recorded patterns, with BOMLENS_INCLUDE_NON_SHIPPED" \
+    "$(sd "non_shipped_globs $X" BOMLENS_INCLUDE_NON_SHIPPED=true)" "env2/**, venv/**, .venv/**"
+check "the left-out manifests do not walk an environment" "$(sd "non_shipped_manifests $X" | tr '\n' ' ')" "tests/requirements.txt "
+_mark() {  # <root> [VAR=value]: mark_sbom_excluded on an empty SBOM
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"properties":[]},"components":[]}\n' > "$WORK/mark.json"
+    sd "mark_sbom_excluded $WORK/mark.json $1" "${@:2}" >/dev/null 2>&1
+    jq -c '[.metadata.properties[] | select(.name == "bomlens:excluded-paths" or .name == "bomlens:excluded-manifests") | .value]' "$WORK/mark.json"
+}
+case "$(_mark "$X")" in '["**/test/**, '*', **/vendor/**/package-lock.json, env2/**, venv/**, .venv/**","tests/requirements.txt"]') pass "mark_sbom_excluded records the environments after the non-shipped patterns" ;;
+    *) fail "mark_sbom_excluded records the environments after the non-shipped patterns" "$(_mark "$X")" ;; esac
+check "mark_sbom_excluded with BOMLENS_INCLUDE_NON_SHIPPED: the environments only" \
+    "$(_mark "$X" BOMLENS_INCLUDE_NON_SHIPPED=1)" '["env2/**, venv/**, .venv/**"]'
+mkdir -p "$WORK/novenv"
+check "mark_sbom_excluded with BOMLENS_INCLUDE_NON_SHIPPED and no environment: nothing" \
+    "$(_mark "$WORK/novenv" BOMLENS_INCLUDE_NON_SHIPPED=1)" '[]'
+# A manifest inside the environment is not a second project for static detection.
+SN="$WORK/static-node"; mkdir -p "$SN/.venv/share/pkg"; : > "$SN/.venv/pyvenv.cfg"
+printf '{"name":"a","dependencies":{"x":"1"}}\n' > "$SN/package.json"
+printf '{"lockfileVersion":3,"packages":{"":{},"node_modules/x":{"version":"1"}}}\n' > "$SN/package-lock.json"
+printf '{"name":"inner"}\n' > "$SN/.venv/share/pkg/package.json"
+check "static detection is not turned away by a manifest inside .venv/" \
+    "$(bash -c '. "$1"; static_detection_check "$2" node; echo "rc=$? $STATIC_DETECTION_WHY"' _ "$DETECT" "$SN")" "rc=0 package-lock.json"
+# The tools themselves, when they are here: syft lists every package an
+# environment holds, and trivy reads a requirements file inside one.
+# A real path: syft does not apply an exclusion under a root reached through
+# a symbolic link (macOS's /var/folders), and the scanner's /src is a real path.
+SY="$(cd "$WORK" && pwd -P)/syft-venv"; mkdir -p "$SY/.venv/lib/python3.12/site-packages" "$SY/.venv/sub"; : > "$SY/.venv/pyvenv.cfg"
+dist "$SY/.venv/lib/python3.12/site-packages" pytest 8.0.0
+printf 'flask==3.0.0\n' > "$SY/.venv/sub/requirements.txt"
+printf 'requests==2.31.0\n' > "$SY/requirements.txt"
+if command -v syft >/dev/null 2>&1; then
+    read -ra _sya <<< "$(sd "non_shipped_syft_args $SY")"
+    check "syft with the excludes lists the declared package only" \
+        "$(syft "dir:$SY" -q "${_sya[@]}" -o json 2>/dev/null | jq -r '[.artifacts[].name] | sort | join(" ")')" "requests"
+else
+    echo "  SKIP: syft is not installed"
+fi
+if command -v trivy >/dev/null 2>&1; then
+    read -ra _tva <<< "$(sd "non_shipped_trivy_args $SY")"
+    check "trivy with the skips reads the project's requirements file only" \
+        "$(trivy fs --quiet --scanners license --format cyclonedx --offline-scan "${_tva[@]}" "$SY" 2>/dev/null | jq -r '[.components[] | select(.type == "library") | .name] | sort | join(" ")')" "requests"
+else
+    echo "  SKIP: trivy is not installed"
 fi
 
 echo "== the licence evidence pass reads the environment =="
