@@ -11219,6 +11219,13 @@ _got="$(bash -c '. "$1"; registry_auth_hint cdxgen "$2" folder' _ "$DETECT" "$WO
 for _d in /tmp/bomlens-ca.*; do
     case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
 done
+printf '[INFO] resolved 120 packages\nlicense lookup: 403 Forbidden (API rate limit) for https://api.github.com/repos/x/y\n' > "$WORK/rf-lic403.log"
+_got="$(bash -c '. "$1"; registry_auth_hint cdxgen "$2" folder' _ "$DETECT" "$WORK/rf-lic403.log" 2>&1)"
+[ -z "$_got" ] && pass "registry-auth hint: a plain 403 from a licence lookup in a successful run gives no warning" \
+    || fail "registry-auth hint: a plain 403 outside a package manager warned" "$_got"
+_rf_reason="$(bash -c '. "$1"; stage1_fail_reason false "$2" 1' _ "$DETECT" "$WORK/rf-lic403.log")"
+[ "$_rf_reason" = registry-auth ] && pass "registry-auth: a plain 403 still classifies a failed run" \
+    || fail "registry-auth: plain 403 in a failed run" "$_rf_reason"
 
 echo "== non-shipped trees: test/example/benchmark manifests and workflows are left out and recorded =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"

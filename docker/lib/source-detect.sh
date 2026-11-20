@@ -180,7 +180,13 @@ TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path buil
 # (Received status code 401) and the plain status lines. Each status number
 # comes with the words around it, so a version or file name holding 401 or
 # 403 does not match.
-REGISTRY_AUTH_ERROR_RE='code E40[13]([^0-9]|$)|(^|[[:space:]])E40[13]:?([[:space:]]|$)|ERR_PNPM_FETCH_40[13]([^0-9]|$)|YN0041|Invalid authentication|HTTP error 40[13]([^0-9]|$)|40[13] Client Error|status code:? 40[13]([^0-9]|$)|Return code is: 40[13]([^0-9]|$)|Not authorized|401 Unauthorized|403 Forbidden'
+# REGISTRY_AUTH_TOOL_RE holds the forms only a package manager prints, plus
+# npm's "403 Forbidden - GET <url>"; it is what the partial-result warning
+# (registry_auth_hint) reads, since a successful run's log can also hold a
+# plain 403 from a licence lookup on a code host. REGISTRY_AUTH_ERROR_RE adds
+# the plain status lines, for classifying a run that produced no SBOM.
+REGISTRY_AUTH_TOOL_RE='code E40[13]([^0-9]|$)|(^|[[:space:]])E40[13]:?([[:space:]]|$)|ERR_PNPM_FETCH_40[13]([^0-9]|$)|YN0041|Invalid authentication|HTTP error 40[13]([^0-9]|$)|40[13] Client Error|status code:? 40[13]([^0-9]|$)|Return code is: 40[13]([^0-9]|$)|40[13] (Forbidden|Unauthorized) - GET https?://'
+REGISTRY_AUTH_ERROR_RE="$REGISTRY_AUTH_TOOL_RE|Not authorized|401 Unauthorized|403 Forbidden"
 
 # tls_trust_hint <step> <file|->...: when a file (or stdin, given as -) holds
 # one of those errors, prints a one-line [WARN] naming SBOM_EXTRA_CA_CERTS,
@@ -261,7 +267,7 @@ registry_auth_hint() {
     local step="$1" log="${2:-}" kind="${3:-}"
     [ -z "$REGISTRY_AUTH_HINT_SHOWN" ] || return 0
     [ -n "$log" ] && [ -f "$log" ] || return 0
-    grep -qE -- "$REGISTRY_AUTH_ERROR_RE" "$log" 2>/dev/null || return 0
+    grep -qE -- "$REGISTRY_AUTH_TOOL_RE" "$log" 2>/dev/null || return 0
     [ -n "$kind" ] || kind="$(scan_input_kind)"
     echo "[WARN] $step: the package registry refused the login for some downloads (HTTP 401/403), so some dependencies may be missing from the SBOM." >&2
     registry_failure_advice registry-auth "$kind"

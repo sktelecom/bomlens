@@ -202,6 +202,8 @@
     "sbomDegradedDisk": "전이 의존성 분석기(cdxgen)가 Docker 디스크 공간 부족으로 실행되지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. 공간을 확보(예: \"docker system prune\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
     "sbomDegradedOom": "전이 의존성 분석기(cdxgen)가 메모리 부족으로 강제 종료돼, 이 SBOM에는 직접 의존성만 담겼습니다. Docker 엔진에 메모리를 더 할당(Docker Desktop은 설정의 Resources, macOS의 Colima는 \"colima start --memory N\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
     "sbomDegradedNetwork": "전이 의존성 분석기(cdxgen)가 실제 의존성 트리를 확인하는 데 필요한 패키지 저장소(Maven Central, npm, PyPI 등)에 접근하지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. Docker 엔진에서 프록시나 방화벽 설정을 확인한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
+    "sbomDegradedTlsTrust": "패키지 저장소의 인증서를 스캔이 신뢰하지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. HTTPS를 검사하는 프록시가 원인인 경우가 많습니다. 회사 인증기관(CA)을 PEM 파일로 SBOM_EXTRA_CA_CERTS에 지정한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
+    "sbomDegradedRegistryAuth": "패키지 저장소가 로그인을 거부해(HTTP 401 또는 403), 이 SBOM에는 직접 의존성만 담겼습니다. 스캔 컨테이너에는 사내 패키지 저장소의 로그인 정보가 없습니다. 프로젝트가 빌드되는 곳의 폴더나 CI에서 스캔하거나, 완전한 lock 파일을 커밋한 뒤 다시 스캔해 주십시오.",
     "sbomDegradedCrash": "이 프로젝트의 의존성을 해석하던 스캔 도구가 비정상 종료해, 이 SBOM은 매니페스트만 읽어 대신 만들어졌고 전이 의존성이 빠졌을 수 있습니다. 스캔 로그를 확인하고, 문제가 계속되면 lock 파일을 둔 뒤 다시 스캔해 주십시오.",
     "sbomDegradedNotRun": "이 프로젝트 언어의 의존성 분석이 결과를 내지 못해, 이 SBOM은 매니페스트만 읽어 만들어졌고 직접 의존성만 담겼습니다. 이유는 스캔 로그에서 확인할 수 있습니다. 스캔이 Docker에 접근하지 못한 경우라면 Docker가 사용 가능한지 확인한 뒤 다시 스캔해 주십시오.",
     "sbomGraphEmptyTitle": "의존성 그래프가 비어 있습니다",
