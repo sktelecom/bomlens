@@ -200,7 +200,7 @@ CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1
 
 계획의 1단계는 govulncheck를 실행하지 않으므로 이 경로에서는 Go 소스 도달성을 판정하지 않습니다. `REACHABILITY=true`를 주면 2단계는 `reachability` 단계를 `skipped`(`no_input`)로 기록합니다.
 
-2단계는 1단계 종료 코드와 관계없이 실행하고, 그 코드를 `BOMLENS_STAGE1_EXIT`로, 1단계 컨테이너가 메모리 부족으로 종료됐으면 `BOMLENS_STAGE1_OOM`에 `true`를, 출력 폴더에 저장한 1단계 로그의 파일 이름을 `BOMLENS_STAGE1_LOG`로 넘깁니다. 1단계가 실패했거나 SBOM을 남기지 않았으면 2단계가 syft로 소스를 대신 스캔하고(직접 의존성만), 사유를 `bomlens:sbom-tool-degraded`(`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)에 적으며, 결과 매니페스트는 `generate`를 `degraded`(`fallback`)로 기록합니다. CLI와 같은 동작입니다. 1단계를 실행하지 않는 `unsupported` 계획에서는 SBOM 없이 `BOMLENS_STAGE1_EXIT=127`(또는 `BOMLENS_STAGE1_REASON=cdxgen-unavailable`)을 넘기면 사유가 `cdxgen-unavailable`이 됩니다.
+2단계는 1단계 종료 코드와 관계없이 실행하고, 그 코드를 `BOMLENS_STAGE1_EXIT`로, 1단계 컨테이너가 메모리 부족으로 종료됐으면 `BOMLENS_STAGE1_OOM`에 `true`를, 출력 폴더에 저장한 1단계 로그의 파일 이름을 `BOMLENS_STAGE1_LOG`로 넘깁니다. 1단계가 실패했거나 SBOM을 남기지 않았으면 2단계가 syft로 소스를 대신 스캔하고(직접 의존성만), 사유를 `bomlens:sbom-tool-degraded`(`oom`, `disk-space`, `tls-trust`, `registry-auth`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)에 적으며, 결과 매니페스트는 `generate`를 `degraded`(`fallback`)로 기록합니다. CLI와 같은 동작입니다. 1단계를 실행하지 않는 `unsupported` 계획에서는 SBOM 없이 `BOMLENS_STAGE1_EXIT=127`(또는 `BOMLENS_STAGE1_REASON=cdxgen-unavailable`)을 넘기면 사유가 `cdxgen-unavailable`이 됩니다. `tls-trust`는 패키지 저장소의 TLS 인증서를 신뢰하지 못했다는 뜻이고, `registry-auth`는 저장소가 로그인을 거부했다(HTTP 401 또는 403)는 뜻입니다. 둘 다 1단계 로그로 판단하며 `network`보다 먼저 확인합니다.
 
 ## 입력 지문
 

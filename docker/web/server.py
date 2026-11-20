@@ -3081,7 +3081,8 @@ def sbom_summary(run_id):
     )
     # sbom-tool-degraded: set by entrypoint.sh when cdxgen couldn't run and the
     # scan fell back to syft (direct deps only): "oom", "disk-space", "network",
-    # "cdxgen-crash" (cdxgen ran and failed on its own: an internal exception,
+    # "tls-trust" (an untrusted certificate), "registry-auth" (a registry
+    # refused the login), "cdxgen-crash" (cdxgen ran and failed on its own: an internal exception,
     # or its own document validation rejecting the result) or the generic
     # "cdxgen-unavailable" (cdxgen never ran at all). Drives a result banner
     # so the thin dependency graph has a visible reason.

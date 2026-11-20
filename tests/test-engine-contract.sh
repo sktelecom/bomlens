@@ -1081,6 +1081,26 @@ elif command -v syft >/dev/null 2>&1; then
             && pass "no stage 1 ($how) is recorded as cdxgen-unavailable, not a crash" \
             || fail "no stage 1 ($how): $(jq -c '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded")]' "$D/demo_1.0_bom.json" 2>&1)"
     done
+    # A registry that refused the login: read from the log ahead of the
+    # timeout that follows it, with the advice for a cloned source (the
+    # scan's .scanmeta.json says git-url); and passed in by the CLI as it is.
+    D="$(new_run fallback-registry-auth empty)"
+    printf 'npm error code E401\nnpm error Unable to authenticate, need: Basic realm="Artifactory"\nnpm error ETIMEDOUT\n' > "$D/bomlens-stage1.log"
+    printf '{"source": "git-url", "target": "https://example.invalid/x.git"}' > "$D/.scanmeta.json"
+    run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=1 BOMLENS_STAGE1_LOG=bomlens-stage1.log
+    [ "$(jq -r '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value] | first' "$D/demo_1.0_bom.json" 2>/dev/null)" = "registry-auth" ] \
+        && grep -q "no login to your company's package repository" "$D.log" \
+        && grep -q 'guides/company-network/' "$D.log" \
+        && pass "a refused login is recorded as registry-auth, with the advice for a cloned source" \
+        || fail "registry-auth: $(jq -c '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded")]' "$D/demo_1.0_bom.json" 2>&1)" "$(grep -E 'WARN|HINT' "$D.log")"
+    for _r in tls-trust registry-auth; do
+        D="$(new_run "fallback-reason-$_r" empty)"
+        run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=1 BOMLENS_STAGE1_REASON="$_r" _BOMLENS_CLI_FALLBACK=1
+        [ "$(jq -r '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value] | first' "$D/demo_1.0_bom.json" 2>/dev/null)" = "$_r" ] \
+            && ! grep -q '^\[HINT\]' "$D.log" \
+            && pass "the reason $_r passed in is used, and the advice is left to the CLI" \
+            || fail "reason $_r passed in: $(jq -c '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded")]' "$D/demo_1.0_bom.json" 2>&1)"
+    done
     D="$(new_run stage1-ok)"
     run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=0
     [ "$(jq -r '[.steps[] | select(.id=="generate")][0].status' "$D/bomlens-result.json")" = "ok" ] \

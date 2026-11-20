@@ -182,7 +182,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `TARGET_DIR` | 모드별 | — | `ROOTFS` 모드의 디렉터리 경로 |
 | `UPLOAD_ENABLED` | — | `true` | `false`면 업로드 없이 로컬 저장만 (CLI `--generate-only`와 동일) |
 | `HOST_OUTPUT_DIR` | — | — | 산출물을 복사할 마운트 경로 |
-| `BOMLENS_STAGE1_EXIT`, `BOMLENS_STAGE1_OOM`, `BOMLENS_STAGE1_LOG`, `BOMLENS_STAGE1_REASON` | — | — | 1단계를 직접 실행한 뒤의 `POSTPROCESS`: 그 종료 코드, 메모리 부족으로 종료됐으면 `true`, 출력 폴더에 둔 로그 파일 이름. 뒤의 두 값 대신 이미 분류한 사유(`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)를 넘겨도 됨. 종료 코드 127은 `cdxgen-unavailable`로 읽으므로, 1단계를 실행하지 않는 `unsupported` 계획에서는 이 값을 넘김. 1단계가 SBOM을 남기지 않았으면 2단계가 syft 스캔으로 대신함([엔진 계약](engine-contract.ko.md#실행-계획) 참조) |
+| `BOMLENS_STAGE1_EXIT`, `BOMLENS_STAGE1_OOM`, `BOMLENS_STAGE1_LOG`, `BOMLENS_STAGE1_REASON` | — | — | 1단계를 직접 실행한 뒤의 `POSTPROCESS`: 그 종료 코드, 메모리 부족으로 종료됐으면 `true`, 출력 폴더에 둔 로그 파일 이름. 뒤의 두 값 대신 이미 분류한 사유(`oom`, `disk-space`, `tls-trust`, `registry-auth`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)를 넘겨도 됨. 종료 코드 127은 `cdxgen-unavailable`로 읽으므로, 1단계를 실행하지 않는 `unsupported` 계획에서는 이 값을 넘김. 1단계가 SBOM을 남기지 않았으면 2단계가 syft 스캔으로 대신함([엔진 계약](engine-contract.ko.md#실행-계획) 참조) |
 | `BOMLENS_EVENTS` | — | — | `file` 또는 `stderr`: 진행 이벤트를 한 줄에 JSON 객체 하나씩 출력 폴더의 `bomlens-events.jsonl` 또는 표준 오류에 씀([엔진 계약](engine-contract.ko.md#진행-이벤트) 참조) |
 | `BOMLENS_IMAGE_REF`, `BOMLENS_IMAGE_DIGEST` | — | — | 호출자가 실행한 이미지 참조와 다이제스트. `bomlens-result.json`에 그대로 적습니다([엔진 계약](engine-contract.ko.md) 참고) |
 | `GENERATE_NOTICE` | — | `false` | 오픈소스 고지문 생성 (CLI `--notice`) |

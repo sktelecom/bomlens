@@ -26,6 +26,10 @@ export function sbomDegradedBodyKey(reason: string): string {
       return "result.sbomDegradedOom";
     case "network":
       return "result.sbomDegradedNetwork";
+    case "tls-trust":
+      return "result.sbomDegradedTlsTrust";
+    case "registry-auth":
+      return "result.sbomDegradedRegistryAuth";
     case "cdxgen-crash":
       return "result.sbomDegradedCrash";
     case "cdxgen-unavailable":

@@ -185,7 +185,9 @@ export interface SbomSummary {
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
   /** Set when cdxgen couldn't run and the scan fell back to syft (direct deps
-   *  only): "oom" | "disk-space" | "network" | "cdxgen-crash" (cdxgen ran and
+   *  only): "oom" | "disk-space" | "network" | "tls-trust" (a certificate the
+   *  scan did not trust) | "registry-auth" (a registry refused the login) |
+   *  "cdxgen-crash" (cdxgen ran and
    *  failed on its own) | "cdxgen-unavailable" (cdxgen never ran at all).
    *  Drives a result banner. */
   sbomToolDegraded?: string | null;
