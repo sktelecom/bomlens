@@ -3893,7 +3893,9 @@ GRADLE_USER_CACHE_EOF
         # The kept copy has credentials in URLs and token-like values masked
         # (mask_log_secrets); when masking fails the log is removed instead.
         # A gradle-packages failure is announced by stage 2 itself, so it is
-        # not repeated here; the log path is still printed.
+        # not repeated here; the log path is still printed. license-fetch
+        # (the registry licence lookup was skipped) leaves no dependency out,
+        # so it gets one [INFO] line instead of the warning.
         if grep -q '"bomlens:pipeline-step-failed"' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null; then
             _s1_kept="$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
             _s1_steps=""
@@ -3902,7 +3904,7 @@ GRADLE_USER_CACHE_EOF
                 # which reports an unreadable SBOM the usual way.
                 _s1_steps="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value | strings] | unique | join(", ")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null)" || _s1_steps=""
             fi
-            _s1_other="$(printf '%s\n' "$_s1_steps" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -vx 'gradle-packages' | grep . | tr '\n' ',' | sed 's/,$//; s/,/, /g')" || _s1_other=""
+            _s1_other="$(printf '%s\n' "$_s1_steps" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -vxE 'gradle-packages|license-fetch' | grep . | tr '\n' ',' | sed 's/,$//; s/,/, /g')" || _s1_other=""
             if mask_log_secrets "$STAGE1_LOG" "$_s1_kept"; then
                 rm -f "$STAGE1_LOG"
                 STAGE1_LOG="$_s1_kept"
@@ -3912,6 +3914,10 @@ GRADLE_USER_CACHE_EOF
                 STAGE1_LOG=""
                 _s1_where="the cdxgen log could not be masked, so it was not kept."
             fi
+            case ", $_s1_steps, " in
+                *", license-fetch, "*)
+                    echo "[INFO] The registry license lookup was skipped; licenses come from lock files and package metadata." ;;
+            esac
             if [ -n "$_s1_other" ] || [ -z "$_s1_steps" ]; then
                 log_warn "cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
             else
