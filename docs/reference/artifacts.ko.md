@@ -124,6 +124,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 패키지 저장소가 응답하지 않거나 `pip install`이 실패해 프로젝트에 설치된 가상 환경을 읽은 Python 소스 스캔은 `metadata.properties`에 `bomlens:python-environment`(스캔 루트 기준 환경 폴더, 예: `.venv`)와 `bomlens:python-environment-reason`(`index-unreachable` 또는 `pip-install-failed`)을 기록합니다. `bomlens:python-environment-unsure`는 확정하지 못한 것이 있을 때만 붙고 그 내용을 적습니다(판정하지 못한 환경 마커, 선언했지만 설치되지 않은 패키지, 선언한 고정 버전과 다른 설치 버전 등). 이때 결과는 `installed-environment-unsure` 사유의 부분 결과이고 `compositions[0].aggregate`는 `incomplete`입니다. 환경을 읽지 않았거나 `BOMLENS_PYTHON_VENV=false`로 두었으면 세 속성 모두 없습니다([Python](ecosystems.ko.md#python)). 환경 폴더 자체는 읽었든 아니든 스캔의 탐색에서 빠지고, 그 패턴(`.venv/**`)은 `BOMLENS_INCLUDE_NON_SHIPPED=1`일 때도 `bomlens:excluded-paths`에 들어갑니다.
 
+커밋한 lock 파일 대신 npm이나 pnpm이 설치할 때 써 둔 lock 파일을 읽은 Node.js 소스 스캔은 `metadata.properties`에 `bomlens:node-lock-source`를 기록합니다. 읽은 파일마다 하나씩 남고, 값은 스캔 루트 기준 상대 경로입니다(예: `node_modules/.package-lock.json`, `web/node_modules/.pnpm/lock.yaml`). 이때 `bomlens:prep-step-applied`에는 `npm-installed-lock` 또는 `pnpm-installed-lock`이 들어갑니다. 모든 폴더에 자체 lock 파일이 있었거나, lock을 읽지 않았거나, `BOMLENS_NODE_INSTALLED_LOCK=false`로 두었으면 이 속성은 없습니다([Node.js](ecosystems.ko.md#nodejs)).
+
 ## 의존성 그래프 완전성
 
 생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.

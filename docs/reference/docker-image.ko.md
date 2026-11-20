@@ -222,6 +222,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | ingest release 라벨 |
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
+| `BOMLENS_NODE_INSTALLED_LOCK` | - | 켜짐 | Node.js 소스 스캔: `false`(또는 `0`)로 두면 npm이나 pnpm이 설치할 때 써 둔 lock 파일(`node_modules/.package-lock.json`, `node_modules/.pnpm/lock.yaml`)을 읽지 않음. 그 밖에는 `package.json`이 있고 그 폴더와 상위 폴더에 커밋한 lock 파일이 없는 폴더를 이 lock으로 스캔하며, lock 파일은 스캔하는 동안만 두었다가 지움([Node.js](ecosystems.ko.md#nodejs)) |
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
 | `BOMLENS_GRADLE_FULL_GRAPH` | - | - | Java Gradle 소스 스캔: `1`로 설정하면 각 프로젝트의 런타임 클래스패스로 거르지 않고 테스트와 compileOnly 의존성까지 포함한 전체 그래프를 유지. 필터용 Gradle 실행은 루트만 해석하던 기존 준비 실행과 달리 모든 프로젝트를 해석하므로, 하위 프로젝트가 많은 빌드에서는 이 단계가 더 오래 걸림 |
 | `BOMLENS_MAVEN_USER_REPOSITORY` | - | 켜짐 | Maven 소스 스캔: `false`(또는 `0`)로 두면 `/bomlens-settings/m2/repository`에 붙인 사용자의 Maven 로컬 저장소를 쓰지 않음. 그 밖에는 Maven이 이 폴더를 스캔 자체 저장소 다음에 읽되 쓰지 않고(`-Dmaven.repo.local.tail`, Maven 3.9 이상), cdxgen이 여기서 POM, 라이선스, jar 해시를 읽으며(`MAVEN_CACHE_DIR`), 내려받을 저장소가 응답하지 않을 때만 Maven을 오프라인(`-o`)으로 실행함([Java (Maven)](ecosystems.ko.md#java-maven)) |
