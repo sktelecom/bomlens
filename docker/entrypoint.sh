@@ -722,6 +722,11 @@ generate_sbom_cdxgen() {
         # By name as well: the id may never have been read.
         [ -z "$cid" ] || docker rm -f "$cid" >/dev/null 2>&1
         docker rm -f "$sibling_name" >/dev/null 2>&1
+        # The first run's log goes now; a refusal it shows stays on the first
+        # SBOM, which is the result when the rerun leaves none.
+        if [ "$rc" -eq 0 ] && [ -s "$bom_path" ] && registry_auth_refused "$logf"; then
+            mark_sbom_registry_refused "$bom_path" registry-auth
+        fi
         rm -f "$logf" "$cidf" "$prep_file" "$venv_reader" "$conda_reader"
         local first="" first_img="$img" retry_img="$JAVA_RETRY_IMAGE"
         if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
