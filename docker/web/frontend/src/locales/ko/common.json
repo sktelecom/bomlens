@@ -1067,6 +1067,7 @@
     "poetryGraph": "Poetry 의존 그래프",
     "cargoWorkspaceMetadata": "Cargo 워크스페이스 멤버 탐지",
     "cargoLicenseMetadata": "Rust 크레이트 라이선스 조회",
+    "licenseFetch": "패키지 저장소 라이선스 조회",
     "aiUsage": "AI 사용 탐지",
     "resolveModels": "Hugging Face 모델 조회",
     "composerInstall": "PHP Composer 의존성 해석",

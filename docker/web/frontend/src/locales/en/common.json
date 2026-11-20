@@ -1067,6 +1067,7 @@
     "poetryGraph": "Poetry dependency graph",
     "cargoWorkspaceMetadata": "Cargo workspace member detection",
     "cargoLicenseMetadata": "Rust crate license lookup",
+    "licenseFetch": "license lookup in the package registries",
     "aiUsage": "AI usage detection",
     "resolveModels": "Hugging Face model lookup",
     "composerInstall": "PHP Composer dependency resolution",
