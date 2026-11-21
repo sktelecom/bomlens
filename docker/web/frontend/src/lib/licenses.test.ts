@@ -67,6 +67,15 @@ describe("reviewGroups", () => {
     expect(groups[0].components.map((x) => x.name)).toEqual(["llama"]);
   });
 
+  it("puts no-derivatives after non-commercial", () => {
+    const nd = c({ name: "nd-data", licenses: ["CC-BY-ND-4.0"], licenseReview: "no-derivatives" });
+    expect(reviewGroups([nd, ...COMPONENTS]).map((g) => g.flag)).toEqual([
+      "behavioral-use",
+      "non-commercial",
+      "no-derivatives",
+    ]);
+  });
+
   it("is empty when nothing needs review", () => {
     expect(reviewGroups([c({ licenses: ["MIT"] })])).toEqual([]);
     expect(reviewCount(COMPONENTS)).toBe(2);

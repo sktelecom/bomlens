@@ -9,7 +9,8 @@
 # Scope is deliberately narrow: the licenses that standard OSS-compliance tooling
 # does NOT already make obvious and that the AI guidance (OpenChain 3.5, G7)
 # calls out — behavioral-use restrictions (RAIL/OpenRAIL, Llama/Gemma/Falcon
-# community licenses) and non-commercial terms (CC-BY-NC…). Permissive (MIT,
+# community licenses), non-commercial terms (CC-BY-NC…) and no-derivatives
+# terms (CC-BY-ND…). Permissive (MIT,
 # Apache) and ordinary copyleft (GPL/LGPL) are intentionally NOT flagged here, so
 # a normal software scan's NOTICE is unchanged.
 #
@@ -19,6 +20,7 @@ def license_flag($s):
   (($s // "") | ascii_downcase | gsub("[ ._/-]+"; " ")) as $n |
   if   ($n | test("openrail|\\brail\\b|responsible ai|community license|\\bllama|\\bgemma\\b|falcon llm")) then "behavioral-use"
   elif ($n | test("cc by nc|non ?commercial")) then "non-commercial"
+  elif ($n | test("cc by nd|no ?deriv(ative)?s|no derivative works")) then "no-derivatives"
   else "" end;
 
 # ---------------------------------------------------------------------------
@@ -107,8 +109,8 @@ def spdx_dnf($s):
 # CC-BY-NC, CC-BY-ND) impose attribution or a field-of-use limit but never
 # propagate the license, so they land on permissive for THIS axis — a
 # non-commercial restriction is a real limitation, but flagging it is
-# license_flag's job (bomlens:licenseReview), not this one's; CC-BY-NC is
-# already caught there. CC-BY-ND is not, and neither axis currently says so.
+# license_flag's job (bomlens:licenseReview), not this one's; CC-BY-NC and
+# CC-BY-ND are caught there.
 def license_class($s):
   (($s // "") | sub("^\\s+"; "") | sub("\\s+$"; "")) as $id
   | (if (([$id | scan("/")] | length) == 1 and ($id | test("://") | not)) then ($id | sub("\\s*/\\s*"; " OR ")) else $id end) as $x

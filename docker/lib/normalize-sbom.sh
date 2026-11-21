@@ -579,7 +579,7 @@ LICENSE_FIX='(.components) |= (if type=="array" then map(
 ) else . end)'
 
 # Tag components whose declared license needs human review (AI behavioral-use /
-# non-commercial) with a bomlens:licenseReview property, so the web UI can badge
+# non-commercial / no-derivatives) with a bomlens:licenseReview property, so the web UI can badge
 # them from structural data. Uses the SAME classifier as the NOTICE's review
 # section (license-flags.jq), so badge and notice never disagree. Runs after
 # LICENSE_FIX so normalized .license.id is in place; permissive/copyleft are not

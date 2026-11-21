@@ -1707,6 +1707,7 @@
     "reviewHint": "AI-restrictive terms: human review required.",
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
+    "flagNoDerivatives": "No derivatives",
     "tier": {
       "networkCopyleft": "Network copyleft",
       "strongCopyleft": "Strong copyleft",
@@ -1719,7 +1720,7 @@
       "networkCopyleft": "Also applies when users only use the software over a network, so offering it as a service may require sharing the source.",
       "strongCopyleft": "If you distribute a work that combines it with your code, the combined work may need to be shared under the same license.",
       "weakCopyleft": "Changes to the library itself must be shared under the same license. Your own code that only uses it is usually not affected.",
-      "reviewNeeded": "The license has use restrictions, such as non-commercial or behavioral-use terms. A person needs to review it.",
+      "reviewNeeded": "The license has use restrictions, such as non-commercial, no-derivatives or behavioral-use terms. A person needs to review it.",
       "uncategorized": "The scan could not tell which class this license belongs to. Check the license text by hand.",
       "permissive": "Few conditions, mostly keeping the copyright and license notices."
     },

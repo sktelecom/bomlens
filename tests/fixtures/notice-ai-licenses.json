@@ -8,6 +8,8 @@
       "licenses": [ { "license": { "name": "Llama 3.1 Community License" } } ] },
     { "type": "data", "name": "some-nc-dataset", "version": "1.0",
       "licenses": [ { "license": { "id": "CC-BY-NC-4.0" } } ] },
+    { "type": "data", "name": "some-nd-dataset", "version": "1.0",
+      "licenses": [ { "license": { "id": "CC-BY-ND-4.0" } } ] },
     { "type": "library", "name": "ordinary-lib", "version": "2.0",
       "licenses": [ { "license": { "id": "MIT" } } ] }
   ]

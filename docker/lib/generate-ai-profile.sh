@@ -75,10 +75,11 @@ CONF_RESULT=$(jq -r '.result // "N/A"' "$CONF")
 
 # --------------------------------------------------------
 # License review flags from the finished SBOM. normalize-sbom.sh tags components
-# whose declared license is an AI behavioral-use or non-commercial license with a
+# whose declared license is an AI behavioral-use, non-commercial or
+# no-derivatives license with a
 # bomlens:licenseReview property (same classifier as the NOTICE's review section).
 # --------------------------------------------------------
-LIC='{"total":0,"behavioral":0,"nonCommercial":0,"items":[]}'
+LIC='{"total":0,"behavioral":0,"nonCommercial":0,"noDerivatives":0,"items":[]}'
 if [ -f "$BOM" ]; then
     LIC=$(jq -c '
       [ .components[]?
@@ -92,7 +93,8 @@ if [ -f "$BOM" ]; then
       | { total: length,
           behavioral:    (map(select(.flag=="behavioral-use"))|length),
           nonCommercial: (map(select(.flag=="non-commercial"))|length),
-          items: . }' "$BOM" 2>/dev/null || echo '{"total":0,"behavioral":0,"nonCommercial":0,"items":[]}')
+          noDerivatives: (map(select(.flag=="no-derivatives"))|length),
+          items: . }' "$BOM" 2>/dev/null || echo '{"total":0,"behavioral":0,"nonCommercial":0,"noDerivatives":0,"items":[]}')
 fi
 
 # --------------------------------------------------------
@@ -182,8 +184,10 @@ esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 G7R="$G7"        # render copy of the G7 rollup (cluster names + item labels)
 FLAG_B="Behavioral-use restriction"
 FLAG_N="Non-commercial"
+FLAG_D="No derivatives"
 if [ "$REPORT_LANG" = "ko" ]; then
     FLAG_B=$(kstr aiprofile.flag_behavioral); FLAG_N=$(kstr aiprofile.flag_noncommercial)
+    FLAG_D=$(kstr aiprofile.flag_noderivatives)
     REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
     # Localize element labels (by id) and cluster display names (by cluster id).
     G7R=$(printf '%s' "$G7" | jq -c --slurpfile reg "$REG" '
@@ -199,6 +203,7 @@ flag_label() {
     case "$1" in
         behavioral-use) echo "$FLAG_B" ;;
         non-commercial) echo "$FLAG_N" ;;
+        no-derivatives) echo "$FLAG_D" ;;
         *)              echo "$1" ;;
     esac
 }
@@ -208,6 +213,7 @@ flag_label() {
 A=$(echo "$G7" | jq -r '.auto'); P=$(echo "$G7" | jq -r '.present')
 Gp=$(echo "$G7" | jq -r '.gap'); Rv=$(echo "$G7" | jq -r '.review')
 LT=$(echo "$LIC" | jq -r '.total'); LB=$(echo "$LIC" | jq -r '.behavioral'); LN=$(echo "$LIC" | jq -r '.nonCommercial')
+LD=$(echo "$LIC" | jq -r '.noDerivatives // 0')
 CONF_UP=$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')
 AT=$(echo "$ASSESS" | jq -r '.models | length')
 AOK=$(echo "$ASSESS" | jq -r '.counts.ok'); ACOND=$(echo "$ASSESS" | jq -r '.counts.conditional')
@@ -220,7 +226,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_MD_INTRO=$(kstr aiprofile.md_intro)
     P_H2_SUMMARY=$(kstr aiprofile.h2_summary)
     P_SUM_G7=$(tfmt aiprofile.sum_g7 "$P" "$A" "$Gp" "$Rv")
-    P_SUM_LIC=$(tfmt aiprofile.sum_lic "$LT" "$LB" "$LN")
+    P_SUM_LIC=$(tfmt aiprofile.sum_lic "$LT" "$LB" "$LN" "$LD")
     P_SUM_BASE=$(tfmt aiprofile.sum_base "$CONF_UP")
     P_H2_LIC=$(kstr aiprofile.h2_lic)
     P_TH_COMP=$(kstr aiprofile.th_component); P_TH_VER=$(kstr aiprofile.th_version)
@@ -253,11 +259,11 @@ else
     P_MD_INTRO="- This profile re-aggregates the conformance and SBOM artifacts already produced."
     P_H2_SUMMARY="Summary"
     P_SUM_G7="- G7 minimum elements: **${P} / ${A} present** (of the automatically checkable), ${Gp} gap, ${Rv} need human review."
-    P_SUM_LIC="- Licenses flagged for review: **${LT}** (${LB} behavioral-use, ${LN} non-commercial)."
+    P_SUM_LIC="- Licenses flagged for review: **${LT}** (${LB} behavioral-use, ${LN} non-commercial, ${LD} no-derivatives)."
     P_SUM_BASE="- Base conformance result: **${CONF_UP}** (the overall pass/fail comes from the required format checks, not from G7)."
     P_H2_LIC="Licenses flagged for review"
     P_TH_COMP="Component"; P_TH_VER="Version"; P_TH_LIC="License"; P_TH_FLAG="Flag"
-    P_LIC_NONE="_No components carry an AI behavioral-use or non-commercial license flag._"
+    P_LIC_NONE="_No components carry an AI behavioral-use, non-commercial or no-derivatives license flag._"
     P_H2_CLUSTERS="G7 minimum elements by cluster"
     P_TH_CLUSTER="Cluster"; P_TH_PRESENT="Present"; P_TH_GAP="Gap"; P_TH_REVIEW="Review"; P_TH_TOTAL="Total"
     P_H2_XWALK="Regulatory crosswalk"
@@ -343,10 +349,11 @@ fi
     if [ "$LT" -gt 0 ]; then
         echo "| ${P_TH_COMP} | ${P_TH_VER} | ${P_TH_LIC} | ${P_TH_FLAG} |"
         echo "|-----------|---------|---------|------|"
-        echo "$LIC" | jq -r --argjson cap "$CAP" --arg fb "$FLAG_B" --arg fn "$FLAG_N" '.items[0:$cap][] |
+        echo "$LIC" | jq -r --argjson cap "$CAP" --arg fb "$FLAG_B" --arg fn "$FLAG_N" --arg fd "$FLAG_D" '.items[0:$cap][] |
             "| \(.name|gsub("[|\n]";" ")) | \(.version|gsub("[|\n]";" ")) | \(.license|gsub("[|\n]";" ")) | \(
               if .flag=="behavioral-use" then $fb
-              elif .flag=="non-commercial" then $fn else .flag end) |"'
+              elif .flag=="non-commercial" then $fn
+              elif .flag=="no-derivatives" then $fd else .flag end) |"'
         if [ "$LT" -gt "$CAP" ]; then
             echo ""
             if [ "$REPORT_LANG" = "ko" ]; then tfmt aiprofile.lic_more_md "$((LT - CAP))"; echo ""; else echo "_… and $((LT - CAP)) more (see the JSON profile)._"; fi

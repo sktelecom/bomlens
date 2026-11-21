@@ -1505,8 +1505,11 @@ g7g_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confg
 
 echo "== AI compliance profile re-aggregates conformance + license flags =="
 # Reuse the AI-fixture conformance from the G7 section ($WORK/conf_conformance.json);
-# give the profile a matching _bom.json carrying one behavioral-use license flag.
-jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])' \
+# give the profile a matching _bom.json carrying one behavioral-use and one
+# no-derivatives license flag.
+jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])
+    | .components += [{type:"data",name:"nd-data",version:"1.0",licenses:[{license:{id:"CC-BY-ND-4.0"}}],
+        properties:[{name:"bomlens:licenseReview",value:"no-derivatives"}]}]' \
    "$FIX/aibom-owasp-1_7.json" > "$WORK/conf_bom.json"
 bash "$LIB/generate-ai-profile.sh" "$WORK/conf" "demo" >/dev/null 2>&1
 PROF="$WORK/conf_ai-profile.json"
@@ -1518,6 +1521,10 @@ if [ -f "$PROF" ]; then
     [ "$inv" = "$tot" ] && pass "G7 present+gap+review == total ($tot)" || fail "G7 counts inconsistent: $inv vs $tot"
     lf=$(jq -r '.licenseReview.total' "$PROF"); lb=$(jq -r '.licenseReview.behavioral' "$PROF")
     { [ "$lf" -ge 1 ] && [ "$lb" -ge 1 ]; } && pass "license-review flag surfaced ($lf total, $lb behavioral-use)" || fail "license flag not surfaced (total=$lf, behavioral=$lb)"
+    ld=$(jq -r '.licenseReview.noDerivatives' "$PROF")
+    [ "$ld" = "1" ] && grep -q "| No derivatives |" "$WORK/conf_ai-profile.md" \
+        && grep -q "1 no-derivatives)" "$WORK/conf_ai-profile.md" \
+        && pass "no-derivatives flag counted and labelled in the profile" || fail "no-derivatives flag not surfaced (noDerivatives=$ld)"
     xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
     grep -q "re-aggregates the conformance and SBOM artifacts" "$WORK/conf_ai-profile.md" && pass "MD states it re-aggregates existing artifacts" || fail "MD lacks the re-aggregation note"
@@ -1766,6 +1773,7 @@ if [ -f "$RTXT" ] && grep -q "License review needed" "$RTXT"; then
     pass "NOTICE has a license-review section"
     grep -q "behavioral-use" "$RTXT" && grep -q "Llama" "$RTXT" && pass "Llama community license flagged behavioral-use" || fail "Llama not flagged behavioral-use"
     grep -q "non-commercial" "$RTXT" && grep -q "CC-BY-NC-4.0" "$RTXT" && pass "CC-BY-NC flagged non-commercial" || fail "CC-BY-NC not flagged non-commercial"
+    grep -q "^\[no-derivatives\] CC-BY-ND-4.0" "$RTXT" && pass "CC-BY-ND flagged no-derivatives" || fail "CC-BY-ND not flagged no-derivatives"
     # An ordinary MIT component must NOT land in the review section.
     if awk '/License review needed/{f=1} /SPDX standard/{f=0} f&&/ordinary-lib/{bad=1} END{exit !bad}' "$RTXT"; then
         fail "MIT component wrongly listed for review"
@@ -1932,6 +1940,11 @@ REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koconf" "demo" >/dev/nu
 if [ -f "$WORK/koconf_ai-profile.json" ]; then
     grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the cluster rollup" || fail "ko cluster rollup not localized"
     grep -q '검토 대상 라이선스' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the license section" || fail "ko license section not localized"
+    { grep -q '변경 금지 1)' "$WORK/koconf_ai-profile.md" && grep -q '| 변경 금지 |' "$WORK/koconf_ai-profile.md"; } \
+        && pass "ko profile labels the no-derivatives flag" || fail "ko profile no-derivatives label missing"
+    REPORT_LANG=ko bash "$LIB/validate-sbom.sh" "$WORK/conf_bom.json" "$WORK/kond" "demo" >/dev/null 2>&1
+    grep -q '<td>변경 금지</td>' "$WORK/kond_conformance.html" \
+        && pass "ko conformance labels the no-derivatives flag" || fail "ko conformance no-derivatives label missing"
     grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_ai-profile.md" && pass "ko profile cluster heading is Korean" || fail "ko profile heading not localized"
     grep -qE '^\| (메타데이터|모델|인프라) ' "$WORK/koconf_ai-profile.md" && pass "ko profile localizes cluster display names (name_ko)" || fail "ko profile cluster names not localized"
     if diff <(jq 'del(.generatedAt)' "$WORK/conf_ai-profile.json") <(jq 'del(.generatedAt)' "$WORK/koconf_ai-profile.json") >/dev/null 2>&1; then
