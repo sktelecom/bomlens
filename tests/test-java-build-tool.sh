@@ -11,8 +11,14 @@
 #   - license exceptions: "X OR <exception id>" and "... with <exception name>"
 #     become "X WITH <exception id>" in normalize-sbom.sh, and are not classified
 #     as strong copyleft or as a conflict.
+#   - Maven multi-module build: a sibling module named in the jar fetch's
+#     errors is not a failed step, a dependency no repository has still is,
+#     and a module scanned without its parent POM gets the
+#     maven-parent-outside-scan hint, which the completeness result turns into
+#     its fix.
 #
-# Fixtures: tests/fixtures/journey/java-both-tools, java-license-exceptions.
+# Fixtures: tests/fixtures/journey/java-both-tools, java-license-exceptions,
+# maven-multi-module.
 set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -76,6 +82,94 @@ out=$(bash "$ROOT_DIR/scripts/scan-sbom.sh" --build-tool bogus 2>&1); rc=$?
 check "an unknown tool exits 1" "$rc" "1"
 case "$out" in *"--build-tool takes auto, maven or gradle"*) pass "the message names the values" ;; *) fail "the message names the values" "$out" ;; esac
 case "$(bash "$ROOT_DIR/scripts/scan-sbom.sh" --help 2>&1)" in *"--build-tool <tool>"*) pass "--help lists --build-tool" ;; *) fail "--help lists --build-tool" ;; esac
+
+echo "== Maven multi-module build: the jar fetch's errors =="
+# The jar fetch block of build-prep.sh, run with a stand-in mvn that prints
+# the [ERROR] lines given in MM_ERR (as --fail-never leaves them, exit 0).
+mm_block=$(sed -n '/^# Maven component hashes/,/^fi$/p' "$LIB/build-prep.sh")
+mm_fns=$(sed -n '/^xml_without_comments() {/,/^}/p' "$LIB/build-prep.sh")
+if [ -z "$mm_block" ] || [ -z "$mm_fns" ]; then
+    fail "could not extract the Maven block of build-prep.sh"
+else
+    mkdir -p "$WORK/mm-bin" "$WORK/mm-home"
+    cat > "$WORK/mm-bin/mvn" <<'STUB'
+#!/bin/sh
+[ -z "$MM_ERR" ] || printf '%s\n' "$MM_ERR"
+exit 0
+STUB
+    chmod +x "$WORK/mm-bin/mvn"
+    mm_prelude='log() { echo "[build-prep] $*"; }
+mark_prep_failed() { echo "MARK-FAILED $1"; }
+prep_cause() { echo "CAUSE $1: $2"; }
+prep_hint() { echo "HINT $1"; }
+run_supervised_timeout() { shift; "$@"; }
+PREP_TIMEOUT_DEFAULT=5'
+    mm_run() {  # <dir> <errors>
+        ( cd "$1" && PATH="$WORK/mm-bin:$PATH" HOME="$WORK/mm-home" MM_ERR="$2" MAVEN_OPTS="" \
+            MAVEN_SETTINGS_ARGS="" bash -c "$mm_prelude
+$mm_fns
+$mm_block" 2>&1 )
+    }
+    cp -R "$FIX/maven-multi-module" "$WORK/mm"
+    # Maven 3.10 lists each unresolved dependency on its own line.
+    sib='[ERROR] Failed to execute goal on project web: Could not resolve dependencies for project example.mm:web:jar:1.0.0
+[ERROR] dependency: example.mm:core:jar:1.0.0 (compile)
+[ERROR] 	prefixes: Path example/mm/core/1.0.0/core-1.0.0.jar NOT allowed from central
+[ERROR] -> [Help 1]'
+    o=$(mm_run "$WORK/mm" "$sib")
+    case "$o" in *MARK-FAILED*) fail "a sibling module is not a failed step" "$o" ;; *) pass "a sibling module of the build (core) is not a failed step" ;; esac
+    case "$o" in *"modules of this build (core) are not built"*) pass "the log names the sibling module" ;; *) fail "the log names the sibling module" "$o" ;; esac
+    o=$(mm_run "$WORK/mm" '[ERROR] Failed to execute goal on project web: Could not resolve dependencies for project example.mm:web:jar:1.0.0: The following artifacts could not be resolved: example.mm:core:jar:1.0.0 (absent): Could not find artifact example.mm:core:jar:1.0.0 in central (https://repo.maven.apache.org/maven2) -> [Help 1]')
+    case "$o" in *MARK-FAILED*) fail "Maven 3.9 one-line form: a sibling module is not a failed step" "$o" ;; *) pass "Maven 3.9 one-line form: a sibling module is not a failed step" ;; esac
+    o=$(mm_run "$WORK/mm" "$sib
+[ERROR] dependency: com.example.nope:nope:jar:9.9.9 (compile)
+[ERROR] 	Could not find artifact com.example.nope:nope:jar:9.9.9 in central (https://repo.maven.apache.org/maven2)")
+    case "$o" in *"MARK-FAILED maven-dependency-resolve"*) pass "a dependency no repository has, beside a sibling module, is still a failed step" ;; *) fail "a missing dependency beside a sibling module is still a failed step" "$o" ;; esac
+    case "$o" in *"CAUSE maven-dependency-resolve: Maven could not resolve com.example.nope:nope:jar:9.9.9"*) pass "the cause names the missing dependency, not the sibling" ;; *) fail "the cause names the missing dependency" "$o" ;; esac
+    o=$(mm_run "$WORK/mm" '[ERROR] Failed to execute goal on project web: Could not resolve dependencies for project example.mm:web:jar:1.0.0
+[ERROR] dependency: example.mm:core:jar:0.9.0 (compile)')
+    case "$o" in *"MARK-FAILED maven-dependency-resolve"*) pass "a sibling at another version than the build's is not excused" ;; *) fail "a sibling at another version than the build's is not excused" "$o" ;; esac
+    # A module whose version comes from a property matches any version.
+    cp -R "$FIX/maven-multi-module" "$WORK/mm-rev"
+    sed -i.bak 's|<artifactId>core</artifactId>|<artifactId>core</artifactId><version>${revision}</version>|' "$WORK/mm-rev/core/pom.xml"
+    o=$(mm_run "$WORK/mm-rev" "$sib")
+    case "$o" in *MARK-FAILED*) fail "a module with a \${revision} version is a module of the build" "$o" ;; *) pass "a module with a \${revision} version is a module of the build" ;; esac
+    # A module scanned alone: its parent POM is one folder up, outside the scan.
+    mkdir -p "$WORK/web-only"; cp "$FIX/maven-multi-module/web/pom.xml" "$WORK/web-only/"
+    par='[ERROR] [ERROR] Some problems were encountered while processing the POMs:
+[ERROR] The build could not read 1 project -> [Help 1]
+[ERROR]   The project example.mm:web:1.0.0 (/app/pom.xml) has 1 error
+[ERROR]     Non-resolvable parent POM for example.mm:web:1.0.0: The following artifacts could not be resolved: example.mm:parent:pom:1.0.0 (absent): Could not find artifact example.mm:parent:pom:1.0.0 and '"'"'parent.relativePath'"'"' points at wrong local POM @ line 4, column 11 -> [Help 2]'
+    o=$(mm_run "$WORK/web-only" "$par")
+    case "$o" in *"MARK-FAILED maven-dependency-tree"*) pass "a parent POM outside the folder: the dependency tree is the failed step" ;; *) fail "a parent POM outside the folder: the dependency tree is the failed step" "$o" ;; esac
+    case "$o" in *"MARK-FAILED maven-dependency-jars"*) fail "a parent POM outside the folder is not recorded as a jar fetch failure" "$o" ;; *) pass "a parent POM outside the folder is not recorded as a jar fetch failure" ;; esac
+    case "$o" in *"HINT maven-parent-outside-scan"*) pass "the hint names the parent POM outside the folder" ;; *) fail "the hint names the parent POM outside the folder" "$o" ;; esac
+    case "$o" in *"parent POM example.mm:parent:1.0.0 at ../pom.xml, outside the scanned folder"*"Scan the top-level folder"*) pass "the log says where the parent is and what to scan" ;; *) fail "the log says where the parent is and what to scan" "$o" ;; esac
+    # A parent from a repository (empty relativePath) that is missing is an
+    # ordinary download failure, without the hint.
+    mkdir -p "$WORK/repo-parent"
+    sed 's|<version>1.0.0</version></parent>|<version>1.0.0</version><relativePath/></parent>|' "$FIX/maven-multi-module/web/pom.xml" > "$WORK/repo-parent/pom.xml"
+    o=$(mm_run "$WORK/repo-parent" "$par")
+    case "$o" in *"HINT maven-parent-outside-scan"*) fail "a repository parent gets no outside-folder hint" "$o" ;; *) pass "a repository parent (empty relativePath) gets no outside-folder hint" ;; esac
+fi
+
+echo "== completeness: a cause and a hint on a failed Maven step =="
+cat > "$WORK/hint.json" <<'EOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"properties":[
+ {"name":"bomlens:pipeline-step-failed","value":"maven-dependency-tree"},
+ {"name":"bomlens:pipeline-step-cause","value":"maven-dependency-tree: Non-resolvable parent POM example.mm:parent:1.0.0 (../pom.xml is outside the scanned folder)"},
+ {"name":"bomlens:resolution-hint","value":"maven-parent-outside-scan"}]},
+ "components":[{"type":"library","name":"spring-web","purl":"pkg:maven/org.springframework/spring-web@5.3.20"}]}
+EOF
+check "the grade stays partial" "$(bash "$LIB/assess-completeness.sh" "$WORK/hint.json" "$WORK/hint")" "partial"
+case "$(jq -r '.reasons[0].fix.en' "$WORK/hint_completeness.json")" in
+    *"Non-resolvable parent POM"*"Scan the top-level folder of the build"*) pass "the fix names the cause and says to scan the top-level folder" ;;
+    *) fail "the fix names the cause and says to scan the top-level folder" "$(jq -r '.reasons[0].fix.en' "$WORK/hint_completeness.json")" ;;
+esac
+case "$(jq -r '.reasons[0].message.ko' "$WORK/hint_completeness.json")" in
+    *"부모 POM이 폴더 밖에"*) pass "the Korean message names the parent POM" ;;
+    *) fail "the Korean message names the parent POM" "$(jq -r '.reasons[0].message.ko' "$WORK/hint_completeness.json")" ;;
+esac
 
 echo "== license exceptions =="
 cp "$FIX/java-license-exceptions/sbom-exceptions.cdx.json" "$WORK/lic.json"

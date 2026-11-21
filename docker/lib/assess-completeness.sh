@@ -42,7 +42,12 @@
 #                                                 or not deployed, so none is listed)
 #   bomlens:sbom-tool-degraded                    (tool-degraded)
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
-#                                                 (resolution-failed)
+#                                                 (resolution-failed), with
+#   bomlens:pipeline-step-cause ("<step>: <what the build tool reported>")
+#                                                 and bomlens:resolution-hint (a
+#                                                 code in resolutionHints: a cause
+#                                                 with its own sentence and fix,
+#                                                 which may raise the grade)
 #   bomlens:lockfile-missing, bomlens:lockfile-corrupt (detect-lockfile-state.sh),
 #   bomlens:source:versionPinning=unpinned        (lockfile-missing, lockfile-corrupt; the
 #                                                 fix names the command that writes each
@@ -97,6 +102,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   # Text that comes from the document is cut to a short single line: a supplier
   # SBOM (--analyze) is not trusted, and these strings reach a terminal and HTML.
   def clean($n): (tostring | gsub("\\p{Cc}"; " ") | .[0:$n]);
+  def sentence: if test("[.!?]$") then . else . + "." end;
   def prop($n): [(.metadata.properties // [])[]? | select(type == "object" and .name == $n) | .value | select(type == "string" and length > 0)];
   ($reg[0]) as $R
   | ([ .components[]? | recurse(.components[]?) ]) as $comps
@@ -105,6 +111,11 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   | (prop("bomlens:sbom-tool-degraded") | first // null) as $degraded
   | ([ prop("bomlens:pipeline-step-failed")[] | clean(100) | select(. as $s | ($R.resolutionSteps | index($s)) or any(($R.resolutionStepPrefixes // [])[]; . as $p | $s | startswith($p))) ]
        | unique | .[0:20]) as $failed
+  | ([ prop("bomlens:pipeline-step-cause")[] | clean(400)
+       | select(. as $c | any($failed[]; . as $s | $c | startswith($s + ": ")))
+       | sub("^[^:]+: "; "") | .[0:300] ] | unique | .[0:3]) as $causes
+  | (prop("bomlens:resolution-hint")) as $hint_props
+  | ([ ($R.resolutionHints // {}) | keys_unsorted[] | select(. as $k | $hint_props | index($k)) ]) as $hints
   | (([ prop("bomlens:lockfile-missing")[] | clean(200) ])
        + (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")
             and (prop("bomlens:lockfile-missing") | length == 0)
@@ -137,22 +148,32 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
       (if $allexcl != null and $empty == null then {code: "only-excluded-dependencies", detail: ($allexcl | clean(200))} else empty end),
       (if $empty != null then {code: (if $cpp_only then "unsupported-build-system" else "empty-with-manifests" end), detail: ($empty | clean(200))} else empty end),
       (if $degraded != null then {code: "tool-degraded", detail: ($degraded | clean(100))} else empty end),
-      (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),
+      (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", ")), causes: $causes, hints: [$hints[] | $R.resolutionHints[.]]} else empty end),
       (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200]), detailKo: ($nolock_ko | join("; ") | .[0:200])} else empty end),
       (if ($corrupt | length) > 0 then {code: "lockfile-corrupt", detail: ($corrupt | join("; ") | .[0:200])} else empty end),
       (if $notread != null and $empty == null then {code: "manifest-not-read", detail: ($notread | clean(200))} else empty end),
       (if $venv_unsure != null then {code: "installed-environment-unsure", detail: ($venv_unsure | clean(200))} else empty end),
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
+    # A failed step may carry the cause the build tool reported and hints,
+    # causes with a fix of their own (resolutionHints): the message names
+    # them and the fix is theirs in place of the general advice. A hint may
+    # also raise the grade (a result whose dependencies are not known at all).
     | map(. as $r | ($R.reasons[$r.code]) as $d
+          | ($r.hints // []) as $rh
+          | (($r.causes // []) | map(sentence) | join(" ")) as $cause
           | {code: $r.code,
-             grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable" else $d.grade end),
+             grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable"
+                     elif any($rh[]; .grade == "unreliable") then "unreliable"
+                     else $d.grade end),
              detail: $r.detail,
-             message: {en: ($d.en | sub("\\{detail\\}"; $r.detail)), ko: ($d.ko | sub("\\{detail\\}"; ($r.detailKo // $r.detail)))},
+             message: {en: ([($d.en | sub("\\{detail\\}"; $r.detail)), ($rh[] | .en), (if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end)] | join(" ")),
+                       ko: ([($d.ko | sub("\\{detail\\}"; ($r.detailKo // $r.detail))), ($rh[] | .ko), (if $cause != "" then "\($R.labels.cause.ko) \($cause)" else empty end)] | join(" "))},
              fix: (if $r.code == "lockfile-missing" and ($lockcmds | length) > 0 and $d.fixEnCommands != null
                    then {en: ($d.fixEnCommands | sub("\\{commands\\}"; $lockcmds | join(", "))),
                          ko: ($d.fixKoCommands | sub("\\{commands\\}"; $lockcmds | join(", ")))}
-                   else {en: $d.fixEn, ko: $d.fixKo} end)})) as $reasons
+                   else {en: ([(if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end), (if ($rh | length) > 0 then ($rh[] | .fixEn) else $d.fixEn end)] | join(" ")),
+                         ko: ([(if $cause != "" then "\($R.labels.cause.ko) \($cause)" else empty end), (if ($rh | length) > 0 then ($rh[] | .fixKo) else $d.fixKo end)] | join(" "))} end)})) as $reasons
   | (if ($reasons | any(.[]; .grade == "unreliable")) then "unreliable"
      elif ($reasons | length) > 0 then "partial" else "complete" end) as $grade
   | {schemaVersion: 1,
