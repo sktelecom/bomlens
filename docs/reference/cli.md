@@ -148,7 +148,7 @@ A short local name with no registry path, such as `sbom-scanner:local`, and a ve
 
 When `SBOM_SCANNER_IMAGE` is pinned by digest only, the opt-in images use `:latest` in the CLI and the web UI and the app's own version in the desktop app; to pin them as well, set each `SBOM_*_IMAGE`.
 
-Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way.
+Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way. To list development dependencies, set `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`: it covers every ecosystem, so `BOMLENS_NODE_FULL_GRAPH` and `BOMLENS_PHP_FULL_GRAPH` are needed only to keep one ecosystem's development dependencies and not the others'.
 
 On Windows, environment variables set in a command prompt do not survive a
 double-click. The launchers therefore also read `UI_PORT`, `SBOM_LANG`,
