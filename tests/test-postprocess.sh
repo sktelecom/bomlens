@@ -13903,6 +13903,38 @@ bash "$LIB/validate-sbom.sh" "$SUMDIR/e.json" "$SUMDIR/e" P >/dev/null 2>&1
 [ "$(head -n 4 "$SUMDIR/e_summary.result" 2>/dev/null)" = "$(printf 'components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-')" ] \
     && pass "an empty result is written as zero components with no percentages" \
     || fail "the empty-result sidecar is wrong" "$(cat "$SUMDIR/e_summary.result" 2>&1)"
+# A step that fails after the conformance step (generate-notice runs later)
+# still reaches the closing summary: the entrypoint rewrites failedSteps from
+# the final SBOM, in place, keeping the other lines.
+cat > "$SUMDIR/f.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"application","name":"app","version":"1"},
+   "properties":[{"name":"bomlens:pipeline-step-failed","value":"normalize"}]},
+ "components":[{"type":"library","name":"a","version":"1","purl":"pkg:npm/a@1"}]}
+JSON
+bash "$LIB/validate-sbom.sh" "$SUMDIR/f.json" "$SUMDIR/f" P >/dev/null 2>&1
+# shellcheck disable=SC2034  # read by run_optional_step in the sourced lib
+(OUTPUT_FILE="$SUMDIR/f.json"; . "$LIB/pipeline-step.sh"; run_optional_step generate-notice false 2>/dev/null
+ refresh_summary_failed_steps "$SUMDIR/f.json" "$SUMDIR/f_summary.result")
+[ "$(grep '^failedSteps' "$SUMDIR/f_summary.result")" = "$(printf 'failedSteps\tnormalize, generate-notice')" ] \
+    && [ "$(grep -c '^failedSteps' "$SUMDIR/f_summary.result")" = 1 ] \
+    && [ "$(sed -n 5p "$SUMDIR/f_summary.result")" = "$(printf 'failedSteps\tnormalize, generate-notice')" ] \
+    && pass "a post-process step that fails after the conformance step is listed in the summary's failed steps" \
+    || fail "the summary's failedSteps misses a later failed step" "$(cat "$SUMDIR/f_summary.result" 2>&1)"
+# No failed step before, one after: the line is added.
+cp "$SUMDIR/e.json" "$SUMDIR/g.json"
+bash "$LIB/validate-sbom.sh" "$SUMDIR/g.json" "$SUMDIR/g" P >/dev/null 2>&1
+g_before=$(grep -c . "$SUMDIR/g_summary.result" 2>/dev/null)
+# shellcheck disable=SC2034  # read by run_optional_step in the sourced lib
+(OUTPUT_FILE="$SUMDIR/g.json"; . "$LIB/pipeline-step.sh"; run_optional_step scan-security false 2>/dev/null
+ refresh_summary_failed_steps "$SUMDIR/g.json" "$SUMDIR/g_summary.result")
+[ "$(grep '^failedSteps' "$SUMDIR/g_summary.result")" = "$(printf 'failedSteps\tscan-security')" ] \
+    && [ "$(grep -c . "$SUMDIR/g_summary.result")" = "$((g_before + 1))" ] \
+    && pass "a failed step after a clean conformance step adds the failedSteps line" \
+    || fail "the failedSteps line was not added" "$(cat "$SUMDIR/g_summary.result" 2>&1)"
+grep -q 'refresh_summary_failed_steps "$OUTPUT_FILE" "${OUT_PREFIX}_summary.result"' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "the entrypoint refreshes the summary's failed steps before its last copy to the host" \
+    || fail "the entrypoint does not refresh the summary's failed steps"
 
 # An incomplete result (a source scan with no component) adds its grade, reason codes
 # and one fix sentence per reason to the sidecar; a complete one adds nothing.
