@@ -73,6 +73,14 @@ REM same file through --volumes-from). Same as scan-sbom.sh --ui.
 REM A relative path is made absolute first: Docker would read a bare name as
 REM a named volume. --mount, not -v: a file the engine cannot see stops
 REM docker run instead of turning into an empty folder in the container.
+REM The guard-state folder the CLI and the desktop app use (%LOCALAPPDATA%\bomlens\guard),
+REM so a folder scan here takes turns with another scan of the same folder and
+REM can put back a source tree an earlier, killed scan left changed.
+set "GUARD_V="
+set "GUARD_DIR=%LOCALAPPDATA%\bomlens\guard"
+if not defined LOCALAPPDATA set "GUARD_DIR=%USERPROFILE%\AppData\Local\bomlens\guard"
+if not exist "%GUARD_DIR%\" mkdir "%GUARD_DIR%" >nul 2>&1
+if exist "%GUARD_DIR%\" set "GUARD_V=-v "%GUARD_DIR%":/bomlens-state"
 set "CA_V="
 REM Build files for the Android SDK image, when this bundle carries them (read-only).
 set "ANDROID_V="
@@ -172,6 +180,7 @@ docker run --rm -it ^
     -v "%OUTDIR%":/host-output ^
     %MOUNT_V% ^
     %CA_V% ^
+    %GUARD_V% ^
     %ANDROID_V% ^
     -v /var/run/docker.sock:/var/run/docker.sock ^
     -e MODE=UI ^

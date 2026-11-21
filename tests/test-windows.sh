@@ -2410,6 +2410,10 @@ CHECK_SH="$REPO/scripts/check-setup.sh"
 [ -f "$SCAN_BAT" ] && pass "scripts/scan-sbom.bat present" || fail "scripts/scan-sbom.bat present"
 if [ -f "$UI_BAT" ]; then
   grep -q "MODE=UI" "$UI_BAT"            && pass "sbom-ui.bat sets MODE=UI"               || fail "sbom-ui.bat sets MODE=UI"
+  { grep -q 'set "GUARD_DIR=%LOCALAPPDATA%\\bomlens\\guard"' "$UI_BAT" && grep -q ':/bomlens-state"' "$UI_BAT" \
+      && grep -q '%GUARD_V% ^' "$UI_BAT"; } \
+    && pass "sbom-ui.bat mounts the guard-state folder the CLI and the app use at /bomlens-state" \
+    || fail "sbom-ui.bat mounts the guard-state folder at /bomlens-state"
   grep -qi "docker version" "$UI_BAT"    && pass "sbom-ui.bat preflight-checks docker"    || fail "sbom-ui.bat preflight-checks docker"
   # New onboarding behaviors: artifacts go to a dedicated home-dir folder, and the
   # image is pre-pulled on first run so the user sees download progress.
