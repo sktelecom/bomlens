@@ -138,19 +138,34 @@ _LOG_RULES = [
 # Files that hold registry, index or service credentials get three more rules,
 # for forms the log rules leave alone: a key whose name says it is a credential
 # (npmAuthIdent, AWS_SECRET_ACCESS_KEY, mavenPassword; the name is bounded so a
-# long line stays cheap), the password of a .netrc
+# long line stays cheap; not a true/false/yes/no value, nor always-auth,
+# auth-type, npmAlwaysAuth or npmAuthType), the password of a .netrc
 # entry, and the value of a nuget.config <add key="...Password" value="..."/>.
 _CREDENTIAL_FILE_NAMES = {
     ".npmrc", ".yarnrc", ".yarnrc.yml", "pip.conf", "pip.ini", ".pypirc",
     "settings.xml", "settings-security.xml", "gradle.properties", ".netrc",
     "_netrc", "nuget.config", ".git-credentials", ".pgpass", "credentials",
 }
+# A key whose name says it is a credential is left alone when its value is a
+# plain yes or no (always-auth=true, strict-ssl=false), or when it is a setting
+# that names how to log in rather than the login itself.
+_NOT_SECRET_VALUES = {"true", "false", "yes", "no"}
+_NOT_SECRET_KEYS = {"always-auth", "auth-type", "npmalwaysauth", "npmauthtype"}
+
+
+def _mask_credential_value(m):
+    value = m.group("value").strip().strip("\"'").strip().lower()
+    if value in _NOT_SECRET_VALUES or m.group("key").lower() in _NOT_SECRET_KEYS:
+        return m.group(0)
+    return m.group(1) + "***"
+
+
 _CREDENTIAL_RULES = [
-    (re.compile(r"^(" + _WS + r"*(?:export" + _WS + r"+)?[\"']?[A-Za-z0-9_.-]{0,128}?"
+    (re.compile(r"^(" + _WS + r"*(?:export" + _WS + r"+)?[\"']?(?P<key>[A-Za-z0-9_.-]{0,128}?"
                 r"(?:secret|token|password|passwd|pwd|credential|auth|api[_-]?key|"
-                r"access[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,128}[\"']?" + _WS
-                + r"*[=:]" + _WS + r"*)(?=\S)[^\n]*$", re.IGNORECASE | re.MULTILINE),
-     r"\1***"),
+                r"access[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,128})[\"']?" + _WS
+                + r"*[=:]" + _WS + r"*)(?=\S)(?P<value>[^\n]*)$", re.IGNORECASE | re.MULTILINE),
+     _mask_credential_value),
     (re.compile(r"(\b(?:password|passwd|account)" + _WS + r"+)\S+", re.IGNORECASE),
      r"\1***"),
     (re.compile(r"(key=" + _Q + r"[^\"']*(?:password|token|apikey|secret)[^\"']*" + _Q

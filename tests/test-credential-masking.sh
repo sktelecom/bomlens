@@ -40,6 +40,7 @@ pip install --extra-index-url=https://deploy:PIPPASS-77x@pypi2.internal.example/
 Authorization: Basic ZGVtbzpwYXNzd29yZA==
 Proxy-Authorization: Bearer AUTHTOK-5512xx
 npm ERR! code E401 for https://npm.internal.example/left-pad
+always-auth=true
 LOG
 check_clean() { # <label> <file>
     local sec bad=0
@@ -65,6 +66,9 @@ else
         || fail "the masker removed more than the credentials" "$(cat "$WORK/kept.log")"
     grep -q 'Could not transfer from https://mvn.internal.example/repo' "$WORK/kept.log" \
         && pass "ordinary error lines are untouched" || fail "an ordinary line changed"
+    grep -qx 'always-auth=true' "$WORK/kept.log" && grep -qx 'always-auth=true' "$WORK/console.log" \
+        && pass "always-auth=true is not a credential and stays in the log" \
+        || fail "the log masker masked always-auth=true"
 fi
 grep -q '| tee "\$logf" | mask_log_stream -u &' "$ROOT_DIR/docker/entrypoint.sh" \
     && pass "entrypoint.sh sends the cdxgen sibling's output through the masker before the console" \
@@ -127,11 +131,16 @@ registry=https://npm.internal.example/
 //registry.npmjs.org/:_authToken=NPMTOKEN-4f9a1c
 //npm.internal.example/:_auth=ZGVtbzpwYXNzd29yZA==
 //npm.internal.example/:_password="RkFLRVBBU1M="
+always-auth=true
+auth-type=legacy
+strict-ssl=false
 EOF
 cat > "$T/.yarnrc.yml" <<'EOF'
 npmRegistryServer: "https://npm.internal.example"
 npmAuthToken: NPMTOKEN-4f9a1c
 npmAuthIdent: "deploy:FAKEIDENT-31k"
+npmAlwaysAuth: true
+npmAuthType: web
 EOF
 printf '[global]\nindex-url = https://deploy:PIPPASS-77x@pypi.internal.example/simple\n' > "$T/pip.conf"
 printf '[pypi]\nusername = __token__\npassword = FAKEPYPI-66t\n' > "$T/.pypirc"
@@ -165,6 +174,17 @@ if [ -s "$WORK/snap_source.json" ]; then
         *"registry=https://npm.internal.example/"*"//registry.npmjs.org/:_authToken=***"*)
             pass "the rest of .npmrc stays readable, only the token is replaced" ;;
         *) fail ".npmrc lost more than the credential" "$npmrc" ;;
+    esac
+    case "$npmrc" in
+        *"always-auth=true"*"auth-type=legacy"*"strict-ssl=false"*)
+            pass "always-auth, auth-type and a true/false setting in .npmrc are not masked" ;;
+        *) fail ".npmrc settings that hold no credential were masked" "$npmrc" ;;
+    esac
+    yarnrc=$(jq -r '.files[] | select(.path == ".yarnrc.yml") | .content' "$WORK/snap_source.json")
+    case "$yarnrc" in
+        *"npmAuthToken: ***"*"npmAlwaysAuth: true"*"npmAuthType: web"*)
+            pass "npmAlwaysAuth and npmAuthType in .yarnrc.yml are not masked, npmAuthToken is" ;;
+        *) fail ".yarnrc.yml masking is wrong" "$yarnrc" ;;
     esac
     jq -e '.files[] | select(.path == ".env") | .content | test("LOG_LEVEL=debug")' "$WORK/snap_source.json" >/dev/null \
         && jq -e '.files[] | select(.path == "package.json") | (.masked | not) and (.content | test("left-pad"))' "$WORK/snap_source.json" >/dev/null \
