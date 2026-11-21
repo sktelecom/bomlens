@@ -97,6 +97,7 @@ case "$1" in
             esac
             prev="$a"
         done
+        [ -z "${FAKE_RUN_SLEEP:-}" ] || sleep "$FAKE_RUN_SLEEP"
         exit "${FAKE_RUN_RC:-0}" ;;
     *) exit 0 ;;
 esac
@@ -136,6 +137,45 @@ fi
     OUTPUT_HOST_DIR="$WORK/r" OUTPUT_FILE="p_1_bom.json" park_unprocessed_sbom
     [ ! -e "$WORK/r/p_1_bom.json" ] && [ -f "$WORK/r/p_1_bom.unprocessed.json" ]
 ) && pass "an SBOM left by stage 1 is renamed to _bom.unprocessed.json" || fail "park_unprocessed_sbom"
+
+# --- 3b) two scans of the same project and version into one folder
+echo "== a second scan of the same name waits its turn"
+rm -rf "$WORK/o4"; mkdir -p "$WORK/o4"
+( cd "$WORK/cwd" && PATH="$WORK/bin:$PATH" HOME="$WORK/home" FAKE_RUN_SLEEP=4 SBOM_PULL=never \
+    bash "$SCRIPT" --project same --version 1 --target alpine:3.20 --generate-only -o "$WORK/o4" >"$WORK/first.out" 2>&1 ) &
+FIRST_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -d "$WORK/o4/same_1/.bomlens-scan-same_1.lock" ] && break
+    sleep 0.2
+done
+SBOM_PULL=never run_cli bash "$SCRIPT" --project same --version 1 --target alpine:3.20 --generate-only -o "$WORK/o4"
+if [ "$RC" = 1 ] && grep -q 'already running into this folder' "$WORK/err" && ! grep -q 'file sharing' "$WORK/err"; then
+    pass "a second scan of the same name into the same folder stops at once and says the first is still running"
+else
+    fail "same-name concurrent scan" "rc=$RC err=$(head -c 300 "$WORK/err")"
+fi
+SBOM_PULL=never run_cli bash "$SCRIPT" --project other --version 1 --target alpine:3.20 --generate-only -o "$WORK/o4"
+if ! grep -q 'already running' "$WORK/err"; then
+    pass "a scan of another name into the same folder is not held back"
+else
+    fail "other-name concurrent scan" "rc=$RC err=$(head -c 300 "$WORK/err")"
+fi
+wait "$FIRST_PID" || true
+if ! grep -q 'already running' "$WORK/first.out" && [ ! -e "$WORK/o4/same_1/.bomlens-scan-same_1.lock" ]; then
+    pass "the first scan runs to its end and frees its lock"
+else
+    fail "first scan after a refused second" "rc=$FIRST_RC $(tail -n 3 "$WORK/first.out")"
+fi
+# A lock left by a scan that was killed outright (its process is gone) is taken over.
+mkdir -p "$WORK/o4/same_1/.bomlens-scan-same_1.lock"
+( exit 0 ) & DEAD_PID=$!; wait "$DEAD_PID"
+echo "$DEAD_PID" > "$WORK/o4/same_1/.bomlens-scan-same_1.lock/pid"
+SBOM_PULL=never run_cli bash "$SCRIPT" --project same --version 1 --target alpine:3.20 --generate-only -o "$WORK/o4"
+if ! grep -q 'already running' "$WORK/err" && [ ! -e "$WORK/o4/same_1/.bomlens-scan-same_1.lock" ]; then
+    pass "a lock whose scan is gone is taken over and freed"
+else
+    fail "stale lock" "rc=$RC err=$(head -c 300 "$WORK/err")"
+fi
 
 # --- 4) the progress line while an image is read
 echo "== progress line"
