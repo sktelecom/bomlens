@@ -233,7 +233,7 @@ The numbers come from the scan's own conformance measurement, so they match the 
 - `No component declares a license`: no component declares one, so license checks have nothing to work with.
 - `Completeness`: shown only when the result is partial or unreliable. It gives the grade and the reason codes, followed by one line per reason with how to fix it. When the scan found no component although manifests declare dependencies, the warning above also follows the reason: a damaged lock file tells you to re-create it, and a failed resolution step names the step.
 - `Reduced analysis`: a shallow fallback ran instead of the full analysis and only direct dependencies were identified. The line names the cause: out of disk space, out of memory, a failed download, or the dependency analyzer failing or not running.
-- `Steps that failed`: post-processing steps that did not complete, by name. Details are in the log above.
+- `Steps that failed`: post-processing steps that did not complete, by name. Details are in the log above. A skipped registry license lookup (`license-fetch`) is not listed here: it removes no dependency and is reported once as an `[INFO]` line, and the SBOM still records it.
 
 The last two are not shown for `--analyze`, because they would describe the submitted document rather than this run. The summary does not change the exit code: an incomplete result still exits 0 by default. To fail a run on these conditions, use `--fail-on incomplete-result` (or `incomplete-result=unreliable` to fail only on an unreliable result), `--fail-on empty-result` or `--fail-on license-coverage=<0-100>`. A scanner image that predates the summary prints only the file list.
 

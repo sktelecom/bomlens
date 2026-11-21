@@ -4447,7 +4447,10 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
             basis)          sum_basis="$sum_val" ;;
             reduced)        sum_reduced="$sum_val" ;;
             emptyManifests) sum_empty_manifests="$sum_val" ;;
-            failedSteps)    sum_failed="$sum_val" ;;
+            # license-fetch (the registry licence lookup was skipped) leaves no
+            # dependency out and is reported once as [INFO] after stage 1, so
+            # it is not listed among the failed steps. The SBOM keeps it.
+            failedSteps)    sum_failed="$(printf '%s' "$sum_val" | sed -E 's/(^|, )license-fetch(, |$)/\1/; s/, $//')" ;;
             completeness)   sum_complete="$sum_val" ;;
             completenessReasons) sum_complete_reasons="$sum_val" ;;
             completenessFix) sum_complete_fix="${sum_complete_fix}${sum_val}"$'\n' ;;
