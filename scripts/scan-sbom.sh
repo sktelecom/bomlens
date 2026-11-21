@@ -1025,6 +1025,26 @@ docker_check() {
         windows_path_too_long "$(pwd)" "the working folder" && exit 1
         log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1
     fi
+    handback_ids
+}
+
+# HANDBACK_UID/HANDBACK_GID: the owner the (root) containers give their files
+# back to, sent as HOST_UID/HOST_GID. Under a rootless engine (Docker or Podman)
+# the container's root is this user already, and a chown to our own uid from in
+# there would give the files to a subordinate uid, so 0:0 is sent instead.
+# Asked once; when the engine cannot say, the calling user's ids are kept.
+handback_ids() {
+    [ -z "${HANDBACK_UID:-}" ] || return 0
+    HANDBACK_UID="$(id -u)"; HANDBACK_GID="$(id -g)"
+    [ "$HANDBACK_UID" != 0 ] || return 0
+    local _sec
+    if _sec="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)"; then
+        case "$_sec" in *name=rootless*) HANDBACK_UID=0; HANDBACK_GID=0 ;; esac
+    elif [ "$(docker info --format '{{.Host.Security.Rootless}}' 2>/dev/null || true)" = true ]; then
+        # Podman's own CLI has no SecurityOptions field.
+        HANDBACK_UID=0; HANDBACK_GID=0
+    fi
+    return 0
 }
 
 # A failure before post-processing could start (the image is missing or cannot
@@ -2112,7 +2132,7 @@ pp_env() {
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
     printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e PRODUCT_SUPPLIER=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e REACHABILITY_NONCE=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${PRODUCT_SUPPLIER:-}" "${SRC_TREE_EXCLUDE:-}" \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "${HANDBACK_UID:-$(id -u)}" "${HANDBACK_GID:-$(id -g)}" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${PRODUCT_SUPPLIER:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
@@ -3923,7 +3943,7 @@ GRADLE_USER_CACHE_EOF
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
-        -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+        -e HOST_UID="${HANDBACK_UID:-$(id -u)}" -e HOST_GID="${HANDBACK_GID:-$(id -g)}" \
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
         $REACH_ARGS \
@@ -4222,7 +4242,7 @@ GRADLE_USER_CACHE_EOF
             -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
             -w /host-output \
             -e DEEP_LICENSE_EXCLUDE="\"$_dl_exclude\"" -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL \
-            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -e HOST_UID="${HANDBACK_UID:-$(id -u)}" -e HOST_GID="${HANDBACK_GID:-$(id -g)}" \
             --entrypoint bash "\"$DL_PRE_IMAGE\"" /usr/local/lib/sbom/deep-license.sh /src "\"/host-output/$_dl_out\"" &
         _dl_pid=$!
         wait "$_dl_pid" || _dl_rc=$?

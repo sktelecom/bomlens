@@ -4,7 +4,8 @@ name: Rootless ownership check
 # daemon, then lists every file in the output folder and in the scanned
 # source copy that the runner user does not own, and tries to delete the
 # output as that user. The job reports what it finds; it does not fail just
-# because foreign-owned files are present.
+# because foreign-owned files are present. The scan runs this branch's CLI and
+# container scripts.
 
 on:
   workflow_dispatch:
@@ -115,6 +116,25 @@ jobs:
             exit 1
           fi
 
+      # The published image with this branch's entrypoint.sh and docker/lib on
+      # top (the paths docker/Dockerfile copies them to), so the scan runs the
+      # container code under test. build-prep.sh is mounted from the checkout.
+      - name: Build overlay image
+        run: |
+          set -euo pipefail
+          ctx="$RUNNER_TEMP/overlay"
+          rm -rf "$ctx"
+          mkdir -p "$ctx"
+          cp docker/entrypoint.sh "$ctx/entrypoint.sh"
+          cp -R docker/lib "$ctx/lib"
+          cat > "$ctx/Dockerfile" <<'EOF'
+          FROM ghcr.io/sktelecom/bomlens:latest
+          COPY entrypoint.sh /usr/local/bin/run-scan
+          COPY lib/ /usr/local/lib/sbom/
+          RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh
+          EOF
+          docker build -q -t bomlens-overlay:check "$ctx"
+
       - name: Scan examples/nodejs
         run: |
           set -uo pipefail
@@ -122,11 +142,15 @@ jobs:
           out="$RUNNER_TEMP/out"
           rm -rf "$src" "$out"
           cp -R examples/nodejs "$src"
+          # Nested folders, so a hand-back to the wrong owner also blocks
+          # deleting what is inside them.
+          mkdir -p "$src/lib/util"
+          printf 'module.exports = {};\n' > "$src/lib/util/helpers.js"
           mkdir -p "$out"
           echo "SRC_DIR=$src" >> "$GITHUB_ENV"
           echo "OUT_DIR=$out" >> "$GITHUB_ENV"
           rc=0
-          SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:latest \
+          SBOM_SCANNER_IMAGE=bomlens-overlay:check \
             bash scripts/scan-sbom.sh --project rootless --version 1.0 \
               --target "$src" --generate-only --output-dir "$out" || rc=$?
           echo "scan exit code: $rc"

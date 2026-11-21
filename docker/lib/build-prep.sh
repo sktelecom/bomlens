@@ -8123,6 +8123,13 @@ cache_handback_wanted() {
     [ "${HOST_UID:-0}" != 0 ] || [ "${HOST_GID:-0}" != 0 ] || return 1
     cache_chown_has_effect "$1"
 }
+# userns_remapped: the same check as owner-handback.sh in the post-process
+# image (this script runs alone in a language image, so it carries a copy).
+userns_remapped() {
+    _um_f="${BOMLENS_UID_MAP:-/proc/self/uid_map}"
+    [ -r "$_um_f" ] || return 1
+    awk '$1 == 0 { f = ($2 != 0) } END { exit !f }' "$_um_f" 2>/dev/null
+}
 # --- end cache hand-back helpers --------------------------------------------
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
@@ -8131,7 +8138,11 @@ cache_handback_wanted() {
 # clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
 # arrive via `docker run -e`; best-effort, never fail the prep on this.
 gradle_settings_remove
-if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
+# Under a rootless engine root in here is the host user already; a chown to
+# HOST_UID would give the tree to a subordinate uid (owner-handback.sh).
+if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ] && userns_remapped; then
+    echo "[INFO] Rootless container engine: the project folder already belongs to you, so it is not chowned to HOST_UID ${HOST_UID}." >&2
+elif [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
     # The Maven and Gradle caches are host folders too (cache-maven,
     # cache-gradle): hand back what this run wrote there. Only a mounted one,

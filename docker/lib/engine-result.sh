@@ -445,7 +445,7 @@ er_finish() {
         fi
     fi
     mv "$tmp" "$outdir/$ENGINE_RESULT_NAME" || rm -f "$tmp"
-    if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+    if owner_handback_wanted; then
         chown "${HOST_UID}:${HOST_GID}" "$outdir/$ENGINE_RESULT_NAME" ${ER_EVENTS_FILE:+"$ER_EVENTS_FILE"} 2>/dev/null || true
     fi
     rm -f "$ER_STEPS"
