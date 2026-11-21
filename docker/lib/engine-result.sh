@@ -27,7 +27,7 @@ ENGINE_RESULT_NAME="bomlens-result.json"
 # even when this run did not run it: an SBOM an earlier run left (a reused
 # stage 1) carries that run's post-process labels. tests/test-engine-contract.sh
 # checks this list against entrypoint.sh.
-ER_POSTPROCESS_STEPS="assess-ai-risk cocoapods component-versions conformance
+ER_POSTPROCESS_STEPS="assess-ai-risk cocoapods cocoapods-licenses component-versions conformance
 declared-components declared-service declared-sources deep-cve deep-license describe-input docmeta
 enrich-aibom enrich-cpe enrich-distro-supplier enrich-eol enrich-github-cpe
 enrich-interpreter-cpe enrich-malicious enrich-maven-cpe enrich-os-context

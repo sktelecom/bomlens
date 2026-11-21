@@ -19,7 +19,11 @@
 #
 # Licences: Podfile.lock names none. With FETCH_LICENSE on (the default, off under
 # --byte-stable) fetch-cocoapods-licenses.py reads each trunk pod's podspec from the
-# CocoaPods CDN (COCOAPODS_CDN_URL) and fills the licence it declares.
+# CocoaPods CDN (COCOAPODS_CDN_URL) and fills the licence it declares. With
+# COCOAPODS_LICENSE_RESULT set to a file path, the outcome of that lookup is written
+# there as one JSON object (status, reason, detail, counts; the statuses and reasons
+# of the result manifest), for entrypoint.sh to record as the cocoapods-licenses step.
+# The file is left empty when there was nothing to look up (no pod).
 #
 # Completeness: Podfile.lock's PODS section is the resolved graph — every pod, direct and
 # transitive, with a pinned version. syft returns that full set (verified) but no edges;
@@ -47,6 +51,16 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+[ -z "${COCOAPODS_LICENSE_RESULT:-}" ] || : > "$COCOAPODS_LICENSE_RESULT" 2>/dev/null || true
+
+# licence_result <status> [reason] [detail] [counts JSON]: the outcome of the licence
+# lookup, into COCOAPODS_LICENSE_RESULT when it is set.
+licence_result() {
+    [ -n "${COCOAPODS_LICENSE_RESULT:-}" ] || return 0
+    jq -nc --arg s "$1" --arg r "${2:-}" --arg d "${3:-}" --arg c "${4:-}" \
+        '{status: $s, reason: $r, detail: $d, counts: ($c | fromjson? // null)}' \
+        > "$COCOAPODS_LICENSE_RESULT" 2>/dev/null || true
+}
 
 # Always emit a valid (possibly empty) CycloneDX envelope so the caller never sees a
 # missing/half file. $1 = status recorded on metadata.properties: "matched" (pods found),
@@ -200,12 +214,15 @@ echo "[cocoapods] SBOM written: $OUTPUT (cocoapods components=${NCOMP}, dependen
 if [ "${NCOMP:-0}" -gt 0 ]; then
     case "${FETCH_LICENSE:-true}" in
         false|0)
-            echo "[cocoapods] licence lookup off (FETCH_LICENSE=false): Podfile.lock names no licence, so the pods have none." >&2 ;;
+            echo "[cocoapods] licence lookup off (FETCH_LICENSE=false): Podfile.lock names no licence, so the pods have none." >&2
+            licence_result disabled "" "FETCH_LICENSE=false" ;;
         *)
             if [ "${BYTE_STABLE:-false}" = "true" ]; then
                 echo "[cocoapods] licence lookup off (--byte-stable): Podfile.lock names no licence, so the pods have none." >&2
+                licence_result disabled "" "--byte-stable"
             elif ! command -v python3 >/dev/null 2>&1; then
                 echo "[cocoapods] python3 not installed in this image; pods keep no licence." >&2
+                licence_result skipped not_installed "python3 is not in this image"
             else
                 LOCK_ARGS=()
                 while IFS= read -r lock; do
@@ -214,8 +231,25 @@ if [ "${NCOMP:-0}" -gt 0 ]; then
 $LOCKS
 EOF
                 echo "[cocoapods] looking up pod licences in the CocoaPods trunk podspecs..." >&2
-                python3 "$SELFDIR/fetch-cocoapods-licenses.py" "$OUTPUT" "${LOCK_ARGS[@]}" >/dev/null \
-                    || echo "[cocoapods] WARN: licence lookup failed; pods keep no licence." >&2
+                LIC_RC=0
+                LIC_COUNTS=$(python3 "$SELFDIR/fetch-cocoapods-licenses.py" "$OUTPUT" "${LOCK_ARGS[@]}") || LIC_RC=$?
+                if [ "$LIC_RC" -ne 0 ] || ! printf '%s' "$LIC_COUNTS" | jq -e 'type == "object"' >/dev/null 2>&1; then
+                    echo "[cocoapods] WARN: licence lookup failed; pods keep no licence." >&2
+                    licence_result failed failed "the licence lookup stopped (exit code $LIC_RC); the pods have no licence"
+                else
+                    # What did not answer leaves pods with no licence: the licence
+                    # coverage of the SBOM is lower than the lookup would give.
+                    LIC_MISSED=$(printf '%s' "$LIC_COUNTS" | jq -r '(.lookup_failed // 0) + (.budget_reached // 0)')
+                    if printf '%s' "$LIC_COUNTS" | jq -e '(.candidates // 0) > 0 and (.lookup_failed // 0) == (.candidates // 0)' >/dev/null; then
+                        licence_result degraded unavailable "the CocoaPods trunk (${COCOAPODS_CDN_URL:-https://cdn.cocoapods.org}) did not answer, so $LIC_MISSED pods have no licence; behind a proxy that inspects TLS, pass its CA with SBOM_EXTRA_CA_CERTS, or set COCOAPODS_CDN_URL to a mirror" "$LIC_COUNTS"
+                    elif printf '%s' "$LIC_COUNTS" | jq -e '(.budget_reached // 0) > 0' >/dev/null; then
+                        licence_result degraded budget_exhausted "the lookup ran out of time (COCOAPODS_LICENSE_BUDGET), so $LIC_MISSED pods have no licence" "$LIC_COUNTS"
+                    elif printf '%s' "$LIC_COUNTS" | jq -e '(.lookup_failed // 0) > 0' >/dev/null; then
+                        licence_result degraded unavailable "$LIC_MISSED pod lookups got no answer from the CocoaPods trunk, so those pods have no licence" "$LIC_COUNTS"
+                    else
+                        licence_result ok "" "" "$LIC_COUNTS"
+                    fi
+                fi
             fi ;;
     esac
 fi

@@ -144,6 +144,57 @@ COCOAPODS_LICENSE_FIXTURE_DIR="$PLF/podspecs" python3 "$LIB/fetch-cocoapods-lice
     && pass "a lockfile without SPEC REPOS still gets trunk licences" \
     || fail "legacy lockfile: Alamofire licence $(lic_of "$WORK/podlic-legacy.json" Alamofire)"
 
+# --- (1c) No-Docker: the outcome of the licence lookup is recorded ------------------
+# identify-cocoapods.sh writes the lookup outcome to COCOAPODS_LICENSE_RESULT, and
+# entrypoint.sh records it as the cocoapods-licenses step of the result manifest; a
+# lookup that got no answer is degraded and stamps the label on the SBOM, so the
+# closing summary and the web UI show it. The completeness grade does not count it.
+echo "== iOS-4: the licence lookup outcome is recorded as the cocoapods-licenses step (no Docker) =="
+lookup() {  # <result file> <env...>: identify-cocoapods.sh with the stand-in syft
+    local res="$1"; shift
+    env PATH="$WORK/bin:$PATH" COCOAPODS_LICENSE_RESULT="$res" "$@" \
+        bash "$LIB/identify-cocoapods.sh" "$PLF" "$WORK/podres.json" 1.0 >/dev/null 2>&1 || true
+}
+lookup "$WORK/res-ok.json" COCOAPODS_LICENSE_FIXTURE_DIR="$PLF/podspecs" FETCH_LICENSE=true BYTE_STABLE=false
+jq -e '.status == "ok" and .reason == "" and .counts.filled == 4 and .counts.candidates == 6' "$WORK/res-ok.json" >/dev/null 2>&1 \
+    && pass "a lookup that got its answers is ok, with the counts" \
+    || fail "lookup outcome when the trunk answers" "$(cat "$WORK/res-ok.json" 2>&1)"
+lookup "$WORK/res-down.json" COCOAPODS_CDN_URL="http://127.0.0.1:9" FETCH_LICENSE=true BYTE_STABLE=false
+jq -e '.status == "degraded" and .reason == "unavailable" and .counts.lookup_failed == 6
+       and (.detail | test("did not answer")) and (.detail | test("6 pods have no licence")) and (.detail | test("SBOM_EXTRA_CA_CERTS"))' \
+    "$WORK/res-down.json" >/dev/null 2>&1 \
+    && pass "a trunk that does not answer is degraded (unavailable), says how many pods have no licence and names the fix" \
+    || fail "lookup outcome when the trunk does not answer" "$(cat "$WORK/res-down.json" 2>&1)"
+lookup "$WORK/res-off.json" FETCH_LICENSE=false BYTE_STABLE=false
+jq -e '.status == "disabled"' "$WORK/res-off.json" >/dev/null 2>&1 \
+    && pass "FETCH_LICENSE=false records the lookup as disabled" \
+    || fail "lookup outcome with FETCH_LICENSE=false" "$(cat "$WORK/res-off.json" 2>&1)"
+mkdir -p "$WORK/nopods"
+printf 'PODS:\n\nCOCOAPODS: 1.15.2\n' > "$WORK/nopods/Podfile.lock"
+printf '#!/bin/sh\necho "{\\"components\\":[]}"\n' > "$WORK/bin-empty-syft"
+mkdir -p "$WORK/bin-empty"; cp "$WORK/bin-empty-syft" "$WORK/bin-empty/syft"; chmod +x "$WORK/bin-empty/syft"
+echo stale > "$WORK/res-none.json"
+PATH="$WORK/bin-empty:$PATH" COCOAPODS_LICENSE_RESULT="$WORK/res-none.json" \
+    bash "$LIB/identify-cocoapods.sh" "$WORK/nopods" "$WORK/podnone.json" 1.0 >/dev/null 2>&1 || true
+[ ! -s "$WORK/res-none.json" ] \
+    && pass "no pod: nothing was looked up and the result file is left empty" \
+    || fail "no pod: the result file holds $(cat "$WORK/res-none.json")"
+ENTRY_SH="$ROOT_DIR/docker/entrypoint.sh"
+grep -q 'COCOAPODS_LICENSE_RESULT="$_cocoa_lic" bash "$LIBDIR/identify-cocoapods.sh"' "$ENTRY_SH" \
+    && grep -q 'er_record cocoapods-licenses "$_cocoa_lic_status"' "$ENTRY_SH" \
+    && grep -q 'mark_pipeline_warning "$OUTPUT_FILE" cocoapods-licenses' "$ENTRY_SH" \
+    && grep -qw 'cocoapods-licenses' "$LIB/engine-result.sh" \
+    && pass "entrypoint.sh records the cocoapods-licenses step and stamps a degraded lookup on the SBOM" \
+    || fail "entrypoint.sh does not record the cocoapods-licenses step"
+# The stamped label does not lower the completeness grade (it is no resolution step).
+jq '.metadata.properties = [{"name":"bomlens:pipeline-step-failed","value":"cocoapods-licenses"}]' \
+    "$FIX/journey/java-license-exceptions/sbom-exceptions.cdx.json" > "$WORK/podgrade.json"
+bash "$LIB/assess-completeness.sh" "$WORK/podgrade.json" "$WORK/podgrade" >/dev/null 2>&1
+jq -e '[.reasons[].code] | index("resolution-failed") | not' "$WORK/podgrade_completeness.json" >/dev/null 2>&1 \
+    && [ "$(jq -r .grade "$WORK/podgrade_completeness.json")" = complete ] \
+    && pass "a degraded licence lookup leaves the completeness grade as it was" \
+    || fail "the cocoapods-licenses label changed the grade" "$(jq -c '[.grade, [.reasons[].code]]' "$WORK/podgrade_completeness.json" 2>&1)"
+
 # --- (2) Docker: identify-cocoapods.sh parses a real Podfile.lock via syft -----------
 echo "== iOS-2: identify-cocoapods.sh parses Podfile.lock via syft, offline (Docker) =="
 IMG="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"

@@ -1870,13 +1870,21 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
         COCOA_SBOM="${OUT_PREFIX}_cocoapods.cdx.json"
         _cocoa_started="$(er_now)"
         _cocoa_status=failed
-        if bash "$LIBDIR/identify-cocoapods.sh" "$COCOA_SRC" "$COCOA_SBOM" "$PROJECT_VERSION"; then
+        # The licence lookup (the trunk podspecs) is a step of its own: a lookup
+        # that got no answer leaves the pods with no licence, which the result
+        # manifest and the SBOM (bomlens:pipeline-step-failed, read by the
+        # closing summary and the web UI) record. It does not change the
+        # completeness grade, the same as the other licence lookups.
+        _cocoa_lic="$(mktemp)"
+        _cocoa_merged=""
+        if COCOAPODS_LICENSE_RESULT="$_cocoa_lic" bash "$LIBDIR/identify-cocoapods.sh" "$COCOA_SRC" "$COCOA_SBOM" "$PROJECT_VERSION"; then
             _cocoa_status=ok
             COCOA_N=$(jq '[.components[]?] | length' "$COCOA_SBOM" 2>/dev/null || echo 0)
             if [ "${COCOA_N:-0}" -gt 0 ]; then
                 echo "[INFO] CocoaPods components identified: $COCOA_N — merging into SBOM."
                 if bash "$LIBDIR/merge-sbom.sh" "${OUTPUT_FILE}.merged" "$PROJECT_NAME" "$PROJECT_VERSION" "$OUTPUT_FILE" "$COCOA_SBOM"; then
                     mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
+                    _cocoa_merged=1
                 else
                     echo "[WARN] merge of CocoaPods components failed; keeping the original SBOM." >&2
                     _cocoa_status=failed
@@ -1885,6 +1893,21 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
             fi
         fi
         er_record cocoapods "$_cocoa_status" "$([ "$_cocoa_status" = failed ] && echo failed)" "" "$_cocoa_started"
+        if [ -n "$_cocoa_merged" ] && [ -s "$_cocoa_lic" ]; then
+            _cocoa_lic_status="$(jq -r '.status // empty' "$_cocoa_lic" 2>/dev/null)"
+            case "$_cocoa_lic_status" in
+                ok|degraded|failed|skipped|disabled)
+                    er_record cocoapods-licenses "$_cocoa_lic_status" \
+                        "$(jq -r '.reason // empty' "$_cocoa_lic" 2>/dev/null)" \
+                        "$(jq -r '.detail // empty' "$_cocoa_lic" 2>/dev/null)" "$_cocoa_started" "" \
+                        "$(jq -c '.counts // empty' "$_cocoa_lic" 2>/dev/null)"
+                    case "$_cocoa_lic_status" in
+                        degraded|failed)
+                            mark_pipeline_warning "$OUTPUT_FILE" cocoapods-licenses ;;
+                    esac ;;
+            esac
+        fi
+        rm -f "$_cocoa_lic"
     fi
 fi
 
