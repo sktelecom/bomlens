@@ -620,6 +620,42 @@ source_manifests() {
     printf '%s' "${out#, }"
 }
 
+# source_dev_only_manifests <dir> [max]: the package.json files in a source
+# tree that declare development dependencies and nothing else (no
+# dependencies, optionalDependencies or peerDependencies), the ones
+# _declares_deps does not count. Printed as "<path> devDependencies: <names>"
+# (the first 5 names, then "(+N more)"), joined with "; ", at most [max]
+# files (default 5), skipping the same folders as source_manifests. A source
+# scan leaves these dependencies out by default, so an empty SBOM from such a
+# tree is the exclusion, not a wrong folder.
+source_dev_only_manifests() {
+    local dir="$1" max="${2:-5}" f rel names out="" n=0
+    local -a prune=(-name .git -o -name node_modules -o -name vendor -o -name .venv -o -name site-packages)
+    if non_shipped_enabled; then
+        for f in $NON_SHIPPED_DIRS; do prune+=(-o -name "$f"); done
+    fi
+    command -v jq >/dev/null 2>&1 || return 0
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        # shellcheck disable=SC2016  # jq program, not shell
+        names="$(jq -r '
+            if type == "object"
+               and ([.dependencies, .optionalDependencies, .peerDependencies]
+                    | map(select(type == "object") | length) | add // 0) == 0
+               and (.devDependencies | type) == "object" and (.devDependencies | length) > 0
+            then (.devDependencies | keys_unsorted | map(tostring | gsub("[\\p{Cc};]"; " ") | .[0:80])) as $k
+                 | ($k[0:5] | join(", ")) + (if ($k | length) > 5 then " (+\(($k | length) - 5) more)" else "" end)
+            else empty end' "$f" 2>/dev/null)" || names=""
+        [ -n "$names" ] || continue
+        rel="${f#"$dir"/}"
+        out="$out; $rel devDependencies: $names"
+        n=$((n + 1))
+        [ "$n" -ge "$max" ] && break
+    done < <(find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o -type f -name package.json -print 2>/dev/null \
+             | LC_ALL=C sort)
+    printf '%s' "${out#; }"
+}
+
 # stage1_fail_reason <oom> [log] [exit code]: why stage 1 (cdxgen) gave no
 # SBOM, in the words bomlens:sbom-tool-degraded uses: oom (the container was
 # killed for memory, or Gradle reports its build daemon disappeared),

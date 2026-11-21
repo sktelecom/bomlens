@@ -16094,6 +16094,57 @@ JS
     fi
 fi
 
+echo "== completeness: a package.json with only development dependencies =="
+# A Node.js project whose package.json declares only devDependencies, with no
+# lock file, ends with no component. The empty result is the default
+# exclusion of development dependencies, so it is said as such
+# (only-excluded-dependencies, partial) with the switch that lists them, not
+# as no-components with the advice to check the folder.
+DVD="$WORK/devonly"
+mkdir -p "$DVD/tree/web" "$DVD/tree/node_modules/x" "$DVD/tree/lib"
+printf '{"name":"a","devDependencies":{"jest":"^29.0.0","eslint":"^9.0.0"}}' > "$DVD/tree/package.json"
+printf '{"name":"w","devDependencies":{"a1":"1","a2":"1","a3":"1","a4":"1","a5":"1","a6":"1","a7":"1"}}' > "$DVD/tree/web/package.json"
+printf '{"name":"x","devDependencies":{"inside-node-modules":"1"}}' > "$DVD/tree/node_modules/x/package.json"
+printf '{"name":"l","dependencies":{},"devDependencies":{}}' > "$DVD/tree/lib/package.json"
+dv_list="$( . "$LIB/source-detect.sh"; source_dev_only_manifests "$DVD/tree" 5 )"
+dv_manifests="$( . "$LIB/source-detect.sh"; source_manifests "$DVD/tree" 5 )"
+[ "$dv_list" = "package.json devDependencies: jest, eslint; web/package.json devDependencies: a1, a2, a3, a4, a5 (+2 more)" ] \
+    && [ -z "$dv_manifests" ] \
+    && pass "completeness/dev-only: the dev-only package.json files are listed with their names, node_modules and empty ones are not, and none counts as declaring" \
+    || fail "completeness/dev-only: listed [$dv_list], manifests [$dv_manifests]"
+printf '{"name":"b","dependencies":{"left-pad":"1.0.0"},"devDependencies":{"jest":"1"}}' > "$DVD/mixed.json"
+mkdir -p "$DVD/mixed"; cp "$DVD/mixed.json" "$DVD/mixed/package.json"
+[ -z "$( . "$LIB/source-detect.sh"; source_dev_only_manifests "$DVD/mixed" 5 )" ] \
+    && pass "completeness/dev-only: a package.json with a runtime dependency is not dev-only" \
+    || fail "completeness/dev-only: a package.json with a runtime dependency was listed"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"p","version":"1"},"properties":[{"name":"bomlens:sbom-empty-all-excluded","value":"package.json devDependencies: eslint, jest"},{"name":"bomlens:lockfile-missing","value":"package.json: no package-lock.json"}]},"components":[]}\n' > "$DVD/bom.json"
+dv_grade="$(bash "$LIB/assess-completeness.sh" "$DVD/bom.json" "$DVD/out" 2>/dev/null)"
+dv_codes="$(jq -r '[.reasons[].code] | join(",")' "$DVD/out_completeness.json" 2>/dev/null)"
+[ "$dv_grade" = "partial" ] && [ "$dv_codes" = "only-excluded-dependencies,lockfile-missing" ] \
+    && pass "completeness/dev-only: graded partial with only-excluded-dependencies, not no-components" \
+    || fail "completeness/dev-only: graded [$dv_grade] with [$dv_codes]"
+jq -e '.reasons[0]
+       | (.message.en | test("package.json devDependencies: eslint, jest"))
+       and (.fix.en | test("BOMLENS_INCLUDE_DEV_DEPENDENCIES=1")) and (.fix.en | test("does not mean the wrong folder"))
+       and (.fix.ko | test("BOMLENS_INCLUDE_DEV_DEPENDENCIES=1"))
+       and ((.fix.en + .fix.ko) | test("top-level folder|bomlens:excluded-components|최상위") | not)' "$DVD/out_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/dev-only: the reason names the development dependencies and the fix names the switch, without the wrong-folder advice" \
+    || fail "completeness/dev-only: message or fix" "$(jq -c '.reasons[0] | {message, fix}' "$DVD/out_completeness.json" 2>&1 | head -c 600)"
+# The uv.lock case keeps its own fix, which names bomlens:excluded-components.
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"p","version":"1"},"properties":[{"name":"bomlens:sbom-empty-all-excluded","value":"pyproject.toml, uv.lock"}]},"components":[]}\n' > "$DVD/uv.json"
+bash "$LIB/assess-completeness.sh" "$DVD/uv.json" "$DVD/uv" >/dev/null 2>&1
+jq -e '.reasons[0].fix.en | test("bomlens:excluded-components")' "$DVD/uv_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/dev-only: an excluded lock file still gets the fix that points at bomlens:excluded-components" \
+    || fail "completeness/dev-only: uv.lock fix changed" "$(jq -c '.reasons[0].fix' "$DVD/uv_completeness.json" 2>&1)"
+# The entrypoint stamps the property from the tree, and only when the
+# development dependencies were not asked for.
+ENTRY_SH="$ROOT_DIR/docker/entrypoint.sh"
+grep -q 'source_dev_only_manifests "${SOURCE_ROOT:-/src}" 5' "$ENTRY_SH" \
+    && grep -q 'mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-all-excluded" "$_empty_devonly"' "$ENTRY_SH" \
+    && grep -q 'case "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}:${BOMLENS_NODE_FULL_GRAPH:-}" in' "$ENTRY_SH" \
+    && pass "completeness/dev-only: entrypoint.sh stamps the dev-only exclusion unless the development dependencies were asked for" \
+    || fail "completeness/dev-only: entrypoint.sh does not stamp the dev-only exclusion"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
