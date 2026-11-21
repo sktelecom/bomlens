@@ -14,7 +14,7 @@ An Android project needs one thing a plain Java project does not: an Android SDK
 
 ## How do I scan it?
 
-In the desktop app or the web UI, add the project folder and run the scan. When the SDK image is missing, a dialog explains why, links Google's terms, and builds the image once if you accept. Then start the scan again from the New scan form.
+In the desktop app or the web UI, add the project folder and run the scan. When the SDK image is missing, a dialog explains why, links Google's terms, and builds the image once if you accept. Then start the scan again from the New scan form. A web UI that cannot build the image itself, such as the one `scan-sbom.sh --ui` opens, shows the `docker build` command instead, ready to run: it builds from the `docker/android` folder of your clone when there is one, and otherwise reads the recipe from GitHub at your release's tag, or at `main` when your copy does not report a release.
 
 On the command line, a scan with no SDK image stops before it starts and prints the `docker build` command, with the API level filled in. Run that command once, which means you accept [Google's SDK terms](https://developer.android.com/studio/terms), then scan again:
 

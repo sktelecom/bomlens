@@ -1175,6 +1175,8 @@ export interface ScanErrorExtra {
   termsUrl?: string;
   /** This server can build the image itself. */
   buildAvailable?: boolean;
+  /** Host path of the launcher's own docker/android recipe; "" when unknown. */
+  hostBuildDir?: string;
 }
 
 /** Whether the Android SDK image for an API level is on this machine, and what
@@ -1187,6 +1189,8 @@ export interface AndroidSdkStatus {
   termsUrl: string;
   buildAvailable: boolean;
   building: boolean;
+  /** Host path of the launcher's own docker/android recipe; "" when unknown. */
+  hostBuildDir?: string;
 }
 
 export async function fetchAndroidSdkStatus(api: number): Promise<AndroidSdkStatus | null> {

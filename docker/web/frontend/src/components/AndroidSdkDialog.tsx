@@ -220,9 +220,9 @@ export function AndroidSdkDialog({
                   {t("androidSdk.manualIntro")}
                 </p>
                 <code className="bl-code" data-testid="android-sdk-command">
-                  {manualBuildCommand(need.api, need.image, version)}
+                  {manualBuildCommand(need.api, need.image, version, need.hostBuildDir)}
                 </code>
-                {!tag && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
+                {!tag && !need.hostBuildDir && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
               </>
             )}
 
@@ -232,9 +232,9 @@ export function AndroidSdkDialog({
                   {t("androidSdk.manualOnly")}
                 </p>
                 <code className="bl-code" data-testid="android-sdk-command">
-                  {manualBuildCommand(need.api, need.image, version)}
+                  {manualBuildCommand(need.api, need.image, version, need.hostBuildDir)}
                 </code>
-                {!tag && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
+                {!tag && !need.hostBuildDir && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
                 <p style={{ margin: 0 }} className="bl-muted">
                   {t("androidSdk.skipNote")}
                 </p>

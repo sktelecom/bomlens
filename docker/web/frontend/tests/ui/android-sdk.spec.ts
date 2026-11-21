@@ -200,10 +200,18 @@ test("a server that cannot build shows the command instead of a build button", a
   const calls = await setup(page, { first: missing({ buildAvailable: false }) });
   await expect(page.getByTestId("android-sdk-manual")).toBeVisible();
   await expect(page.getByTestId("android-sdk-command")).toHaveText(
-    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 https://github.com/sktelecom/bomlens.git#<release-tag>:docker/android",
+    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 https://github.com/sktelecom/bomlens.git#main:docker/android",
   );
   await expect(page.getByRole("button", { name: "Accept the terms and prepare now" })).toHaveCount(0);
   expect(calls.build).toBe(0);
+});
+
+test("the manual command builds from the launcher's recipe folder when the server knows it", async ({ page }) => {
+  await setup(page, { first: missing({ buildAvailable: false, hostBuildDir: "/Users/me/bomlens/docker/android" }) });
+  await expect(page.getByTestId("android-sdk-command")).toHaveText(
+    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 /Users/me/bomlens/docker/android",
+  );
+  await expect(page.getByText("reads the recipe from the main branch")).toHaveCount(0);
 });
 
 test("the manual command is pinned to the release the server reports", async ({ page }) => {

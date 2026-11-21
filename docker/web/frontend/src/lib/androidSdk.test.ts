@@ -70,11 +70,27 @@ describe("helpers", () => {
     );
     expect(releaseTag("v1.15.0")).toBe("v1.15.0");
   });
-  it("leaves a placeholder tag when the release is unknown", () => {
+  it("reads the main branch when the release is unknown, so the command runs as shown", () => {
     for (const v of [undefined, "", "dev", "latest-abc1234"]) {
       expect(releaseTag(v)).toBeNull();
-      expect(manualBuildCommand(34, "i", v)).toContain("#<release-tag>:docker/android");
+      expect(manualBuildCommand(34, "i", v)).toBe(
+        "docker build --build-arg ANDROID_API=34 -t i https://github.com/sktelecom/bomlens.git#main:docker/android",
+      );
     }
+  });
+  it("builds from the launcher's own recipe folder when the server knows its host path", () => {
+    expect(manualBuildCommand(34, "bomlens-android-sdk34:latest", "", "/Users/me/bomlens/docker/android")).toBe(
+      "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34:latest /Users/me/bomlens/docker/android",
+    );
+    // The local folder wins over a release tag, as in the CLI.
+    expect(manualBuildCommand(34, "i", "1.15.0", "/opt/b/docker/android")).toMatch(/ \/opt\/b\/docker\/android$/);
+    // A path with spaces or quotes stays one shell word.
+    expect(manualBuildCommand(34, "i", "", "/Users/me/my repo/docker/android")).toMatch(/ '\/Users\/me\/my repo\/docker\/android'$/);
+    expect(manualBuildCommand(34, "i", "", "/a/it's/android")).toMatch(/ '\/a\/it'\\''s\/android'$/);
+  });
+  it("reads the recipe's host path from the scan error event", () => {
+    expect(androidSdkNeed({ ...EVENT, hostBuildDir: " /r/docker/android " })?.hostBuildDir).toBe("/r/docker/android");
+    expect(androidSdkNeed({ ...EVENT, hostBuildDir: "" })).not.toHaveProperty("hostBuildDir");
   });
   it("reads the older errorCode spelling of the missing-image code", () => {
     const { code: _c, ...rest } = EVENT;

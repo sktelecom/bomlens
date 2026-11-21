@@ -27,6 +27,9 @@ export interface AndroidSdkNeed {
   termsUrl: string;
   consentRequired: boolean;
   buildAvailable: boolean;
+  /** The host path of the launcher's own docker/android recipe, when it said
+   *  so: the manual command then builds from it, as the CLI does. */
+  hostBuildDir?: string;
 }
 
 /** True for the scan `error` event that asks for the Android SDK image. */
@@ -47,6 +50,9 @@ export function androidSdkNeed(extra: ScanErrorExtra | undefined): AndroidSdkNee
     consentRequired: extra.consentRequired !== false,
     // Unknown means the server did not say it cannot.
     buildAvailable: extra.buildAvailable !== false,
+    ...(typeof extra.hostBuildDir === "string" && extra.hostBuildDir.trim()
+      ? { hostBuildDir: extra.hostBuildDir.trim() }
+      : {}),
   };
 }
 
@@ -67,16 +73,24 @@ export function releaseTag(version: string | undefined): string | null {
   return m ? `v${m[1]}` : null;
 }
 
-/** The tag shown in the command when the release is not known; the dialog tells
- *  the reader to replace it. */
-export const TAG_PLACEHOLDER = "<release-tag>";
+/** The branch the command reads when the release is not known, as the CLI does. */
+export const DEFAULT_BRANCH = "main";
 
-/** The command that builds the image by hand. It reads the recipe from the
- *  GitHub repository at the release tag, so it works where no `docker/` folder
- *  exists (the run modes that open this step have none). */
-export function manualBuildCommand(api: number, image: string, version?: string): string {
-  const tag = releaseTag(version) ?? TAG_PLACEHOLDER;
-  return `docker build --build-arg ANDROID_API=${api} -t ${image} https://github.com/sktelecom/bomlens.git#${tag}:docker/android`;
+/** A path as one shell word: left as is when it holds only plain characters,
+ *  otherwise in single quotes. */
+function shellWord(path: string): string {
+  return /^[A-Za-z0-9._/:@%+=,-]+$/.test(path) ? path : `'${path.replace(/'/g, "'\\''")}'`;
+}
+
+/** The command that builds the image by hand, runnable as shown. With the host
+ *  path of the launcher's own recipe it builds from that folder, as the CLI
+ *  prints it. Otherwise it reads the recipe from the GitHub repository, at the
+ *  release tag, or at the main branch when this is not a release. */
+export function manualBuildCommand(api: number, image: string, version?: string, hostBuildDir?: string): string {
+  const ctx = hostBuildDir
+    ? shellWord(hostBuildDir)
+    : `https://github.com/sktelecom/bomlens.git#${releaseTag(version) ?? DEFAULT_BRANCH}:docker/android`;
+  return `docker build --build-arg ANDROID_API=${api} -t ${image} ${ctx}`;
 }
 
 const REASONS = new Set([
