@@ -3394,6 +3394,36 @@ else
 fi
 rm -f "$OUT"/rref_1.0_* "$OUT"/rrefodd_1.0_* "$OUT"/rrefclean_1.0_*
 
+echo "== version source (sbom_summary) =="
+# Versions read from an installed Python environment or from the lock file npm
+# wrote at install at the scan root are "installed"; an offline npm install
+# from npm's cache is "npm-cache"; an installed lock in a subfolder only, or
+# nothing, is None.
+vs_bom() {  # <run> <metadata.properties JSON>
+    printf '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"%s","version":"1.0"},"properties":%s},"components":[]}\n' "$1" "$2" > "$OUT/$1_1.0_bom.json"
+}
+vs_bom vsvenv '[{"name":"bomlens:python-environment","value":".venv"}]'
+vs_bom vsnode '[{"name":"bomlens:node-lock-source","value":"node_modules/.package-lock.json"}]'
+vs_bom vssub '[{"name":"bomlens:node-lock-source","value":"web/node_modules/.package-lock.json"}]'
+vs_bom vscache '[{"name":"bomlens:prep-step-applied","value":"npm-offline-cache"}]'
+vs_bom vsnone '[]'
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server.sbom_summary("vsvenv_1.0")["versionSource"] == "installed"
+assert server.sbom_summary("vsnode_1.0")["versionSource"] == "installed"
+assert server.sbom_summary("vssub_1.0")["versionSource"] is None
+assert server.sbom_summary("vscache_1.0")["versionSource"] == "npm-cache"
+assert server.sbom_summary("vsnone_1.0")["versionSource"] is None
+PY
+then
+    pass "versionSource: installed environment or root installed lock, npm cache, None otherwise"
+else
+    fail "versionSource not surfaced correctly"
+fi
+rm -f "$OUT"/vsvenv_1.0_* "$OUT"/vsnode_1.0_* "$OUT"/vssub_1.0_* "$OUT"/vscache_1.0_* "$OUT"/vsnone_1.0_*
+
 echo "== credential masking: a long input without a closing @ stays fast, the same strings are masked =="
 # The userinfo pattern backtracked over every colon of a long input (16,000 colons
 # took two seconds). It must stay linear, and it must still mask what it did before.

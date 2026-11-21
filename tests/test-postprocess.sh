@@ -1344,11 +1344,20 @@ else
     fail "generate-risk-report.sh produced no md/html with a BOM present"
 fi
 # A source that stated version ranges and shipped no lock file says so in the report,
-# in both languages; a pinned or unmarked one does not.
-for pin in unpinned pinned none; do
+# in both languages; a pinned or unmarked one does not, and neither does one whose
+# versions were read from an installed Python environment (venv) or from the lock
+# file npm wrote at install (nodelock).
+for pin in unpinned pinned none venv nodelock; do
     d="$WORK/risk-pin-$pin"; mkdir -p "$d"
-    if [ "$pin" = none ]; then cp "$WORK/lc.json" "$d/p_1.0_bom.json"
-    else jq --arg v "$pin" '.metadata.component.properties = ((.metadata.component.properties // []) + [{name:"bomlens:source:versionPinning", value:$v}])' "$WORK/lc.json" > "$d/p_1.0_bom.json"; fi
+    case "$pin" in
+        none) cp "$WORK/lc.json" "$d/p_1.0_bom.json" ;;
+        venv|nodelock)
+            if [ "$pin" = venv ]; then _rp='{"name":"bomlens:python-environment","value":".venv"}'
+            else _rp='{"name":"bomlens:node-lock-source","value":"node_modules/.package-lock.json"}'; fi
+            jq --argjson rp "$_rp" '(.metadata.component.properties = ((.metadata.component.properties // []) + [{name:"bomlens:source:versionPinning", value:"unpinned"}]))
+                | .metadata.properties = ((.metadata.properties // []) + [$rp])' "$WORK/lc.json" > "$d/p_1.0_bom.json" ;;
+        *) jq --arg v "$pin" '.metadata.component.properties = ((.metadata.component.properties // []) + [{name:"bomlens:source:versionPinning", value:$v}])' "$WORK/lc.json" > "$d/p_1.0_bom.json" ;;
+    esac
     printf 'License: MIT\n' > "$d/p_1.0_NOTICE.txt"
     ( cd "$d" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 && mkdir ko && cd ko && cp ../p_1.0_bom.json ../p_1.0_NOTICE.txt . && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
     en_n=$(grep -c 'states version ranges and ships no lock file' "$d/p_1.0_risk-report.md" "$d/p_1.0_risk-report.html" | awk -F: '{s+=$2} END{print s}')

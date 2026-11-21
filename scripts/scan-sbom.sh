@@ -4003,6 +4003,13 @@ GRADLE_USER_CACHE_EOF
         else
             rm -f "$STAGE1_LOG"
         fi
+        # A Node.js project with no lock file whose npm registry did not
+        # answer, and whose offline install found every dependency in npm's
+        # cache (build-prep.sh records npm-offline-cache).
+        if command -v jq >/dev/null 2>&1 \
+           && jq -e 'any(.metadata.properties[]?; .name == "bomlens:prep-step-applied" and .value == "npm-offline-cache")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" >/dev/null 2>&1; then
+            echo "[INFO] The npm registry did not answer, so the dependencies were resolved from BomLens's npm cache; the versions are the newest cached ones package.json allows and may not be the newest releases."
+        fi
     fi
     fi
 

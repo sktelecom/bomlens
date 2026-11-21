@@ -183,6 +183,8 @@
     "zeroComponentsTitle": "컴포넌트를 찾지 못했습니다",
     "zeroComponentsBody": "안전하다는 뜻이 아니라 경고입니다. 읽을 것이 없으면 결과가 0건이 됩니다. 폴더 최상위에 의존성 목록 파일(requirements.txt, package.json, pom.xml 등)이 없거나, 검사 경로가 다른 곳을 가리키는 경우입니다. 목록과 경로를 확인한 뒤 다시 검사해 주십시오.",
     "zeroComponentsBodyDegraded": "안전하다는 뜻이 아니라 경고입니다. 읽을 것이 없으면 결과가 0건이 됩니다. 폴더 최상위에 의존성 목록 파일(requirements.txt, package.json, pom.xml 등)이 없거나, 검사 경로가 다른 곳을 가리키는 경우입니다. 목록과 경로를 확인한 뒤 다시 검사해 주십시오. 전이 의존성 분석기(cdxgen)도 실행되지 못해 이번에는 직접 의존성조차 확인하지 못했습니다.",
+    "npmCacheTitle": "npm 캐시에서 버전을 정했습니다",
+    "npmCacheBody": "이 프로젝트에는 lock 파일이 없고 npm 레지스트리도 응답하지 않아서, BomLens의 npm 캐시로 의존성을 해석했습니다. 여기 표시된 버전은 package.json이 허용하는 범위에서 캐시에 있는 가장 새 버전이므로, 최신 릴리스나 여러분 환경에 설치된 버전과 다를 수 있습니다. 실제로 쓰는 버전을 보려면 lock 파일을 함께 두거나, 레지스트리에 접속할 수 있을 때 다시 검사해 주십시오.",
     "unpinnedTitle": "검사 시점에 버전이 정해졌습니다",
     "unpinnedBody": "이 프로젝트는 버전을 범위로 적었고 고정 파일이 없어서, 여기 표시된 버전은 지금 새로 설치하면 받게 될 버전입니다. 여러분 환경에 설치된 버전과 다를 수 있습니다. 취약점 결과도 이 버전을 기준으로 나온 것입니다. 실제 환경의 위험을 보려면 정확한 버전이 적힌 목록으로 검사해 주십시오.",
     "scanWarningsTitle": "검사 중 알린 사항",
@@ -1021,6 +1023,10 @@
         "title": "설치한 버전과 다를 수 있습니다",
         "short": "버전은 지금 새로 설치할 때 받게 될 버전입니다."
       },
+      "npmCache": {
+        "title": "npm 캐시에서 버전을 정했습니다",
+        "short": "npm 레지스트리가 응답하지 않아 캐시에 있는 가장 새 버전을 썼습니다."
+      },
       "firmware": {
         "title": "이미지 일부가 집계에서 빠졌습니다",
         "short": "이미지 일부를 열지 못해, 집계는 연 부분만 기준입니다."
@@ -1079,6 +1085,7 @@
     "pnpmInstalledLock": "설치 때 생긴 pnpm lock 파일 읽기",
     "npmRegistryTlsTrust": "npm 레지스트리 접속(인증서를 신뢰하지 않음)",
     "npmRegistryNetwork": "npm 레지스트리 접속(연결할 수 없음)",
+    "npmOfflineCache": "npm 캐시로 의존성 해석",
     "pipInstall": "Python 의존성 설치",
     "poetryGraph": "Poetry 의존 그래프",
     "cargoWorkspaceMetadata": "Cargo 워크스페이스 멤버 탐지",

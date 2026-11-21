@@ -236,6 +236,11 @@ export interface SbomSummary {
   /** Whether the scanned source pinned its versions ("pinned" | "unpinned").
    *  Absent for a tree that could not be judged, and for every non-source scan. */
   versionPinning?: string | null;
+  /** Where the root project's versions came from when not from a fresh
+   *  resolution: "installed" (an installed Python environment, or the lock file
+   *  npm or pnpm wrote at install) or "npm-cache" (an offline npm install
+   *  resolved from npm's cache). Absent otherwise. */
+  versionSource?: "installed" | "npm-cache" | null;
   /** Direct/transitive dependency counts across the whole SBOM (0 when the SBOM
    *  has no dependency graph). Drives the Overview dependency tile. */
   directCount?: number;

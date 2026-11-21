@@ -145,7 +145,7 @@ export function FailureBanner({
 
 interface Notice {
   /** i18n id under `overview.notice.*` for the merged one-line form. */
-  id: "completeness" | "pipeline" | "licenseLookup" | "warnings" | "vendored" | "degraded" | "registryRefused" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
+  id: "completeness" | "pipeline" | "licenseLookup" | "warnings" | "vendored" | "degraded" | "registryRefused" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "npmCache" | "firmware";
   variant: "warning" | "info";
   title: string;
   testId?: string;
@@ -282,9 +282,15 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
 
   // Versions the resolver chose, not versions anyone installed. Not said when a
   // dependency resolution step failed: the versions then did not come from a
-  // fresh install, and the completeness warning above already says why.
+  // fresh install, and the completeness warning above already says why. Nor
+  // when the versions were read from what is installed (an installed Python
+  // environment, or the lock file npm or pnpm wrote at install): those are the
+  // installed versions. An offline npm install from npm's cache gets its own
+  // note saying so.
   const resolutionFailed = Boolean(completeness?.reasons?.some((r) => r.code === "resolution-failed"));
-  if (sb?.versionPinning === "unpinned" && !resolutionFailed)
+  if (sb?.versionPinning === "unpinned" && !resolutionFailed && sb.versionSource === "npm-cache")
+    notices.push({ id: "npmCache", variant: "info", title: t("result.npmCacheTitle"), testId: "version-npm-cache", body: t("result.npmCacheBody") });
+  else if (sb?.versionPinning === "unpinned" && !resolutionFailed && sb.versionSource !== "installed")
     notices.push({ id: "unpinned", variant: "info", title: t("result.unpinnedTitle"), testId: "version-pinning", body: t("result.unpinnedBody") });
 
   if (!ai && sb?.suggestIdentifyVendored)

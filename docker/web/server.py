@@ -2845,6 +2845,29 @@ def _ai_usage_list(data):
     return rows[:MAX_AI_USAGE_ROWS], len(rows) > MAX_AI_USAGE_ROWS
 
 
+# The lock files npm and pnpm write at install, at the scan root, as build-prep.sh
+# records them in bomlens:node-lock-source (relative to the scan root).
+ROOT_INSTALLED_LOCKS = ("node_modules/.package-lock.json", "node_modules/.pnpm/lock.yaml")
+
+
+def _version_source(meta_props):
+    """Where the root project's versions came from, read from the SBOM's
+    metadata.properties: "installed" when build-prep.sh read an installed Python
+    environment (bomlens:python-environment) or the lock file npm or pnpm wrote
+    at install at the scan root (bomlens:node-lock-source), "npm-cache" when an
+    offline npm install resolved every dependency from npm's cache
+    (bomlens:prep-step-applied npm-offline-cache), None otherwise."""
+    for p in meta_props:
+        name, value = p.get("name"), p.get("value")
+        if name == "bomlens:python-environment" and isinstance(value, str) and value:
+            return "installed"
+        if name == "bomlens:node-lock-source" and value in ROOT_INSTALLED_LOCKS:
+            return "installed"
+    if any(p.get("name") == "bomlens:prep-step-applied" and p.get("value") == "npm-offline-cache" for p in meta_props):
+        return "npm-cache"
+    return None
+
+
 def sbom_summary(run_id):
     p = run_file(run_id, "_bom.json")
     if not p or not os.path.isfile(p):
@@ -3230,6 +3253,7 @@ def sbom_summary(run_id):
         pipeline_steps_seen.append(value[:MAX_PIPELINE_STEP_LEN])
     pipeline_steps_failed_more = max(0, len(pipeline_steps_seen) - MAX_PIPELINE_STEPS)
     pipeline_steps_failed = pipeline_steps_seen[:MAX_PIPELINE_STEPS]
+    version_source = _version_source(meta_props)
     # sbom-oversized: set by entrypoint.sh when the finished document is over
     # the same 100 MB budget this server's own upload path enforces (MAX_BYTES
     # above) — a scan run against --target never goes through that upload
@@ -3332,6 +3356,11 @@ def sbom_summary(run_id):
             ),
             None,
         ),
+        # Where the root project's versions came from when that is not a fresh
+        # resolution: "installed" (an installed Python environment, or the lock
+        # file npm or pnpm wrote at install) or "npm-cache" (an offline npm
+        # install resolved from npm's cache). None otherwise.
+        "versionSource": version_source,
         "directCount": direct_count,
         "transitiveCount": transitive_count,
         "eolCount": eol_count,

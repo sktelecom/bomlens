@@ -3728,8 +3728,11 @@ fi
 # The node registry probe found the registry down and cdxgen's install ran
 # offline. A lock file at the root now (there was none) means that install
 # resolved every dependency from the cache, so the registry was not needed.
+# Recorded as npm-offline-cache: the versions are the newest ones the cache
+# holds, not necessarily the newest releases, and the CLI and the web UI say so.
 if [ -n "$NODE_REGISTRY_DOWN" ] && { [ -f package-lock.json ] || [ -f pnpm-lock.yaml ]; }; then
     unmark_prep_failed "npm-registry:$NODE_REGISTRY_DOWN"
+    mark_prep_applied npm-offline-cache
     log "node: cdxgen's offline npm install resolved every dependency from npm's cache; the versions are the newest cached ones that package.json allows"
 fi
 

@@ -17,7 +17,7 @@ description: 사내 패키지 저장소에서 의존성을 받는 프로젝트�
 
 구성요소 개수를 본인 빌드가 보고하는 개수와 비교합니다. 훨씬 적으면 해석이 실패한 것입니다. 패키지 저장소가 일부 다운로드의 로그인을 거부한 채 SBOM이 만들어졌으면 스캔 로그에 `[WARN]` 한 줄이 나오고, SBOM에 `bomlens:registry-refused`가 기록되며, 웹 UI 개요에 "일부 의존성이 빠졌을 수 있습니다" 경고가 나타납니다([산출물](../reference/artifacts.ko.md)).
 
-lock 파일이 없는 Node.js 프로젝트는 프로젝트 `.npmrc`가 가리키는 레지스트리에서 npm install로 해석합니다. 스캔은 먼저 그 레지스트리에 로그인 정보 없이 한 번 응답을 요청합니다. 응답이 없거나 TLS 인증서를 신뢰할 수 없으면 npm의 재시도를 기다리지 않습니다. npm은 캐시만으로 해석하고, 스캔은 몇 초 안에 끝나며, `node_modules`나 그 캐시에 있는 것만 목록에 올리고, 실패한 단계 `npm-registry:network` 또는 `npm-registry:tls-trust`를 기록합니다. 스캔 로그에는 레지스트리와 원인이 남습니다([Node.js](../reference/ecosystems.ko.md#nodejs)).
+lock 파일이 없는 Node.js 프로젝트는 프로젝트 `.npmrc`가 가리키는 레지스트리에서 npm install로 해석합니다. 스캔은 먼저 그 레지스트리에 로그인 정보 없이 한 번 응답을 요청합니다. 응답이 없거나 TLS 인증서를 신뢰할 수 없으면 npm의 재시도를 기다리지 않습니다. npm은 캐시만으로 해석하고, 스캔은 몇 초 안에 끝나며, `node_modules`나 그 캐시에 있는 것만 목록에 올리고, 실패한 단계 `npm-registry:network` 또는 `npm-registry:tls-trust`를 기록합니다. 스캔 로그에는 레지스트리와 원인이 남습니다([Node.js](../reference/ecosystems.ko.md#nodejs)). 캐시에 의존성이 모두 있었다면 실패한 단계를 지우고 대신 `bomlens:prep-step-applied`에 `npm-offline-cache`를 기록합니다. CLI는 `[INFO]` 줄을, 웹 UI 개요는 안내를 보여 줍니다. 두 곳 모두 버전이 `package.json`이 허용하는 범위에서 캐시에 있는 가장 새 버전이라 최신 릴리스가 아닐 수 있다고 알립니다.
 
 ## 프록시는 어떻게 설정하나요?
 

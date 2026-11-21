@@ -184,6 +184,22 @@ test("one notice is one banner with its own text", async ({ page }) => {
   await expect(page.getByTestId("merged-warning")).toHaveCount(0);
 });
 
+test("versions read from an installed environment get no fresh-install note", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ versionPinning: "unpinned", versionSource: "installed" }) });
+  await expect(page.getByTestId("version-pinning")).toHaveCount(0);
+  await expect(page.getByTestId("version-npm-cache")).toHaveCount(0);
+  await expect(page.getByText("fresh install")).toHaveCount(0);
+});
+
+test("versions resolved from the npm cache say so instead of a fresh install", async ({ page }) => {
+  await open(page, { ...DONE, sbom: sbomWith({ versionPinning: "unpinned", versionSource: "npm-cache" }) });
+  const banner = page.getByTestId("version-npm-cache");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("Versions came from the npm cache");
+  await expect(banner).toContainText("BomLens's npm cache");
+  await expect(page.getByTestId("version-pinning")).toHaveCount(0);
+});
+
 test("a registry that refused some downloads warns with advice for a folder and the company-network guide", async ({ page }) => {
   await open(page, { ...DONE, sbom: sbomWith({ registryRefused: "registry-auth" }), scanConfig: { source: "current-dir", target: "", project: "demo", version: "1.0" } });
   const banner = page.getByTestId("registry-refused");

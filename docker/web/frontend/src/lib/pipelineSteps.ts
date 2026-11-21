@@ -55,6 +55,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "pnpm-installed-lock": "pipelineSteps.pnpmInstalledLock",
   "npm-registry:tls-trust": "pipelineSteps.npmRegistryTlsTrust",
   "npm-registry:network": "pipelineSteps.npmRegistryNetwork",
+  "npm-offline-cache": "pipelineSteps.npmOfflineCache",
   "pip-install": "pipelineSteps.pipInstall",
   "poetry-graph": "pipelineSteps.poetryGraph",
   "cargo-workspace-metadata": "pipelineSteps.cargoWorkspaceMetadata",
