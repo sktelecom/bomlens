@@ -878,5 +878,8 @@ describe("getProjectInfo / scanExists", () => {
     startScan({ ...base, timestamp: true }, h);
     expect(new URLSearchParams(urls[0].split("?")[1]).get("timestamp")).toBe("");
     expect(new URLSearchParams(urls[1].split("?")[1]).get("timestamp")).toBe("true");
+    // The browser's time zone offset rides along, so a kept folder is named by
+    // the clock the user sees and not by the container's UTC.
+    expect(new URLSearchParams(urls[1].split("?")[1]).get("tz_offset")).toBe(String(new Date().getTimezoneOffset()));
   });
 });

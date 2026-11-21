@@ -6512,6 +6512,38 @@ else
     fail "concurrent scans still resolve to the same run folder"
 fi
 
+# "Keep both" names the folder by the user's clock, not the container's UTC.
+# The browser sends Date.getTimezoneOffset() as tz_offset; anything that is not
+# a plain integer in the real range is ignored.
+if python3 - "$SERVER" <<'TZPY'
+import importlib.util, sys
+from datetime import datetime, timezone
+spec = importlib.util.spec_from_file_location("server", sys.argv[1])
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+utc = datetime(2026, 11, 21, 2, 59, 12, tzinfo=timezone.utc)
+local = server.client_local_now
+# Seoul is UTC+9, which JavaScript reports as -540.
+assert local("-540", utc) == datetime(2026, 11, 21, 11, 59, 12), local("-540", utc)
+assert local("300", utc) == datetime(2026, 11, 20, 21, 59, 12)
+assert local("0", utc) == datetime(2026, 11, 21, 2, 59, 12)
+for bad in ("", None, "abc", "1e3", "-541.5", "9999", "-841", "721", " 60;rm", "0x10", "+60"):
+    assert local(bad, utc) is None, bad
+rid = server.claim_run_id("mvn_1", set(), now=local("-540", utc), force_suffix=True)
+assert rid == "mvn_1_20261121-115912", rid
+print("ok")
+TZPY
+then
+    pass "a kept folder is named by the browser's local time, and a bad offset is ignored"
+else
+    fail "a kept folder is not named by the browser's local time"
+fi
+if grep -q 'now=client_local_now(g("tz_offset"))' "$SERVER"; then
+    pass "the scan launch passes the browser's offset to claim_run_id"
+else
+    fail "the scan launch does not use tz_offset for the run folder suffix"
+fi
+
 # The claim is released on every exit, including a client that closed the stream
 # mid-scan. A name left behind would push every later scan of that project onto
 # a suffixed folder for the life of the process.

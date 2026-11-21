@@ -2128,6 +2128,9 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     deep_cve: String(params.deepCve),
     reachability: String(params.reachability ?? false),
     timestamp: params.timestamp ? "true" : "",
+    // The server runs in UTC; the browser's offset lets it name a kept folder
+    // by the clock the user sees. Read server-side as `tz_offset`.
+    tz_offset: String(new Date().getTimezoneOffset()),
     upload_target: params.uploadTarget ?? "",
     upload_url: params.uploadUrl ?? "",
     upload_cred: params.uploadCred ?? "",
