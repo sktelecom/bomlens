@@ -3,9 +3,8 @@ name: Rootless ownership check
 # Runs a source scan under rootless Docker and under the regular (rootful)
 # daemon, then lists every file in the output folder and in the scanned
 # source copy that the runner user does not own, and tries to delete the
-# output as that user. The job reports what it finds; it does not fail just
-# because foreign-owned files are present. The scan runs this branch's CLI and
-# container scripts.
+# output and the scanned folder as that user. The job fails unless the verdict
+# is NOT REPRODUCED. The scan runs this branch's CLI and container scripts.
 
 on:
   workflow_dispatch:
@@ -13,6 +12,13 @@ on:
     branches: [ main ]
     paths:
       - .github/workflows/rootless-check.yml
+      - docker/lib/owner-handback.sh
+      - docker/lib/build-prep.sh
+      - docker/entrypoint.sh
+      - docker/lib/make-plan.sh
+      - docker/lib/deep-license.sh
+      - docker/lib/engine-result.sh
+      - scripts/scan-sbom.sh
 
 permissions:
   contents: read
@@ -242,6 +248,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
           echo "VERDICT (${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }}): $verdict"
+          if [ "$verdict" != "NOT REPRODUCED" ]; then
+            echo "::error::Ownership check ${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }}: $verdict"
+            exit 1
+          fi
 
       - name: Show rootless daemon log
         if: always() && matrix.daemon == 'rootless'
