@@ -7,7 +7,8 @@
   },
   "labels": {
     "title": { "en": "Result completeness", "ko": "결과 완전성" },
-    "fix": { "en": "How to fix", "ko": "해결 방법" }
+    "fix": { "en": "How to fix", "ko": "해결 방법" },
+    "cause": { "en": "The build tool reported:", "ko": "빌드 도구가 보고한 오류:" }
   },
   "headline": {
     "en": "The result is empty or incomplete. Reasons and how to fix them:",
@@ -30,6 +31,27 @@
     "composer-install", "gradle-wrapper-jdk"
   ],
   "resolutionStepPrefixes": ["npm-excluded:"],
+  "resolutionHints": {
+    "maven-parent-outside-scan": {
+      "en": "The scanned folder is a module of a multi-module Maven build whose parent POM is outside the folder, so Maven could not read the project and only the dependencies written in its pom.xml are listed.",
+      "ko": "스캔한 폴더는 여러 모듈로 된 Maven 빌드의 한 모듈이고 부모 POM이 폴더 밖에 있어 Maven이 프로젝트를 읽지 못했습니다. 그래서 pom.xml에 직접 적힌 의존성만 목록에 있습니다.",
+      "fixEn": "Scan the top-level folder of the build (the folder whose pom.xml is the parent POM and lists the modules), not a module folder.",
+      "fixKo": "모듈 폴더가 아니라 빌드의 최상위 폴더(부모 POM이 있고 모듈 목록이 적힌 pom.xml이 있는 폴더)를 스캔하세요."
+    },
+    "android-useandroidx-missing": {
+      "en": "The app uses AndroidX libraries, but the Gradle property android.useAndroidX=true is not set, so Gradle stopped before it resolved the app's dependencies.",
+      "ko": "앱이 AndroidX 라이브러리를 쓰는데 Gradle 속성 android.useAndroidX=true가 설정되어 있지 않아 Gradle이 앱의 의존성을 해석하기 전에 멈췄습니다.",
+      "fixEn": "Add the line android.useAndroidX=true to gradle.properties in the project's top-level folder (Android Studio writes it there for a new project), then scan again.",
+      "fixKo": "프로젝트 최상위 폴더의 gradle.properties에 android.useAndroidX=true 한 줄을 추가한 뒤 다시 스캔하세요. Android Studio는 새 프로젝트를 만들 때 이 줄을 적어 둡니다."
+    },
+    "android-release-classpath-unresolved": {
+      "grade": "unreliable",
+      "en": "Gradle failed before it read the app's release runtime classpath, so the app's dependencies are not in this SBOM. The components of the build's other configurations (build and test tooling) were left out, because the app does not ship them.",
+      "ko": "Gradle이 앱의 릴리스 런타임 클래스패스를 읽기 전에 실패해 앱의 의존성이 이 SBOM에 없습니다. 빌드의 다른 구성에서 나온 컴포넌트(빌드 도구와 테스트 도구)는 앱에 포함되지 않으므로 제외했습니다.",
+      "fixEn": "Fix the Gradle error named in the scan log (./gradlew :app:dependencies in the project shows it too) and scan again.",
+      "fixKo": "스캔 로그에 나온 Gradle 오류를 해결한 뒤 다시 스캔하세요. 프로젝트에서 ./gradlew :app:dependencies를 실행해도 같은 오류가 보입니다."
+    }
+  },
   "reasons": {
     "no-components-supplied": {
       "grade": "unreliable",
