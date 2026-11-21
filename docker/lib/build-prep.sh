@@ -8138,10 +8138,10 @@ userns_remapped() {
 # clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
 # arrive via `docker run -e`; best-effort, never fail the prep on this.
 gradle_settings_remove
-# Under a rootless engine root in here is the host user already; a chown to
-# HOST_UID would give the tree to a subordinate uid (owner-handback.sh).
+# In a user namespace (rootless engine, userns-remap) a chown to HOST_UID would
+# give the tree to a subordinate uid (owner-handback.sh).
 if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ] && userns_remapped; then
-    echo "[INFO] Rootless container engine: the project folder already belongs to you, so it is not chowned to HOST_UID ${HOST_UID}." >&2
+    echo "[INFO] This container runs in a user namespace (a rootless engine or userns-remap): the project folder's ownership is left as the engine maps it." >&2
 elif [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
     # The Maven and Gradle caches are host folders too (cache-maven,

@@ -7501,7 +7501,7 @@ _oh_want() { # UID_MAP HOST_UID -> prints the rc of owner_handback_wanted, then 
 [ "$(_oh_want "$_oh_t/identity" 1001)" = 0 ] \
     && pass "an identity uid map hands files back to HOST_UID" || fail "identity uid map skipped the hand-back"
 _oh_out="$(_oh_want "$_oh_t/rootless" 1001)"
-{ [ "$(printf '%s\n' "$_oh_out" | tail -1)" = 1 ] && printf '%s' "$_oh_out" | grep -q "Rootless container engine"; } \
+{ [ "$(printf '%s\n' "$_oh_out" | tail -1)" = 1 ] && printf '%s' "$_oh_out" | grep -q "runs in a user namespace"; } \
     && pass "a remapped uid 0 skips the hand-back and says why" || fail "remapped uid map" "$_oh_out"
 [ "$(_oh_want "$_oh_t/none" 1001)" = 0 ] \
     && pass "an unreadable uid map keeps the hand-back" || fail "unreadable uid map skipped the hand-back"

@@ -10,9 +10,10 @@
 # the two the same).
 
 # userns_remapped: 0 when this process runs in a user namespace that maps its
-# uid 0 to a non-zero host uid (rootless Docker, rootless Podman). Root in here
-# is then the host user already, and a chown to HOST_UID would hand the file to
-# a subordinate uid instead. BOMLENS_UID_MAP overrides the file read (tests).
+# uid 0 to a non-zero host uid (rootless Docker or Podman, a userns-remap
+# daemon). A chown to HOST_UID from in here would then give the file to a
+# subordinate uid, so ownership is left as the engine maps it: the calling user
+# under a rootless engine. BOMLENS_UID_MAP overrides the file read (tests).
 userns_remapped() {
     _um_f="${BOMLENS_UID_MAP:-/proc/self/uid_map}"
     [ -r "$_um_f" ] || return 1
@@ -26,7 +27,7 @@ owner_handback_wanted() {
     case "${HOST_GID:-}" in ''|*[!0-9]*) return 1 ;; esac
     if userns_remapped; then
         if [ -z "${_OWNER_HANDBACK_NOTED:-}" ]; then
-            echo "[INFO] Rootless container engine: files written here already belong to you, so they are not chowned to HOST_UID ${HOST_UID}." >&2
+            echo "[INFO] This container runs in a user namespace (a rootless engine or userns-remap): file ownership is left as the engine maps it." >&2
             _OWNER_HANDBACK_NOTED=1
         fi
         return 1
