@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>Security report — SpringBootDemo</title>
+<style>
+:root {
+  --background: 0 0% 100%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --muted: 210 29% 97%;
+  --muted-foreground: 240 4% 44%;
+  --border: 240 5% 91%;
+  --input: 240 5% 91%;
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 210 29% 97%;
+  --secondary-foreground: 240 6% 10%;
+  --accent: 210 29% 97%;
+  --accent-foreground: 240 6% 10%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 224.3 76.3% 48%;
+  --brand: 224.3 76.3% 48%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 224.3 76.3% 48%;
+  --brand-hover: 225.9 70.7% 40.2%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 240 6% 10%;
+  --sidebar-border: 240 5% 91%;
+  --font-size-display: 1.875rem;
+  --font-size-title: 1.25rem;
+  --font-size-heading: 1.125rem;
+  --font-size-body: 1rem;
+  --font-size-body-sm: 0.875rem;
+  --font-size-label: 0.75rem;
+  --font-size-caption: 0.6875rem;
+  --font-size-mono: 0.75rem;
+  --role-danger-fg: 185 28 28;
+  --role-danger-muted: 251 229 229;
+  --role-danger-emphasis: 220 38 38;
+  --role-danger-border: 239 157 157;
+  --role-severe-fg: 154 52 18;
+  --role-severe-muted: 252 235 226;
+  --role-severe-emphasis: 234 88 12;
+  --role-severe-border: 246 180 146;
+  --role-attention-fg: 133 77 14;
+  --role-attention-muted: 247 240 225;
+  --role-attention-emphasis: 190 129 3;
+  --role-attention-border: 231 202 142;
+  --role-info-fg: 29 78 216;
+  --role-info-muted: 229 236 253;
+  --role-info-emphasis: 37 99 235;
+  --role-info-border: 157 185 246;
+  --role-success-fg: 6 95 70;
+  --role-success-muted: 226 243 238;
+  --role-success-emphasis: 10 155 110;
+  --role-success-border: 147 224 198;
+  --role-neutral-fg: 63 63 70;
+  --role-neutral-muted: 238 238 239;
+  --role-neutral-emphasis: 113 113 122;
+  --role-neutral-border: 191 191 195;
+  --cat-permissive-fg: 63 63 70;
+  --cat-permissive-muted: 238 238 239;
+  --cat-permissive-emphasis: 136 136 144;
+  --cat-permissive-border: 191 191 195;
+  --cat-weak-fg: 74 80 20;
+  --cat-weak-muted: 240 242 226;
+  --cat-weak-emphasis: 112 121 28;
+  --cat-weak-border: 196 202 146;
+  --cat-strong-fg: 82 40 103;
+  --cat-strong-muted: 241 234 244;
+  --cat-strong-emphasis: 137 78 166;
+  --cat-strong-border: 202 175 215;
+  --cat-network-fg: 107 36 74;
+  --cat-network-muted: 244 233 239;
+  --cat-network-emphasis: 167 68 121;
+  --cat-network-border: 215 171 195;
+  --cat-review-fg: 80 60 43;
+  --cat-review-muted: 240 237 234;
+  --cat-review-emphasis: 131 106 84;
+  --cat-review-border: 199 188 178;
+  --code-keyword: 29 78 216;
+  --code-string: 6 95 70;
+  --code-comment: 110 119 129;
+  --code-number: 133 77 14;
+  --code-title: 36 41 47;
+}
+@media screen and (prefers-color-scheme: dark) {
+:root {
+  --background: 216 28% 7%;
+  --foreground: 0 0% 98%;
+  --card: 216 28% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 214 25% 11%;
+  --popover-foreground: 0 0% 98%;
+  --muted: 214 25% 11%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 215 18% 13%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 215 18% 13%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 213.1 93.9% 67.8%;
+  --brand: 224.3 76.3% 48%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 213.1 93.9% 67.8%;
+  --brand-hover: 225.9 70.7% 40.2%;
+  --sidebar: 216 28% 7%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 4% 24%;
+  --role-danger-fg: 252 165 165;
+  --role-danger-muted: 60 38 41;
+  --role-danger-emphasis: 248 113 113;
+  --role-danger-border: 125 64 66;
+  --role-severe-fg: 253 186 116;
+  --role-severe-muted: 60 44 32;
+  --role-severe-emphasis: 251 146 60;
+  --role-severe-border: 126 79 42;
+  --role-attention-fg: 232 200 110;
+  --role-attention-muted: 53 47 34;
+  --role-attention-emphasis: 205 170 70;
+  --role-attention-border: 105 90 46;
+  --role-info-fg: 147 197 253;
+  --role-info-muted: 36 47 63;
+  --role-info-emphasis: 96 165 250;
+  --role-info-border: 56 87 127;
+  --role-success-fg: 110 231 183;
+  --role-success-muted: 28 54 47;
+  --role-success-emphasis: 52 211 153;
+  --role-success-border: 37 108 84;
+  --role-neutral-fg: 212 212 216;
+  --role-neutral-muted: 46 46 50;
+  --role-neutral-emphasis: 161 161 170;
+  --role-neutral-border: 86 86 91;
+  --cat-permissive-fg: 212 212 216;
+  --cat-permissive-muted: 46 46 50;
+  --cat-permissive-emphasis: 118 118 126;
+  --cat-permissive-border: 86 86 91;
+  --cat-weak-fg: 208 214 140;
+  --cat-weak-muted: 47 49 33;
+  --cat-weak-emphasis: 168 178 72;
+  --cat-weak-border: 92 97 50;
+  --cat-strong-fg: 223 198 235;
+  --cat-strong-muted: 52 44 58;
+  --cat-strong-emphasis: 183 134 208;
+  --cat-strong-border: 97 75 110;
+  --cat-network-fg: 237 196 218;
+  --cat-network-muted: 57 43 52;
+  --cat-network-emphasis: 213 129 174;
+  --cat-network-border: 111 73 94;
+  --cat-review-fg: 230 216 204;
+  --cat-review-muted: 54 50 48;
+  --cat-review-emphasis: 196 169 146;
+  --cat-review-border: 103 91 82;
+  --code-keyword: 96 165 250;
+  --code-string: 110 231 183;
+  --code-comment: 145 152 161;
+  --code-number: 232 200 110;
+  --code-title: 230 237 243;
+}
+}
+:root{
+  color-scheme:light dark;
+  --bg:hsl(var(--card));--surface:hsl(var(--card));--text:hsl(var(--foreground));
+  --text-muted:hsl(var(--muted-foreground));--line:hsl(var(--border));--th-bg:hsl(var(--muted));
+  --link:hsl(var(--brand-strong));
+  --radius:6px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{font-family:var(--font);font-size:var(--font-size-body-sm);background:var(--bg);color:var(--text);
+  max-width:1280px;margin:0 auto;padding:0 32px 48px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow-wrap:break-word;}
+a{color:var(--link);text-decoration:underline;text-underline-offset:.2em;}
+/* Top bar and page head */
+.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0;
+  border-bottom:1px solid var(--line);margin-bottom:24px;}
+.topbar .brand{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--text);}
+.topbar .brand svg{width:20px;height:20px;flex:none;display:block;}
+.topbar .sep{color:var(--text-muted);}
+.topbar .proj{font-weight:600;}
+.topbar .proj a{color:inherit;text-decoration-thickness:1px;}
+.topbar .ver,.desc .ver{font-weight:400;color:var(--text-muted);}
+.page-head{margin:0 0 24px;}
+h1{font-size:var(--font-size-title);font-weight:600;line-height:1.3;margin:0 0 4px;}
+.subtitle{color:var(--text);margin:0 0 4px;}
+.desc{color:var(--text-muted);font-size:var(--font-size-label);margin:2px 0 0;}
+.desc>span+span::before{content:"\00B7";padding:0 6px;color:var(--text-muted);}
+.meta{color:var(--text-muted);font-size:var(--font-size-label);margin:4px 0 0;}
+time{white-space:nowrap;}
+/* Sections */
+h2{font-size:1rem;font-weight:600;line-height:1.4;margin:32px 0 8px;padding-bottom:8px;
+  border-bottom:1px solid var(--line);}
+h3{font-size:var(--font-size-body-sm);font-weight:600;margin:16px 0 8px;}
+p{margin:8px 0;}
+/* Box: one border, a head row (title + count) and rows. No box inside a box. */
+.box{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  margin:12px 0 24px;overflow:hidden;}
+.box-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;
+  background:var(--th-bg);border-bottom:1px solid var(--line);}
+.box-head h2,.box-head h3,.box-head .box-title{font-size:var(--font-size-body-sm);font-weight:600;
+  margin:0;padding:0;border:0;}
+.box-head .meta{margin:0;flex-basis:100%;}
+.box-head .end{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+.box-body{padding:12px 16px;}
+.box-body>:first-child{margin-top:0;}.box-body>:last-child{margin-bottom:0;}
+.rows{list-style:none;margin:0;padding:0;}
+.rows>li{padding:8px 16px;border-top:1px solid var(--line);margin:0;}
+.rows>li:first-child{border-top:0;}
+.rows.mono>li,.mono li{font-family:var(--mono);font-size:var(--font-size-mono);overflow-wrap:anywhere;}
+.rows.toc>li{display:flex;gap:8px;align-items:center;padding:4px 16px;}
+.rows.toc .counter{margin-left:auto;}
+/* Counter and labels */
+.counter{display:inline-block;min-width:20px;padding:0 6px;border-radius:2em;text-align:center;
+  background:rgb(var(--role-neutral-muted));color:var(--text);font-size:var(--font-size-label);
+  font-weight:500;line-height:18px;font-variant-numeric:tabular-nums;}
+.summary{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px;}
+.lbl{display:inline-flex;align-items:center;gap:4px;padding:0 7px;border:1px solid rgb(var(--role-neutral-border));
+  border-radius:2em;color:rgb(var(--role-neutral-fg));background:transparent;font-size:var(--font-size-label);
+  font-weight:500;line-height:18px;white-space:nowrap;}
+.lbl .count{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text);}
+.lbl .mk{font-size:.75em;line-height:1;}
+.summary .lbl{font-size:var(--font-size-body-sm);line-height:22px;padding:0 10px;}
+.lbl-danger,.lbl.sev-CRITICAL,.s-fail .lbl{color:rgb(var(--role-danger-fg));border-color:rgb(var(--role-danger-emphasis));}
+.lbl-severe,.lbl.sev-HIGH{color:rgb(var(--role-severe-fg));border-color:rgb(var(--role-severe-emphasis));}
+.lbl-attention,.lbl.sev-MEDIUM,.s-warn .lbl{color:rgb(var(--role-attention-fg));border-color:rgb(var(--role-attention-emphasis));}
+.lbl-success,.s-pass .lbl{color:rgb(var(--role-success-fg));border-color:rgb(var(--role-success-emphasis));}
+.lbl.sev-LOW,.lbl.sev-UNKNOWN,.s-na .lbl,.s-review .lbl{color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.lbl-cat-network{color:rgb(var(--cat-network-fg));border-color:rgb(var(--cat-network-emphasis));}
+.lbl-cat-strong{color:rgb(var(--cat-strong-fg));border-color:rgb(var(--cat-strong-emphasis));}
+.lbl-cat-weak{color:rgb(var(--cat-weak-fg));border-color:rgb(var(--cat-weak-emphasis));}
+.lbl-cat-permissive{color:rgb(var(--cat-permissive-fg));border-color:rgb(var(--cat-permissive-emphasis));}
+.lbl-cat-review{color:rgb(var(--cat-review-fg));border-color:rgb(var(--cat-review-emphasis));}
+.lbl.zero{color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.kevbadge{display:inline-block;padding:0 7px;border:1px solid rgb(var(--role-danger-emphasis));border-radius:2em;
+  color:rgb(var(--role-danger-fg));font-size:var(--font-size-label);font-weight:600;line-height:18px;white-space:nowrap;}
+/* Banner: one notice block. Tinted fill and a full 1px border. */
+.banner{border:1px solid rgb(var(--role-attention-border));background:rgb(var(--role-attention-muted));
+  border-radius:var(--radius);padding:12px 16px;margin:12px 0 16px;}
+.banner>:first-child{margin-top:0;}.banner>:last-child{margin-bottom:0;}
+.banner p{margin:6px 0;}
+.banner ul{margin:6px 0 0;padding-left:20px;}
+.banner li{margin:2px 0;}
+.banner b{color:var(--text);}
+.banner-title,.banner h2.banner-title{font-size:var(--font-size-body-sm);font-weight:600;margin:0 0 4px;padding:0;border:0;}
+.banner-danger{border-color:rgb(var(--role-danger-border));background:rgb(var(--role-danger-muted));}
+.banner code{overflow-wrap:anywhere;}
+/* Definition rows: a label, then what it means (the risk report's deadlines). */
+.deadlines{margin:0;}
+.deadlines>div{display:flex;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid var(--line);}
+.deadlines>div:first-child{border-top:0;}
+.deadlines dt{min-width:7em;margin:0;}
+.deadlines dd{margin:0;}
+/* Legend under a table head, or a closing line of a box. */
+.legend{margin:0;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--text-muted);
+  font-size:var(--font-size-label);display:flex;flex-wrap:wrap;gap:4px 20px;}
+.legend span b{color:var(--text);font-weight:600;}
+.box>.legend:last-child{border-bottom:0;border-top:1px solid var(--line);}
+/* Tables */
+.table-scroll{overflow-x:auto;}
+.table-scroll::-webkit-scrollbar{height:10px;}
+.table-scroll::-webkit-scrollbar-thumb{background:rgb(var(--role-neutral-border));border-radius:6px;border:2px solid var(--surface);}
+.table-scroll::-webkit-scrollbar-track{background:var(--th-bg);}
+table{border-collapse:collapse;width:100%;font-size:var(--font-size-body-sm);}
+th{background:var(--th-bg);text-align:left;font-size:var(--font-size-label);font-weight:600;
+  color:var(--text-muted);padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:bottom;}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere;}
+tbody:last-child tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--th-bg);}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+td.num:first-child{color:var(--text-muted);}
+/* Short columns take their content width; the column marked grow takes the rest. */
+th.num,td.num,td.sev,td.id,td.req,td.dl,td.st{width:1%;}
+td.id{white-space:nowrap;font-variant-numeric:tabular-nums;overflow-wrap:normal;}
+td.sev,td.st,td.dl{white-space:nowrap;}
+td.req{white-space:nowrap;}
+td.ver{font-variant-numeric:tabular-nums;}
+td.fix{max-width:16ch;min-width:9ch;}
+td.grow{width:auto;}
+@media screen{td.pkgc{min-width:20ch;}}
+td.purl{font-family:var(--mono);font-size:var(--font-size-mono);}
+td.total{font-weight:600;}
+.nofix{color:var(--text-muted);}
+/* Each part of a package stays whole while it fits the cell, and wraps
+   anywhere only when one part alone is wider than the cell. */
+.pkg .pg,.pkg .pn,.pkg .pv{display:inline-block;max-width:100%;}
+.pkg .pn{font-weight:600;}
+.pkg .pg,.pkg .psep{color:var(--text-muted);}
+.pkg .pv{font-variant-numeric:tabular-nums;}
+tr.grp th{background:var(--surface);color:var(--text);font-size:var(--font-size-body-sm);
+  padding:10px 10px 6px;border-top:1px solid var(--line);}
+tr.grp th .counter{margin-left:6px;}
+tbody.met td{padding-top:3px;padding-bottom:3px;}
+code{font-family:var(--mono);font-size:var(--font-size-mono);}
+pre{background:var(--th-bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:8px 12px;overflow-x:auto;margin:8px 0;}
+pre code{white-space:pre;}
+ol,ul{margin:8px 0 0;padding-left:20px;}
+li{margin:4px 0;}
+.mono{list-style:none;padding-left:0;}
+.print-only{display:none;}
+/* One evidence item per line; a long one ends in an ellipsis, its text in title. */
+.ev{display:block;max-width:36ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* NOTICE */
+.rows .src{display:block;color:var(--text-muted);font-family:var(--font);font-size:var(--font-size-label);margin-top:2px;}
+.src a{word-break:break-all;}
+.rows .attr{display:block;color:var(--text-muted);font-family:var(--font);font-size:var(--font-size-label);margin-top:2px;}
+.unverified{color:rgb(var(--role-attention-fg));font-size:var(--font-size-label);margin:0;flex-basis:100%;}
+.texts .box pre{border:0;border-radius:0;margin:0;background:transparent;padding:12px 16px;
+  font-size:var(--font-size-mono);line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;}
+/* Conformance */
+details.fix,details.more{margin:6px 0 0;}
+details.fix summary,details.more summary{cursor:pointer;color:var(--link);font-size:var(--font-size-label);font-weight:600;}
+details.fix pre{margin:6px 0 2px;}
+details.fix pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
+details.fix .meta{font-size:var(--font-size-label);}
+@media screen and (max-width:767px){body{padding:0 16px 32px;}}
+/* Print: always light (the dark tokens apply to screens only), A4, no page
+   background, table headers repeat on every page, rows do not split, a table
+   box draws only its row lines (a box border would break at the page edge),
+   every cell may wrap, the text of a collapsed details is printed, and an
+   external link shows its address because paper cannot be clicked. */
+@page{size:A4;margin:16mm 14mm;}
+@media print{
+  body{max-width:none;margin:0;padding:0;background:#fff;font-size:10pt;line-height:1.45;}
+  .topbar{padding-top:0;}
+  .table-scroll{overflow:visible;}
+  .box{overflow:visible;break-inside:auto;border:0;border-radius:0;}
+  .box-head{padding:6px 0;border-bottom:1px solid var(--line);}
+  .rows>li,.legend,.deadlines>div{padding-left:0;padding-right:0;}
+  table{font-size:8.5pt;}
+  th,td{padding:3px 4px;}
+  /* Long values wrap; a label, an id, a number and a time stay on one line. */
+  th,td{white-space:normal;}
+  td.grow{min-width:0;}
+  td.fix{max-width:none;}
+  .pkg .pg{overflow-wrap:anywhere;}
+  .ev{max-width:none;white-space:normal;overflow:visible;overflow-wrap:anywhere;}
+  table .meta{font-size:8pt;}
+  pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
+  .box-head,th,tr.grp th{background:transparent;}
+  thead{display:table-header-group;}
+  tfoot{display:table-footer-group;}
+  tr,.banner,li,.box-head{break-inside:avoid;page-break-inside:avoid;}
+  h1,h2,h3,.box-head{break-after:avoid;page-break-after:avoid;}
+  tbody tr:hover td{background:transparent;}
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:var(--font-size-label);word-break:break-all;}
+  .src a::after,.topbar a::after,.rows.toc a::after{content:none;}
+  details.fix,details.more{display:none;}
+  .print-only{display:block;}
+}
+</style>
+</head><body>
+<header class="topbar"><span class="brand"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect width="48" height="48" rx="11" fill="#1d4ed8"/><g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="12"/><line x1="27.23" y1="19.28" x2="33.19" y2="31.71"/><line x1="29.7" y1="24.44" x2="21.92" y2="35.82"/><line x1="26.47" y1="29.16" x2="12.72" y2="28.1"/><line x1="20.77" y1="28.72" x2="14.81" y2="16.29"/><line x1="18.3" y1="23.56" x2="26.08" y2="12.18"/><line x1="21.53" y1="18.84" x2="35.28" y2="19.9"/></g></svg>BomLens</span><span class="sep" aria-hidden="true">/</span><span class="proj">SpringBootDemo <span class="ver">1.0.0</span></span></header>
+<div class="page-head">
+<h1>Security report</h1>
+<p class="desc"><span>SpringBootDemo <span class="ver">1.0.0</span></span><span>Application</span><span><time datetime="2026-11-15T13:42:47Z">2026-11-15 13:42 UTC</time></span><span>64 components</span><span>Engine: Trivy</span></p>
+</div>
+<div class="box"><div class="box-head"><h2 id="box-1">Findings</h2><span class="counter">96</span><span class="end">
+<span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">9</span></span>
+<span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">37</span></span>
+<span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">&#9679;</span>Medium <span class="count">36</span></span>
+<span class="lbl sev-LOW"><span class="mk" aria-hidden="true">&#9632;</span>Low <span class="count">14</span></span>
+<span class="lbl sev-UNKNOWN zero"><span class="mk" aria-hidden="true">&#8211;</span>Unknown <span class="count">0</span></span>
+<span class="lbl lbl-danger">KEV <span class="count">1</span></span>
+</span></div>
+<p class="legend"><span><b>KEV</b> CISA known-exploited</span><span><b>EPSS</b> exploit probability (FIRST.org)</span><span><b>Order</b> KEV first, then severity, then EPSS</span></p>
+<div class="table-scroll"><table aria-labelledby="box-1"><thead><tr><th>Severity</th><th>KEV</th><th class="num">CVSS</th><th class="num">EPSS</th><th>CVE</th><th>Package (installed)</th><th>Fixed</th><th>Title</th></tr></thead><tbody>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td><span class="kevbadge">KEV</span></td><td class="num">10</td><td class="num">0.999</td><td class="id">CVE-2025-24813</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.3</span>, <span class="v">10.1.35</span>, <span class="v">9.0.99</span></td><td class="grow">tomcat: Potential RCE and/<wbr>or information disclosure and/<wbr>or information corruption with partial PUT</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.8</td><td class="num">0.017</td><td class="id">CVE-2026-41293</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat-<wbr>coyote: Apache Tomcat: HTTP/<wbr>2 request headers not validated</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.8</td><td class="num">0.013</td><td class="id">CVE-2026-43512</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat-<wbr>coyote: Apache Tomcat: Authentication bypass via digest authentication</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.1</td><td class="num">0.012</td><td class="id">CVE-2026-43515</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat-<wbr>coyote: tomcat: Improper Authorization allows security bypass</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.8</td><td class="num">0.007</td><td class="id">CVE-2026-65905</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.25</span>, <span class="v">10.1.58</span>, <span class="v">9.0.121</span></td><td class="grow">tomcat: Apache Tomcat: Authentication bypass via limited replay attack in DIGEST authenticator</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.1</td><td class="num">0.006</td><td class="id">CVE-2026-65182</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.25</span>, <span class="v">10.1.58</span>, <span class="v">9.0.121</span></td><td class="grow">tomcat: Apache Tomcat: Security constraint bypass due to improper access control</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.1</td><td class="num">0.006</td><td class="id">CVE-2026-68525</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.25</span>, <span class="v">10.1.58</span>, <span class="v">9.0.121</span></td><td class="grow">tomcat: Apache Tomcat: Unauthorized resource access via FORM authentication bypass</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.1</td><td class="num">0.006</td><td class="id">CVE-2026-55276</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.23</span>, <span class="v">10.1.56</span>, <span class="v">9.0.119</span></td><td class="grow">tomcat: Apache Tomcat: Misleading security logs due to incorrect control flow</td></tr>
+<tr><td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">◆</span>Critical</span></td><td></td><td class="num">9.8</td><td class="num">0.006</td><td class="id">CVE-2026-47884</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.9</span></td><td class="grow">org.<wbr>springframework/<wbr>spring-<wbr>webmvc: Spring Framework: Remote Code Execution via improper path limitation in XsltView</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.644</td><td class="id">CVE-2025-55752</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.11</span>, <span class="v">10.1.45</span>, <span class="v">9.0.109</span></td><td class="grow">tomcat: org.<wbr>apache.<wbr>tomcat/<wbr>tomcat-<wbr>catalina: Apache Tomcat: Directory traversal via rewrite with possible RCE</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.564</td><td class="id">CVE-2024-38819</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.14</span></td><td class="grow">org.<wbr>springframework:spring-<wbr>webmvc: Path traversal vulnerability in functional web frameworks</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">9.8</td><td class="num">0.318</td><td class="id">CVE-2024-50379</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.2</span>, <span class="v">10.1.34</span>, <span class="v">9.0.98</span></td><td class="grow">tomcat: RCE due to TOCTOU issue in JSP compilation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.314</td><td class="id">CVE-2025-48988</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.8</span>, <span class="v">10.1.42</span>, <span class="v">9.0.106</span></td><td class="grow">tomcat: Apache Tomcat DoS in multipart upload</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.212</td><td class="id">CVE-2024-38816</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.13</span></td><td class="grow">spring-<wbr>webmvc: Path Traversal Vulnerability in Spring Applications Using RouterFunctions and FileSystemResource</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">9.8</td><td class="num">0.089</td><td class="id">CVE-2024-56337</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.2</span>, <span class="v">10.1.34</span>, <span class="v">9.0.98</span></td><td class="grow">tomcat: Incomplete fix for CVE-<wbr>2024-<wbr>50379 -<wbr> RCE due to TOCTOU issue in JSP compilation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.046</td><td class="id">CVE-2024-34750</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.0-M21</span>, <span class="v">10.1.25</span>, <span class="v">9.0.90</span></td><td class="grow">tomcat: Improper Handling of Exceptional Conditions</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.1</td><td class="num">0.039</td><td class="id">CVE-2024-22243</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.4</span>, <span class="v">6.0.17</span>, <span class="v">5.3.32</span></td><td class="grow">springframework: URL Parsing with Host Validation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.038</td><td class="id">CVE-2025-48989</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.10</span>, <span class="v">10.1.44</span>, <span class="v">9.0.108</span></td><td class="grow">tomcat: http/<wbr>2 &quot;MadeYouReset&quot; DoS attack through HTTP/<wbr>2 control frames</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.3</td><td class="num">0.028</td><td class="id">CVE-2026-55957</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.5</span>, <span class="v">10.1.37</span>, <span class="v">9.0.101</span></td><td class="grow">tomcat: Apache Tomcat: Authentication bypass via missing critical step in JNDIRealm GSSAPI configuration</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.1</td><td class="num">0.025</td><td class="id">CVE-2024-22259</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.5</span>, <span class="v">6.0.18</span>, <span class="v">5.3.33</span></td><td class="grow">springframework: URL Parsing with Host Validation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.021</td><td class="id">CVE-2025-52520</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.9</span>, <span class="v">10.1.43</span>, <span class="v">9.0.107</span></td><td class="grow">tomcat: Apache Tomcat denial of service</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.021</td><td class="id">CVE-2025-53506</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.107</span>, <span class="v">10.1.43</span>, <span class="v">11.0.9</span></td><td class="grow">tomcat: Apache Tomcat denial of service</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.6</td><td class="num">0.016</td><td class="id">CVE-2024-38286</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.0-M21</span>, <span class="v">10.1.25</span>, <span class="v">9.0.90</span></td><td class="grow">tomcat: Denial of Service in Tomcat</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.1</td><td class="num">0.012</td><td class="id">CVE-2026-54513</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.8</span>, <span class="v">2.21.4</span>, <span class="v">3.1.4</span></td><td class="grow">jackson-<wbr>databind: Jackson-<wbr>databind: Security bypass allows arbitrary code execution</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.1</td><td class="num">0.011</td><td class="id">CVE-2024-22262</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">5.3.34</span>, <span class="v">6.0.19</span>, <span class="v">6.1.6</span></td><td class="grow">springframework: URL Parsing with Host Validation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">8.1</td><td class="num">0.01</td><td class="id">CVE-2026-54512</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.8</span>, <span class="v">3.1.4</span>, <span class="v">2.21.4</span></td><td class="grow">jackson-<wbr>databind: jackson-<wbr>databind: Arbitrary code execution via PolymorphicTypeValidator bypass</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.009</td><td class="id">CVE-2023-6378</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-classic"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-classic</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.3.12</span>, <span class="v">1.4.12</span>, <span class="v">1.2.13</span></td><td class="grow">logback: serialization vulnerability in logback receiver</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.009</td><td class="id">CVE-2023-6378</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.3.12</span>, <span class="v">1.4.12</span>, <span class="v">1.2.13</span></td><td class="grow">logback: serialization vulnerability in logback receiver</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.008</td><td class="id">CVE-2026-41284</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat: Apache Tomcat: Denial of Service due to uncontrolled resource allocation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.007</td><td class="id">CVE-2026-24880</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.116</span>, <span class="v">10.1.52</span>, <span class="v">11.0.20</span></td><td class="grow">Apache Tomcat: Apache Tomcat: HTTP Request/<wbr>Response Smuggling via invalid chunk extension</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.3</td><td class="num">0.006</td><td class="id">CVE-2026-53404</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.23</span>, <span class="v">10.1.56</span>, <span class="v">9.0.119</span></td><td class="grow">Apache Tomcat: Apache Tomcat: Incorrect control flow in rewrite valve allows unexpected rule processing</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.3</td><td class="num">0.006</td><td class="id">CVE-2026-42498</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow"><span title="tomcat-coyote: Apache Tomcat: Information disclosure due to HTTP Authentication Header exposure during WebSocket authentication.">tomcat-<wbr>coyote: Apache Tomcat: Information disclosure due to HTTP Authentication Header exposure during WebSocket authent…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.006</td><td class="id">CVE-2026-68497</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.10</span>, <span class="v">2.21.6</span>, <span class="v">2.22.2</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: jackson-databind: CPU Denial of Service via unbounded numeric parsing">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: jackson-<wbr>databind: CPU Denial of Servic…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.006</td><td class="id">CVE-2026-89425</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-core"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-core</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.21.7</span>, <span class="v">2.22.3</span>, <span class="v">2.18.11</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-core: Jackson-core: Denial of Service via unbounded StringBuilder growth during malformed token processing">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>core: Jackson-<wbr>core: Denial of Service via unbounded StringBuilder growth during malfo…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.005</td><td class="id">CVE-2026-24734</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.18</span>, <span class="v">10.1.52</span>, <span class="v">9.0.115</span></td><td class="grow">tomcat: Apache Tomcat: Certificate revocation bypass due to improper OCSP response validation</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.005</td><td class="id">CVE-2026-91776</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.11</span>, <span class="v">2.21.7</span>, <span class="v">2.22.3</span></td><td class="grow"><span title="jackson-databind: com.fasterxml.jackson/jackson-core: jackson-databind: Denial of Service via unbounded cache growth in TypeDeserializerBase">jackson-<wbr>databind: com.<wbr>fasterxml.<wbr>jackson/<wbr>jackson-<wbr>core: jackson-<wbr>databind: Denial of Service via unbounded cache growth in …</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.005</td><td class="id">CVE-2026-91777</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.21.7</span>, <span class="v">2.18.11</span>, <span class="v">2.22.3</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: tools.jackson.core:jackson-databind: Jackson-databind: Denial of Service via quadratic forward-reference completion">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: tools.<wbr>jackson.<wbr>core:jackson-<wbr>databind: Jackson-<wbr>databind: Denial of Service vi…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.005</td><td class="id">CVE-2026-43513</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat-<wbr>catalina: Apache Tomcat: Improper Handling of Case Sensitivity in LockOutRealm</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2025-41249</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-core"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-core</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.2.11</span></td><td class="grow">org.<wbr>springframework/<wbr>spring-<wbr>core: Spring Framework Annotation Detection Vulnerability</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-34483</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.116</span>, <span class="v">10.1.54</span>, <span class="v">11.0.21</span></td><td class="grow">Apache Tomcat: Apache Tomcat: Information disclosure due to improper encoding in JsonAccessLogValve</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-68494</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-core"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-core</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.8</span>, <span class="v">2.21.4</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-core: tools.jackson.core/jackson-core: jackson-core: Denial of Service via incomplete fix in async JSON parser">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>core: tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>core: jackson-<wbr>core: Denial of Service via incomplete…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-34487</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.117</span>, <span class="v">10.1.54</span>, <span class="v">11.0.21</span></td><td class="grow">Apache Tomcat: Apache Tomcat: Information disclosure via sensitive data in log files</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.3</td><td class="num">0.004</td><td class="id">CVE-2025-22235</td><td class="pkgc"><span class="pkg" title="org.springframework.boot:spring-boot"><span class="pg">org.<wbr>springframework.<wbr>boot</span><span class="psep"> / </span><span class="pn">spring-boot</span> <span class="pv">3.2.0</span></span></td><td class="fix"><span class="v">3.3.11</span>, <span class="v">3.4.5</span></td><td class="grow"><span title="org.springframework.boot/spring-boot: Spring Boot EndpointRequest.to() creates wrong matcher if actuator endpoint is not exposed">org.<wbr>springframework.<wbr>boot/<wbr>spring-<wbr>boot: Spring Boot EndpointRequest.<wbr>to() creates wrong matcher if actuator endpoint is not…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41842</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">spring-<wbr>framework: Spring Framework: Denial of Service when resolving static resources</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41850</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-expression"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-expression</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">spring-<wbr>framework: Spring Framework: Denial of Service via specially crafted SpEL expressions</td></tr>
+<tr><td class="sev"><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">▲</span>High</span></td><td></td><td class="num">7.1</td><td class="num">0.001</td><td class="id">CVE-2026-41845</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">org.<wbr>springframework: Spring Framework: Cross-<wbr>site scripting (XSS) via incorrect JavaScript escaping</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">7.5</td><td class="num">0.613</td><td class="id">CVE-2025-31650</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.104</span>, <span class="v">10.1.40</span>, <span class="v">11.0.6</span></td><td class="grow">tomcat: Apache Tomcat: DoS via malformed HTTP/<wbr>2 PRIORITY_UPDATE frame</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">7.5</td><td class="num">0.23</td><td class="id">CVE-2024-24549</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">8.5.99</span>, <span class="v">9.0.86</span>, <span class="v">10.1.19</span>, <span class="v">11.0.0-M17</span></td><td class="grow">Tomcat: HTTP/<wbr>2 header handling DoS</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">7.5</td><td class="num">0.026</td><td class="id">CVE-2025-49125</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.8</span>, <span class="v">10.1.42</span>, <span class="v">9.0.106</span></td><td class="grow">tomcat: Apache Tomcat: Security constraint bypass for pre/<wbr>post-<wbr>resources</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.026</td><td class="id">CVE-2025-48924</td><td class="pkgc"><span class="pkg" title="org.apache.commons:commons-lang3"><span class="pg">org.<wbr>apache.<wbr>commons</span><span class="psep"> / </span><span class="pn">commons-lang3</span> <span class="pv">3.14.0</span></span></td><td class="fix"><span class="v">3.18.0</span></td><td class="grow">commons-<wbr>lang/<wbr>commons-<wbr>lang: org.<wbr>apache.<wbr>commons/<wbr>commons-<wbr>lang3: Uncontrolled Recursion vulnerability in Apache Commons Lang</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">7.5</td><td class="num">0.023</td><td class="id">CVE-2024-23672</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-websocket"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-websocket</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.0-M17</span>, <span class="v">10.1.19</span>, <span class="v">9.0.86</span>, <span class="v">8.5.99</span></td><td class="grow">Tomcat: WebSocket DoS with incomplete closing handshake</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.022</td><td class="id">CVE-2025-41242</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.2.10</span></td><td class="grow">org.<wbr>springframework/<wbr>spring-<wbr>webmvc: Spring Framework MVC path traversal vulnerability</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.009</td><td class="id">CVE-2025-55668</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.8</span>, <span class="v">10.1.42</span>, <span class="v">9.0.106</span></td><td class="grow">org.<wbr>apache.<wbr>tomcat/<wbr>tomcat-<wbr>catalina: tomcat: Apache Tomcat: session fixation via rewrite valve</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.008</td><td class="id">CVE-2024-38809</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">5.3.38</span>, <span class="v">6.0.23</span>, <span class="v">6.1.12</span></td><td class="grow">org.<wbr>springframework:spring-<wbr>web: Spring Framework DoS via conditional HTTP request</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.6</td><td class="num">0.007</td><td class="id">CVE-2026-83557</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.10</span>, <span class="v">2.21.6</span>, <span class="v">2.22.2</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: jackson-databind: Path traversal via incomplete type validation">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: jackson-<wbr>databind: Path traversal via i…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.006</td><td class="id">CVE-2026-55956</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.23</span>, <span class="v">10.1.56</span>, <span class="v">9.0.119</span></td><td class="grow">tomcat: Apache Tomcat: Improper Authorization Allows Security Constraint Bypass</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.006</td><td class="id">CVE-2024-38820</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-context"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-context</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.14</span></td><td class="grow">The fix for CVE-<wbr>2022-<wbr>22968 made disallowedFieldspatterns in DataBinder .<wbr>.<wbr>.<wbr></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.006</td><td class="id">CVE-2024-38820</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.1.14</span></td><td class="grow">The fix for CVE-<wbr>2022-<wbr>22968 made disallowedFieldspatterns in DataBinder .<wbr>.<wbr>.<wbr></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.006</td><td class="id">CVE-2025-41234</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-web"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-web</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.2.8</span>, <span class="v">6.1.21</span></td><td class="grow">springframework: Reflected download attack in Spring Framework with non-<wbr>ASCII headers</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.005</td><td class="id">CVE-2026-49844</td><td class="pkgc"><span class="pkg" title="org.apache.logging.log4j:log4j-api"><span class="pg">org.<wbr>apache.<wbr>logging.<wbr>log4j</span><span class="psep"> / </span><span class="pn">log4j-api</span> <span class="pv">2.21.1</span></span></td><td class="fix"><span class="v">2.25.5</span>, <span class="v">2.26.1</span></td><td class="grow"><span title="org.apache.logging.log4j/log4j-api: Apache Log4j API: Malformed JSON output due to improper encoding of floating-point values">org.<wbr>apache.<wbr>logging.<wbr>log4j/<wbr>log4j-<wbr>api: Apache Log4j API: Malformed JSON output due to improper encoding of floating-<wbr>point v…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.1</td><td class="num">0.005</td><td class="id">CVE-2026-25854</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.116</span>, <span class="v">10.1.53</span>, <span class="v">11.0.20</span></td><td class="grow">Apache Tomcat: Apache Tomcat: Open Redirect vulnerability via LoadBalancerDrainingValve</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.005</td><td class="id">CVE-2026-19032</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.10</span>, <span class="v">2.21.6</span>, <span class="v">2.22.2</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: Jackson-databind: Uncontrolled URI scheme resolution in Path deserialization">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: Jackson-<wbr>databind: Uncontrolled URI sch…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.5</td><td class="num">0.004</td><td class="id">CVE-2024-12798</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.13</span>, <span class="v">1.3.15</span></td><td class="grow">logback-<wbr>core: arbitrary code execution via JaninoEventEvaluator</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.004</td><td class="id">CVE-2026-22737</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.6</span>, <span class="v">6.2.17</span></td><td class="grow">Spring Framework: Spring Framework: Information disclosure via Java scripting engine enabled template views</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.004</td><td class="id">CVE-2026-59888</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.8</span>, <span class="v">2.21.4</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: jackson-databind: @JsonIgnore bypass in Java Records">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: jackson-<wbr>databind: @JsonIgnore bypass i…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.004</td><td class="id">CVE-2026-18401</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-core"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-core</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.21.1</span>, <span class="v">2.18.6</span></td><td class="grow"><span title="tools.jackson.core/jackson-core: com.fasterxml.jackson.core/jackson-core: jackson-core: Denial of Service due to number length bypass in asynchronous JSON parser">tools.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>core: com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>core: jackson-<wbr>core: Denial of Service due to number …</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41851</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-expression"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-expression</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">Spring Framework: Spring Framework: Denial of Service via unbounded cache growth in SpEL evaluation</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">8.4</td><td class="num">0.003</td><td class="id">CVE-2025-49124</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.8</span>, <span class="v">10.1.42</span>, <span class="v">9.0.106</span></td><td class="grow">Apache Tomcat installer for Windows has an untrusted search path vulnerability</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-54515</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">3.1.4</span>, <span class="v">2.18.9</span>, <span class="v">2.21.5</span>, <span class="v">2.22.1</span></td><td class="grow">jackson-<wbr>databind: jackson-<wbr>databind: Ignored properties can be unexpectedly modified</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41843</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">spring-<wbr>webflux: spring-<wbr>webmvc: Spring Framework: Information Disclosure via Path Traversal</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-54514</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.8</span>, <span class="v">2.21.4</span></td><td class="grow">jackson-<wbr>databind: jackson-<wbr>databind: Information Disclosure via Eager DNS Resolution</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.5</td><td class="num">0.003</td><td class="id">CVE-2026-59889</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.21.5</span>, <span class="v">2.18.9</span>, <span class="v">2.22.1</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: Jackson-databind: Privilege escalation via improper handling of @JsonUnwrapped properties">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: Jackson-<wbr>databind: Privilege escalation via improper handling of @JsonUnwrap…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-22745</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.7</span>, <span class="v">6.2.18</span></td><td class="grow">spring-<wbr>webflux: Spring MVC and Spring WebFlux: Denial of Service via slow static resource resolution on Windows</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41841</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">Spring Framework: Spring MVC and WebFlux applications: Information Disclosure via static resource resolution</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41721</td><td class="pkgc"><span class="pkg" title="org.springframework.data:spring-data-commons"><span class="pg">org.<wbr>springframework.<wbr>data</span><span class="psep"> / </span><span class="pn">spring-data-commons</span> <span class="pv">3.2.0</span></span></td><td class="fix"><span class="v">4.0.6</span>, <span class="v">3.5.12</span></td><td class="grow">Spring Data Commons: Spring Data Commons: Denial of Service via specially crafted HTTP request with @ProjectedPayload</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-77310</td><td class="pkgc"><span class="pkg" title="com.fasterxml.jackson.core:jackson-databind"><span class="pg">com.<wbr>fasterxml.<wbr>jackson.<wbr>core</span><span class="psep"> / </span><span class="pn">jackson-databind</span> <span class="pv">2.16.0</span></span></td><td class="fix"><span class="v">2.18.9</span>, <span class="v">2.21.5</span>, <span class="v">2.22.1</span></td><td class="grow"><span title="com.fasterxml.jackson.core/jackson-databind: jackson-databind: Server-Side Request Forgery and internal host enumeration via eager DNS resolution">com.<wbr>fasterxml.<wbr>jackson.<wbr>core/<wbr>jackson-<wbr>databind: jackson-<wbr>databind: Server-<wbr>Side Request Forgery and internal host enumeration…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41711</td><td class="pkgc"><span class="pkg" title="org.springframework.data:spring-data-commons"><span class="pg">org.<wbr>springframework.<wbr>data</span><span class="psep"> / </span><span class="pn">spring-data-commons</span> <span class="pv">3.2.0</span></span></td><td class="fix"><span class="v">4.0.6</span>, <span class="v">3.5.12</span></td><td class="grow">Spring Data Commons: Spring Data Commons: Denial of Service via parsing Sort parameters</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">9.1</td><td class="num">0.002</td><td class="id">CVE-2025-66614</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.15</span>, <span class="v">10.1.50</span>, <span class="v">9.0.113</span></td><td class="grow">tomcat: Client certificate verification bypass due to virtual host mapping</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.4</td><td class="num">0.001</td><td class="id">CVE-2025-11226</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.19</span>, <span class="v">1.3.16</span></td><td class="grow">ch.<wbr>qos.<wbr>logback/<wbr>logback-<wbr>core: Conditional abitrary code execution in logback-<wbr>core</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">5.3</td><td class="num">0.001</td><td class="id">CVE-2026-41853</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">Spring Framework: Spring Framework: Request smuggling vulnerability in Spring MVC and WebFlux</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.8</td><td class="num">0.001</td><td class="id">CVE-2026-41846</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">Spring Framework: Spring Framework: Cross-<wbr>site scripting (XSS) via user-<wbr>supplied values in JSP form tags</td></tr>
+<tr><td class="sev"><span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">●</span>Medium</span></td><td></td><td class="num">6.1</td><td class="num">0.001</td><td class="id">CVE-2026-41844</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">Spring Framework: Spring Framework: Open Redirect via crafted link</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">9.7</td><td class="num">0.103</td><td class="id">CVE-2025-55754</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.11</span>, <span class="v">10.1.45</span>, <span class="v">9.0.109</span></td><td class="grow">org.<wbr>apache.<wbr>tomcat/<wbr>tomcat-<wbr>juli: tomcat: Apache Tomcat: console manipulation</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">9.8</td><td class="num">0.042</td><td class="id">CVE-2025-31651</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.104</span>, <span class="v">10.1.40</span>, <span class="v">11.0.6</span></td><td class="grow">tomcat: Apache Tomcat: Bypass of rules in Rewrite Valve</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">7.3</td><td class="num">0.031</td><td class="id">CVE-2025-46701</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.105</span>, <span class="v">10.1.41</span>, <span class="v">11.0.7</span></td><td class="grow">tomcat: Apache Tomcat: Security constraint bypass for CGI scripts</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">5.3</td><td class="num">0.012</td><td class="id">CVE-2025-61795</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">11.0.12</span>, <span class="v">10.1.47</span>, <span class="v">9.0.110</span></td><td class="grow">tomcat: org.<wbr>apache.<wbr>tomcat/<wbr>tomcat-<wbr>catalina: Apache Tomcat: Denial of service</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">3.1</td><td class="num">0.004</td><td class="id">CVE-2025-22233</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-context"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-context</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">6.2.7</span>, <span class="v">6.1.20</span></td><td class="grow">CVE-<wbr>2024-<wbr>38820 ensured Locale-<wbr>independent, lowercase conversion for bo .<wbr>.<wbr>.<wbr></td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num"></td><td class="num">0.003</td><td class="id">CVE-2026-10532</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.34</span></td><td class="grow">Deserialization of untrusted data vulnerability in QOS.<wbr>CH Sarl logback .<wbr>.<wbr>.<wbr></td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num"></td><td class="num">0.003</td><td class="id">CVE-2026-9828</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.33</span></td><td class="grow">Deserialization of untrusted data vulnerability in QOS.<wbr>CH Sarl logback .<wbr>.<wbr>.<wbr></td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">3.7</td><td class="num">0.003</td><td class="id">CVE-2026-43514</td><td class="pkgc"><span class="pkg" title="org.apache.tomcat.embed:tomcat-embed-core"><span class="pg">org.<wbr>apache.<wbr>tomcat.<wbr>embed</span><span class="psep"> / </span><span class="pn">tomcat-embed-core</span> <span class="pv">10.1.16</span></span></td><td class="fix"><span class="v">9.0.118</span>, <span class="v">10.1.55</span>, <span class="v">11.0.22</span></td><td class="grow">tomcat: Apache Tomcat: Information disclosure via AJP secret timing discrepancy</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41848</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-core"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-core</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow">spring-<wbr>framework: Spring Framework: Regular Expression Denial of Service in AntPathMatcher</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">5.9</td><td class="num">0.002</td><td class="id">CVE-2026-22741</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.7</span>, <span class="v">6.2.18</span></td><td class="grow">Spring MVC: Spring WebFlux: Spring MVC and Spring WebFlux: Denial of Service via cache poisoning</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">3.3</td><td class="num">0.002</td><td class="id">CVE-2024-12801</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.13</span>, <span class="v">1.3.15</span></td><td class="grow">logback-<wbr>core: SaxEventRecorder vulnerable to Server-<wbr>Side Request Forgery (SSRF) attacks</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">5.3</td><td class="num">0.001</td><td class="id">CVE-2026-41852</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-expression"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-expression</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.8</span>, <span class="v">6.2.19</span></td><td class="grow"><span title="spring-framework: org.springframework/spring-expression: Spring Framework: SpEL vulnerability allows unintended application logic invocation">spring-<wbr>framework: org.<wbr>springframework/<wbr>spring-<wbr>expression: Spring Framework: SpEL vulnerability allows unintended applicat…</span></td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">5</td><td class="num">0.001</td><td class="id">CVE-2026-1225</td><td class="pkgc"><span class="pkg" title="ch.qos.logback:logback-core"><span class="pg">ch.<wbr>qos.<wbr>logback</span><span class="psep"> / </span><span class="pn">logback-core</span> <span class="pv">1.4.11</span></span></td><td class="fix"><span class="v">1.5.25</span></td><td class="grow">ch.<wbr>qos.<wbr>logback/<wbr>logback-<wbr>core: Malicious logback.<wbr>xml configuration file allows instantiation of arbitrary classes</td></tr>
+<tr><td class="sev"><span class="lbl sev-LOW"><span class="mk" aria-hidden="true">■</span>Low</span></td><td></td><td class="num">2.6</td><td class="num">0.001</td><td class="id">CVE-2026-22735</td><td class="pkgc"><span class="pkg" title="org.springframework:spring-webmvc"><span class="pg">org.<wbr>springframework</span><span class="psep"> / </span><span class="pn">spring-webmvc</span> <span class="pv">6.1.1</span></span></td><td class="fix"><span class="v">7.0.6</span>, <span class="v">6.2.17</span></td><td class="grow"><span title="org.springframework/spring-webmvc: org.springframework/spring-webflux: Spring MVC and WebFlux: Stream corruption vulnerability when using Server-Sent Events">org.<wbr>springframework/<wbr>spring-<wbr>webmvc: org.<wbr>springframework/<wbr>spring-<wbr>webflux: Spring MVC and WebFlux: Stream corruption vulnera…</span></td></tr>
+</tbody></table></div>
+</div>
+</body></html>
