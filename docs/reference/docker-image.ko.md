@@ -221,7 +221,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `TRUSCA_REF` | — | `main` | ingest ref 라벨 |
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | ingest release 라벨 |
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
-| `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
+| `BOMLENS_NODE_FULL_GRAPH` | - | - | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지. `BOMLENS_INCLUDE_DEV_DEPENDENCIES` 중 Node.js 부분에 해당하며, 그 변수는 Node.js에서 같은 일을 하고 다른 생태계의 개발 의존성도 그대로 둠 |
 | `BOMLENS_NODE_INSTALLED_LOCK` | - | 켜짐 | Node.js 소스 스캔: `false`(또는 `0`)로 두면 npm이나 pnpm이 설치할 때 써 둔 lock 파일(`node_modules/.package-lock.json`, `node_modules/.pnpm/lock.yaml`)을 읽지 않음. 그 밖에는 `package.json`이 있고 그 폴더와 상위 폴더에 커밋한 lock 파일이 없는 폴더를 이 lock으로 스캔하며, lock 파일은 스캔하는 동안만 두었다가 지움([Node.js](ecosystems.ko.md#nodejs)) |
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
 | `BOMLENS_GRADLE_FULL_GRAPH` | - | - | Java Gradle 소스 스캔: `1`로 설정하면 각 프로젝트의 런타임 클래스패스로 거르지 않고 테스트와 compileOnly 의존성까지 포함한 전체 그래프를 유지. 필터용 Gradle 실행은 루트만 해석하던 기존 준비 실행과 달리 모든 프로젝트를 해석하므로, 하위 프로젝트가 많은 빌드에서는 이 단계가 더 오래 걸림 |
@@ -230,7 +230,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_GRADLE_USER_CACHE` | - | 켜짐 | Gradle 소스 스캔: `false`(또는 `0`)로 두면 `/bomlens-user-cache/gradle`과 `/bomlens-user-cache/gradle-wrapper`에 붙인 사용자의 Gradle 캐시와 래퍼 배포본을 쓰지 않음. 그 밖에는 캐시를 Gradle의 읽기 전용 의존성 캐시(`GRADLE_RO_DEP_CACHE`)로 쓰고, 빌드의 저장소가 하나도 응답하지 않을 때만 Gradle을 `--offline`으로 실행함([Java (Gradle)](ecosystems.ko.md#java-gradle)) |
 | `BOMLENS_PYTHON_VENV` | - | 켜짐 | Python 소스 스캔: `false`(또는 `0`)로 두면 프로젝트에 설치된 가상 환경을 읽지 않음. 그 밖에는 소스에 `.venv/`, `venv/`, 또는 `pyvenv.cfg`가 든 다른 최상위 폴더 하나가 있고 pip이 쓸 패키지 저장소가 짧은 확인 요청에 응답하지 않거나 `pip install`이 실패하면, SBOM의 Python 부분을 그 환경의 `*.dist-info` 메타데이터에서 읽기 전용으로 가져오고 SBOM에 `bomlens:python-environment`를 기록함. 어느 쪽이든 환경 폴더는 cdxgen의 탐색, syft 폴백, 정적 읽기에서 빠짐([Python](ecosystems.ko.md#python)) |
 | `BOMLENS_BUILD_TOOL` | - | `auto` | 최상위 폴더에 `pom.xml`과 `build.gradle`이 함께 있는 Java 소스 스캔. `maven` 또는 `gradle`이면 그 도구의 파일만 읽고, `auto`는 Gradle을 유지한다. CLI에서는 `--build-tool`로 지정한다 |
-| `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP(Composer) 소스 스캔: `1`로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지 |
+| `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP(Composer) 소스 스캔: `1`로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지. `BOMLENS_INCLUDE_DEV_DEPENDENCIES` 중 PHP 부분에 해당 |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | 소스 스캔: `1`로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌 |
 | `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |
 | `BOMLENS_LICENSE_PROBE_TIMEOUT` | - | `6` | `FETCH_LICENSE`가 켜진 소스 스캔: cdxgen 실행 전에 발견한 생태계의 패키지 저장소마다 요청 한 번에 응답을 기다리는 시간(초). 응답하지 않는 저장소가 있으면 그 스캔의 라이선스 조회를 끄고 SBOM에 `bomlens:pipeline-step-failed` `license-fetch`로 기록함. 이때 라이선스는 lock 파일과 패키지 메타데이터에서 가져오며, 빠진 의존성은 없고 완전성 판정에도 반영하지 않음(CLI는 `[INFO]` 한 줄, 웹 UI는 안내 메모로 알림) |
@@ -238,7 +238,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_CANCEL_GRACE` | — | `30` | 스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 `--ui`에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다 |
 | `BOMLENS_REATTACH_GRACE` | - | `30` | 웹 UI: 어느 브라우저 탭에도 열려 있지 않은 스캔을 취소하기 전까지 계속 실행하는 시간(초, 0~600). 그동안 새로 고친 탭이나 다른 탭에서 다시 열 수 있음. 컨테이너 안의 웹 UI 서버가 읽음 |
 | `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | 소스 스캔: `1`로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트, `.github/workflows`의 GitHub Actions 워크플로, `gradle/wrapper`의 Gradle 래퍼를 포함 |
-| `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨 |
+| `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 의존성을 모든 생태계에서 그대로 둠. 대상은 npm `devDependencies`와 그것만 필요로 하는 것(`BOMLENS_NODE_FULL_GRAPH=1`처럼 production 필터를 적용하지 않음), cdxgen이 개발 전용으로 표시한 컴포넌트(npm, pnpm, yarn, bun, uv와 Poetry 의존성 그룹, Cargo, sbt, Crystal, Gleam), 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem, Composer `require-dev`(`BOMLENS_PHP_FULL_GRAPH=1`과 같음), 설치된 Python 가상 환경에서 읽는 Poetry 의존성 그룹임. 개발 전용 표시 필터가 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨. Maven, Gradle, Android 범위 필터는 개발 의존성 말고도 빼는 것이 있어 각자의 스위치(`BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_GRADLE_FULL_GRAPH`, `BOMLENS_ANDROID_FULL_GRAPH`)를 따름 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
 | `BOMLENS_NO_AI_USAGE` | - | - | 소스 스캔: `1`로 설정하면 코드가 쓰는 AI(모델, AI 서비스, MCP 서버, 에이전트 지침 파일)를 기록하는 단계를 건너뜀([소스 스캔의 AI 사용 기록](../guides/ai-model.ko.md#소스-스캔의-ai-사용-기록) 참고) |

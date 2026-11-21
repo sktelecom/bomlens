@@ -148,7 +148,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 
 `SBOM_SCANNER_IMAGE`를 digest로만 지정하면 opt-in 이미지는 CLI와 웹 UI에서 `:latest`를, 데스크톱 앱에서 앱 버전 태그를 씁니다. opt-in 이미지도 고정하려면 각 `SBOM_*_IMAGE`를 지정하세요.
 
-`BOMLENS_MAVEN_FULL_GRAPH` 같은 소스 스캔 의존성 해석 옵션은 [Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)에 정리돼 있습니다. `scan-sbom.sh`를 실행하는 셸에서 설정하면 같은 방식으로 의존성 해석에 적용됩니다.
+`BOMLENS_MAVEN_FULL_GRAPH` 같은 소스 스캔 의존성 해석 옵션은 [Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)에 정리돼 있습니다. `scan-sbom.sh`를 실행하는 셸에서 설정하면 같은 방식으로 의존성 해석에 적용됩니다. 개발 의존성을 목록에 넣으려면 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`을 설정하세요. 모든 생태계에 적용되므로 `BOMLENS_NODE_FULL_GRAPH`와 `BOMLENS_PHP_FULL_GRAPH`는 한 생태계의 개발 의존성만 넣고 다른 생태계의 것은 뺄 때만 필요합니다.
 
 Windows에서는 명령 프롬프트에서 설정한 환경변수가 더블클릭 실행에는 적용되지 않습니다.
 그래서 런처는 `UI_PORT`, `SBOM_LANG`, `SBOM_PULL`, `SBOM_IMAGE_TAR`, `SBOM_SCANNER_IMAGE`,
