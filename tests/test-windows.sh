@@ -267,7 +267,10 @@ case "${1:-}" in
       # records as failed (bomlens:pipeline-step-failed), space-separated.
       failed_props=""
       case "$*" in *build-prep*)
-        for st in ${DOCKER_STUB_STAGE1_FAILED:-}; do failed_props="$failed_props,{\"name\":\"bomlens:pipeline-step-failed\",\"value\":\"$st\"}"; done ;;
+        for st in ${DOCKER_STUB_STAGE1_FAILED:-}; do failed_props="$failed_props,{\"name\":\"bomlens:pipeline-step-failed\",\"value\":\"$st\"}"; done
+        # DOCKER_STUB_STAGE1_APPLIED: the steps it records as applied
+        # (bomlens:prep-step-applied), space-separated.
+        for st in ${DOCKER_STUB_STAGE1_APPLIED:-}; do failed_props="$failed_props,{\"name\":\"bomlens:prep-step-applied\",\"value\":\"$st\"}"; done ;;
       esac
       [ -n "$keep" ] || printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"},"properties":[{"name":"stub","value":"stage1-from=%s"}%s]},"components":[]}\n' \
         "$pn" "$pv" "$from" "$failed_props" > "$dest/${spn}_${spv}_bom.json"
@@ -872,6 +875,17 @@ DOCKER_STUB_STAGE1_FAILED="pip-install license-fetch" scan_in "$d" --project Lfe
     && in_out "[INFO] The registry license lookup was skipped"; } \
   && pass "license-fetch beside pip-install: the warning names pip-install only, and the [INFO] line follows" \
   || { fail "license-fetch beside pip-install is reported wrongly" "rc=$RC"; show; }
+# An offline npm install that found every dependency in npm's cache: one [INFO]
+# line saying where the versions came from, and no warning.
+DOCKER_STUB_STAGE1_APPLIED="npm-offline-cache" scan_in "$d" --project Ncache --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[INFO] The npm registry did not answer, so the dependencies were resolved from BomLens's npm cache" \
+    && ! in_out "may lack dependencies"; } \
+  && pass "npm-offline-cache: one [INFO] line says the versions came from the npm cache" \
+  || { fail "npm-offline-cache is not reported" "rc=$RC"; show; }
+scan_in "$d" --project Ncache --version 1.0.0 --generate-only
+! in_out "resolved from BomLens's npm cache" \
+  && pass "no npm-offline-cache: no npm cache line" \
+  || { fail "the npm cache line is printed without npm-offline-cache"; show; }
 
 # Fail-closed on an empty host mount, in the DEFAULT (non --generate-only) path.
 # Regression: the "did the artifact reach the host?" guard used to run ONLY under

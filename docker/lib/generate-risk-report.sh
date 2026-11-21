@@ -112,9 +112,16 @@ fi
 # The source stated version ranges and shipped no lock file (detect-version-pinning.sh),
 # so the SBOM lists what a fresh install resolves at scan time. The severity table is
 # then a statement about those versions, which may not be the ones that were run.
+# Not when build-prep.sh read the versions from what is installed: an installed
+# Python environment (bomlens:python-environment) or the lock file npm or pnpm
+# wrote at install at the scan root (bomlens:node-lock-source).
 UNPINNED=0
-if [ -f "${OUT_PREFIX}_bom.json" ] && jq -e '[.metadata.component.properties[]?
-        | select(.name == "bomlens:source:versionPinning" and .value == "unpinned")] | length > 0' \
+if [ -f "${OUT_PREFIX}_bom.json" ] && jq -e '([.metadata.component.properties[]?
+        | select(.name == "bomlens:source:versionPinning" and .value == "unpinned")] | length > 0)
+        and ([.metadata.properties[]? | select(.name == "bomlens:python-environment"
+              or (.name == "bomlens:node-lock-source"
+                  and (.value == "node_modules/.package-lock.json" or .value == "node_modules/.pnpm/lock.yaml")))]
+             | length == 0)' \
         "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
     UNPINNED=1
 fi

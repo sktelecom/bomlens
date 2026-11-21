@@ -183,6 +183,8 @@
     "zeroComponentsTitle": "No components were found",
     "zeroComponentsBody": "This is a warning, not a clean result. A scan finds nothing when it has nothing to read: no dependency manifest at the top of the folder (requirements.txt, package.json, pom.xml and the like), or a scan path that points somewhere else. Check the manifest and the path, then scan again.",
     "zeroComponentsBodyDegraded": "This is a warning, not a clean result. A scan finds nothing when it has nothing to read: no dependency manifest at the top of the folder (requirements.txt, package.json, pom.xml and the like), or a scan path that points somewhere else. Check the manifest and the path, then scan again. The transitive-dependency analyzer (cdxgen) also couldn't run, so even direct dependencies could not be resolved this time.",
+    "npmCacheTitle": "Versions came from the npm cache",
+    "npmCacheBody": "This project ships no lock file and the npm registry did not answer, so the dependencies were resolved from BomLens's npm cache. The versions listed here are the newest cached ones that package.json allows, which may not be the newest releases or what is installed on your machine. To list the versions you use, commit the lock file, or scan again when the registry can be reached.",
     "unpinnedTitle": "Versions were resolved at scan time",
     "unpinnedBody": "This project states version ranges and ships no lock file, so the versions listed here are what a fresh install would fetch today (not necessarily what is installed on your machine). The vulnerability result was measured against these versions. To see the risk in your own environment, scan a manifest that pins exact versions.",
     "scanWarningsTitle": "The scan reported these while it ran",
@@ -1024,6 +1026,10 @@
         "title": "Versions may differ from what you installed",
         "short": "Versions are what a fresh install would get today."
       },
+      "npmCache": {
+        "title": "Versions came from the npm cache",
+        "short": "The npm registry did not answer, so versions are the newest cached ones."
+      },
       "firmware": {
         "title": "Part of the image is not in the counts",
         "short": "Part of the image could not be opened, so counts cover the opened part."
@@ -1082,6 +1088,7 @@
     "pnpmInstalledLock": "pnpm lock file written at install",
     "npmRegistryTlsTrust": "npm registry (certificate not trusted)",
     "npmRegistryNetwork": "npm registry (not reachable)",
+    "npmOfflineCache": "npm dependencies resolved from the cache",
     "pipInstall": "Python dependency installation",
     "poetryGraph": "Poetry dependency graph",
     "cargoWorkspaceMetadata": "Cargo workspace member detection",

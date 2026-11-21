@@ -410,16 +410,19 @@ _un="$WORK/unmark.sh"
 {
     printf '%s\n' 'log() { echo "[build-prep] $*"; }'
     sed -n '/^unmark_prep_failed() {$/,/^}$/p' "$PREP"
+    sed -n '/^mark_prep_applied() {$/,/^}$/p' "$PREP"
     sed -n '/^# The node registry probe found the registry down/,/^fi$/p' "$PREP"
     # shellcheck disable=SC2016
-    printf '%s\n' 'echo "FAILED:$PREP_FAILED"'
+    printf '%s\n' 'echo "FAILED:$PREP_FAILED"' 'echo "APPLIED:$PREP_APPLIED"'
 } > "$_un"
 p="$WORK/cached"; mkdir -p "$p"
-o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" sh "$_un") 2>&1)
+o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" PREP_APPLIED="npm-production-set" sh "$_un") 2>&1)
 check "no lock file written: npm-registry:network stays" "$(line "$o" FAILED)" "npm-registry:network npm-production-set"
+check "no lock file written: npm-offline-cache is not recorded" "$(line "$o" APPLIED)" "npm-production-set"
 printf '{}\n' > "$p/package-lock.json"
-o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" sh "$_un") 2>&1)
+o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" PREP_APPLIED="npm-production-set" sh "$_un") 2>&1)
 check "a lock file written by the offline install: npm-registry:network is taken off" "$(line "$o" FAILED)" "npm-production-set"
+check "a lock file written by the offline install: npm-offline-cache is recorded" "$(line "$o" APPLIED)" "npm-production-set npm-offline-cache"
 printf '%s\n' "$o" | grep -qF "resolved every dependency from npm's cache" \
     && pass "the log says the cache resolved it" || fail "the cache resolve is not logged" "$o"
 
