@@ -5539,6 +5539,32 @@ else
     fail "starting tab did not see the cancel" "$(tail -c 300 "$WORK/owner.sse")"
 fi
 
+# Once a cancelled scan has sent its done event it is no longer listed, even
+# while the server is still cleaning up after it (a cancelled run waits a
+# second between its two container sweeps before it releases its folder).
+echo hang > "$STUB_MODE_FILE"
+curl -sN --max-time 8 "$BASE2/scan-stream?project=stopq&version=1.0&source=current-dir" >/dev/null 2>&1 &
+STOPQ_OWNER=$!
+sleep 1
+curl -sN --max-time 8 "$BASE2/scan-attach?id=stopq_1.0" > "$WORK/stopq.sse" 2>/dev/null &
+STOPQ_TAB=$!
+sleep 0.5
+during=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+curl -s -X POST "$BASE2/scan-cancel?id=stopq_1.0" >/dev/null
+for _ in $(seq 1 80); do
+    grep -q '^event: done' "$WORK/stopq.sse" 2>/dev/null && break
+    sleep 0.1
+done
+right_after=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+wait "$STOPQ_TAB" "$STOPQ_OWNER" 2>/dev/null || true
+if grep -q '^event: done' "$WORK/stopq.sse" \
+    && echo "$during" | python3 -c "import sys,json; assert [x for x in json.load(sys.stdin) if x['id'] == 'stopq_1.0']" \
+    && echo "$right_after" | python3 -c "import sys,json; assert not [x for x in json.load(sys.stdin) if x['id'] == 'stopq_1.0']"; then
+    pass "/running-scans drops a cancelled scan as soon as it has stopped"
+else
+    fail "/running-scans still lists a stopped scan" "during: $during right after done: $right_after"
+fi
+
 # The starting tab closes; a tab that joined keeps the scan running past the
 # grace, and once that tab closes too the scan stops after the grace.
 rm -f "$STUB_HEARTBEAT"
