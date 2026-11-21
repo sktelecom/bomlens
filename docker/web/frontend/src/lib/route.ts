@@ -14,6 +14,8 @@
  *   `#/scan/<id>`                 → a scan's Overview
  *   `#/scan/<id>/<section>`       → a scan's specific section
  *   `#/scan/<id>/<section>?…`     → that section with its filters applied
+ *   `#/running/<id>`              → a scan still running: its progress, followed
+ *                                   live, so a reload or another tab joins it
  *
  * `<id>` is the scan's run_id — the run-folder name (`DoneEvent.id`, what
  * `loadScan` takes). `<section>` is a SectionId. Ids are encoded so any run_id
@@ -36,7 +38,9 @@ export type Route =
   /** The External lookup screen. `query.q`, when present, is the term to
    *  prefill and look up immediately (a shared link or a GlobalSearch pick). */
   | { kind: "lookup"; query?: RouteQuery }
-  | { kind: "scan"; id: string; section: SectionId; query?: RouteQuery };
+  | { kind: "scan"; id: string; section: SectionId; query?: RouteQuery }
+  /** A running scan's progress screen, by run id. */
+  | { kind: "running"; id: string };
 
 const DEFAULT_SECTION: SectionId = "overview";
 
@@ -60,6 +64,10 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "lookup") {
     return query && Object.keys(query).length ? { kind: "lookup", query } : { kind: "lookup" };
   }
+  if (parts[0] === "running" && parts[1]) {
+    const id = safeDecode(parts[1]);
+    if (id) return { kind: "running", id };
+  }
   if (parts[0] === "scan" && parts[1]) {
     const id = safeDecode(parts[1]);
     if (id) {
@@ -79,6 +87,7 @@ export function buildHash(route: Route): string {
     const q = buildQuery(route.query);
     return q ? `#/lookup?${q}` : "#/lookup";
   }
+  if (route.kind === "running") return `#/running/${encodeURIComponent(route.id)}`;
   const path = `#/scan/${encodeURIComponent(route.id)}`;
   const base =
     route.section && route.section !== DEFAULT_SECTION
@@ -119,6 +128,11 @@ export function buildQuery(query?: RouteQuery): string {
 /** Hash for the home screen — Recent scans (the logo target). */
 export function homeHash(): string {
   return "#/";
+}
+
+/** Hash for a running scan's progress screen. */
+export function runningHash(id: string): string {
+  return buildHash({ kind: "running", id });
 }
 
 /** Hash for the New scan screen. */
