@@ -89,6 +89,62 @@ else
     fail "sub-folder scan root or label check failed (see assertion above)"
 fi
 
+echo "== the copy keeps an installed Python environment's metadata (Windows and Linux layouts) =="
+mkdir -p "$ADDED/py-win/.venv/Lib/site-packages/requests-2.32.3.dist-info/licenses" \
+         "$ADDED/py-win/.venv/Lib/site-packages/requests" "$ADDED/py-win/.venv/Scripts" \
+         "$ADDED/py-nix/venv/lib/python3.12/site-packages/idna-3.10.dist-info" \
+         "$ADDED/py-nix/env/lib/python3.12/site-packages/x-1.0.dist-info"
+printf 'requests\n' > "$ADDED/py-win/requirements.txt"
+printf 'home = C:\\Python312\nversion_info = 3.12.4\n' > "$ADDED/py-win/.venv/pyvenv.cfg"
+printf 'Metadata-Version: 2.1\nName: requests\nVersion: 2.32.3\n' > "$ADDED/py-win/.venv/Lib/site-packages/requests-2.32.3.dist-info/METADATA"
+echo 'Apache' > "$ADDED/py-win/.venv/Lib/site-packages/requests-2.32.3.dist-info/licenses/LICENSE"
+echo 'code' > "$ADDED/py-win/.venv/Lib/site-packages/requests/__init__.py"
+echo 'MZ' > "$ADDED/py-win/.venv/Scripts/python.exe"
+printf 'Metadata-Version: 2.1\nName: certifi\nVersion: 2024.8.30\n' > "$ADDED/py-win/.venv/Lib/site-packages/certifi-2024.8.30.egg-info"
+printf 'version = 3.12.1\n' > "$ADDED/py-nix/venv/pyvenv.cfg"
+printf 'Metadata-Version: 2.1\nName: idna\nVersion: 3.10\n' > "$ADDED/py-nix/venv/lib/python3.12/site-packages/idna-3.10.dist-info/METADATA"
+# env/ without a pyvenv.cfg is not an environment: it stays out, as before.
+printf 'Name: x\n' > "$ADDED/py-nix/env/lib/python3.12/site-packages/x-1.0.dist-info/METADATA"
+if SBOM_OUTPUT_DIR="$WORK/out" SBOM_UI_SCAN_ROOTS="$ADDED|$HOST_LABEL" \
+   python3 -I - "$ROOT_DIR" "$ADDED" "$WORK" <<'PY'
+import os, subprocess, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+added, work = sys.argv[2], sys.argv[3]
+
+dest = os.path.join(work, "copy-win")
+server.copy_scan_target_tree(added + "/py-win", dest)
+site = os.path.join(dest, ".venv", "Lib", "site-packages")
+assert os.path.isfile(os.path.join(dest, ".venv", "pyvenv.cfg"))
+assert sorted(os.listdir(site)) == ["certifi-2024.8.30.egg-info", "requests-2.32.3.dist-info"], os.listdir(site)
+assert os.path.isfile(os.path.join(site, "requests-2.32.3.dist-info", "licenses", "LICENSE"))
+assert not os.path.exists(os.path.join(dest, ".venv", "Scripts"))           # only the metadata
+assert not os.path.exists(os.path.join(site, "requests"))
+
+# The reader the scan runs finds the copied environment the same way it finds the original.
+reader = os.path.join(sys.argv[1], "docker", "lib", "read-python-venv.py")
+r = subprocess.run([sys.executable, "-I", reader, "find", dest], capture_output=True, text=True)
+assert r.returncode == 0 and r.stdout.splitlines()[0] == ".venv", (r.returncode, r.stdout, r.stderr)
+assert r.stdout.splitlines()[1].endswith(os.path.join(".venv", "Lib", "site-packages")), r.stdout
+
+dest2 = os.path.join(work, "copy-nix")
+server.copy_scan_target_tree(added + "/py-nix", dest2)
+assert os.path.isfile(os.path.join(dest2, "venv", "lib", "python3.12", "site-packages", "idna-3.10.dist-info", "METADATA"))
+assert not os.path.exists(os.path.join(dest2, "env"))
+PY
+then
+    pass "pyvenv.cfg and the dist-info/egg-info folders are copied, the rest of the environment is not; read-python-venv.py finds it"
+else
+    fail "an installed Python environment is lost in the copy of a picked folder (see assertion above)"
+fi
+
+# The web UI lists the excluded environment the way the CLI does (bomlens:excluded-paths).
+if bash -c '. "$1/docker/lib/source-detect.sh" >/dev/null 2>&1; python_venv_folders "$2"' _ "$ROOT_DIR" "$WORK/copy-win" | grep -qx '.venv'; then
+    pass "the copied environment is recognised as one by python_venv_folders, so .venv/** is excluded"
+else
+    fail "python_venv_folders does not see the copied .venv"
+fi
+
 echo "== path validation is as strict as before =="
 if SBOM_OUTPUT_DIR="$WORK/out" SBOM_UI_SCAN_ROOTS="$ADDED|$HOST_LABEL" \
    python3 -I - "$ROOT_DIR" "$ADDED" "$WORK" <<'PY'

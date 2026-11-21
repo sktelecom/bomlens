@@ -294,6 +294,32 @@ test("with other failed steps the warning lists only those, and the license look
   await expect(page.getByTestId("license-lookup-skipped")).toBeVisible();
 });
 
+test("beside a failed resolution step, the license note does not claim nothing is missing and the fresh-install note is not shown", async ({ page }) => {
+  await open(page, {
+    ...DONE,
+    sbom: sbomWith({ pipelineStepsFailed: ["pip-install", "license-fetch"], versionPinning: "unpinned" }),
+    completeness: {
+      grade: "partial",
+      gradeLabel: { en: "Partial", ko: "부분" },
+      componentCount: 1,
+      reasons: [
+        {
+          code: "resolution-failed",
+          grade: "partial",
+          detail: "pip-install",
+          message: { en: "A dependency resolution step failed (pip-install).", ko: "의존성 해석 단계가 실패했습니다(pip-install)." },
+          fix: { en: "Read the scan log.", ko: "스캔 로그를 확인하세요." },
+        },
+      ],
+    },
+  });
+  await expect(page.getByTestId("pipeline-steps-failed")).toHaveCount(1);
+  const note = page.getByTestId("license-lookup-skipped");
+  await expect(note).toContainText("Skipping the lookup does not remove any dependency");
+  await expect(page.getByText(/no dependency is missing/i)).toHaveCount(0);
+  await expect(page.getByTestId("version-pinning")).toHaveCount(0);
+});
+
 test("a scan with no components warns, and a failed scan never shares a banner", async ({ page }) => {
   await open(page, {
     ...DONE,

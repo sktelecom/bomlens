@@ -979,7 +979,7 @@
     "notice": {
       "licenseLookup": {
         "title": "The registry license lookup was skipped",
-        "short": "Licenses come from lock files and package metadata. No dependency is missing."
+        "short": "Licenses come from lock files and package metadata. Skipping the lookup does not remove any dependency."
       },
       "pipeline": {
         "title": "Some enrichment data may be missing",
@@ -1109,7 +1109,7 @@
     "supplierHint": "Ask the supplier to regenerate this document.",
     "more": "{{count}} more",
     "licenseLookupTitle": "The license lookup in the package registries was skipped",
-    "licenseLookupBody": "Licenses in this SBOM come from lock files and package metadata, and no dependency is missing. The lookup runs when the scan can reach the package registries; behind a proxy that inspects HTTPS, give BomLens your company's CA as a PEM file in SBOM_EXTRA_CA_CERTS."
+    "licenseLookupBody": "Licenses in this SBOM come from lock files and package metadata. Skipping the lookup does not remove any dependency from the SBOM. The lookup runs when the scan can reach the package registries; behind a proxy that inspects HTTPS, give BomLens your company's CA as a PEM file in SBOM_EXTRA_CA_CERTS."
   },
   "models": {
     "loading": "Loading model details…",
