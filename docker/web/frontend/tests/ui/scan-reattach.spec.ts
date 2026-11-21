@@ -238,3 +238,70 @@ for (const theme of ["light", "dark"] as const) {
     expect(results.violations).toEqual([]);
   });
 }
+
+const WAIT_LINE =
+  "[INFO] Another scan of this folder is running (a command-line scan, process 4242 on this computer); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting.";
+const WAITING = { waiting: true, code: "SAME_FOLDER_SCAN_RUNNING", detail: WAIT_LINE };
+
+for (const lang of ["en", "ko"] as const) {
+  test(`a scan waiting for another scan of its folder says so, and the notice goes when it starts (${lang})`, async ({
+    page,
+  }) => {
+    await seedThemeLang(page, "light", lang);
+    await stub(page);
+    await fakeStream(page);
+    await page.goto("/#/new");
+    await page.fill("#project", "demo-service");
+    await page.fill("#version", "1.0");
+    await page.getByTestId("run-scan").click();
+    await streamUrl(page);
+    await emit(page, "started", started("demo-service_1.0", "demo-service", false));
+    await emit(page, "log", WAIT_LINE);
+    await emit(page, "waiting", WAITING);
+    const notice = page.getByTestId("run-waiting");
+    await expect(notice).toContainText(
+      lang === "en"
+        ? "Waiting for another scan of this folder to finish. This scan starts on its own when that one ends; cancel it to stop waiting."
+        : "같은 폴더를 스캔하는 다른 작업이 끝나기를 기다리고 있습니다.",
+    );
+    // A wait, not a problem: the scan is still the running one with its Cancel.
+    await expect(page.getByTestId("run-cancel")).toBeVisible();
+    await expect(page.getByTestId("run-failed")).toHaveCount(0);
+    await emit(page, "waiting", { waiting: false, code: "SAME_FOLDER_SCAN_RUNNING" });
+    await expect(notice).toHaveCount(0);
+  });
+}
+
+test("a tab that joins a waiting scan shows the wait from the replay", async ({ page }) => {
+  await seedThemeLang(page, "light", "en");
+  await stub(page);
+  await fakeStream(page);
+  await page.goto("/#/running/acme_1.0");
+  expect(await streamUrl(page)).toBe("/scan-attach?id=acme_1.0");
+  // The server replays the log so far, then the wait still under way.
+  await emit(page, "started", started("acme_1.0", "acme", true));
+  await emit(page, "log", WAIT_LINE);
+  await emit(page, "waiting", WAITING);
+  await expect(page.getByTestId("run-waiting")).toContainText("Waiting for another scan of this folder to finish.");
+  await emit(page, "done", DONE);
+  await expect(page.getByTestId("run-waiting")).toHaveCount(0);
+});
+
+for (const theme of ["light", "dark"] as const) {
+  test(`the waiting notice has no accessibility violations (${theme})`, async ({ page }) => {
+    await seedThemeLang(page, theme, "en");
+    await stub(page);
+    await fakeStream(page);
+    await page.goto("/#/running/acme_1.0");
+    await streamUrl(page);
+    await emit(page, "started", started("acme_1.0", "acme", true));
+    await emit(page, "waiting", WAITING);
+    await expect(page.getByTestId("run-waiting")).toBeVisible();
+    await page.mouse.move(0, 0);
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="run-waiting"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+  });
+}

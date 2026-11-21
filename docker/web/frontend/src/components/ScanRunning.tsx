@@ -13,9 +13,11 @@ import { Banner, Button, Dialog, ProgressBar, Spinner, Timeline } from "@primer/
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { ScanWaiting } from "@/lib/api";
 import { explainFailure } from "@/lib/failureExplain";
 import { currentLiveStep, formatElapsed, QUIET_AFTER_SECONDS } from "@/lib/pipelineSteps";
 import { anyStageMarker, visiblePercent, visibleStages, type StageStatus } from "@/lib/scanProgress";
+import { scanWaitingText } from "@/lib/scanWarnings";
 import { useToast } from "@/lib/toast";
 
 import { ScreenHeader } from "./primer";
@@ -50,6 +52,7 @@ export function ScanRunning({
   onRetry,
   onCancel,
   deepCveEnabled,
+  waiting,
 }: {
   logs: string[];
   status: Status;
@@ -73,6 +76,9 @@ export function ScanRunning({
   /** Whether this run requested deep CVE matching. When false its marker never
    *  appears in the log, so the step is dropped rather than left pending. */
   deepCveEnabled?: boolean;
+  /** The scan waits for another scan of the same folder before it starts;
+   *  null or absent when it does not (or no longer) wait. */
+  waiting?: ScanWaiting | null;
 }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -92,6 +98,7 @@ export function ScanRunning({
   // log already holds it as received; showing it again above the log would
   // repeat the sentence.
   const messageInLog = Boolean(errorMessage) && logs[logs.length - 1] === `✖ ${errorMessage}`;
+  const waitText = !failed && waiting ? scanWaitingText(waiting.code, waiting.detail) : null;
 
   return (
     <div className="bl-run">
@@ -141,6 +148,17 @@ export function ScanRunning({
             }
           />
         </>
+      )}
+
+      {/* Not a problem to fix: the scan starts by itself once the other one
+          ends, and Cancel above is the way to stop waiting. */}
+      {waitText && (
+        <Banner
+          variant="info"
+          role="status"
+          data-testid="run-waiting"
+          title={waitText.key ? t(waitText.key) : waitText.text}
+        />
       )}
 
       <Steps logs={logs} status={status} deepCve={Boolean(deepCveEnabled)} />
