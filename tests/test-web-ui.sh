@@ -8158,7 +8158,8 @@ pp_branch=$(awk '/^    POSTPROCESS\)$/{on=1} /^    ANALYZE\)$/{on=0} on' "$EP")
 if [ -n "$cli_info" ] && [ -n "$cli_warn" ] \
    && printf '%s\n' "$src_branch" | grep -qF "[INFO] $cli_info" \
    && printf '%s\n' "$src_branch" | grep -qF "[WARN]   $cli_warn" \
-   && printf '%s\n' "$src_branch" | grep -q 'if \[ "$(detect_lang "$SRC_ROOT")" = "swift" \]' \
+   && printf '%s\n' "$src_branch" | grep -q '_src_lang="$(detect_lang "$SRC_ROOT")"' \
+   && printf '%s\n' "$src_branch" | grep -q 'if \[ "$_src_lang" = "swift" \]' \
    && ! printf '%s\n' "$pp_branch" | grep -qF "UIKit" \
    && grep -q -- '-e MODE=POSTPROCESS' "$CLI"; then
     pass "a web UI Swift scan logs the same UIKit note as the CLI, and a CLI run does not log it twice"
@@ -8169,6 +8170,38 @@ fi
 sw_lang=$(bash -c '. "$1"; detect_lang "$2"' _ "$ROOT_DIR/docker/lib/source-detect.sh" "$ROOT_DIR/examples/swift" 2>/dev/null)
 [ "$sw_lang" = "swift" ] && pass "examples/swift is detected as swift, the case the note is printed for" \
     || fail "examples/swift detected as '$sw_lang', not swift"
+
+echo ""
+echo "== entrypoint SOURCE mode prints the CLI's C/C++ and no-manifest notes =="
+# The same move for the C/C++ note and the note for a folder with no package
+# manifest: every line scan-sbom.sh prints for LANG_DET cpp or unknown is in the
+# entrypoint's SOURCE branch, and none of them in its POSTPROCESS branch.
+nt_missing=""
+for nt_lang in cpp unknown; do
+    nt_lines=$(awk -v l="$nt_lang" '$0 ~ "if \\[ \"\\$LANG_DET\" = \"" l "\" \\]; then" {on=1; next} on && /^        fi$/ {on=0} on' "$CLI" \
+        | sed -n 's/^ *log_warn "\(.*\)"$/\1/p')
+    [ -n "$nt_lines" ] || nt_missing="$nt_missing $nt_lang:no-cli-lines"
+    printf '%s\n' "$src_branch" | grep -q "if \[ \"\$_src_lang\" = \"$nt_lang\" \]" || nt_missing="$nt_missing $nt_lang:no-branch"
+    while IFS= read -r nt_l; do
+        [ -n "$nt_l" ] || continue
+        printf '%s\n' "$src_branch" | grep -qF "[WARN] $nt_l" || nt_missing="$nt_missing $nt_lang:'${nt_l:0:40}'"
+        printf '%s\n' "$pp_branch" | grep -qF "$nt_l" && nt_missing="$nt_missing $nt_lang:in-postprocess"
+    done <<< "$nt_lines"
+done
+[ -z "$nt_missing" ] \
+    && pass "a web UI C/C++ or no-manifest scan logs the same notes as the CLI, and a CLI run does not log them twice" \
+    || fail "the entrypoint's SOURCE branch does not print the CLI's C/C++ and no-manifest notes" "$nt_missing"
+# Without a sibling container the folder is read by syft, so the no-manifest
+# note does not name the all-in-one image there.
+printf '%s\n' "$src_branch" | grep -qF '[WARN] No package manifest detected (results may be sparse).' \
+    && pass "the no-manifest note has a form for a scan with no sibling container" \
+    || fail "the no-manifest note names the all-in-one image where syft reads the folder"
+nt_cpp=$(mktemp -d); : > "$nt_cpp/conanfile.txt"
+nt_none=$(mktemp -d); echo notes > "$nt_none/README.txt"
+nt_got=$(bash -c '. "$1"; detect_lang "$2"; detect_lang "$3"' _ "$ROOT_DIR/docker/lib/source-detect.sh" "$nt_cpp" "$nt_none" 2>/dev/null | tr '\n' ' ')
+rm -rf "$nt_cpp" "$nt_none"
+[ "$nt_got" = "cpp unknown " ] && pass "a conanfile.txt folder reads as cpp and a folder with no manifest as unknown, the cases the notes are printed for" \
+    || fail "detect_lang gave '$nt_got' for the C/C++ and no-manifest folders"
 
 # Scan-target path handling has its own No-Docker suite; run it here so the
 # existing CI step for this file covers it.
