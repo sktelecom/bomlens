@@ -1,0 +1,40 @@
+PODS:
+  - AcmeKit (2.0.0)
+  - Alamofire (5.8.1)
+  - GitPod (1.0.0)
+  - Missing (3.0.0)
+  - Moya (15.0.0):
+    - Moya/Core (= 15.0.0)
+  - Moya/Core (15.0.0):
+    - Alamofire (~> 5.0)
+  - NoLicPod (1.0.0)
+  - Quick (7.0.0)
+
+DEPENDENCIES:
+  - AcmeKit
+  - GitPod (from `https://github.com/example/GitPod.git`)
+  - Missing
+  - Moya
+  - NoLicPod
+  - Quick
+
+SPEC REPOS:
+  https://github.com/acme/Specs.git:
+    - AcmeKit
+  trunk:
+    - Alamofire
+    - Missing
+    - Moya
+    - NoLicPod
+    - "Quick"
+
+EXTERNAL SOURCES:
+  GitPod:
+    :git: https://github.com/example/GitPod.git
+
+CHECKOUT OPTIONS:
+  GitPod:
+    :commit: 0123456789abcdef0123456789abcdef01234567
+    :git: https://github.com/example/GitPod.git
+
+COCOAPODS: 1.15.2

@@ -17,6 +17,10 @@
 # caller reconciles against the main scan and merges, so CVE/notice generation picks the
 # pods up.
 #
+# Licences: Podfile.lock names none. With FETCH_LICENSE on (the default, off under
+# --byte-stable) fetch-cocoapods-licenses.py reads each trunk pod's podspec from the
+# CocoaPods CDN (COCOAPODS_CDN_URL) and fills the licence it declares.
+#
 # Completeness: Podfile.lock's PODS section is the resolved graph — every pod, direct and
 # transitive, with a pinned version. syft returns that full set (verified) but no edges;
 # the dependency edges are rebuilt below from the nested PODS lists (parse-podfile-lock.py)
@@ -187,3 +191,31 @@ jq -n \
 }' > "$OUTPUT"
 
 echo "[cocoapods] SBOM written: $OUTPUT (cocoapods components=${NCOMP}, dependency edges=${NEDGES})"
+
+# Licences. Podfile.lock names none, so a pod would otherwise reach the SBOM with no
+# licence. The trunk podspec of each pinned version carries it; ask for it under the
+# same switch as the registry licence lookup of the language scan (FETCH_LICENSE,
+# off for a reproducible --byte-stable run). Best-effort: a failed lookup leaves the
+# pods as they are and never fails the step.
+if [ "${NCOMP:-0}" -gt 0 ]; then
+    case "${FETCH_LICENSE:-true}" in
+        false|0)
+            echo "[cocoapods] licence lookup off (FETCH_LICENSE=false): Podfile.lock names no licence, so the pods have none." >&2 ;;
+        *)
+            if [ "${BYTE_STABLE:-false}" = "true" ]; then
+                echo "[cocoapods] licence lookup off (--byte-stable): Podfile.lock names no licence, so the pods have none." >&2
+            elif ! command -v python3 >/dev/null 2>&1; then
+                echo "[cocoapods] python3 not installed in this image; pods keep no licence." >&2
+            else
+                LOCK_ARGS=()
+                while IFS= read -r lock; do
+                    [ -n "$lock" ] && LOCK_ARGS+=("$lock")
+                done <<EOF
+$LOCKS
+EOF
+                echo "[cocoapods] looking up pod licences in the CocoaPods trunk podspecs..." >&2
+                python3 "$SELFDIR/fetch-cocoapods-licenses.py" "$OUTPUT" "${LOCK_ARGS[@]}" >/dev/null \
+                    || echo "[cocoapods] WARN: licence lookup failed; pods keep no licence." >&2
+            fi ;;
+    esac
+fi

@@ -186,6 +186,7 @@ jq -n \
             PROJECT_NAME: $pname,
             PROJECT_VERSION: $pver,
             CYCLONEDX_SPEC_VERSION: $spec,
+            FETCH_LICENSE: $fetch,
             UPLOAD_ENABLED: "false"
           },
           env_passthrough: (["HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE", "NVD_API_KEY"] + ($prep2 | split(" ") | map(select(. != "")))
