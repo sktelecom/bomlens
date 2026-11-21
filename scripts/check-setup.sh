@@ -265,7 +265,7 @@ while IFS= read -r row; do
     img_lines="$img_lines$(awk -v r="$img_ref" -v m="$img_mb" 'BEGIN { printf "     %-60s %6.1f GB\n", r, m / 1000 }')
 "
 done <<EOF_IMGS
-$(docker image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E ' (ghcr\.io/cdxgen/|ghcr\.io/sktelecom/(bomlens|sbom-)|bomlens-android-sdk)' | grep -v ':<none>$')
+$(docker image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' 2>/dev/null | awk -v own="$DOCKER_IMAGE" '$2 == own || $2 ~ /^(ghcr\.io\/cdxgen\/|ghcr\.io\/sktelecom\/(bomlens|sbom-)|bomlens-android-sdk)/' | grep -v ':<none>$')
 EOF_IMGS
 if [ -n "$img_lines" ]; then
     note "-  $M_O_IMAGES"
@@ -280,6 +280,22 @@ if [ -n "${BOMLENS_FAKE_FREE_MB:-}" ]; then
 elif [ -n "$probe_img" ]; then
     free_mb=$(docker run --rm --pull never --entrypoint df "$probe_img" -Pm / 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}')
 fi
+# On macOS and Windows the engine's VM disk is a file on the host disk that holds
+# the home folder, and the VM can report its maximum size rather than what the
+# host still has (Rancher Desktop and Docker Desktop on WSL 2). The smaller of
+# the two is what a download can use, as in scan-sbom.sh.
+host_free_mb=""
+if [ -n "${BOMLENS_FAKE_HOST_FREE_MB:-}" ]; then
+    host_free_mb="$BOMLENS_FAKE_HOST_FREE_MB"
+elif [ -z "${BOMLENS_FAKE_FREE_MB:-}" ]; then
+    case "$(uname -s 2>/dev/null)" in
+        Darwin|MINGW*|MSYS*|CYGWIN*) host_free_mb=$(df -Pm "$HOME" 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}') ;;
+    esac
+fi
+case "$free_mb:$host_free_mb" in
+    *[!0-9:]*|:*|*:) ;;
+    *) [ "$host_free_mb" -lt "$free_mb" ] && free_mb="$host_free_mb" ;;
+esac
 case "$free_mb" in
     ''|*[!0-9]*) ;;
     *)

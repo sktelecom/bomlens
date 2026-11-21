@@ -173,7 +173,7 @@ REM set /a never sees a number past 32 bits. Each image ID is counted once.
 set "IMG_SEEN= "
 set /a IMG_TOTAL=0
 set "IMG_ANY="
-for /f "tokens=1,2" %%a in ('docker image ls --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]"') do call :img_line %%a %%b
+for /f "tokens=1,2" %%a in ('docker image ls --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]" /C:" %DOCKER_IMAGE%$"') do call :img_line %%a %%b
 if not defined IMG_ANY goto :disk_free_step
 call :say M_O_TOTAL
 echo   %IMG_TOTAL% MB
@@ -208,6 +208,18 @@ if not defined FREE_MB for /f "tokens=4" %%f in ('docker run --rm --pull never -
 if not defined FREE_MB goto :check_port_step
 for /f "delims=0123456789" %%x in ("%FREE_MB%") do goto :check_port_step
 set /a "FREE_MBN=%FREE_MB%" 2>nul
+REM The engine's VM disk is a file on the drive that holds the user profile, and
+REM Rancher Desktop and Docker Desktop on WSL 2 report the VM disk's maximum size,
+REM not what that drive still has. The smaller of the two is what a download can
+REM use, as in scan-sbom.sh.
+set "HOST_FREE_MB="
+if defined BOMLENS_FAKE_HOST_FREE_MB set "HOST_FREE_MB=%BOMLENS_FAKE_HOST_FREE_MB%"
+if not defined HOST_FREE_MB if not defined BOMLENS_FAKE_FREE_MB for /f "delims=" %%h in ('powershell -NoProfile -Command "[math]::Floor((Get-Item $env:USERPROFILE).PSDrive.Free / 1MB)" 2^>nul') do set "HOST_FREE_MB=%%h"
+if not defined HOST_FREE_MB goto :disk_free_compare
+for /f "delims=0123456789" %%x in ("%HOST_FREE_MB%") do goto :disk_free_compare
+set /a "HOST_FREE_MBN=%HOST_FREE_MB%" 2>nul
+if %HOST_FREE_MBN% LSS %FREE_MBN% set /a "FREE_MBN=%HOST_FREE_MBN%"
+:disk_free_compare
 if %FREE_MBN% LSS 5000 goto :disk_low
 call :say M_O_DISK
 echo   %FREE_MBN% MB
