@@ -1255,6 +1255,29 @@ maven_tree_has_gradle() {
         \( -name build.gradle -o -name build.gradle.kts -o -name settings.gradle -o -name settings.gradle.kts \) \
         -print 2>/dev/null | head -1)" ]
 }
+# The Maven version the project's wrapper runs: the version in the
+# distributionUrl of .mvn/wrapper/maven-wrapper.properties, or nothing when
+# there is none to read.
+maven_wrapper_version() {
+    sed -n -E 's#^[[:space:]]*distributionUrl[[:space:]]*[=:].*/apache-maven-([0-9]+\.[0-9]+[0-9A-Za-z.-]*)-bin\.(zip|tar\.gz)[[:space:]]*$#\1#p' \
+        .mvn/wrapper/maven-wrapper.properties 2>/dev/null | head -n 1
+}
+# Whether a Maven version is older than 3.9, which is the first to read
+# maven.repo.local.tail.
+maven_version_below_39() {
+    _mvb_major=${1%%.*}; _mvb_rest=${1#*.}; _mvb_minor=${_mvb_rest%%[!0-9]*}
+    case "$_mvb_major$_mvb_minor" in ""|*[!0-9]*) return 1 ;; esac
+    [ "$_mvb_major" -lt 3 ] || { [ "$_mvb_major" -eq 3 ] && [ "$_mvb_minor" -lt 9 ]; }
+}
+# Whether maven-dependency-plugin is in the user's Maven local repository or
+# in BomLens's own: offline, cdxgen's dependency:tree needs it there.
+maven_dependency_plugin_present() {
+    for _mdp_r in "${MAVEN_USER_REPO:-}" "$MAVEN_REPO_LOCAL"; do
+        [ -n "$_mdp_r" ] && [ -d "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" ] || continue
+        [ -n "$(find "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" -maxdepth 2 -type f -name 'maven-dependency-plugin-*.jar' 2>/dev/null | head -n 1)" ] && return 0
+    done
+    return 1
+}
 sha512_tool() {
     for _st in sha512sum shasum openssl; do
         if command -v "$_st" >/dev/null 2>&1; then echo "$_st"; return 0; fi
@@ -1334,11 +1357,43 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
         [ -x ./mvnw ] || _mvn_sh=$(wrapper_shell ./mvnw)
     elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
     fi
+    _mvn_tree_failed=""; _mvn_skip_fetch=""
+    # Offline with the user's Maven local repository: a wrapper Maven older
+    # than 3.9 ignores maven.repo.local.tail, so the image's mvn runs in its
+    # place (cdxgen too, through MVN_CMD and CDXGEN_JVM_TOOL_PINNED, unless a
+    # Gradle build in the tree needs its wrappers). And cdxgen's
+    # dependency:tree needs maven-dependency-plugin in a local repository.
+    if [ -n "${MAVEN_USER_REPO_OFFLINE:-}" ]; then
+        _mvn_wv=""
+        [ "$_mvn_cmd" != ./mvnw ] || _mvn_wv=$(maven_wrapper_version)
+        if [ -n "$_mvn_wv" ] && maven_version_below_39 "$_mvn_wv"; then
+            _mvn_old="maven: the project's mvnw runs Maven $_mvn_wv, which offline cannot read your Maven local repository (maven.repo.local.tail needs Maven 3.9 or later)"
+            if ! command -v mvn >/dev/null 2>&1; then
+                log "$_mvn_old, and this image has no mvn to run instead, so the dependency tree is missing. Point .mvn/wrapper/maven-wrapper.properties at Maven 3.9 or later, or let the scan reach the Maven repository, and scan again"
+                _mvn_tree_failed=1
+                mark_prep_failed maven-dependency-tree
+            elif maven_tree_has_gradle; then
+                _mvn_cmd=mvn; _mvn_sh=""
+                log "$_mvn_old. cdxgen is not told to skip mvnw (CDXGEN_JVM_TOOL_PINNED), because it would then also skip the Gradle wrappers of the Gradle builds in this tree, so the Maven dependency tree may be missing. Point .mvn/wrapper/maven-wrapper.properties at Maven 3.9 or later and scan again"
+                _mvn_tree_failed=1
+                mark_prep_failed maven-dependency-tree
+            else
+                _mvn_cmd=mvn; _mvn_sh=""
+                MVN_CMD=mvn; CDXGEN_JVM_TOOL_PINNED=true
+                export MVN_CMD CDXGEN_JVM_TOOL_PINNED
+                log "$_mvn_old; the image's mvn runs in its place, for cdxgen too"
+            fi
+        fi
+        if [ -z "$_mvn_tree_failed" ] && ! maven_dependency_plugin_present; then
+            log "maven: Maven runs offline, and neither your Maven local repository nor BomLens's Maven cache holds maven-dependency-plugin (org/apache/maven/plugins/maven-dependency-plugin), so the dependency tree cannot be built and the SBOM may list only the dependencies written in pom.xml. This scan needs maven-dependency-plugin in your Maven local repository: run 'mvn dependency:tree' once in the project on this machine, then scan again"
+            _mvn_tree_failed=1; _mvn_skip_fetch=1
+            mark_prep_failed maven-dependency-tree
+        fi
+    fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
         log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
-    elif [ -n "$_mvn_cmd" ]; then
+    elif [ -n "$_mvn_cmd" ] && [ -z "$_mvn_skip_fetch" ]; then
         _mvn_err=$(mktemp); _mvn_list=$(mktemp)
-        _mvn_tree_failed=""
         maven_resolve_jars ${_mvn_sh:+"$_mvn_sh"} "$_mvn_cmd"
         if maven_model_rejected; then
             log "maven: $_mvn_cmd refused pom.xml:"
@@ -1399,6 +1454,13 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
         _mvn_total=${_mvn_counts% *}; _mvn_have=${_mvn_counts#* }
         if [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"; then
             log "maven: fetched dependency jars for component hashes ($_mvn_have of $_mvn_total in the local repository)"
+        elif [ -n "${MAVEN_USER_REPO_OFFLINE:-}" ] && [ "${_mvn_have:-0}" -eq 0 ] && [ -z "$_mvn_tree_failed" ]; then
+            # Offline, a run that found none of its jars in either repository
+            # cannot have found the POMs the dependency tree needs either.
+            log "maven: Maven runs offline and none of the $_mvn_total resolved jars is in your Maven local repository or BomLens's Maven cache, so the dependency tree is missing and the SBOM may list only the dependencies written in pom.xml. Build the project once on this machine (for example 'mvn dependency:tree'), or let the scan reach the Maven repository, and scan again"
+            grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
+            _mvn_tree_failed=1
+            mark_prep_failed maven-dependency-tree
         else
             log "maven: could not fetch every dependency jar; $_mvn_have of $_mvn_total resolved jars are in the local repository, so some components will have no hashes (non-fatal)"
             grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
