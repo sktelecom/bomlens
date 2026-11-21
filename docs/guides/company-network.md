@@ -17,6 +17,8 @@ Pick the first of these that fits.
 
 Compare the component count with what your own build reports. A far lower number means resolution failed. When the SBOM was written although the package registry refused the login for some downloads, the scan log has one `[WARN]` line, the SBOM records `bomlens:registry-refused`, and the web UI Overview shows the warning "Some dependencies may be missing" ([Artifacts](../reference/artifacts.md)).
 
+A Node.js project with no lock file is resolved by an npm install against the registry its own `.npmrc` names. The scan asks that registry once first, without the login. When it does not answer, or its TLS certificate is not trusted, the scan does not wait for npm's retries: npm resolves from its cache alone, the scan ends within seconds, it lists only what `node_modules` or that cache holds, and it records the failed step `npm-registry:network` or `npm-registry:tls-trust`. The scan log names the registry and the cause ([Node.js](../reference/ecosystems.md#nodejs)).
+
 ## What do I set for a proxy?
 
 `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. The desktop app does not pass proxy variables, so set the proxy in the Docker engine there.

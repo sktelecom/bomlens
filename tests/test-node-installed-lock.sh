@@ -15,6 +15,11 @@
 #   - The written files are removed again; the production set is read from the
 #     written lock with no npm run; bomlens:node-lock-source is written on the
 #     SBOM; static detection names the installed lock in its reason.
+#   - With no lock file at all, the registry the project's npm configuration
+#     names is asked first: one that does not answer (or whose certificate is
+#     not trusted) makes cdxgen's npm install and the production set resolve
+#     run offline and is recorded as npm-registry:network or
+#     npm-registry:tls-trust, taken off when the offline install wrote a lock.
 #
 # The fixtures are written here by hand (no npm or pnpm install).
 set -u
@@ -302,16 +307,20 @@ _ps2="$WORK/prodset-nolock.sh"
     printf '%s\n' 'mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }'
     printf '%s\n' 'unmark_prep_failed() { :; }'
     printf '%s\n' 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
-    printf '%s\n' 'prep_step() { echo "PREP_STEP_CALLED:$1" >&2; mark_prep_applied "$1"; mark_prep_failed "$1"; return 1; }'
+    printf '%s\n' 'prep_step() { echo "PREP_STEP_CALLED:$1 $*" >&2; mark_prep_applied "$1"; mark_prep_failed "$1"; return 1; }'
     printf '%s\n' 'run_supervised_timeout() { echo "RETRY_CALLED"; return 1; }'
-    printf '%s\n' 'npm() { if [ "$1" = config ]; then echo "$TEST_NPM_REGISTRY"; else echo "NPM_CALLED"; return 1; fi; }'
+    # npm config get: the project's registry where an .npmrc is (the project
+    # folder), the one configured outside the project elsewhere (the scratch copy).
+    printf '%s\n' 'npm() { if [ "$1" = config ]; then if [ -f .npmrc ]; then echo "$TEST_NPM_PROJECT_REGISTRY"; else echo "$TEST_NPM_REGISTRY"; fi; else echo "NPM_CALLED"; return 1; fi; }'
     printf '%s\n' 'PREP_APPLIED=""; PREP_FAILED=""; PREP_TIMEOUT_DEFAULT=60; NODE_INSTALLED_ROOT=""; BOMLENS_LICENSE_PROBE_TIMEOUT=3'
     sed -n '/^# --- licence lookup probe ---$/,/^# --- end licence lookup probe ---$/p' "$PREP"
+    sed -n '/^# --- node registry probe ---$/,/^# --- end node registry probe ---$/p' "$PREP"
     sed -n '/^NODE_PROD_SET=""$/,/^# --- build the cdxgen argument list/p' "$PREP"
     # shellcheck disable=SC2016
-    printf '%s\n' 'echo "APPLIED:$PREP_APPLIED"; echo "FAILED:$PREP_FAILED"'
+    printf '%s\n' 'echo "APPLIED:$PREP_APPLIED"; echo "FAILED:$PREP_FAILED"; echo "NPM_ARGS:${NPM_INSTALL_ARGS:-}"'
 } > "$_ps2"
 grep -q '^npm_registry_url() {' "$_ps2" || fail "could not extract npm_registry_url from build-prep.sh"
+grep -q '^NODE_REGISTRY_DOWN=""$' "$_ps2" || fail "could not extract the node registry probe from build-prep.sh"
 cat > "$WORK/srv.js" <<'JS'
 const http = require("http");
 const fs = require("fs");
@@ -331,12 +340,18 @@ printf '# yarn installed state\n' > "$p/node_modules/.yarn-integrity"
 _t0=$(date +%s)
 o=$( (cd "$p" && TEST_NPM_REGISTRY="http://user:secret@127.0.0.1:$CLOSED_PORT/" sh "$_ps2") 2>&1)
 _t1=$(date +%s)
-check "a registry that does not answer: only npm-production-set failed, not applied" "$(line "$o" APPLIED)|$(line "$o" FAILED)" "|npm-production-set"
-if printf '%s\n' "$o" | grep -qE 'PREP_STEP_CALLED|RETRY_CALLED|NPM_CALLED'; then
-    fail "the resolve ran although the registry did not answer" "$o"
+check "a registry that does not answer: npm-registry:network and npm-production-set failed" "$(line "$o" FAILED)" "npm-registry:network npm-production-set"
+check "cdxgen's npm install runs offline" "$(line "$o" NPM_ARGS)" "--offline"
+printf '%s\n' "$o" | grep -qF "cdxgen's npm install runs offline instead of waiting for it, so only packages already in node_modules or in npm's cache can be listed" \
+    && pass "the log says the install runs offline and what is listed" || fail "the offline install is not logged" "$o"
+if printf '%s\n' "$o" | grep -q 'PREP_STEP_CALLED:npm-production-set .*install --offline ' \
+   && ! printf '%s\n' "$o" | grep -qE 'RETRY_CALLED|NPM_CALLED'; then
+    pass "the resolve runs once, offline, and its retries are skipped"
 else
-    pass "the resolve and its retries are skipped"
+    fail "the resolve was not run offline once" "$o"
 fi
+printf '%s\n' "$o" | grep -qF "the production set is not resolved (the npm registry did not answer, and npm's cache does not hold every package)" \
+    && pass "a failed offline resolve is logged as such" || fail "the failed offline resolve is not logged" "$o"
 printf '%s\n' "$o" | grep -qF "node: no lock file, and the npm registry 127.0.0.1:$CLOSED_PORT did not answer" \
     && pass "one log line names the registry, without its login" || fail "the unreachable registry is not logged" "$o"
 printf '%s\n' "$o" | grep -q "using full graph" \
@@ -344,12 +359,69 @@ printf '%s\n' "$o" | grep -q "using full graph" \
 [ $((_t1 - _t0)) -lt 15 ] && pass "the skip is immediate" || fail "the skip took $((_t1 - _t0))s"
 o=$( (cd "$p" && TEST_NPM_REGISTRY="http://127.0.0.1:$OK_PORT/" sh "$_ps2") 2>&1)
 printf '%s\n' "$o" | grep -q "PREP_STEP_CALLED:npm-production-set" \
+   && ! printf '%s\n' "$o" | grep -q -- "--offline" \
     && pass "a registry that answers: the resolve runs as before" || fail "the resolve did not run with a registry that answers" "$o"
+check "a registry that answers: cdxgen's npm install is left as it was" "$(line "$o" NPM_ARGS)" ""
+# The project's .npmrc names another registry: that is the one cdxgen's
+# install uses, and the one asked first.
+printf 'registry=http://127.0.0.1:%s/\n' "$CLOSED_PORT" > "$p/.npmrc"
+o=$( (cd "$p" && TEST_NPM_PROJECT_REGISTRY="http://127.0.0.1:$CLOSED_PORT/" TEST_NPM_REGISTRY="http://127.0.0.1:$OK_PORT/" sh "$_ps2") 2>&1)
+check "the project's registry does not answer, the outside one does: npm-registry:network" "$(line "$o" FAILED)|$(line "$o" NPM_ARGS)" "npm-registry:network npm-production-set|--offline"
+printf '%s\n' "$o" | grep -q 'PREP_STEP_CALLED:npm-production-set .*install --offline ' \
+    && pass "the resolve runs offline as well" || fail "the resolve did not run offline" "$o"
+o=$( (cd "$p" && TEST_NPM_PROJECT_REGISTRY="http://127.0.0.1:$OK_PORT/" TEST_NPM_REGISTRY="http://127.0.0.1:$CLOSED_PORT/" sh "$_ps2") 2>&1)
+check "the project's registry answers, the outside one does not: only the resolve is skipped" "$(line "$o" FAILED)|$(line "$o" NPM_ARGS)" "npm-production-set|"
+if command -v openssl >/dev/null 2>&1 \
+   && openssl req -x509 -newkey rsa:2048 -nodes -subj /CN=127.0.0.1 -days 1 -keyout "$WORK/tls.key" -out "$WORK/tls.crt" >/dev/null 2>&1; then
+    cat > "$WORK/tls.js" <<'JS'
+const https = require("https");
+const fs = require("fs");
+const s = https.createServer({ key: fs.readFileSync(process.argv[2]), cert: fs.readFileSync(process.argv[3]) },
+  (req, res) => { res.writeHead(404); res.end(); });
+s.listen(0, "127.0.0.1", () => fs.writeFileSync(process.argv[4], String(s.address().port)));
+setTimeout(() => process.exit(0), 60000);
+JS
+    node "$WORK/tls.js" "$WORK/tls.key" "$WORK/tls.crt" "$WORK/tlsport" &
+    TLS_PID=$!
+    n=0; while [ ! -s "$WORK/tlsport" ] && [ "$n" -lt 50 ]; do sleep 0.1; n=$((n + 1)); done
+    TLS_PORT=$(cat "$WORK/tlsport" 2>/dev/null)
+    o=$( (cd "$p" && TEST_NPM_PROJECT_REGISTRY="https://127.0.0.1:$TLS_PORT/" TEST_NPM_REGISTRY="http://127.0.0.1:$OK_PORT/" sh "$_ps2") 2>&1)
+    check "a self-signed project registry: npm-registry:tls-trust" "$(line "$o" FAILED)|$(line "$o" NPM_ARGS)" "npm-registry:tls-trust npm-production-set|--offline"
+    _lg=$(printf '%s\n' "$o" | grep "npm registry 127.0.0.1:$TLS_PORT did not answer")
+    # shellcheck source=docker/lib/source-detect.sh
+    if [ -n "$_lg" ] && (. "$DETECT" >/dev/null 2>&1; printf '%s\n' "$_lg" | grep -qE -- "$TLS_TRUST_ERROR_RE"); then
+        pass "the log line names the certificate error the TLS hint reads"
+    else
+        fail "the certificate error is not in the log line, or not matched" "$o"
+    fi
+    kill "$TLS_PID" 2>/dev/null; wait "$TLS_PID" 2>/dev/null
+else
+    echo "  SKIP: openssl could not make a certificate; the TLS case is not run"
+fi
+rm -f "$p/.npmrc"
 printf '%s\n' 'lockfile v1' > "$p/yarn.lock"
 o=$( (cd "$p" && TEST_NPM_REGISTRY="http://127.0.0.1:$CLOSED_PORT/" sh "$_ps2") 2>&1)
 printf '%s\n' "$o" | grep -q "PREP_STEP_CALLED:npm-production-set" \
     && pass "with a yarn.lock the registry is not asked first" || fail "a yarn.lock project skipped the resolve" "$o"
 kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null; SRV_PID=""
+
+echo "== an offline install that resolved from npm's cache =="
+_un="$WORK/unmark.sh"
+{
+    printf '%s\n' 'log() { echo "[build-prep] $*"; }'
+    sed -n '/^unmark_prep_failed() {$/,/^}$/p' "$PREP"
+    sed -n '/^# The node registry probe found the registry down/,/^fi$/p' "$PREP"
+    # shellcheck disable=SC2016
+    printf '%s\n' 'echo "FAILED:$PREP_FAILED"'
+} > "$_un"
+p="$WORK/cached"; mkdir -p "$p"
+o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" sh "$_un") 2>&1)
+check "no lock file written: npm-registry:network stays" "$(line "$o" FAILED)" "npm-registry:network npm-production-set"
+printf '{}\n' > "$p/package-lock.json"
+o=$( (cd "$p" && NODE_REGISTRY_DOWN=network PREP_FAILED="npm-registry:network npm-production-set" sh "$_un") 2>&1)
+check "a lock file written by the offline install: npm-registry:network is taken off" "$(line "$o" FAILED)" "npm-production-set"
+printf '%s\n' "$o" | grep -qF "resolved every dependency from npm's cache" \
+    && pass "the log says the cache resolved it" || fail "the cache resolve is not logged" "$o"
 
 echo "== bomlens:node-lock-source on the SBOM =="
 _rec="$WORK/record.sh"

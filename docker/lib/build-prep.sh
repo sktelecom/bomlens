@@ -2528,10 +2528,13 @@ license_lookup_urls() {
 # registry_probe <url>...: ask each URL once (HEAD, LICENSE_PROBE_TIMEOUT
 # seconds each, all at once). Returns 3 when one did not answer, with
 # REGISTRY_PROBE_HOST and REGISTRY_PROBE_WHY naming the first such host and the
-# cause in words; 0 when every one answered, and also when the probe cannot run
-# (no node, or a node without fetch), so a caller never acts on a guess.
+# cause in words, and REGISTRY_PROBE_REASON the cause in the words
+# stage1_fail_reason uses (tls-trust for a certificate this container does not
+# trust, network otherwise); 0 when every one answered, and also when the probe
+# cannot run (no node, or a node without fetch), so a caller never acts on a
+# guess.
 registry_probe() {
-    REGISTRY_PROBE_HOST=""; REGISTRY_PROBE_WHY=""
+    REGISTRY_PROBE_HOST=""; REGISTRY_PROBE_WHY=""; REGISTRY_PROBE_REASON=""
     command -v node >/dev/null 2>&1 || return 0
     [ "$#" -gt 0 ] || return 0
     _rp_js="$(mktemp)" || return 0
@@ -2579,6 +2582,8 @@ LICENSE_PROBE_JS
     _rp_kind="$(printf '%s' "$_rp_out" | cut -f1)"
     REGISTRY_PROBE_HOST="$(printf '%s' "$_rp_out" | cut -f2)"
     _rp_code="$(printf '%s' "$_rp_out" | cut -f3 | tr -cd 'A-Za-z0-9_ .:-' | cut -c1-120)"
+    REGISTRY_PROBE_REASON=network
+    [ "$_rp_kind" != certificate ] || REGISTRY_PROBE_REASON=tls-trust
     case "$_rp_kind" in
         timeout) REGISTRY_PROBE_WHY="it did not answer within ${LICENSE_PROBE_TIMEOUT}s" ;;
         certificate)
@@ -3160,6 +3165,44 @@ NODE_INSTALLED_LOCK_JS
 fi
 # --- end node installed lock ---
 
+# --- node registry probe ---
+# With no lock file at the root, cdxgen runs `npm install` itself in the
+# project folder, which reads the project's own .npmrc. A registry that does not
+# answer does not stop that install: npm asks for every dependency in turn,
+# three times each (measured: 21 minutes through a proxy that never answers,
+# and as long against a registry whose certificate is not trusted), and the
+# result still lists nothing. So the registry npm reads from the project's
+# configuration (npm_registry_url in the project folder; its login is never
+# sent) is asked once first. When it does not answer, cdxgen's npm and pnpm
+# installs run with --offline (NPM_INSTALL_ARGS, PNPM_INSTALL_ARGS): they
+# resolve from the package manager's cache alone and end at once when it lacks
+# a package, so what is listed is what node_modules or that cache holds (the
+# CLI keeps npm's cache between scans: measured, a project scanned before
+# resolved its 120 components this way). The cause is logged and recorded as
+# the failed step npm-registry:tls-trust or npm-registry:network, taken off
+# again after cdxgen when the offline install wrote a lock file, that is,
+# resolved every dependency. The production set below is resolved offline too.
+NODE_REGISTRY_DOWN=""
+NODE_PROJECT_REGISTRY=""
+if [ -f package.json ] && command -v node >/dev/null 2>&1; then
+    _nrp_lock=""
+    for _nrp_lf in package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
+        [ ! -f "$_nrp_lf" ] || _nrp_lock=1
+    done
+    if [ -z "$_nrp_lock" ]; then
+        NODE_PROJECT_REGISTRY=$(npm_registry_url .)
+        if ! registry_probe "$NODE_PROJECT_REGISTRY"; then
+            NODE_REGISTRY_DOWN="${REGISTRY_PROBE_REASON:-network}"
+            NPM_INSTALL_ARGS="${NPM_INSTALL_ARGS:+$NPM_INSTALL_ARGS }--offline"
+            PNPM_INSTALL_ARGS="${PNPM_INSTALL_ARGS:+$PNPM_INSTALL_ARGS }--offline"
+            export NPM_INSTALL_ARGS PNPM_INSTALL_ARGS
+            log "node: no lock file, and the npm registry $REGISTRY_PROBE_HOST did not answer ($REGISTRY_PROBE_WHY); cdxgen's npm install runs offline instead of waiting for it, so only packages already in node_modules or in npm's cache can be listed. Commit a lock file, or let the scan reach the registry"
+            mark_prep_failed "npm-registry:$NODE_REGISTRY_DOWN"
+        fi
+    fi
+fi
+# --- end node registry probe ---
+
 # Node (npm) — cdxgen reads package.json's devDependencies and pulls the whole dev
 # tree (jest/eslint/babel/prettier…) into the SBOM as if a deployed app shipped its
 # build/test tooling. It is the npm analogue of the Android over-scan and inflates a
@@ -3215,11 +3258,20 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     done
     # With no lock file at all, the resolve below needs the registry for every
     # package (offline it retries for minutes, measured). Ask the registry npm
-    # would use once first; one that does not answer skips the resolve.
+    # would use once first; one that does not answer skips the resolve. The
+    # scratch copy has no .npmrc, so that is the registry configured outside
+    # the project, asked again only when it is not the one the node registry
+    # probe above asked. When that one did not answer, cdxgen's own install
+    # runs offline, and so does this resolve (npm's cache only, no retries,
+    # and not the retry loop below): it ends at once unless the cache holds
+    # every package, as it does for a project scanned before.
     _npm_unreachable=""
-    if [ -n "$_npm_nolock" ] && [ "$NODE_INSTALLED_ROOT" != npm ]; then
+    _npm_offline=""
+    if [ -n "$_npm_nolock" ] && [ "$NODE_INSTALLED_ROOT" != npm ] && [ -n "$NODE_REGISTRY_DOWN" ]; then
+        _npm_offline=" --offline"
+    elif [ -n "$_npm_nolock" ] && [ "$NODE_INSTALLED_ROOT" != npm ]; then
         _npm_reg=$(npm_registry_url "$_npmtmp")
-        if ! registry_probe "$_npm_reg"; then
+        if [ "$_npm_reg" != "$NODE_PROJECT_REGISTRY" ] && ! registry_probe "$_npm_reg"; then
             _npm_unreachable=1
             log "node: no lock file, and the npm registry $REGISTRY_PROBE_HOST did not answer ($REGISTRY_PROBE_WHY); dependency relations are not available and the production filter is not applied. Commit a lock file, or let the scan reach the registry"
             mark_prep_failed npm-production-set
@@ -3234,9 +3286,13 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
         mark_prep_applied npm-production-set
         _npm_ok=1
         log "node: production set read from the installed lock file (no npm resolve)"
-    elif prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
+    elif prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install$_npm_offline --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
        && [ -f "$_npmtmp/package-lock.json" ]; then
         _npm_ok=1
+    fi
+    if [ -z "$_npm_ok" ] && [ -n "$_npm_offline" ]; then
+        _npm_unreachable=1
+        log "node: the production set is not resolved (the npm registry did not answer, and npm's cache does not hold every package); the production filter is not applied"
     fi
     # One dependency npm cannot fetch (a private git URL, a package missing from
     # the registry, a version that does not exist) fails the whole resolve, and
@@ -3668,6 +3724,13 @@ if [ "$rc" -eq 124 ] && [ -n "$CDXGEN_LOOKUP_LIMITED" ]; then
     rc=$?
 elif [ "$rc" -eq 124 ]; then
     log "cdxgen: stopped after ${PREP_TIMEOUT_DEFAULT}s on a Swift tree (a dependency clone that does not finish is the usual cause); raise BOMLENS_PREP_TIMEOUT to wait longer"
+fi
+# The node registry probe found the registry down and cdxgen's install ran
+# offline. A lock file at the root now (there was none) means that install
+# resolved every dependency from the cache, so the registry was not needed.
+if [ -n "$NODE_REGISTRY_DOWN" ] && { [ -f package-lock.json ] || [ -f pnpm-lock.yaml ]; }; then
+    unmark_prep_failed "npm-registry:$NODE_REGISTRY_DOWN"
+    log "node: cdxgen's offline npm install resolved every dependency from npm's cache; the versions are the newest cached ones that package.json allows"
 fi
 
 # The installed Python environment read above: its packages and their graph

@@ -30,7 +30,7 @@
     "swift-package-resolve", "cargo-lockfile", "go-mod-tidy", "bundle-lock",
     "composer-install", "gradle-wrapper-jdk"
   ],
-  "resolutionStepPrefixes": ["npm-excluded:"],
+  "resolutionStepPrefixes": ["npm-excluded:", "npm-registry:"],
   "resolutionHints": {
     "maven-parent-outside-scan": {
       "en": "The scanned folder is a module of a multi-module Maven build whose parent POM is outside the folder, so Maven could not read the project and only the dependencies written in its pom.xml are listed.",

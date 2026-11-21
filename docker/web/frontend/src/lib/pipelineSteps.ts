@@ -53,6 +53,8 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "npm-production-set": "pipelineSteps.npmProductionSet",
   "npm-installed-lock": "pipelineSteps.npmInstalledLock",
   "pnpm-installed-lock": "pipelineSteps.pnpmInstalledLock",
+  "npm-registry:tls-trust": "pipelineSteps.npmRegistryTlsTrust",
+  "npm-registry:network": "pipelineSteps.npmRegistryNetwork",
   "pip-install": "pipelineSteps.pipInstall",
   "poetry-graph": "pipelineSteps.poetryGraph",
   "cargo-workspace-metadata": "pipelineSteps.cargoWorkspaceMetadata",

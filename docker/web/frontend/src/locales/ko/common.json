@@ -1077,6 +1077,8 @@
     "npmProductionSet": "npm 프로덕션 의존성 해석",
     "npmInstalledLock": "설치 때 생긴 npm lock 파일 읽기",
     "pnpmInstalledLock": "설치 때 생긴 pnpm lock 파일 읽기",
+    "npmRegistryTlsTrust": "npm 레지스트리 접속(인증서를 신뢰하지 않음)",
+    "npmRegistryNetwork": "npm 레지스트리 접속(연결할 수 없음)",
     "pipInstall": "Python 의존성 설치",
     "poetryGraph": "Poetry 의존 그래프",
     "cargoWorkspaceMetadata": "Cargo 워크스페이스 멤버 탐지",

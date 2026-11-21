@@ -853,13 +853,14 @@ mark_compositions_aggregate() {
                 # and so is a stage 1 whose registry refused some downloads
                 # (bomlens:registry-refused), and a Node.js workspace whose
                 # installed lock was not read (npm-installed-lock,
-                # pnpm-installed-lock failed).
+                # pnpm-installed-lock failed), and a Node.js project with no
+                # lock file whose npm registry did not answer (npm-registry:*).
                 | ((($props | map(select(.name=="bomlens:sbom-tool-degraded" or .name=="bomlens:python-environment-unsure" or .name=="bomlens:registry-refused")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
                    or ($failed | index("gradle-packages") != null)
                    or ($failed | index("gradle-wrapper-jdk") != null)
-                   or ($failed | any(startswith("npm-excluded:")))
+                   or ($failed | any(startswith("npm-excluded:") or startswith("npm-registry:")))
                    or ($failed | index("maven-dependency-tree") != null)
                    or ($failed | index("npm-installed-lock") != null)
                    or ($failed | index("pnpm-installed-lock") != null)) as $degraded

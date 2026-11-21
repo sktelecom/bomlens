@@ -1077,6 +1077,8 @@
     "npmProductionSet": "npm production dependency resolution",
     "npmInstalledLock": "npm lock file written at install",
     "pnpmInstalledLock": "pnpm lock file written at install",
+    "npmRegistryTlsTrust": "npm registry (certificate not trusted)",
+    "npmRegistryNetwork": "npm registry (not reachable)",
     "pipInstall": "Python dependency installation",
     "poetryGraph": "Poetry dependency graph",
     "cargoWorkspaceMetadata": "Cargo workspace member detection",
