@@ -851,14 +851,18 @@ mark_compositions_aggregate() {
                 # installed Python environment read with something it could
                 # not settle (bomlens:python-environment-unsure) is the same,
                 # and so is a stage 1 whose registry refused some downloads
-                # (bomlens:registry-refused).
+                # (bomlens:registry-refused), and a Node.js workspace whose
+                # installed lock was not read (npm-installed-lock,
+                # pnpm-installed-lock failed).
                 | ((($props | map(select(.name=="bomlens:sbom-tool-degraded" or .name=="bomlens:python-environment-unsure" or .name=="bomlens:registry-refused")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
                    or ($failed | index("gradle-packages") != null)
                    or ($failed | index("gradle-wrapper-jdk") != null)
                    or ($failed | any(startswith("npm-excluded:")))
-                   or ($failed | index("maven-dependency-tree") != null)) as $degraded
+                   or ($failed | index("maven-dependency-tree") != null)
+                   or ($failed | index("npm-installed-lock") != null)
+                   or ($failed | index("pnpm-installed-lock") != null)) as $degraded
                 | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
                 | ((.components // []) | length) as $components
                 | ([(.dependencies // [])[]?.dependsOn[]?] | length) as $edges

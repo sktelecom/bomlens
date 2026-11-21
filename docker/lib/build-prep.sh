@@ -2803,7 +2803,8 @@ NODE_INSTALLED_LOCK_JS
             _nil_src="${_nil_rel:+$_nil_rel/}node_modules/.package-lock.json"
             _nil_out="$_nil_dir/package-lock.json"
             if node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(p && p.workspaces ? 0 : 1)' "$_nil_pj" 2>/dev/null; then
-                log "node: $_nil_where is an npm workspace root with no lock file; $_nil_src is not read (workspaces are not supported here)"
+                log "node: $_nil_where is an npm workspace root with no lock file; $_nil_src is not read (workspaces are not supported here), so the dependency relations and the workspace members' dependencies may be missing. Commit package-lock.json and scan again"
+                mark_prep_failed npm-installed-lock
                 continue
             fi
             _nil_msg=$(node "$_nil_js" npm "$_nil_pj" "$_nil_npm" "$_nil_out" 2>/dev/null) || _nil_rc=$?
@@ -2827,7 +2828,8 @@ NODE_INSTALLED_LOCK_JS
                 mark_prep_applied "$_nil_kind-installed-lock"
                 log "node: no lock file in $_nil_where; reading the lock file $_nil_kind wrote at install ($_nil_src)" ;;
             3) log "node: $_nil_src does not list $(printf '%s' "$_nil_msg" | cut -c1-200) from package.json (installed before package.json changed); not read. Run $_nil_kind install again, or commit the lock file" ;;
-            4) log "node: $_nil_src is the lock of a workspace; not read (workspaces are not supported here)" ;;
+            4) log "node: $_nil_src is the lock of a workspace; not read (workspaces are not supported here), so the workspace members' dependencies may be missing. Commit the lock file and scan again"
+               mark_prep_failed "$_nil_kind-installed-lock" ;;
             5) log "node: could not place a lock file in $_nil_where; $_nil_src is not read" ;;
             *) log "node: $_nil_src could not be read; not used" ;;
         esac
@@ -2855,7 +2857,15 @@ if [ -f package.json ] && [ ! -f package-lock.json ] \
    && { [ -f pnpm-workspace.yaml ] || { command -v node >/dev/null 2>&1 \
         && node -e 'const p=JSON.parse(require("fs").readFileSync("package.json","utf8")); process.exit(p.workspaces ? 0 : 1)' 2>/dev/null; }; }; then
     _node_ws_nolock=1
-    log "node: workspace root with no package-lock.json; keeping the full graph (production filter not applied)"
+    _node_ws_lock=""
+    for _node_ws_lf in npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
+        [ -f "$_node_ws_lf" ] && { _node_ws_lock=$_node_ws_lf; break; }
+    done
+    if [ -n "$_node_ws_lock" ]; then
+        log "node: workspace root with no package-lock.json; keeping the full graph from $_node_ws_lock (production filter not applied)"
+    else
+        log "node: workspace root with no lock file; dependency relations are not available and the production filter is not applied"
+    fi
 fi
 if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
    && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
