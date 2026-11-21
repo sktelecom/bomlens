@@ -41,14 +41,15 @@ _sec="$WORK/section.sh"
 {
     printf '%s\n' 'log() { echo "[build-prep] $*"; }'
     printf '%s\n' 'mark_prep_applied() { PREP_APPLIED="${PREP_APPLIED:+$PREP_APPLIED }$1"; }'
-    printf '%s\n' 'PREP_APPLIED=""'
+    printf '%s\n' 'mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }'
+    printf '%s\n' 'PREP_APPLIED=""; PREP_FAILED=""'
     printf '%s\n' 'NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples sample samples bench benches benchmark benchmarks demo demos playground"'
     printf '%s\n' 'EXCLUDE_NON_SHIPPED=1'
     printf '%s\n' 'SRC="$(pwd)"'
     sed -n '/^NODE_INSTALLED_LOCKS=""$/,/^}$/p' "$PREP"
     sed -n '/^# --- node installed lock ---$/,/^# --- end node installed lock ---$/p' "$PREP"
     # shellcheck disable=SC2016
-    printf '%s\n' 'echo "ROOT:$NODE_INSTALLED_ROOT"; echo "APPLIED:$PREP_APPLIED"' \
+    printf '%s\n' 'echo "ROOT:$NODE_INSTALLED_ROOT"; echo "APPLIED:$PREP_APPLIED"; echo "FAILED:$PREP_FAILED"' \
         'printf "%s\n" "$NODE_INSTALLED_LOCK_SOURCES" | sed "s/^/SOURCE:/"' \
         'printf "%s\n" "$NODE_INSTALLED_LOCKS" | sed "s/^/WROTE:/"' \
         '[ -z "${REMOVE:-}" ] || node_installed_lock_remove'
@@ -225,11 +226,21 @@ o=$(run_section "$p")
 check "an npm workspace root: nothing written" "$( [ -f "$p/package-lock.json" ] && echo written)|$(line "$o" APPLIED)" "|"
 printf '%s\n' "$o" | grep -q "npm workspace root with no lock file" \
     && pass "the workspace root is logged" || fail "the workspace root is not logged" "$o"
+check "an npm workspace root: npm-installed-lock is recorded as failed" "$(line "$o" FAILED)" "npm-installed-lock"
+o=$( (cd "$p" && sh "$_ps") 2>&1)
+printf '%s\n' "$o" | grep -q "workspace root with no lock file; dependency relations are not available and the production filter is not applied" \
+    && pass "with no lock file, the log does not claim a full graph" || fail "the no-lock workspace log line is wrong" "$o"
+printf '# yarn lockfile v1\n' > "$p/yarn.lock"
+o=$( (cd "$p" && sh "$_ps") 2>&1)
+printf '%s\n' "$o" | grep -q "keeping the full graph from yarn.lock" \
+    && pass "with a yarn.lock, the log names the lock the full graph comes from" || fail "the yarn workspace log line is wrong" "$o"
+rm -f "$p/yarn.lock"
 p="$WORK/ws-lock"; npm_project "$p"
 jq '.packages["packages/a"] = {"name":"a","version":"1.0.0"} | .packages["node_modules/a"] = {"resolved":"packages/a","link":true}' \
     "$p/node_modules/.package-lock.json" > "$p/l.json" && mv "$p/l.json" "$p/node_modules/.package-lock.json"
 o=$(run_section "$p")
 check "a lock with workspace members: nothing written" "$( [ -f "$p/package-lock.json" ] && echo written)|$(line "$o" APPLIED)" "|"
+check "a lock with workspace members: npm-installed-lock is recorded as failed" "$(line "$o" FAILED)" "npm-installed-lock"
 
 p="$WORK/member"; mkdir -p "$p/packages"; printf '{"lockfileVersion":3,"packages":{"":{}}}\n' > "$p/package-lock.json"
 printf '{"name":"root","private":true}\n' > "$p/package.json"; npm_project "$p/packages/a"
@@ -267,11 +278,13 @@ p="$WORK/pnpm-stale"; pnpm_project "$p"
 jq '.dependencies.chalk = "^5.0.0"' "$p/package.json" > "$p/p.json" && mv "$p/p.json" "$p/package.json"
 o=$(run_section "$p")
 check "pnpm, a dependency added after the install: nothing written" "$( [ -f "$p/pnpm-lock.yaml" ] && echo written)|$(line "$o" APPLIED)" "|"
+check "a stale lock is not a failed step" "$(line "$o" FAILED)" ""
 p="$WORK/pnpm-ws"; pnpm_project "$p"
 awk '{print} /^importers:/{print ""; print "  packages/a:"; print "    dependencies: {}"}' "$p/node_modules/.pnpm/lock.yaml" > "$p/l.yaml" \
     && mv "$p/l.yaml" "$p/node_modules/.pnpm/lock.yaml"
 o=$(run_section "$p")
 check "pnpm workspace (a second importer): nothing written" "$( [ -f "$p/pnpm-lock.yaml" ] && echo written)|$(line "$o" APPLIED)" "|"
+check "pnpm workspace (a second importer): pnpm-installed-lock is recorded as failed" "$(line "$o" FAILED)" "pnpm-installed-lock"
 p="$WORK/both"; npm_project "$p"; pnpm_project "$p"
 jq '.dependencies = {"ms": "^2.1.2"}' "$p/package.json" > "$p/p.json" && mv "$p/p.json" "$p/package.json"
 touch -t 202601010000 "$p/node_modules/.pnpm/lock.yaml"
