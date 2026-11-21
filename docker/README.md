@@ -33,6 +33,12 @@ docker build -t sbom-scanner:local .
 # Build time: about 10-15 minutes, depending on network speed
 ```
 
+A local build carries no version of its own, so the SBOMs it generates, from the CLI and the web UI alike, name the tool version `unknown` (the scan log shows `[docmeta] tool=BomLens@unknown`). To record one, pass it when you build:
+
+```bash
+docker build --build-arg BOMLENS_VERSION="$(git describe --tags)" -t sbom-scanner:local .
+```
+
 ### Verifying the build
 
 Check with tools that are actually in the image. cdxgen is not in this image; for source scans, `scan-sbom.sh` pulls the per-language official cdxgen images separately when it needs one.
