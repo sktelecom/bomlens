@@ -280,8 +280,11 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
       ),
     });
 
-  // Versions the resolver chose, not versions anyone installed.
-  if (sb?.versionPinning === "unpinned")
+  // Versions the resolver chose, not versions anyone installed. Not said when a
+  // dependency resolution step failed: the versions then did not come from a
+  // fresh install, and the completeness warning above already says why.
+  const resolutionFailed = Boolean(completeness?.reasons?.some((r) => r.code === "resolution-failed"));
+  if (sb?.versionPinning === "unpinned" && !resolutionFailed)
     notices.push({ id: "unpinned", variant: "info", title: t("result.unpinnedTitle"), testId: "version-pinning", body: t("result.unpinnedBody") });
 
   if (!ai && sb?.suggestIdentifyVendored)
