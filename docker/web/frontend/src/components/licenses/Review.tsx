@@ -12,10 +12,11 @@ import { type LicenseReview, reviewGroups } from "@/lib/licenses";
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
   "non-commercial": "licenses.flagNonCommercial",
+  "no-derivatives": "licenses.flagNoDerivatives",
 };
 
-/** Terms that need a person to read them: AI behavioral-use and non-commercial
- *  licenses, flagged from the bomlens:licenseReview property so the box matches
+/** Terms that need a person to read them: AI behavioral-use, non-commercial and
+ *  no-derivatives licenses, flagged from the bomlens:licenseReview property so the box matches
  *  the NOTICE review section. */
 export function Review({ components }: { components: ComponentItem[] }) {
   const { t } = useTranslation();

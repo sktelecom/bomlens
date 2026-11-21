@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A no-derivatives license (CC-BY-ND, "NoDerivatives") is flagged for review as `no-derivatives` in `bomlens:licenseReview`, next to `behavioral-use` and `non-commercial`: the NOTICE review section, the AI profile (`licenseReview.noDerivatives`), the conformance report and the web UI's "License review needed" box list it.
 - A source scan whose SBOM was written although the package registry refused some downloads (HTTP 401 or 403) records `bomlens:registry-refused` (`registry-auth`) on the SBOM, declares the dependency graph `incomplete`, and the web UI Overview shows a warning with advice for the input (a folder, a Git URL or an archive) and a link to the company-network guide.
 - `--fail-on incomplete-result` exits 4 when the result is partial or unreliable (the grade the reports state), and `--fail-on incomplete-result=unreliable` only when it is unreliable. The closing summary now prints the grade, the reason codes and how to fix each, and the advice for a source with no component depends on the reason (a damaged lock file, a failed resolution step). The default exit code is unchanged: an incomplete result still exits 0 unless you ask.
 - CMake `FetchContent_Declare` dependencies are recognised as declared C/C++ dependencies: a source whose only manifests are vcpkg, Conan or CMake FetchContent ones and that resolves no component is graded unreliable, with `--identify-vendored` and `sbom-declared.cdx.json` as the alternatives.

@@ -355,6 +355,7 @@ describe("profileCard", () => {
       licenseTotal: 2,
       licenseBehavioral: 1,
       licenseNonCommercial: 1,
+      licenseNoDerivatives: 0,
       frameworkCount: 2,
       crosswalk: { total: 14, present: 8, gap: 4, review: 2, failed: 0 },
     });

@@ -66,7 +66,7 @@ if report_completeness_incomplete; then INCOMPLETE=true; fi
 # The normalize() definition is shared with normalize-sbom.sh via spdx-normalize.jq
 # so the NOTICE and the bom.json the web UI reads group licenses identically.
 NORMALIZE_DEF="$(cat "$SCRIPT_DIR/spdx-normalize.jq")"
-# AI-relevant restrictive-license classifier (behavioral-use / non-commercial),
+# AI-relevant restrictive-license classifier (behavioral-use / non-commercial / no-derivatives),
 # shared with normalize-sbom.sh. Drives the "license review" section below.
 LICENSE_FLAGS_DEF="$(cat "$SCRIPT_DIR/license-flags.jq")"
 
@@ -299,7 +299,8 @@ def unverified_note($s):
   else "  [unverified name — not an SPDX identifier; confirm against the component'"'"'s license file]" end;
 '
 
-# Licenses needing human review (AI behavioral-use / non-commercial). Empty for a
+# Licenses needing human review (AI behavioral-use / non-commercial /
+# no-derivatives). Empty for a
 # normal software scan; populated when a model/dataset carries e.g. a Llama/RAIL
 # or CC-BY-NC license. The tool surfaces the class; a human judges applicability.
 REVIEW=$(echo "$LICENSE_MAP" | jq -c "$LICENSE_FLAGS_DEF"'
@@ -348,7 +349,7 @@ done)
         echo "================================================================================"
         echo "License review needed — AI / restrictive terms (human review required)"
         echo "================================================================================"
-        echo "behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use."
+        echo "behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use; no-derivatives = modified versions may not be distributed."
         echo "$REVIEW" | jq -r '.[] |
             "\n[\(.flag)] \(.license)  (\(.components|length) component(s)):",
             (.components[] | "  - \(.)")'
@@ -411,10 +412,10 @@ HTMLHEAD
         report_completeness_html
     fi
 
-    # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
+    # License review banner (AI behavioral-use / non-commercial / no-derivatives). Escaped via @html.
     if [ "$REVIEW_N" -gt 0 ]; then
         echo "<div class=\"banner\"><h2 class=\"banner-title\">$(n_s review_title 'License review needed — AI / restrictive terms')</h2>"
-        echo "<p class=\"meta\">$(n_s review_intro 'behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use. Human review required.')</p><ul>"
+        echo "<p class=\"meta\">$(n_s review_intro 'behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use; no-derivatives = modified versions may not be distributed. Human review required.')</p><ul>"
         echo "$REVIEW" | jq -r '.[] |
             "<li><b>[" + (.flag|@html) + "]</b> " + (.license|@html) + " — "
             + (.components | map(@html) | join(", ")) + "</li>"'

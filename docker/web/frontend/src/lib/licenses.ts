@@ -3,7 +3,7 @@
 
 /**
  * License grouping and restriction review for the Licenses section. The review
- * classes (behavioral-use / non-commercial) come from the component's
+ * classes (behavioral-use / non-commercial / no-derivatives) come from the component's
  * bomlens:licenseReview property (set by normalize-sbom.sh via the shared
  * license-flags.jq), so the badge and the NOTICE's review section never
  * disagree. Pure and unit tested.
@@ -209,8 +209,8 @@ export function parseSpdxExpression(s: string): string[][] {
  * CC-BY-NC, CC-BY-ND) impose attribution or a field-of-use limit but never
  * propagate the license, so they land on permissive for THIS axis — a
  * non-commercial restriction is a real limitation, but flagging it is
- * license_flag's job (bomlens:licenseReview), not this one's; CC-BY-NC is
- * already caught there. CC-BY-ND is not, and neither axis currently says so.
+ * license_flag's job (bomlens:licenseReview), not this one's; CC-BY-NC and
+ * CC-BY-ND are caught there.
  */
 export function licenseRiskTier(license: string): LicenseRiskTier {
   const id = license.trim();
@@ -382,7 +382,7 @@ export function licenseRiskSummary(
 }
 
 // Most-restrictive first.
-const REVIEW_ORDER: LicenseReview[] = ["behavioral-use", "non-commercial"];
+const REVIEW_ORDER: LicenseReview[] = ["behavioral-use", "non-commercial", "no-derivatives"];
 
 /** Components grouped by their restriction class — empty when none need review. */
 export function reviewGroups(components: ComponentItem[]): ReviewGroup[] {

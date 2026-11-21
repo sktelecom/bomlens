@@ -397,6 +397,7 @@ export interface ProfileCardModel {
   licenseTotal: number;
   licenseBehavioral: number;
   licenseNonCommercial: number;
+  licenseNoDerivatives: number;
   /** How many regulatory frameworks the crosswalk covers. */
   frameworkCount: number;
   /** Aggregate coverage across all crosswalk frameworks. */
@@ -413,6 +414,7 @@ export function profileCard(profile: AiProfile): ProfileCardModel {
     licenseTotal: profile.licenseReview.total,
     licenseBehavioral: profile.licenseReview.behavioral,
     licenseNonCommercial: profile.licenseReview.nonCommercial,
+    licenseNoDerivatives: profile.licenseReview.noDerivatives ?? 0,
     frameworkCount: profile.regulatoryCrosswalk.frameworks.length,
     crosswalk: crosswalkTotals(profile.regulatoryCrosswalk.frameworks),
   };
