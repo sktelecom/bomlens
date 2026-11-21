@@ -684,13 +684,39 @@ def _scrub_error_text(text):
 _SCAN_ERROR_MAX_CHARS = 500
 
 _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
+# An older scanner image's note that another scan of the same folder was still
+# running while this one went ahead. It reaches the result screen as a warning
+# with this code in front.
+_SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
+# The scanner waits for another scan of the same folder (from the web UI or the
+# command line) before it starts: one [INFO] line when the wait begins and one
+# when it ends. The running view shows the wait from a `waiting` SSE event.
+_SAME_FOLDER_WAIT_RE = re.compile(r"^\[INFO\]\s+Another scan of this folder is running\b")
+_SAME_FOLDER_WAIT_END_RE = re.compile(
+    r"^\[INFO\]\s+The earlier scan of this folder has finished; this scan starts now")
+SAME_FOLDER_WAIT_CODE = "SAME_FOLDER_SCAN_RUNNING"
+
+
+def same_folder_wait_event(line):
+    """The `waiting` event payload a scanner log line stands for: a dict with
+    waiting true (and the code and the masked line) when the scan starts to
+    wait for another scan of its folder, waiting false when that wait ends,
+    and None for any other line."""
+    if not isinstance(line, str):
+        return None
+    text = line.strip()
+    if _SAME_FOLDER_WAIT_RE.search(text):
+        return {"waiting": True, "code": SAME_FOLDER_WAIT_CODE,
+                "detail": _mask_credentials(text)[:_SCAN_ERROR_MAX_CHARS]}
+    if _SAME_FOLDER_WAIT_END_RE.search(text):
+        return {"waiting": False, "code": SAME_FOLDER_WAIT_CODE}
+    return None
+
+
 # A scanner [ERROR] line may carry a machine-readable code right after the
 # marker ("[ERROR] ANDROID_SDK_IMAGE_MISSING: ..."), for a program that shows
 # its own dialog instead of the text. Only the codes listed here are passed on,
 # so a log line can never put arbitrary text into the `code` field.
-# The scanner's note that another scan of the same folder is still running. It
-# reaches the result screen as a warning with this code in front.
-_SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
 KNOWN_ERROR_CODES = (
     "ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE",
     # Upload-time refusals of a supplier SBOM that cannot be parsed (the code
@@ -6006,7 +6032,8 @@ def _bounded_int_env(name, default, low, high):
 # (GET /scan-attach): a reloaded tab, or another one. The events are kept in a
 # bounded buffer per scan so a tab that joins late is shown the log so far, and
 # then follows it. Only log and error events are kept, oldest first out past
-# either cap; the last progress event and the final done event are kept apart.
+# either cap; the last progress event, a same-folder wait still under way
+# (`waiting`) and the final done event are kept apart.
 SCAN_REPLAY_MAX_EVENTS = 5000
 SCAN_REPLAY_MAX_BYTES = 1024 * 1024
 # Error events pushed out of the buffer are still replayed, up to this many.
@@ -6048,6 +6075,7 @@ class _ScanBroadcast:
         self.dropped_lines = 0
         self._kept_errors = []
         self._progress = None
+        self._waiting = None
         self._done = None
         self._followers = set()
         self.owner_alive = True
@@ -6063,6 +6091,13 @@ class _ScanBroadcast:
                 self.ended_at = time.monotonic()
             elif event == "progress":
                 self._progress = payload
+            elif event == "waiting":
+                # Only a wait still under way is replayed to a joining tab.
+                try:
+                    still = json.loads(payload).get("waiting") is True
+                except (ValueError, AttributeError):
+                    still = False
+                self._waiting = payload if still else None
             else:
                 self._events.append((event, payload))
                 self._bytes += len(payload)
@@ -6093,6 +6128,8 @@ class _ScanBroadcast:
             if self._done is None and len(self._followers) >= SCAN_ATTACH_MAX_CLIENTS:
                 return None
             replay = list(self._kept_errors) + list(self._events)
+            if self._waiting is not None and self._done is None:
+                replay.append(("waiting", self._waiting))
             if self._progress is not None:
                 replay.append(("progress", self._progress))
             if self._done is not None:
@@ -9581,6 +9618,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Credential-shaped text is masked before it reaches the browser
                 # (and so the copy-log button); digests and checksums are kept.
                 sse("log", json.dumps(_mask_credentials(ln) if isinstance(ln, str) else ln))
+                # The scan waits for another scan of the same folder, or that
+                # wait has ended: the running view says so, after the line.
+                waiting = same_folder_wait_event(ln)
+                if waiting is not None:
+                    sse("waiting", json.dumps(waiting))
             if (sibling is not None and env.get("MODE") == "SOURCE" and sibling.get("source_root")
                     and env.get("DEEP_LICENSE") == "true" and deep_license_capable()):
                 # Deep license with deep CVE on a source tree: the sibling runs
