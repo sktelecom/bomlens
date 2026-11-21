@@ -1505,11 +1505,13 @@ g7g_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confg
 
 echo "== AI compliance profile re-aggregates conformance + license flags =="
 # Reuse the AI-fixture conformance from the G7 section ($WORK/conf_conformance.json);
-# give the profile a matching _bom.json carrying one behavioral-use and one
-# no-derivatives license flag.
+# give the profile a matching _bom.json carrying one behavioral-use, one
+# no-derivatives and one proprietary license flag.
 jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])
     | .components += [{type:"data",name:"nd-data",version:"1.0",licenses:[{license:{id:"CC-BY-ND-4.0"}}],
-        properties:[{name:"bomlens:licenseReview",value:"no-derivatives"}]}]' \
+        properties:[{name:"bomlens:licenseReview",value:"no-derivatives"}]},
+      {type:"library",name:"vendor-sdk",version:"2.0",licenses:[{license:{name:"Commercial license"}}],
+        properties:[{name:"bomlens:licenseReview",value:"proprietary"}]}]' \
    "$FIX/aibom-owasp-1_7.json" > "$WORK/conf_bom.json"
 bash "$LIB/generate-ai-profile.sh" "$WORK/conf" "demo" >/dev/null 2>&1
 PROF="$WORK/conf_ai-profile.json"
@@ -1523,8 +1525,12 @@ if [ -f "$PROF" ]; then
     { [ "$lf" -ge 1 ] && [ "$lb" -ge 1 ]; } && pass "license-review flag surfaced ($lf total, $lb behavioral-use)" || fail "license flag not surfaced (total=$lf, behavioral=$lb)"
     ld=$(jq -r '.licenseReview.noDerivatives' "$PROF")
     [ "$ld" = "1" ] && grep -q "| No derivatives |" "$WORK/conf_ai-profile.md" \
-        && grep -q "1 no-derivatives)" "$WORK/conf_ai-profile.md" \
+        && grep -q "1 no-derivatives, " "$WORK/conf_ai-profile.md" \
         && pass "no-derivatives flag counted and labelled in the profile" || fail "no-derivatives flag not surfaced (noDerivatives=$ld)"
+    lp=$(jq -r '.licenseReview.proprietary' "$PROF")
+    [ "$lp" = "1" ] && grep -q "| Proprietary or commercial |" "$WORK/conf_ai-profile.md" \
+        && grep -q "1 proprietary)" "$WORK/conf_ai-profile.md" \
+        && pass "proprietary flag counted and labelled in the profile" || fail "proprietary flag not surfaced (proprietary=$lp)"
     xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
     grep -q "re-aggregates the conformance and SBOM artifacts" "$WORK/conf_ai-profile.md" && pass "MD states it re-aggregates existing artifacts" || fail "MD lacks the re-aggregation note"
@@ -1940,8 +1946,10 @@ REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koconf" "demo" >/dev/nu
 if [ -f "$WORK/koconf_ai-profile.json" ]; then
     grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the cluster rollup" || fail "ko cluster rollup not localized"
     grep -q '검토 대상 라이선스' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the license section" || fail "ko license section not localized"
-    { grep -q '변경 금지 1)' "$WORK/koconf_ai-profile.md" && grep -q '| 변경 금지 |' "$WORK/koconf_ai-profile.md"; } \
+    { grep -q '변경 금지 1, ' "$WORK/koconf_ai-profile.md" && grep -q '| 변경 금지 |' "$WORK/koconf_ai-profile.md"; } \
         && pass "ko profile labels the no-derivatives flag" || fail "ko profile no-derivatives label missing"
+    { grep -q '상용 또는 독점 1)' "$WORK/koconf_ai-profile.md" && grep -q '| 상용 또는 독점 |' "$WORK/koconf_ai-profile.md"; } \
+        && pass "ko profile labels the proprietary flag" || fail "ko profile proprietary label missing"
     REPORT_LANG=ko bash "$LIB/validate-sbom.sh" "$WORK/conf_bom.json" "$WORK/kond" "demo" >/dev/null 2>&1
     grep -q '<td>변경 금지</td>' "$WORK/kond_conformance.html" \
         && pass "ko conformance labels the no-derivatives flag" || fail "ko conformance no-derivatives label missing"

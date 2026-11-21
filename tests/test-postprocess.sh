@@ -16173,6 +16173,38 @@ jq -e '.reasons[] | select(.code == "resolution-failed") | (.fix.en | test("Fix 
     && pass "completeness/hints: a general hint with no specific one keeps its fix" \
     || fail "completeness/hints: the general hint lost its fix" "$(jq -c '.reasons' "$RHD/general_completeness.json" 2>&1 | head -c 400)"
 
+echo "== licenseReview: a proprietary or commercial license text is flagged for review =="
+# A podspec (or any manifest) that says "commercial" names no open source
+# license. It gets bomlens:licenseReview=proprietary, the NOTICE lists it under
+# license review, and the class stays uncategorized. No SPDX id gets the flag.
+LRD="$WORK/lrprop"
+mkdir -p "$LRD"
+cat > "$LRD/bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"p","version":"1"}},"components":[
+ {"type":"library","name":"PaySDK","version":"1.0","purl":"pkg:cocoapods/PaySDK@1.0","licenses":[{"license":{"name":"commercial"}}]},
+ {"type":"library","name":"Vendor","version":"1.0","purl":"pkg:cocoapods/Vendor@1.0","licenses":[{"license":{"name":"Commercial license"}}]},
+ {"type":"library","name":"Closed","version":"1.0","purl":"pkg:pypi/closed@1.0","licenses":[{"license":{"name":"Proprietary"}}]},
+ {"type":"library","name":"Classifier","version":"1.0","purl":"pkg:pypi/classifier@1.0","licenses":[{"license":{"name":"Other/Proprietary License"}}]},
+ {"type":"library","name":"NC","version":"1.0","purl":"pkg:pypi/nc@1.0","licenses":[{"license":{"id":"CC-BY-NC-4.0"}}]},
+ {"type":"library","name":"Free","version":"1.0","purl":"pkg:pypi/free@1.0","licenses":[{"license":{"id":"MIT"}}]}]}
+JSON
+bash "$LIB/normalize-sbom.sh" "$LRD/bom.json" >/dev/null 2>&1
+lrv() { jq -r --arg n "$1" --arg p "$2" '.components[] | select(.name == $n) | [(.properties // [])[] | select(.name == $p) | .value] | first // "ABSENT"' "$LRD/bom.json" 2>/dev/null; }
+lr_got="$(for n in PaySDK Vendor Closed Classifier NC Free; do printf '%s=%s/%s ' "$n" "$(lrv "$n" bomlens:licenseReview)" "$(lrv "$n" bomlens:licenseClass)"; done)"
+[ "$lr_got" = "PaySDK=proprietary/uncategorized Vendor=proprietary/uncategorized Closed=proprietary/uncategorized Classifier=proprietary/uncategorized NC=non-commercial/permissive Free=ABSENT/permissive " ] \
+    && pass "licenseReview: commercial and proprietary texts are flagged proprietary, the class is unchanged, CC-BY-NC stays non-commercial" \
+    || fail "licenseReview: flags/classes [$lr_got]"
+lr_ids="$(jq -r "$(cat "$LIB/license-flags.jq")"' [.ids[] | select(license_flag(.) == "proprietary")] | join(",")' "$LIB/cdx-spdx-ids.json" 2>/dev/null)"
+[ -z "$lr_ids" ] \
+    && pass "licenseReview: no SPDX license id is flagged proprietary" \
+    || fail "licenseReview: SPDX ids flagged proprietary: $lr_ids"
+bash "$LIB/generate-notice.sh" "$LRD/bom.json" "$LRD/p" proj >/dev/null 2>&1
+grep -q '^\[proprietary\] commercial  (1 component(s)):' "$LRD/p_NOTICE.txt" 2>/dev/null \
+    && grep -q '; proprietary = a commercial or proprietary license' "$LRD/p_NOTICE.txt" 2>/dev/null \
+    && grep -q '\[proprietary\]</b> Proprietary' "$LRD/p_NOTICE.html" 2>/dev/null \
+    && pass "licenseReview: the NOTICE (text and HTML) lists the proprietary licenses under license review with the class explained" \
+    || fail "licenseReview: NOTICE review section" "$(grep -A3 'License review' "$LRD/p_NOTICE.txt" 2>&1 | head -8)"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
