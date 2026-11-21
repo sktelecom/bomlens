@@ -90,6 +90,8 @@ PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_DEFAULT=900
 prep_step() { _l="$1"; shift 2; PREP_APPLIED="$PREP_APPLIED $_l"; "$@"; _r=$?; [ "$_r" -eq 0 ] || PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$_l"; return "$_r"; }
 mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }
 unmark_prep_failed() { _n=""; for _x in $PREP_FAILED; do [ "$_x" = "$1" ] || _n="${_n:+$_n }$_x"; done; PREP_FAILED="$_n"; }
+npm_registry_url() { echo "https://registry.npmjs.org/"; }
+registry_probe() { REGISTRY_PROBE_HOST=""; REGISTRY_PROBE_WHY=""; return 0; }
 E
 run_npm_block() {  # <dir>
     ( cd "$1" && PATH="$WORK/bin:$PATH" bash -c '. "$1"; . "$2"; echo "FAILED=[$PREP_FAILED]"; echo "SET=$(cat "$NODE_PROD_SET" 2>/dev/null | tr "\n" " ")"' _ "$WORK/npmprelude.sh" "$WORK/npmblock.sh" 2>/dev/null )
