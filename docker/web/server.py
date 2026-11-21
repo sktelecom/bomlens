@@ -2924,8 +2924,8 @@ def sbom_summary(run_id):
             (p.get("value") for p in props if p.get("name") == "bomlens:scanoss:match"),
             "",
         )
-        # AI-relevant restrictive license class (behavioral-use / non-commercial /
-        # no-derivatives), set by normalize-sbom.sh via the shared license-flags.jq classifier.
+        # Restrictive license class needing review (behavioral-use / non-commercial /
+        # no-derivatives / proprietary), set by normalize-sbom.sh via the shared license-flags.jq classifier.
         review = next(
             (p.get("value") for p in props if p.get("name") == "bomlens:licenseReview"),
             "",
@@ -3852,6 +3852,7 @@ def ai_profile_summary(run_id):
             "behavioral": int(lic.get("behavioral") or 0),
             "nonCommercial": int(lic.get("nonCommercial") or 0),
             "noDerivatives": int(lic.get("noDerivatives") or 0),
+            "proprietary": int(lic.get("proprietary") or 0),
         },
         "regulatoryCrosswalk": {
             "disclaimer": str(xwalk.get("disclaimer") or ""),
