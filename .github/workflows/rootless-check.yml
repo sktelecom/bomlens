@@ -1,0 +1,163 @@
+name: Rootless ownership check
+
+# Runs a source scan under rootless Docker and under the regular (rootful)
+# daemon, then lists every file in the output folder and in the scanned
+# source copy that the runner user does not own, and tries to delete the
+# output as that user. The job reports what it finds; it does not fail just
+# because foreign-owned files are present.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - .github/workflows/rootless-check.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rootless-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ownership:
+    name: Ownership (${{ matrix.daemon }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        daemon: [ rootless, rootful ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Switch to rootless Docker
+        if: matrix.daemon == 'rootless'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq uidmap dbus-user-session
+          if ! command -v dockerd-rootless.sh >/dev/null 2>&1; then
+            sudo apt-get install -y -qq docker-ce-rootless-extras
+          fi
+          command -v dockerd-rootless.sh
+          # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor,
+          # which rootlesskit needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          me="$(id -un)"
+          grep -q "^${me}:" /etc/subuid || echo "${me}:100000:65536" | sudo tee -a /etc/subuid
+          grep -q "^${me}:" /etc/subgid || echo "${me}:100000:65536" | sudo tee -a /etc/subgid
+          echo "subuid: $(grep "^${me}:" /etc/subuid)"
+          echo "subgid: $(grep "^${me}:" /etc/subgid)"
+          sudo systemctl disable --now docker.service docker.socket
+          sudo rm -f /var/run/docker.sock
+          xdg="$RUNNER_TEMP/xdg"
+          mkdir -p "$xdg"
+          chmod 700 "$xdg"
+          echo "XDG_RUNTIME_DIR=$xdg" >> "$GITHUB_ENV"
+          echo "DOCKER_HOST=unix://$xdg/docker.sock" >> "$GITHUB_ENV"
+          XDG_RUNTIME_DIR="$xdg" nohup dockerd-rootless.sh > "$RUNNER_TEMP/dockerd-rootless.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          if ! DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
+            echo "rootless daemon did not come up"
+            cat "$RUNNER_TEMP/dockerd-rootless.log"
+            exit 1
+          fi
+
+      - name: Show daemon mode
+        id: daemon
+        run: |
+          set -euo pipefail
+          opts="$(docker info --format '{{json .SecurityOptions}}')"
+          echo "SecurityOptions: $opts"
+          docker info --format 'Root dir: {{.DockerRootDir}}  Storage: {{.Driver}}'
+          if printf '%s' "$opts" | grep -q 'name=rootless'; then
+            echo "mode=rootless" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=rootful" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ matrix.daemon }}" = rootless ] && ! printf '%s' "$opts" | grep -q 'name=rootless'; then
+            echo "expected a rootless daemon"
+            exit 1
+          fi
+
+      - name: Scan examples/nodejs
+        run: |
+          set -uo pipefail
+          src="$RUNNER_TEMP/src"
+          out="$RUNNER_TEMP/out"
+          rm -rf "$src" "$out"
+          cp -R examples/nodejs "$src"
+          mkdir -p "$out"
+          echo "SRC_DIR=$src" >> "$GITHUB_ENV"
+          echo "OUT_DIR=$out" >> "$GITHUB_ENV"
+          rc=0
+          SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:latest \
+            bash scripts/scan-sbom.sh --project rootless --version 1.0 \
+              --target "$src" --generate-only --output-dir "$out" || rc=$?
+          echo "scan exit code: $rc"
+          echo "SCAN_RC=$rc" >> "$GITHUB_ENV"
+
+      - name: Check ownership and deletion
+        run: |
+          set -uo pipefail
+          uid="$(id -u)"
+          gid="$(id -g)"
+          echo "runner user: $(id)"
+          report="$RUNNER_TEMP/foreign.txt"
+          : > "$report"
+          for d in "$OUT_DIR" "$SRC_DIR"; do
+            echo "::group::files in $d"
+            find "$d" -printf '%u:%g %m %p\n' | head -200
+            echo "::endgroup::"
+            find "$d" \( ! -user "$uid" -o ! -group "$gid" \) -printf '%u:%g %p\n' >> "$report"
+          done
+          foreign="$(wc -l < "$report" | tr -d ' ')"
+          echo "files not owned by ${uid}:${gid}: $foreign"
+          head -100 "$report"
+          rm_rc=0
+          rm -rf "$OUT_DIR" 2> "$RUNNER_TEMP/rm.err" || rm_rc=$?
+          rm_err="$(head -5 "$RUNNER_TEMP/rm.err")"
+          left=0
+          [ -e "$OUT_DIR" ] && left="$(find "$OUT_DIR" | wc -l | tr -d ' ')"
+          if [ "$foreign" -gt 0 ] || [ "$rm_rc" -ne 0 ]; then
+            verdict=REPRODUCED
+          else
+            verdict="NOT REPRODUCED"
+          fi
+          {
+            echo "## Ownership check: ${{ matrix.daemon }} (${{ steps.daemon.outputs.mode }})"
+            echo
+            echo "- Verdict: **$verdict**"
+            echo "- Scan exit code: $SCAN_RC"
+            echo "- Runner user: $(id -un) ($uid:$gid)"
+            echo "- Files in output and source copy not owned by the runner user: $foreign"
+            echo "- \`rm -rf\` of the output folder: exit $rm_rc, entries left: $left"
+            if [ -n "$rm_err" ]; then
+              echo
+              echo '```'
+              echo "$rm_err"
+              echo '```'
+            fi
+            if [ "$foreign" -gt 0 ]; then
+              echo
+              echo '```'
+              head -50 "$report"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "VERDICT (${{ matrix.daemon }}): $verdict"
+
+      - name: Show rootless daemon log
+        if: always() && matrix.daemon == 'rootless'
+        run: tail -50 "$RUNNER_TEMP/dockerd-rootless.log" || true
