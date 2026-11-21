@@ -71,8 +71,11 @@ case "$(uname -s 2>/dev/null)" in
         DOCKER_MSYS="MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "
         DOCKER_ENV=(env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*')
         hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
-        # A path printed for the user to open: C:\Users\... on Windows.
-        shownpath() { cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; }
+        # A path printed for the user to open: C:\Users\... on Windows. -l
+        # gives the long form of a short (8.3) name such as SKTELE~1 that
+        # TEMP often holds; a cygpath without -l, or a path that does not
+        # exist yet, falls back to the plain form.
+        shownpath() { cygpath -w -l -- "$1" 2>/dev/null || cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; }
         # A POSIX path this shell can mkdir/read directly; hostpath() (above)
         # still does the cygpath -m conversion when this needs to reach a
         # docker -v flag, same as every other mount in this script.
@@ -1661,9 +1664,9 @@ take_scan_lock() {
     return 1
 }
 if ! take_scan_lock; then
-    log_error "Another scan of ${PROJECT_NAME} ${PROJECT_VERSION} is already running into this folder: $OUTPUT_HOST_DIR"
+    log_error "Another scan of ${PROJECT_NAME} ${PROJECT_VERSION} is already running into this folder: $(shownpath "$OUTPUT_HOST_DIR")"
     echo "        Wait for it to finish, or give this scan another --version, another folder with -o <folder>, or --timestamp to keep both." >&2
-    echo "        If no scan is running, remove the leftover lock and run again: $SCAN_LOCK_DIR" >&2
+    echo "        If no scan is running, remove the leftover lock and run again: $(shownpath "$SCAN_LOCK_DIR")" >&2
     echo "        같은 이름(${PROJECT_NAME} ${PROJECT_VERSION})의 스캔이 이 폴더에서 이미 진행 중입니다. 끝난 뒤 다시 실행하거나, --version, -o <폴더>, --timestamp 중 하나로 결과 위치를 나눠 주세요." >&2
     exit 1
 fi
@@ -4485,7 +4488,7 @@ SUMMARY_BUF="$(mktemp)"; SUMMARY_ERR="$(mktemp)"
 {
 if [ "$UPLOAD_VAR" = "false" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
-    echo "  Output dir: ${OUTPUT_HOST_DIR}"
+    echo "  Output dir: $(shownpath "$OUTPUT_HOST_DIR")"
     echo "  SBOM: ${OUTPUT_FILE}"
     if [ "$GENERATE_NOTICE" = "true" ]; then
         summary_line "Notice:" "${P}_NOTICE.txt" "${P}_NOTICE.html" || note_missing "notice"
