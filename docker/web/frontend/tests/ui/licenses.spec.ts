@@ -148,7 +148,8 @@ test("the distribution sorts by count or by name", async ({ page }) => {
 
 test("a license row opens Components filtered to it, and the unlicensed row is not a link", async ({ page }) => {
   await open(page, doneWith(LIST));
-  const row = dist(page).getByRole("link", { name: /^GPL-3.0-only,/ });
+  // Named by what the row shows (licence, class, count), then the hint.
+  const row = dist(page).getByRole("link", { name: /^GPL-3\.0-only Strong copyleft 1\b/ });
   await expect(row).toHaveAttribute("href", `#/scan/${DONE.id}/components?license=GPL-3.0-only`);
   await expect(dist(page).getByRole("link")).toHaveCount(20);
   await row.click();

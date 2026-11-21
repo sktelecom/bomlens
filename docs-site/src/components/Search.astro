@@ -1,0 +1,27 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Starlight's search, with the header button named by everything it shows. The
+// button reads "Search" and the shortcut ("Ctrl K", "⌘ K" on a Mac), but its
+// name was "Search" alone, so the shortcut words were text the name lacked. The
+// name now repeats the shortcut, and spaces between the parts keep the words
+// apart in the button's text (the parts sit in flex boxes, so the spaces take no
+// room). The script runs after Starlight's own, which sets the Mac key.
+import Default from '@astrojs/starlight/components/Search.astro';
+---
+
+<Default {...Astro.props}><slot /></Default>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>('site-search button[data-open-modal]');
+  const shortcut = button?.querySelector<HTMLElement>(':scope > kbd');
+  if (button && shortcut) {
+    const keys = [...shortcut.querySelectorAll('kbd')];
+    keys.slice(1).forEach((key) => key.before(' '));
+    shortcut.before(' ');
+    const label = button.getAttribute('aria-label') ?? '';
+    const said = keys.map((key) => key.textContent?.trim() ?? '').filter(Boolean).join(' ');
+    if (label && said) button.setAttribute('aria-label', `${label} ${said}`);
+  }
+</script>

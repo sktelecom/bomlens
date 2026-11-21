@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { licenseOperands } from "./licenseOperands";
+import { licenseOperands, shownLicenseLabels } from "./licenseOperands";
 
 describe("licenseOperands", () => {
   it("keeps plain ids and drops repeats", () => {
@@ -22,5 +22,18 @@ describe("licenseOperands", () => {
   });
   it("skips empty values", () => {
     expect(licenseOperands(["", "  "])).toEqual([]);
+  });
+});
+
+describe("shownLicenseLabels", () => {
+  it("shows up to two operands as they are", () => {
+    expect(shownLicenseLabels([])).toEqual([]);
+    expect(shownLicenseLabels(["MIT OR ISC"])).toEqual(["MIT", "ISC"]);
+  });
+  it("folds the rest into a count", () => {
+    expect(shownLicenseLabels(["MIT", "ISC", "Apache-2.0", "BSD-3-Clause"])).toEqual(["MIT", "ISC", "+2"]);
+  });
+  it("shows every operand with all", () => {
+    expect(shownLicenseLabels(["MIT", "ISC", "Apache-2.0"], true)).toEqual(["MIT", "ISC", "Apache-2.0"]);
   });
 });

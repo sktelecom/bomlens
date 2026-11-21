@@ -447,7 +447,6 @@
     "vulnLayout": "Layout",
     "vulnLayoutList": "List",
     "vulnLayoutPackage": "By package",
-    "pkgGroupToggle": "Show or hide the CVEs of {{pkg}}",
     "pkgGroupCount_one": "{{n}} CVE",
     "pkgGroupCount_other": "{{n}} CVEs",
     "pkgGroupUpgrade": "Upgrade to {{fixed}} to resolve {{count}}",

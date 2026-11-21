@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- In the web UI, the accessible name of the sidebar sections, the license rows, the severity cells, the package rows on Vulnerabilities, the advisory rows on External lookup, the What's new menu entry, the AI declaration steps and the dependency and source tree rows now contains the text the element shows, in the order it shows it, and the documentation site's search button is named with its keyboard shortcut.
 - A Node.js source scan with no lock file whose npm registry did not answer, and whose offline npm install resolved every dependency from npm's cache, now says where the versions came from: it records `npm-offline-cache` in `bomlens:prep-step-applied`, the CLI prints an `[INFO]` line after stage 1, and the web UI Overview shows a note that the versions are the newest cached ones `package.json` allows and may not be the newest releases.
 - The web UI Overview and the risk report no longer say the versions are what a fresh install would get when they were read from what is installed: an installed Python environment (`bomlens:python-environment`) or the lock file npm or pnpm wrote at install at the scan root (`bomlens:node-lock-source`). The summary reports this as `versionSource`.
 - The source snapshot no longer masks `always-auth`, `auth-type`, `npmAlwaysAuth`, `npmAuthType` or a `true`, `false`, `yes` or `no` value in registry configuration files.

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Label } from "@primer/react";
+import { Fragment } from "react";
 
-import { licenseOperands } from "@/lib/licenseOperands";
+import { licenseOperands, shownLicenseLabels } from "@/lib/licenseOperands";
 
 /**
  * A package's licences as Labels: one per SPDX operand (an expression splits at
@@ -21,19 +22,19 @@ export function LicenseLabels({
 }) {
   const operands = licenseOperands(licenses);
   if (operands.length === 0) return null;
-  const shown = all ? operands : operands.slice(0, 2);
+  const shown = shownLicenseLabels(licenses, all);
+  // The spaces keep the labels apart as words in the text; the box is flex, so
+  // they take no room.
   return (
     <span className="bl-dep-labels" title={licenses.join(", ")}>
-      {shown.map((l) => (
-        <Label key={l} variant="secondary" className="bl-dep-label">
-          {l}
-        </Label>
+      {shown.map((l, i) => (
+        <Fragment key={l}>
+          {i > 0 && " "}
+          <Label variant="secondary" className="bl-dep-label" title={!all && i === 2 ? operands.slice(2).join(", ") : undefined}>
+            {l}
+          </Label>
+        </Fragment>
       ))}
-      {!all && operands.length > 2 && (
-        <Label variant="secondary" className="bl-dep-label" title={operands.slice(2).join(", ")}>
-          +{operands.length - 2}
-        </Label>
-      )}
     </span>
   );
 }

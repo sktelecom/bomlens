@@ -936,7 +936,7 @@ test("Overview severity bar routes into filtered Vulnerabilities", async ({ page
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 
   // Click the High band in the Overview severity axis.
-  await page.getByRole("link", { name: "High 1" }).first().click();
+  await page.getByRole("link", { name: "1 High" }).first().click();
 
   // Lands on Vulnerabilities filtered to HIGH — the HIGH CVE stays, the CRITICAL one is gone.
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -1746,8 +1746,7 @@ for (const lang of ["en", "ko"] as const) {
     // runs into its count; all three overrun the budget.
     const { checked, overrun } = await page.evaluate((badge) => {
       for (const b of document.querySelectorAll('[data-testid^="nav-count-"]')) {
-        const visible = b.querySelector("[aria-hidden]") ?? b;
-        visible.textContent = badge;
+        b.textContent = badge;
       }
       // Read a layout property to flush the mutations before measuring.
       void document.body.offsetHeight;
@@ -2214,7 +2213,7 @@ test("View zlib in Dependencies jumps to its row, openssl already expanded", asy
   await page.getByRole("button", { name: "View zlib in Dependencies" }).click();
 
   await expect(page).toHaveURL(/#\/scan\/.*\/dependencies\?q=zlib&version=1\.2\.0/);
-  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
+  const zlibRow = page.getByRole("treeitem", { name: /^zlib 1\.2\.0(?: |$)/ });
   await expect(zlibRow).toBeVisible();
   await expect(zlibRow).toBeFocused();
 });
@@ -2226,7 +2225,7 @@ test("Dependencies tree search box jumps to a match and reports a miss", async (
 
   const search = page.getByRole("textbox", { name: /Search packages/i });
   await search.fill("zlib");
-  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
+  const zlibRow = page.getByRole("treeitem", { name: /^zlib 1\.2\.0(?: |$)/ });
   // Typing keeps the cursor in the box; the match is marked and Enter moves there.
   await expect(zlibRow).toHaveAttribute("aria-current", "true");
   await expect(search).toBeFocused();

@@ -355,6 +355,7 @@ function HelpMenu({
   const [shortcuts, setShortcuts] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const ext = { target: "_blank", rel: "noreferrer noopener" } as const;
+  const versionLine = version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown");
   // Every entry but the shortcuts list leaves the app in a new tab: say so.
   const external = (
     <ActionList.TrailingVisual>
@@ -434,10 +435,14 @@ function HelpMenu({
               <ActionList.LeadingVisual>
                 <MegaphoneIcon />
               </ActionList.LeadingVisual>
-              {t("nav.helpWhatsNew")}
+              {/* The version line is part of what the entry shows, so it is in
+                  the name, read once: the copy in the label is for a screen
+                  reader and the visible line under it is hidden from one. */}
+              {t("nav.helpWhatsNew")}{" "}
+              <span className="bl-visually-hidden">{versionLine}</span>
               <ActionList.Description variant="block">
-                <span data-testid="app-version">
-                  {version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown")}
+                <span data-testid="app-version" aria-hidden>
+                  {versionLine}
                 </span>
               </ActionList.Description>
               {external}
