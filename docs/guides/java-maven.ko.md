@@ -31,7 +31,7 @@ Maven 스캔은 컨테이너 안에서 Maven을 실행해 의존성 트리를 �
 
 CLI, `--ui`, 데스크톱 앱은 모두 이렇게 합니다. 더블클릭하는 `sbom-ui.bat`은 넘기지 않으므로, 빌드에 이 파일이 필요한 Windows 사용자는 데스크톱 앱을 쓰세요. 미러 주소와 서버 인증 정보가 든 `settings.xml`은 그대로 사용됩니다. 비밀번호를 암호화했다면 `settings-security.xml`이 같은 폴더에 있어야 합니다. Maven 스캔은 파일을 찾으면 `maven: using the mounted settings.xml`을 로그에 남깁니다.
 
-이 컴퓨터에서 빌드한 프로젝트는 스캔이 사내 저장소에 접속하지 못해도 해석됩니다. BomLens는 사용자의 Maven 로컬 저장소(`settings.xml`의 `<localRepository>`, 없으면 `~/.m2/repository`)도 읽기 전용으로 붙이고, Maven은 BomLens 자체 저장소 다음에 이 폴더를 읽되 여기에 쓰지는 않습니다. Maven이 내려받을 저장소가 응답하지 않으면 Maven을 오프라인(`-o`)으로 실행하고, 로그에 그 사실을 한 줄로 남깁니다. Maven 3.9 이상이 필요하며, 오프라인에서 프로젝트의 `mvnw`가 그보다 낮은 Maven을 실행하면 이미지의 Maven을 대신 씁니다. 저장소에 `maven-dependency-plugin`도 있어야 하므로, `mvn package`만 실행해 왔다면 먼저 `mvn dependency:tree`를 한 번 실행하세요. 붙이지 않으려면 `BOMLENS_MAVEN_USER_REPOSITORY=false`를 설정하세요. 자세한 동작은 [지원 생태계](../reference/ecosystems.ko.md#java-maven)에 있습니다.
+이 컴퓨터에서 빌드한 프로젝트는 스캔이 사내 저장소에 접속하지 못해도 해석됩니다. BomLens는 사용자의 Maven 로컬 저장소(`settings.xml`의 `<localRepository>`, 없으면 `~/.m2/repository`)도 읽기 전용으로 붙이고, Maven은 BomLens 자체 저장소 다음에 이 폴더를 읽되 여기에 쓰지는 않습니다. Maven이 내려받을 저장소가 응답하지 않으면 Maven을 오프라인(`-o`)으로 실행하고, 로그에 그 사실을 한 줄로 남깁니다. Maven 3.9 이상이 필요하며, 오프라인에서 프로젝트의 `mvnw`가 그보다 낮은 Maven을 실행하면 이미지의 Maven을 대신 씁니다. 저장소에 `maven-dependency-plugin`과 Maven의 플러그인 접두어 정보도 있어야 하므로, `mvn package`만 실행해 왔거나 3.9보다 낮은 Maven만 써 왔다면 먼저 Maven 3.9 이상으로 `mvn dependency:tree`를 한 번 실행하세요. 붙이지 않으려면 `BOMLENS_MAVEN_USER_REPOSITORY=false`를 설정하세요. 자세한 동작은 [지원 생태계](../reference/ecosystems.ko.md#java-maven)에 있습니다.
 
 사내 의존성이 여전히 빠질 때는 다음을 확인하세요.
 

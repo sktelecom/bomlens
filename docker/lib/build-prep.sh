@@ -1269,14 +1269,33 @@ maven_version_below_39() {
     case "$_mvb_major$_mvb_minor" in ""|*[!0-9]*) return 1 ;; esac
     [ "$_mvb_major" -lt 3 ] || { [ "$_mvb_major" -eq 3 ] && [ "$_mvb_minor" -lt 9 ]; }
 }
-# Whether maven-dependency-plugin is in the user's Maven local repository or
-# in BomLens's own: offline, cdxgen's dependency:tree needs it there.
+# Whether cdxgen's dependency:tree can run offline from the user's Maven local
+# repository or BomLens's own: maven-dependency-plugin must be in one of them,
+# and so must the plugin group's prefix data (a maven-metadata*.xml under
+# org/apache/maven/plugins/ naming the prefix "dependency"), which Maven needs
+# to turn dependency:tree into the plugin. Returns 0 when both are there, 1
+# when the plugin is not, 2 when the plugin is there but the prefix data is
+# not (a repository filled by a Maven older than 3.9 leaves none).
 maven_dependency_plugin_present() {
+    _mdp_jar=""; _mdp_meta=""
     for _mdp_r in "${MAVEN_USER_REPO:-}" "$MAVEN_REPO_LOCAL"; do
-        [ -n "$_mdp_r" ] && [ -d "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" ] || continue
-        [ -n "$(find "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" -maxdepth 2 -type f -name 'maven-dependency-plugin-*.jar' 2>/dev/null | head -n 1)" ] && return 0
+        [ -n "$_mdp_r" ] && [ -d "$_mdp_r/org/apache/maven/plugins" ] || continue
+        if [ -z "$_mdp_jar" ] && [ -d "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" ] \
+           && [ -n "$(find "$_mdp_r/org/apache/maven/plugins/maven-dependency-plugin" -maxdepth 2 -type f -name 'maven-dependency-plugin-*.jar' 2>/dev/null | head -n 1)" ]; then
+            _mdp_jar=1
+        fi
+        if [ -z "$_mdp_meta" ]; then
+            for _mdp_m in "$_mdp_r"/org/apache/maven/plugins/maven-metadata*.xml; do
+                [ -f "$_mdp_m" ] || continue
+                if grep -q '<prefix>[[:space:]]*dependency[[:space:]]*</prefix>' "$_mdp_m" 2>/dev/null; then
+                    _mdp_meta=1; break
+                fi
+            done
+        fi
     done
-    return 1
+    [ -n "$_mdp_jar" ] || return 1
+    [ -n "$_mdp_meta" ] || return 2
+    return 0
 }
 sha512_tool() {
     for _st in sha512sum shasum openssl; do
@@ -1384,10 +1403,18 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
                 log "$_mvn_old; the image's mvn runs in its place, for cdxgen too"
             fi
         fi
-        if [ -z "$_mvn_tree_failed" ] && ! maven_dependency_plugin_present; then
-            log "maven: Maven runs offline, and neither your Maven local repository nor BomLens's Maven cache holds maven-dependency-plugin (org/apache/maven/plugins/maven-dependency-plugin), so the dependency tree cannot be built and the SBOM may list only the dependencies written in pom.xml. This scan needs maven-dependency-plugin in your Maven local repository: run 'mvn dependency:tree' once in the project on this machine, then scan again"
-            _mvn_tree_failed=1; _mvn_skip_fetch=1
-            mark_prep_failed maven-dependency-tree
+        if [ -z "$_mvn_tree_failed" ]; then
+            _mvn_pp=0
+            maven_dependency_plugin_present || _mvn_pp=$?
+            if [ "$_mvn_pp" -eq 1 ]; then
+                log "maven: Maven runs offline, and neither your Maven local repository nor BomLens's Maven cache holds maven-dependency-plugin (org/apache/maven/plugins/maven-dependency-plugin), so the dependency tree cannot be built and the SBOM may list only the dependencies written in pom.xml. This scan needs maven-dependency-plugin in your Maven local repository: run 'mvn dependency:tree' once in the project on this machine, then scan again"
+            elif [ "$_mvn_pp" -eq 2 ]; then
+                log "maven: Maven runs offline, and your Maven local repository holds maven-dependency-plugin but not Maven's plugin prefix data (org/apache/maven/plugins/maven-metadata-*.xml naming the prefix dependency, which a Maven older than 3.9 does not leave), so the dependency tree cannot be built and the SBOM may list only the dependencies written in pom.xml. Run 'mvn dependency:tree' once in the project on this machine with Maven 3.9 or later, then scan again"
+            fi
+            if [ "$_mvn_pp" -ne 0 ]; then
+                _mvn_tree_failed=1; _mvn_skip_fetch=1
+                mark_prep_failed maven-dependency-tree
+            fi
         fi
     fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
@@ -1454,7 +1481,7 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
         _mvn_total=${_mvn_counts% *}; _mvn_have=${_mvn_counts#* }
         if [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"; then
             log "maven: fetched dependency jars for component hashes ($_mvn_have of $_mvn_total in the local repository)"
-        elif [ -n "${MAVEN_USER_REPO_OFFLINE:-}" ] && [ "${_mvn_have:-0}" -eq 0 ] && [ -z "$_mvn_tree_failed" ]; then
+        elif [ -n "${MAVEN_USER_REPO_OFFLINE:-}" ] && [ "${_mvn_total:-0}" -gt 0 ] && [ "${_mvn_have:-0}" -eq 0 ] && [ -z "$_mvn_tree_failed" ]; then
             # Offline, a run that found none of its jars in either repository
             # cannot have found the POMs the dependency tree needs either.
             log "maven: Maven runs offline and none of the $_mvn_total resolved jars is in your Maven local repository or BomLens's Maven cache, so the dependency tree is missing and the SBOM may list only the dependencies written in pom.xml. Build the project once on this machine (for example 'mvn dependency:tree'), or let the scan reach the Maven repository, and scan again"
