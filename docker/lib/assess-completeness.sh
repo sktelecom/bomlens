@@ -187,6 +187,11 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --arg vuln_env "${BOMLEN
     # also raise the grade (a result whose dependencies are not known at all).
     | map(. as $r | ($R.reasons[$r.code]) as $d
           | ($r.hints // []) as $rh
+          # A hint marked general (its fix is "fix the build error and scan
+          # again") gives its fix only when no other hint names a specific one:
+          # the specific fix already ends in "scan again". Its message stays.
+          | (($rh | map(select(.general != true))) as $specific
+             | if ($specific | length) > 0 then $specific else $rh end) as $rhfix
           | (($r.causes // []) | map(sentence) | join(" ")) as $cause
           | {code: $r.code,
              grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable"
@@ -200,8 +205,8 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --arg vuln_env "${BOMLEN
                    elif $r.code == "lockfile-missing" and ($lockcmds | length) > 0 and $d.fixEnCommands != null
                    then {en: ($d.fixEnCommands | sub("\\{commands\\}"; $lockcmds | join(", "))),
                          ko: ($d.fixKoCommands | sub("\\{commands\\}"; $lockcmds | join(", ")))}
-                   else {en: ([(if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end), (if ($rh | length) > 0 then ($rh[] | .fixEn) else $d.fixEn end)] | join(" ")),
-                         ko: ([(if $cause != "" then "\($R.labels.cause.ko) \($cause)" else empty end), (if ($rh | length) > 0 then ($rh[] | .fixKo) else $d.fixKo end)] | join(" "))} end)})) as $reasons
+                   else {en: ([(if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end), (if ($rhfix | length) > 0 then ($rhfix[] | .fixEn) else $d.fixEn end)] | join(" ")),
+                         ko: ([(if $cause != "" then "\($R.labels.cause.ko) \($cause)" else empty end), (if ($rhfix | length) > 0 then ($rhfix[] | .fixKo) else $d.fixKo end)] | join(" "))} end)})) as $reasons
   | (if ($reasons | any(.[]; .grade == "unreliable")) then "unreliable"
      elif ($reasons | length) > 0 then "partial" else "complete" end) as $grade
   | {schemaVersion: 1,

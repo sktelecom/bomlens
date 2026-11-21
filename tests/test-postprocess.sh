@@ -16145,6 +16145,34 @@ grep -q 'source_dev_only_manifests "${SOURCE_ROOT:-/src}" 5' "$ENTRY_SH" \
     && pass "completeness/dev-only: entrypoint.sh stamps the dev-only exclusion unless the development dependencies were asked for" \
     || fail "completeness/dev-only: entrypoint.sh does not stamp the dev-only exclusion"
 
+echo "== completeness: a specific resolution hint replaces the general fix =="
+# Two hints on one failed step: android-useandroidx-missing names the fix, and
+# android-release-classpath-unresolved (marked general) only says to fix the
+# Gradle error. The fix gives the specific one alone, so "scan again" is said
+# once; both causes stay in the message, and the grade is still unreliable.
+RHD="$WORK/hints"
+mkdir -p "$RHD"
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"p","version":"1"},"properties":[{"name":"bomlens:sbom-empty-with-manifests","value":"app/build.gradle"},{"name":"bomlens:pipeline-step-failed","value":"android-release-classpath"},{"name":"bomlens:pipeline-step-cause","value":"android-release-classpath: Configuration contains AndroidX dependencies, but the android.useAndroidX property is not enabled"},{"name":"bomlens:resolution-hint","value":"android-useandroidx-missing"},{"name":"bomlens:resolution-hint","value":"android-release-classpath-unresolved"}]},"components":[]}' > "$RHD/both.json"
+rh_grade="$(bash "$LIB/assess-completeness.sh" "$RHD/both.json" "$RHD/both" 2>/dev/null)"
+rh_fix_en="$(jq -r '.reasons[] | select(.code == "resolution-failed") | .fix.en' "$RHD/both_completeness.json" 2>/dev/null)"
+rh_fix_ko="$(jq -r '.reasons[] | select(.code == "resolution-failed") | .fix.ko' "$RHD/both_completeness.json" 2>/dev/null)"
+rh_msg="$(jq -r '.reasons[] | select(.code == "resolution-failed") | .message.en' "$RHD/both_completeness.json" 2>/dev/null)"
+[ "$rh_grade" = "unreliable" ] \
+    && [ "$(printf '%s' "$rh_fix_en" | grep -o 'scan again' | wc -l | tr -d ' ')" = "1" ] \
+    && [ "$(printf '%s' "$rh_fix_ko" | grep -o '다시 스캔' | wc -l | tr -d ' ')" = "1" ] \
+    && case "$rh_fix_en" in "The build tool reported: Configuration contains AndroidX dependencies"*"Add the line android.useAndroidX=true"*) true ;; *) false ;; esac \
+    && case "$rh_fix_ko" in *"android.useAndroidX=true"*) true ;; *) false ;; esac \
+    && case "$rh_fix_en$rh_fix_ko" in *"Fix the Gradle error"*|*"Gradle 오류를 해결"*) false ;; *) true ;; esac \
+    && case "$rh_msg" in *"android.useAndroidX=true is not set"*"release runtime classpath"*) true ;; *) false ;; esac \
+    && pass "completeness/hints: the specific fix alone, with the cause, in English and Korean; both messages kept; still unreliable" \
+    || fail "completeness/hints: grade [$rh_grade]" "en: $rh_fix_en | ko: $rh_fix_ko | msg: $rh_msg"
+# The general hint alone still gives its fix.
+jq '.metadata.properties |= map(select(.value != "android-useandroidx-missing"))' "$RHD/both.json" > "$RHD/general.json"
+bash "$LIB/assess-completeness.sh" "$RHD/general.json" "$RHD/general" >/dev/null 2>&1
+jq -e '.reasons[] | select(.code == "resolution-failed") | (.fix.en | test("Fix the Gradle error")) and (.fix.ko | test("Gradle 오류를 해결"))' "$RHD/general_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/hints: a general hint with no specific one keeps its fix" \
+    || fail "completeness/hints: the general hint lost its fix" "$(jq -c '.reasons' "$RHD/general_completeness.json" 2>&1 | head -c 400)"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
