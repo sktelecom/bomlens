@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A folder picked in the web UI keeps the `pyvenv.cfg` and package metadata (`*.dist-info`, `*.egg-info`) of an installed Python environment at its top (also the Windows `Lib/site-packages` layout) in the copy it scans, so the environment is read and left out of cdxgen's search as in the CLI.
 - The CLI's `Steps that failed` line leaves out `license-fetch`, which is reported on its own `[INFO]` line; the SBOM still records it.
 - The web UI's note on a skipped license lookup says that skipping it removes no dependency, and the note that versions are those a fresh install would get is not shown when a resolution step failed.
+- The Go vulnerability database is no longer reported as old while it is current: its age counts from when the export was taken from vuln.go.dev (recorded beside the snapshot at image build and beside a download, else the file's modification time), not from the `index/db.json` date, which stays at the last advisory change while the export is republished daily. With no Go advisory for more than seven days, every Go source scan was recorded as degraded. The `go-vulndb` sidecar gives the time as `GoVulnDB.Taken`.
 
 ## [v1.15.0] - 2026-11-15
 

@@ -624,6 +624,8 @@ RUN timeout 1200 python3 /tmp/build-malicious-index.py \
 # at scan time and named with BOMLENS_GO_VULNDB_PATH; a scan that is not
 # offline downloads a newer one when this snapshot is older than
 # BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days, with the same checks as here.
+# --fetch also writes go-vulndb.zip.fetched, when the export was taken, which
+# that age counts from.
 # Best-effort in the same way: if the fetch fails no file is written and the
 # go-vulndb step is skipped at scan time. See scan-go-vulndb.py --fetch.
 RUN timeout 300 python3 /usr/local/lib/sbom/scan-go-vulndb.py --fetch /usr/local/lib/sbom/go-vulndb.zip \
