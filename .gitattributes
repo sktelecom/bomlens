@@ -13,6 +13,21 @@
 build-prep  text eol=lf
 entrypoint  text eol=lf
 
+# Programs and data the image reads on Linux: LF whatever text=auto decides.
+*.jq        text eol=lf
+*.py        text eol=lf
+*.js        text eol=lf
+*.mjs       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.txt       text eol=lf
+*.toml      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+Dockerfile  text eol=lf
+
 # Windows batch wrappers must stay CRLF.
 *.bat       text eol=crlf
 
