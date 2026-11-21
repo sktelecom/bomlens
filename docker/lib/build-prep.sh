@@ -2292,6 +2292,21 @@ LICENSE_PROBE_JS
     return 3
 }
 
+# npm_registry_url <dir>: the registry npm uses when it runs in <dir> (its
+# `npm config get registry`, which reads npm_config_registry and the .npmrc
+# files), else npm_config_registry, else the public registry. A login in the
+# URL is dropped: any answer counts as reachable, so the probe never needs it.
+npm_registry_url() {
+    _nru=""
+    if command -v npm >/dev/null 2>&1; then
+        # Reads configuration only; npm does not reach the network for it.
+        _nru="$(cd "$1" 2>/dev/null && npm config get registry 2>/dev/null | head -n 1)"
+    fi
+    [ -n "$_nru" ] || _nru="${npm_config_registry:-${NPM_CONFIG_REGISTRY:-}}"
+    case "$_nru" in http://*|https://*) ;; *) _nru="https://registry.npmjs.org/" ;; esac
+    printf '%s\n' "$_nru" | sed -E 's#^(https?://)[^/@]*@#\1#'
+}
+
 # Ask each registry once. On the first that does not answer, FETCH_LICENSE is
 # set to false (exported, so cdxgen sees it), the host and the cause are logged
 # and license-fetch is recorded as a failed step on the SBOM. Returns 0 in every
@@ -2887,7 +2902,25 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     [ -f package-lock.json ] || _node_by_name=1
     _nodeset=$(mktemp)
     _npm_ok=""
-    if [ "$NODE_INSTALLED_ROOT" = npm ] && [ -f "$_npmtmp/package-lock.json" ]; then
+    _npm_nolock=1
+    for _npm_lf in package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
+        [ ! -f "$_npm_lf" ] || _npm_nolock=""
+    done
+    # With no lock file at all, the resolve below needs the registry for every
+    # package (offline it retries for minutes, measured). Ask the registry npm
+    # would use once first; one that does not answer skips the resolve.
+    _npm_unreachable=""
+    if [ -n "$_npm_nolock" ] && [ "$NODE_INSTALLED_ROOT" != npm ]; then
+        _npm_reg=$(npm_registry_url "$_npmtmp")
+        if ! registry_probe "$_npm_reg"; then
+            _npm_unreachable=1
+            log "node: no lock file, and the npm registry $REGISTRY_PROBE_HOST did not answer ($REGISTRY_PROBE_WHY); dependency relations are not available and the production filter is not applied. Commit a lock file, or let the scan reach the registry"
+            mark_prep_failed npm-production-set
+        fi
+    fi
+    if [ -n "$_npm_unreachable" ]; then
+        :
+    elif [ "$NODE_INSTALLED_ROOT" = npm ] && [ -f "$_npmtmp/package-lock.json" ]; then
         # The lock npm wrote at install already marks each package dev or not, and
         # a re-resolve would ask the registry for the other platforms' optional
         # packages it lacks (measured: no answer offline). Read it as it is.
@@ -2908,11 +2941,7 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     # (yarn, pnpm, bun and npm-shrinkwrap projects are left to cdxgen: their lock
     # file already pins what npm cannot fetch here, and the production set above
     # is matched by name against it.)
-    _npm_nolock=1
-    for _npm_lf in package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
-        [ ! -f "$_npm_lf" ] || _npm_nolock=""
-    done
-    if [ -z "$_npm_ok" ] && [ -n "$_node_by_name" ] && [ -n "$_npm_nolock" ]; then
+    if [ -z "$_npm_ok" ] && [ -z "$_npm_unreachable" ] && [ -n "$_node_by_name" ] && [ -n "$_npm_nolock" ]; then
         _npmdrop=$(mktemp).js
         cat > "$_npmdrop" <<'NPMDROP_JS'
 // Reads npm's error output and removes the direct dependency it names from
@@ -3050,7 +3079,7 @@ NPMDROP_JS
         NODE_PROD_SET="$_nodeset"
         log "node: production set = $(wc -l < "$_nodeset" | tr -d ' ') components${_node_by_name:+ (matched by name: no package-lock.json)}"
     else
-        log "node: could not resolve production set; using full graph"
+        [ -n "$_npm_unreachable" ] || log "node: could not resolve production set; using full graph"
         rm -f "$_nodeset"
     fi
     rm -rf "$_npmtmp"
