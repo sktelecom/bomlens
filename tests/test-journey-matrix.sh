@@ -153,7 +153,9 @@ matrix_inputs() {
     empty_props '[{"name":"bomlens:sbom-empty-all-excluded","value":"pyproject.toml, uv.lock"}]' | add all-excluded partial
     empty_props '[{"name":"bomlens:sbom-empty-with-manifests","value":"vcpkg.json"}]' | add native-manifest unreliable
     with_props '[{"name":"bomlens:lockfile-missing","value":"package-lock.json"}]' | add lockfile-missing partial
+    with_props '[{"name":"bomlens:lockfile-missing","value":"go.mod: no go.sum; Cargo.toml: no Cargo.lock"}]' | add lockfile-missing-go-cargo partial
     with_props '[{"name":"bomlens:lockfile-corrupt","value":"Gemfile.lock"}]' | add lockfile-corrupt partial
+    with_props '[{"name":"bomlens:manifest-not-read","value":"vcpkg.json: curl, fmt"}]' | add native-manifest-not-read partial
     with_props '[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen"}]' | add tool-degraded partial
     with_props '[{"name":"bomlens:pipeline-step-failed","value":"gradle-dependencies"}]' | add step-failed partial
 }
@@ -239,6 +241,8 @@ all-excluded python-uv-lock partial
 git-dependency npm-git-dep any
 optional-gem ruby-optional-group any
 go-module go-mod any
+go-no-sum go-mod-no-sum partial
+rust-no-lock rust-no-lock partial
 old-wrapper android-old-wrapper any
 both-tools java-both-tools any
 CASES

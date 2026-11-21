@@ -15615,6 +15615,103 @@ bash "$LIB/assess-completeness.sh" "$CPD/cmake-fetch/proj_1.0_bom.json" "$CPD/cm
     && pass "completeness/fetchcontent: an empty result with only a FetchContent declaration gets the C/C++ reason" \
     || fail "completeness/fetchcontent: verdict $(cat "$CPD/cmake-fetch/proj_1.0_completeness.json" 2>&1)"
 
+# 5d. Conan, vcpkg and CMake together: the Conan packages are read, vcpkg.json is not.
+JFX="$ROOT_DIR/tests/fixtures/journey"
+cp_bom cpp-vcpkg-unread '[]' "[$(cp_lib openssl 3.2.1 pkg:conan/openssl@3.2.1),$(cp_lib zlib 1.3.1 pkg:conan/zlib@1.3.1)]"
+cp -R "$JFX/cpp-conan-vcpkg/." "$CPD/cpp-vcpkg-unread/src/"
+cp_run cpp-vcpkg-unread
+cp_check cpp-vcpkg-unread partial "manifest-not-read"
+jq -e '.reasons[0] | .detail == "vcpkg.json: curl, fmt" and (.fix.en | test("sbom-declared.cdx.json")) and (.fix.ko | test("sbom-declared.cdx.json"))' \
+    "$CPD/cpp-vcpkg-unread/proj_1.0_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/cpp-vcpkg-unread: the reason names vcpkg.json and the two ports (not the host port) and points to sbom-declared.cdx.json" \
+    || fail "completeness/cpp-vcpkg-unread: detail or fix" "$(jq -c '.reasons' "$CPD/cpp-vcpkg-unread/proj_1.0_completeness.json" 2>&1 | head -c 400)"
+# The same ports listed in the SBOM (CMake find_package names, or sbom-declared.cdx.json) leave it complete.
+cp_bom cpp-vcpkg-listed '[]' "[$(cp_lib openssl 3.2.1 pkg:conan/openssl@3.2.1),$(cp_lib fmt '' pkg:generic/fmt),$(cp_lib CURL '' pkg:generic/CURL)]"
+cp -R "$JFX/cpp-conan-vcpkg/." "$CPD/cpp-vcpkg-listed/src/"
+cp_run cpp-vcpkg-listed
+[ "$(jq -r '.grade' "$CPD/cpp-vcpkg-listed/proj_1.0_completeness.json" 2>/dev/null)" = "complete" ] \
+    && pass "completeness/cpp-vcpkg-listed: vcpkg ports that are in the SBOM (any letter case) are not reported" \
+    || fail "completeness/cpp-vcpkg-listed: graded $(jq -c '[.grade, [.reasons[].code]]' "$CPD/cpp-vcpkg-listed/proj_1.0_completeness.json" 2>&1)"
+# conanfile.py: its requires are reported, its tool and test requirements are not; a conan.lock beside it is read instead.
+cp_bom conanpy '[]' "[$(cp_lib fmt 10.2.1 pkg:conan/fmt@10.2.1)]"
+cat > "$CPD/conanpy/src/conanfile.py" <<'PY'
+from conan import ConanFile
+class Demo(ConanFile):
+    requires = ("fmt/10.2.1",
+                "spdlog/[>=1.12]@demo/stable")
+    tool_requires = "cmake/3.28.1"
+    def requirements(self):
+        self.requires("boost/1.84.0")
+        self.test_requires("gtest/1.14.0")
+PY
+bash "$LIB/detect-lockfile-state.sh" "$CPD/conanpy/src" "$CPD/conanpy/proj_1.0_bom.json" >/dev/null 2>&1
+[ "$(jq -r '.metadata.properties[]? | select(.name == "bomlens:manifest-not-read") | .value' "$CPD/conanpy/proj_1.0_bom.json")" = "conanfile.py: boost, spdlog" ] \
+    && pass "completeness/conanpy: conanfile.py requirements that are not in the SBOM are recorded, build tools are not" \
+    || fail "completeness/conanpy: recorded $(jq -c '.metadata.properties' "$CPD/conanpy/proj_1.0_bom.json" 2>&1)"
+printf '{"version":"0.5","requires":[]}' > "$CPD/conanpy/src/conan.lock"
+bash "$LIB/detect-lockfile-state.sh" "$CPD/conanpy/src" "$CPD/conanpy/proj_1.0_bom.json" >/dev/null 2>&1
+! jq -e 'any(.metadata.properties[]?; .name == "bomlens:manifest-not-read")' "$CPD/conanpy/proj_1.0_bom.json" >/dev/null 2>&1 \
+    && pass "completeness/conanpy: a conan.lock beside conanfile.py removes the reason on a re-run" \
+    || fail "completeness/conanpy: the property stayed with a conan.lock beside conanfile.py"
+# An empty SBOM with only vcpkg.json keeps the one C/C++ reason, not two.
+cp_bom vcpkg-empty '[{"name":"bomlens:sbom-empty-with-manifests","value":"vcpkg.json"}]' '[]'
+cp "$JFX/cpp-conan-vcpkg/vcpkg.json" "$CPD/vcpkg-empty/src/"
+bash "$LIB/detect-lockfile-state.sh" "$CPD/vcpkg-empty/src" "$CPD/vcpkg-empty/proj_1.0_bom.json" >/dev/null 2>&1
+bash "$LIB/assess-completeness.sh" "$CPD/vcpkg-empty/proj_1.0_bom.json" "$CPD/vcpkg-empty/proj_1.0" >/dev/null 2>&1
+[ "$(jq -r '.grade + " " + (.reasons | map(.code) | join(","))' "$CPD/vcpkg-empty/proj_1.0_completeness.json")" = "unreliable unsupported-build-system" ] \
+    && pass "completeness/vcpkg-empty: an empty vcpkg-only result keeps the single unsupported-build-system reason" \
+    || fail "completeness/vcpkg-empty: verdict $(jq -c '[.grade, [.reasons[].code]]' "$CPD/vcpkg-empty/proj_1.0_completeness.json" 2>&1)"
+
+# 5e. A manifest resolved afresh at scan time is graded the same in every ecosystem,
+# and the fix names the command that writes that lock file.
+# <case> <fixture dir under tests/fixtures/journey, or - for files written here> <component> <lockfile-missing value> <command>
+lock_case() {
+    local c="$1" fx="$2" comp="$3" want="$4" cmd="$5" d="$CPD/$1"
+    cp_bom "$c" '[]' "[$comp]"
+    [ "$fx" = "-" ] || cp -R "$JFX/$fx/." "$d/src/"
+    bash "$LIB/detect-lockfile-state.sh" "$d/src" "$d/proj_1.0_bom.json" >/dev/null 2>&1
+    bash "$LIB/assess-completeness.sh" "$d/proj_1.0_bom.json" "$d/proj_1.0" >/dev/null 2>&1
+    jq -e --arg want "$want" --arg cmd "$cmd" '.grade == "partial" and (.reasons | length == 1)
+            and .reasons[0].code == "lockfile-missing" and .reasons[0].detail == $want
+            and (.reasons[0].fix.en | contains("(" + $cmd + ")")) and (.reasons[0].fix.ko | contains("(" + $cmd + ")"))' \
+        "$d/proj_1.0_completeness.json" >/dev/null 2>&1 \
+        && pass "completeness/$c: partial (lockfile-missing: $want), the fix names $cmd in English and Korean" \
+        || fail "completeness/$c: verdict" "$(jq -c '[.grade, .reasons]' "$d/proj_1.0_completeness.json" 2>&1 | head -c 500)"
+}
+lock_case go-nosum go-mod-no-sum "$(cp_lib github.com/google/uuid v1.6.0 pkg:golang/github.com/google/uuid@v1.6.0)" "go.mod: no go.sum" "go mod tidy"
+lock_case cargo-nolock rust-no-lock "$(cp_lib itoa 1.0.11 pkg:cargo/itoa@1.0.11)" "Cargo.toml: no Cargo.lock" "cargo generate-lockfile"
+mkdir -p "$CPD/gem-nolock/src"; printf "source 'https://rubygems.org'\ngem 'zz-demo-gem'\n" > "$CPD/gem-nolock/src/Gemfile"
+lock_case gem-nolock - "$(cp_lib zz-demo-gem 1.0.0 pkg:gem/zz-demo-gem@1.0.0)" "Gemfile: no Gemfile.lock" "bundle lock"
+mkdir -p "$CPD/composer-nolock/src"; printf '{"require":{"php":">=8.1","zz/demo":"^1.0"}}' > "$CPD/composer-nolock/src/composer.json"
+lock_case composer-nolock - "$(cp_lib zz/demo 1.0.0 pkg:composer/zz/demo@1.0.0)" "composer.json: no composer.lock" "composer update"
+# Not reported: a lock file in place, a go.mod that requires nothing, a workspace member
+# whose lock is at the root, an empty dependency table, and a composer.json that requires
+# only the platform.
+NL="$CPD/no-lock-needed"
+mkdir -p "$NL/go" "$NL/gobare" "$NL/ws/crates/a" "$NL/crate" "$NL/php"
+cp "$JFX/go-mod/go.mod" "$JFX/go-mod/go.sum" "$NL/go/"
+printf 'module example.com/bare\n\ngo 1.21\n' > "$NL/gobare/go.mod"
+printf '[workspace]\nmembers = ["crates/a"]\n' > "$NL/ws/Cargo.toml"; : > "$NL/ws/Cargo.lock"
+printf '[package]\nname = "a"\n\n[dependencies]\nitoa = "1"\n' > "$NL/ws/crates/a/Cargo.toml"
+printf '[package]\nname = "crate"\n\n[dependencies]\n\n[profile.release]\nlto = true\n' > "$NL/crate/Cargo.toml"
+printf '{"require":{"php":">=8.1","ext-json":"*"}}' > "$NL/php/composer.json"
+cp_bom no-lock-needed-bom '[]' "[$(cp_lib itoa 1.0.11 pkg:cargo/itoa@1.0.11)]"
+bash "$LIB/detect-lockfile-state.sh" "$NL" "$CPD/no-lock-needed-bom/proj_1.0_bom.json" >/dev/null 2>&1
+! jq -e 'any(.metadata.properties[]?; .name == "bomlens:lockfile-missing")' "$CPD/no-lock-needed-bom/proj_1.0_bom.json" >/dev/null 2>&1 \
+    && pass "completeness/no-lock-needed: go.sum present, a go.mod that requires nothing, a workspace member, an empty [dependencies] and a platform-only composer.json are not reported" \
+    || fail "completeness/no-lock-needed: reported $(jq -c '.metadata.properties' "$CPD/no-lock-needed-bom/proj_1.0_bom.json" 2>&1)"
+# Version ranges with no lock file: the command follows the package type of the components.
+jq '.metadata.component.properties = [{name:"bomlens:source:versionPinning", value:"unpinned"}]' "$CPD/ok/proj_1.0_bom.json" > "$CPD/unpinned-npm.json"
+bash "$LIB/assess-completeness.sh" "$CPD/unpinned-npm.json" "$CPD/unpinned-npm" >/dev/null 2>&1
+jq -e '.reasons[0].fix.en == "Create the lock file with the package manager (npm install), keep it in the project folder and scan again."' "$CPD/unpinned-npm_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/unpinned-npm: the fix names npm install for npm components" \
+    || fail "completeness/unpinned-npm: fix $(jq -c '.reasons[0].fix' "$CPD/unpinned-npm_completeness.json" 2>&1)"
+jq '.metadata.properties = [{name:"bomlens:lockfile-missing", value:"Makefile.lock"}]' "$CPD/ok/proj_1.0_bom.json" > "$CPD/lock-unknown.json"
+bash "$LIB/assess-completeness.sh" "$CPD/lock-unknown.json" "$CPD/lock-unknown" >/dev/null 2>&1
+jq -e '.reasons[0].fix.en | test("for example npm install, pod install or swift package resolve")' "$CPD/lock-unknown_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/lock-unknown: a lock file with no known command keeps the general fix" \
+    || fail "completeness/lock-unknown: fix $(jq -c '.reasons[0].fix' "$CPD/lock-unknown_completeness.json" 2>&1)"
+
 # Korean: the reports use the Korean sentence pair and drop the clean sentence.
 cp_run empty-npm ko
 { grep -q "결과 완전성" "$CPD/empty-npm/proj_1.0_risk-report.md" "$CPD/empty-npm/proj_1.0_risk-report.html" "$CPD/empty-npm/proj_1.0_security.html" \

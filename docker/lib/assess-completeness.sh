@@ -44,7 +44,14 @@
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
 #                                                 (resolution-failed)
 #   bomlens:lockfile-missing, bomlens:lockfile-corrupt (detect-lockfile-state.sh),
-#   bomlens:source:versionPinning=unpinned        (lockfile-missing, lockfile-corrupt)
+#   bomlens:source:versionPinning=unpinned        (lockfile-missing, lockfile-corrupt; the
+#                                                 fix names the command that writes each
+#                                                 missing lock file, from lockCommands)
+#   bomlens:manifest-not-read (detect-lockfile-state.sh)
+#                                                 (manifest-not-read: a vcpkg.json or
+#                                                 conanfile.py whose dependencies are not in
+#                                                 the SBOM; left out when the SBOM is empty,
+#                                                 which unsupported-build-system already says)
 #   bomlens:python-environment-unsure             (installed-environment-unsure: the Python
 #                                                 part was read from an installed environment
 #                                                 and some of it could not be settled)
@@ -106,7 +113,17 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
        + (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")
             and (prop("bomlens:lockfile-missing") | length == 0)
           then ["락 파일 없이 버전 범위만 선언됨"] else [] end)) as $nolock_ko
+  # The command that writes each missing lock file, for the fix sentence: the
+  # lock named in "go.mod: no go.sum", a value that is the lock name itself, and
+  # for version ranges without a lock file the package types the SBOM holds.
+  | ($R.reasons["lockfile-missing"].lockCommands // {}) as $LC
+  | ([ (prop("bomlens:lockfile-missing")[] | split("; ")[] | (capture(": no (?<l>[^ ]+)$").l // .)),
+       (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")
+          then ($comps[] | (.purl // "") | strings | capture("^pkg:(?<t>[a-z]+)/").t) else empty end) ]
+     | map($LC[.] // empty)
+     | reduce .[] as $c ([]; if any(.[]; . == $c) then . else . + [$c] end)) as $lockcmds
   | ([ prop("bomlens:lockfile-corrupt")[] | clean(200) ]) as $corrupt
+  | (prop("bomlens:manifest-not-read") | first // null) as $notread
   | (prop("bomlens:python-environment-unsure") | first // null) as $venv_unsure
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
@@ -123,6 +140,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),
       (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200]), detailKo: ($nolock_ko | join("; ") | .[0:200])} else empty end),
       (if ($corrupt | length) > 0 then {code: "lockfile-corrupt", detail: ($corrupt | join("; ") | .[0:200])} else empty end),
+      (if $notread != null and $empty == null then {code: "manifest-not-read", detail: ($notread | clean(200))} else empty end),
       (if $venv_unsure != null then {code: "installed-environment-unsure", detail: ($venv_unsure | clean(200))} else empty end),
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
@@ -131,7 +149,10 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
              grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable" else $d.grade end),
              detail: $r.detail,
              message: {en: ($d.en | sub("\\{detail\\}"; $r.detail)), ko: ($d.ko | sub("\\{detail\\}"; ($r.detailKo // $r.detail)))},
-             fix: {en: $d.fixEn, ko: $d.fixKo}})) as $reasons
+             fix: (if $r.code == "lockfile-missing" and ($lockcmds | length) > 0 and $d.fixEnCommands != null
+                   then {en: ($d.fixEnCommands | sub("\\{commands\\}"; $lockcmds | join(", "))),
+                         ko: ($d.fixKoCommands | sub("\\{commands\\}"; $lockcmds | join(", ")))}
+                   else {en: $d.fixEn, ko: $d.fixKo} end)})) as $reasons
   | (if ($reasons | any(.[]; .grade == "unreliable")) then "unreliable"
      elif ($reasons | length) > 0 then "partial" else "complete" end) as $grade
   | {schemaVersion: 1,
