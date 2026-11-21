@@ -25,8 +25,14 @@
 # the file BOMLENS_GO_VULNDB_STATUS_FILE names, when set, as JSON
 # {"status": "ok"|"degraded"|"failed"|"no_input", "detail": ...}.
 #
-# Database age: a database older than BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days,
-# counted from index/db.json "modified", misses what was published since. When
+# Database age: a database older than BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days
+# misses what was published since. The age counts from when the export was
+# taken from its source: the time --fetch or a download wrote beside it in
+# <export>.fetched (the source's Last-Modified, else the download time), else
+# the file's modification time (index/db.json in an unpacked folder). The
+# export's own date, index/db.json "modified", is when an advisory last
+# changed; vuln.go.dev publishes the export daily even when that date stays
+# put, so it only counts when it is the later of the two. When
 # it is the bundled snapshot and the scan is not offline (TRIVY_OFFLINE_SCAN or
 # TRIVY_SKIP_DB_UPDATE), a newer export is downloaded from BOMLENS_GO_VULNDB_URL
 # (default https://vuln.go.dev/vulndb.zip, 60 s) into a temporary folder that
@@ -75,10 +81,13 @@ import tempfile
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
 
 DEFAULT_URL = "https://vuln.go.dev/vulndb.zip"
 DEFAULT_MAX_AGE_DAYS = 7
+# Beside an export: {"taken": "<UTC time>", "url": "<source>"}.
+TAKEN_SUFFIX = ".fetched"
 DOWNLOAD_TIMEOUT = 60
 BUILD_DOWNLOAD_TIMEOUT = 120
 # The export is about 3.6 MB (2026-11).
@@ -330,6 +339,32 @@ def age_days(modified):
     return max(0, int((datetime.now(timezone.utc) - t.replace(tzinfo=timezone.utc)).total_seconds() // 86400))
 
 
+def _utc(t):
+    return t.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def taken_at(path):
+    """When the export at path was taken from its source (see the header), or ""."""
+    try:
+        with open(path + TAKEN_SUFFIX) as f:
+            taken = json.loads(f.read(4096)).get("taken", "")
+        if isinstance(taken, str) and age_days(taken) is not None:
+            return taken
+    except (OSError, ValueError, AttributeError):
+        pass
+    target = os.path.join(path, "index", "db.json") if os.path.isdir(path) else path
+    try:
+        return _utc(datetime.fromtimestamp(os.path.getmtime(target), timezone.utc))
+    except (OSError, ValueError, OverflowError):
+        return ""
+
+
+def database_age(modified, taken):
+    """Days since the later of the export's own date and when it was taken."""
+    ages = [a for a in (age_days(modified), age_days(taken)) if a is not None]
+    return min(ages) if ages else None
+
+
 def build_index(records):
     """lower-cased path -> [(record, affected entry, "module" | "package")]."""
     index = {}
@@ -558,8 +593,9 @@ def validate_export(blob):
 
 
 def fetch(url, out, timeout):
-    """Download vulndb.zip from url, check it and write it to out. Returns
-    (record count, modified); DatabaseError when it cannot be used."""
+    """Download vulndb.zip from url, check it and write it to out, with when
+    it was taken in out + TAKEN_SUFFIX. Returns (record count, modified,
+    taken); DatabaseError when it cannot be used."""
     if not re.match(r"^(https?|file)://", url):
         raise DatabaseError("%s is not an http, https or file URL" % url)
     req = urllib.request.Request(url, headers={"Accept": "application/zip",
@@ -567,14 +603,24 @@ def fetch(url, out, timeout):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (scheme checked above)
             blob = resp.read(MAX_DOWNLOAD_BYTES + 1)
+            last_modified = resp.headers.get("Last-Modified", "")
     except (OSError, ValueError) as exc:
         raise DatabaseError("download from %s failed: %s" % (url, exc))
     n, modified = validate_export(blob)
+    now = datetime.now(timezone.utc)
+    try:
+        # A mirror that serves an old copy says so here; never later than now.
+        taken = _utc(min(parsedate_to_datetime(last_modified), now))
+    except (TypeError, ValueError, IndexError):
+        taken = _utc(now)
     tmp = out + ".tmp.%d" % os.getpid()
     with open(tmp, "wb") as f:
         f.write(blob)
     os.replace(tmp, out)
-    return n, modified
+    with open(tmp, "w") as f:
+        json.dump({"taken": taken, "url": url}, f)
+    os.replace(tmp, out + TAKEN_SUFFIX)
+    return n, modified, taken
 
 
 def _max_age_days():
@@ -601,40 +647,42 @@ def _write_status(status, detail=""):
 
 
 def refresh_if_old(db_path, bundled, modified, records):
-    """(db description, modified, records, degraded reason or "").
+    """(db description, modified, taken, records, degraded reason or "").
 
     A bundled snapshot older than the limit is replaced, for this scan only,
     by a download from BOMLENS_GO_VULNDB_URL, unless the scan is offline. A
     database the caller named is never replaced."""
     max_days = _max_age_days()
-    age = age_days(modified)
+    taken = taken_at(db_path)
+    age = database_age(modified, taken)
     if age is None or age <= max_days:
-        return "bundled" if bundled else "named", modified, records, ""
+        return "bundled" if bundled else "named", modified, taken, records, ""
     old = "the Go vulnerability database is %d days old (over %d)" % (age, max_days)
     if not bundled:
-        return "named", modified, records, old + "; it is the one BOMLENS_GO_VULNDB_PATH names, so it is not replaced"
+        return "named", modified, taken, records, old + "; it is the one BOMLENS_GO_VULNDB_PATH names, so it is not replaced"
     if _offline():
-        return "bundled", modified, records, old + "; not refreshed, the scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE)"
+        return "bundled", modified, taken, records, old + "; not refreshed, the scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE)"
     url = os.environ.get("BOMLENS_GO_VULNDB_URL") or DEFAULT_URL
     print("[go-vulndb] %s; downloading a newer one from %s" % (old, url))
     try:
         tmpdir = tempfile.mkdtemp(prefix="bomlens-go-vulndb.")
     except OSError as exc:
-        return "bundled", modified, records, old + "; no temporary folder for a newer one: %s" % exc
+        return "bundled", modified, taken, records, old + "; no temporary folder for a newer one: %s" % exc
     atexit.register(shutil.rmtree, tmpdir, True)
     try:
         fresh = os.path.join(tmpdir, "vulndb.zip")
-        fetch(url, fresh, DOWNLOAD_TIMEOUT)
+        _, _, new_taken = fetch(url, fresh, DOWNLOAD_TIMEOUT)
         new_modified, new_records = open_database(fresh)
     except DatabaseError as exc:
         print("[go-vulndb] WARN: %s; reading the snapshot in the image" % exc, file=sys.stderr)
-        return "bundled", modified, records, old + "; the download of a newer one failed: %s" % exc
-    print("[go-vulndb] downloaded the Go vulnerability database of %s (%d records)" % (new_modified, len(new_records)))
-    new_age = age_days(new_modified)
+        return "bundled", modified, taken, records, old + "; the download of a newer one failed: %s" % exc
+    print("[go-vulndb] downloaded the Go vulnerability database of %s, taken %s (%d records)"
+          % (new_modified, new_taken, len(new_records)))
+    new_age = database_age(new_modified, new_taken)
     if new_age is not None and new_age > max_days:
-        return "downloaded", new_modified, new_records, (
+        return "downloaded", new_modified, new_taken, new_records, (
             "the downloaded Go vulnerability database is %d days old (over %d)" % (new_age, max_days))
-    return "downloaded", new_modified, new_records, ""
+    return "downloaded", new_modified, new_taken, new_records, ""
 
 
 def main(argv):
@@ -642,11 +690,12 @@ def main(argv):
         # Image build: bundle the snapshot (see docker/Dockerfile).
         url = os.environ.get("BOMLENS_GO_VULNDB_URL") or DEFAULT_URL
         try:
-            n, modified = fetch(url, argv[2], BUILD_DOWNLOAD_TIMEOUT)
+            n, modified, taken = fetch(url, argv[2], BUILD_DOWNLOAD_TIMEOUT)
         except (DatabaseError, OSError) as exc:
             print("[build] Go vulnerability database snapshot skipped: %s" % exc)
             return 1
-        print("[build] Go vulnerability database snapshot: %d records, modified %s -> %s" % (n, modified, argv[2]))
+        print("[build] Go vulnerability database snapshot: %d records, modified %s, taken %s -> %s"
+              % (n, modified, taken, argv[2]))
         return 0
     bundled = False
     if len(argv) > 1 and argv[1] == "--bundled":
@@ -674,7 +723,7 @@ def main(argv):
         print("[go-vulndb] cannot read the Go vulnerability database: %s" % exc, file=sys.stderr)
         _write_status("failed", "could not read the Go vulnerability database at %s: %s" % (db_path, exc))
         return 3
-    source, modified, records, degraded = refresh_if_old(db_path, bundled, modified, records)
+    source, modified, taken, records, degraded = refresh_if_old(db_path, bundled, modified, records)
     comps, kept, already = scan(sbom, records, reports)
     sidecar = {
         "Results": [{
@@ -685,7 +734,8 @@ def main(argv):
         }],
         "GoVulnDB": {
             "Modified": modified,
-            "AgeDays": age_days(modified),
+            "Taken": taken,
+            "AgeDays": database_age(modified, taken),
             "Source": source,
             "Records": len(records),
             "Components": len(comps),

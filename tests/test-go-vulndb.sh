@@ -52,6 +52,9 @@ with zipfile.ZipFile(out, "w") as z:
             full = os.path.join(d, f)
             z.write(full, os.path.relpath(full, root).replace(os.sep, "/"))
 PY
+# The age counts from when an export was taken: with no .fetched beside it,
+# the file's modification time. Date this one as the fixture's own date.
+touch -t 202611010000 "$WORK/vulndb.zip"
 
 summary() {
     jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName) \(.InstalledVersion) \(.VulnerabilityID) \(.Severity) \(.FixedVersion // "-") \(.["bomlens:goVulnDB"].match)"] | sort | .[]' "$1"
@@ -231,6 +234,38 @@ BOMLENS_GO_VULNDB_MAX_AGE_DAYS=7 BOMLENS_GO_VULNDB_STATUS_FILE="$WORK/named.stat
 { [ "$(gv_meta named | cut -d' ' -f1)" = named ] && gv_stat named | grep -q "BOMLENS_GO_VULNDB_PATH names, so it is not replaced"; } \
     && pass "a database the caller named is never replaced, only degraded" \
     || fail "named: $(gv_stat named)"
+
+# vuln.go.dev republishes the export daily while index/db.json "modified"
+# stays at the last advisory change: an export taken today is current however
+# old that date is.
+cp "$WORK/vulndb.zip" "$WORK/taken.zip"
+printf '{"taken":"%s","url":"file:///stand-in"}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK/taken.zip.fetched"
+touch -t 202611010000 "$WORK/taken.zip"
+: > "$WORK/taken.status"
+BOMLENS_GO_VULNDB_MAX_AGE_DAYS=7 BOMLENS_GO_VULNDB_STATUS_FILE="$WORK/taken.status" BOMLENS_GO_VULNDB_URL="file://$WORK/no-such.zip" \
+    python3 "$LIB/scan-go-vulndb.py" --bundled "$FIX/sbom.json" "$WORK/taken" "$WORK/taken.zip" > "$WORK/taken.log" 2>&1
+{ [ "$(gv_meta taken)" = "bundled -" ] && [ "$(gv_stat taken)" = "ok " ] \
+  && jq -e '.GoVulnDB | .Modified == "2026-11-01T00:00:00Z" and .AgeDays == 0 and (.Taken | test("^20[0-9]{2}-"))' "$WORK/taken_security_govulndb.json" >/dev/null; } \
+    && pass "a snapshot taken today is current although its index/db.json date is older than the limit" \
+    || fail "taken: $(gv_meta taken) / $(gv_stat taken)" "$(cat "$WORK/taken.log")"
+
+# --fetch (the image build) records when the export was taken: the source's
+# Last-Modified, which file:// gives as the file's modification time.
+touch -t 202611050000 "$WORK/fresh.zip"
+BOMLENS_GO_VULNDB_URL="file://$WORK/fresh.zip" python3 "$LIB/scan-go-vulndb.py" --fetch "$WORK/built.zip" > "$WORK/built.log" 2>&1
+{ jq -e --arg u "file://$WORK/fresh.zip" '(.taken | startswith("2026-11-0")) and .url == $u' "$WORK/built.zip.fetched" >/dev/null \
+  && cmp -s "$WORK/fresh.zip" "$WORK/built.zip"; } \
+    && pass "--fetch keeps the export as published and records when it was taken beside it" \
+    || fail "fetch stamp: $(cat "$WORK/built.zip.fetched" 2>&1)" "$(cat "$WORK/built.log")"
+
+# A source that serves an old copy (a stale mirror: an old date, and an old
+# Last-Modified) is still old after the download.
+cp "$WORK/vulndb.zip" "$WORK/mirror.zip"
+touch -t 202611010000 "$WORK/mirror.zip"
+gv_age stale BOMLENS_GO_VULNDB_URL="file://$WORK/mirror.zip"
+{ [ "$(gv_meta stale | cut -d' ' -f1)" = downloaded ] && gv_stat stale | grep -q '^degraded the downloaded Go vulnerability database is [0-9]* days old (over 7)$'; } \
+    && pass "a download from a source that serves an old copy stays degraded" \
+    || fail "stale source: $(gv_meta stale) / $(gv_stat stale)" "$(cat "$WORK/stale.log")"
 
 gv_age young BOMLENS_GO_VULNDB_MAX_AGE_DAYS=100000 BOMLENS_GO_VULNDB_URL="file://$WORK/no-such.zip"
 [ "$(gv_meta young)" = "bundled -" ] && [ "$(gv_stat young)" = "ok " ] \
