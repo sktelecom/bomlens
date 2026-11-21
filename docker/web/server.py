@@ -16,6 +16,8 @@
 #   GET  /file?name=...   -> serve one artifact (path-traversal guarded)
 #   POST /upload?kind=... -> store an uploaded file, return a {token}
 #   GET  /scan-stream?... -> Server-Sent Events: live scan log + final summary
+#   GET  /scan-attach?id= -> SSE: follow a running scan (log so far, then live)
+#   POST /scan-cancel?id= -> stop a running scan, from any tab
 #
 # Input types (the `source` query param on /scan-stream):
 #   current-dir   -> MODE=SOURCE  (syft dir scan of /src)
@@ -32,6 +34,7 @@ import io
 import hashlib
 import json
 import os
+import queue
 import re
 import secrets
 import select
@@ -49,7 +52,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -3893,8 +3896,7 @@ SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 
 def running_scans():
     """Scans running now, newest first: id, project, version and start time.
-    Read-only. The progress stream belongs to the tab that started the scan, so
-    another tab can say that a scan is running but cannot join it."""
+    Read-only. Another tab joins one through GET /scan-attach?id=."""
     with _scan_lock:
         rows = [
             {"id": rid, **_scan_started.get(rid, {"project": rid, "version": "", "startedAt": 0})}
@@ -3902,6 +3904,8 @@ def running_scans():
         ]
         for stale in [k for k in _scan_started if k not in _scan_active]:
             del _scan_started[stale]
+        # The new-scan screen polls this, so ended streams are released here too.
+        _prune_scan_streams()
     rows.sort(key=lambda r: r.get("startedAt", 0), reverse=True)
     return rows
 
@@ -5956,6 +5960,187 @@ _scan_started = {}
 _active_upload_tokens = set()
 
 
+def _bounded_int_env(name, default, low, high):
+    """An integer setting from the server's own environment, within [low, high];
+    the default for anything else."""
+    raw = os.environ.get(name, "").strip()
+    if not re.fullmatch(r"[0-9]{1,6}", raw):
+        return default
+    return max(low, min(high, int(raw)))
+
+
+# A running scan's stream can be followed by more than the tab that started it
+# (GET /scan-attach): a reloaded tab, or another one. The events are kept in a
+# bounded buffer per scan so a tab that joins late is shown the log so far, and
+# then follows it. Only log and error events are kept, oldest first out past
+# either cap; the last progress event and the final done event are kept apart.
+SCAN_REPLAY_MAX_EVENTS = 5000
+SCAN_REPLAY_MAX_BYTES = 1024 * 1024
+# Error events pushed out of the buffer are still replayed, up to this many.
+SCAN_REPLAY_MAX_ERRORS = 20
+# Tabs that may follow one scan at once, besides the one that started it.
+SCAN_ATTACH_MAX_CLIENTS = 8
+# Events waiting for one following tab. A tab that falls this far behind is
+# dropped (its stream ends) rather than holding the scan up.
+SCAN_ATTACH_QUEUE_MAX = 2000
+# A finished scan's stream stays joinable this long, so a tab that asks just
+# after the end still gets the log and the done event.
+SCAN_ATTACH_LINGER_SECONDS = 60
+# Seconds a scan keeps running with no tab following it, so a reload (or a
+# second tab opened right after the first was closed) can join it again. Past
+# this, it is cancelled as a closed tab always was.
+SCAN_REATTACH_GRACE_SECONDS = _bounded_int_env("BOMLENS_REATTACH_GRACE", 30, 0, 600)
+
+
+class _ScanFollower:
+    """One tab following a running scan through GET /scan-attach."""
+
+    def __init__(self):
+        self.events = queue.Queue(maxsize=SCAN_ATTACH_QUEUE_MAX)
+        self.dropped = False
+
+
+class _ScanBroadcast:
+    """The events of one running scan: a bounded replay buffer and the tabs
+    following it. The thread running the scan publishes; it writes to the tab
+    that started the scan itself, and hands every event to each follower's
+    queue, which that follower's own request thread drains."""
+
+    def __init__(self, run_id, info):
+        self.run_id = run_id
+        self.info = dict(info)
+        self._lock = threading.Lock()
+        self._events = deque()
+        self._bytes = 0
+        self.dropped_lines = 0
+        self._kept_errors = []
+        self._progress = None
+        self._done = None
+        self._followers = set()
+        self.owner_alive = True
+        self._unwatched_since = None
+        self._cancel = threading.Event()
+        self.ended_at = None
+
+    def publish(self, event, payload):
+        """Record one event and hand it to every follower."""
+        with self._lock:
+            if event == "done":
+                self._done = payload
+                self.ended_at = time.monotonic()
+            elif event == "progress":
+                self._progress = payload
+            else:
+                self._events.append((event, payload))
+                self._bytes += len(payload)
+                while self._events and (len(self._events) > SCAN_REPLAY_MAX_EVENTS
+                                        or self._bytes > SCAN_REPLAY_MAX_BYTES):
+                    old_event, old_payload = self._events.popleft()
+                    self._bytes -= len(old_payload)
+                    if old_event == "error":
+                        if len(self._kept_errors) < SCAN_REPLAY_MAX_ERRORS:
+                            self._kept_errors.append((old_event, old_payload))
+                    else:
+                        self.dropped_lines += 1
+            for f in list(self._followers):
+                try:
+                    f.events.put_nowait((event, payload))
+                except queue.Full:
+                    f.dropped = True
+                    self._followers.discard(f)
+                    self._note_unwatched()
+
+    def attach(self):
+        """Join the stream: (follower, replay), or None when the scan already
+        has as many followers as it may. The replay is everything kept so far,
+        taken under the same lock publish() holds, so no event falls between
+        the replay and the live part. A scan that has ended returns no
+        follower, and its replay ends with the done event."""
+        with self._lock:
+            if self._done is None and len(self._followers) >= SCAN_ATTACH_MAX_CLIENTS:
+                return None
+            replay = list(self._kept_errors) + list(self._events)
+            if self._progress is not None:
+                replay.append(("progress", self._progress))
+            if self._done is not None:
+                replay.append(("done", self._done))
+                return None, replay, self.dropped_lines
+            follower = _ScanFollower()
+            self._followers.add(follower)
+            self._unwatched_since = None
+            return follower, replay, self.dropped_lines
+
+    def detach(self, follower):
+        with self._lock:
+            self._followers.discard(follower)
+            self._note_unwatched()
+
+    def owner_gone(self):
+        """The tab that started the scan closed or reloaded."""
+        with self._lock:
+            self.owner_alive = False
+            self._note_unwatched()
+
+    def _note_unwatched(self):
+        # Caller holds the lock.
+        if not self.owner_alive and not self._followers and self._unwatched_since is None:
+            self._unwatched_since = time.monotonic()
+
+    def request_cancel(self):
+        """Ask the scan to stop. True the first time only, and only while it
+        runs, so two tabs cancelling at once stop it once."""
+        with self._lock:
+            if self._done is not None or self._cancel.is_set():
+                return False
+            self._cancel.set()
+            return True
+
+    def cancel_requested(self):
+        return self._cancel.is_set()
+
+    def finish(self, run_id):
+        """Make sure the stream ends with a done event, so no follower waits
+        on a scan whose thread has already left."""
+        with self._lock:
+            ended = self._done is not None
+        if not ended:
+            self.publish("done", json.dumps({
+                "ok": False, "id": run_id, "results": [], "sbom": None,
+                "security": None, "conformance": None,
+                "cancelled": self._cancel.is_set()}))
+
+    def should_stop(self, grace=None):
+        """Cancelled on request, or no tab has followed it for the grace."""
+        if self._cancel.is_set():
+            return True
+        grace = SCAN_REATTACH_GRACE_SECONDS if grace is None else grace
+        with self._lock:
+            since = self._unwatched_since
+        return since is not None and time.monotonic() - since >= grace
+
+
+# Run id -> _ScanBroadcast, for the scans running now and the ones that ended
+# less than SCAN_ATTACH_LINGER_SECONDS ago. Guarded by _scan_lock.
+_scan_streams = {}
+
+
+def _prune_scan_streams():
+    """Drop the streams of scans that ended past the linger. Caller holds
+    _scan_lock."""
+    now = time.monotonic()
+    for rid in [k for k, b in _scan_streams.items()
+                if b.ended_at is not None and now - b.ended_at > SCAN_ATTACH_LINGER_SECONDS]:
+        del _scan_streams[rid]
+
+
+def scan_stream_for(run_id):
+    """The stream of a running (or just ended) scan, or None. The id must
+    already have passed scan_id_ok; it is only ever a dictionary key here."""
+    with _scan_lock:
+        _prune_scan_streams()
+        return _scan_streams.get(run_id)
+
+
 def client_local_now(tz_offset, now_utc=None):
     """The time the user sees, from the browser's Date.getTimezoneOffset().
 
@@ -6951,6 +7136,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, json.dumps({"error": "bad origin"}))
                 return
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
+        elif path == "/scan-attach":
+            # Read-only, but it is the scan log: the same checks as the stream
+            # that started it.
+            if not (_origin_allowed(self.headers.get("Origin")) and _fetch_site_ok(self.headers)):
+                self._send(403, json.dumps({"error": "bad origin"}))
+                return
+            self._scan_attach(urllib.parse.parse_qs(parsed.query))
         elif path == "/android-sdk-status":
             self._android_sdk_status(urllib.parse.parse_qs(parsed.query))
         elif path == "/android-sdk-build-stream":
@@ -6993,6 +7185,8 @@ class Handler(BaseHTTPRequestHandler):
             self._android_sdk_build_cancel(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/scan-delete":
             self._scan_delete(urllib.parse.parse_qs(parsed.query))
+        elif parsed.path == "/scan-cancel":
+            self._scan_cancel(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/vex-verdict":
             self._vex_verdict_save(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/vex-import":
@@ -7041,6 +7235,77 @@ class Handler(BaseHTTPRequestHandler):
         with _scan_lock:
             running = rid in _scan_active
         self._send(200, json.dumps({"exists": exists, "id": rid, "running": running}))
+
+    def _scan_cancel(self, qs):
+        """POST /scan-cancel?id= : stop a running scan, from any tab. The first
+        request answers cancelling:true; one that arrives while the scan is
+        already stopping answers cancelling:false. 404 when no scan of that id
+        is running."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "invalid id"}))
+            return
+        broadcast = scan_stream_for(sid)
+        if broadcast is None or broadcast.ended_at is not None:
+            self._send(404, json.dumps({"error": "no running scan", "cancelling": False}))
+            return
+        self._send(200, json.dumps({"cancelling": broadcast.request_cancel()}))
+
+    def _scan_attach(self, qs):
+        """GET /scan-attach?id= : SSE, follow a scan another request started.
+        Sends a `started` event (id, project, version, startedAt, attached and
+        how many early log lines the buffer no longer holds), the kept events
+        in order, then the live ones until the done event. A scan that ended
+        less than SCAN_ATTACH_LINGER_SECONDS ago replays to its done event.
+        Closing this stream does not stop the scan."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "invalid id"}))
+            return
+        broadcast = scan_stream_for(sid)
+        if broadcast is None:
+            self._send(404, json.dumps({"error": "no running scan"}))
+            return
+        joined = broadcast.attach()
+        if joined is None:
+            self._send(429, json.dumps({"error": "too many tabs follow this scan"}))
+            return
+        follower, replay, dropped = joined
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+
+            def write(event, payload):
+                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
+                self.wfile.flush()
+
+            write("started", json.dumps(dict(broadcast.info, id=sid, attached=True, droppedLines=dropped)))
+            for event, payload in replay:
+                write(event, payload)
+            if follower is None:
+                return
+            beats = 0
+            while True:
+                try:
+                    event, payload = follower.events.get(timeout=1.0)
+                except queue.Empty:
+                    if follower.dropped or _peer_closed(self.connection):
+                        return
+                    beats += 1
+                    if beats % 5 == 0:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+                    continue
+                write(event, payload)
+                if event == "done":
+                    return
+        except (BrokenPipeError, ConnectionResetError, ValueError):
+            return
+        finally:
+            if follower is not None:
+                broadcast.detach(follower)
 
     def _scan_delete(self, qs):
         """Delete one past scan. New layout: remove the whole run folder
@@ -8249,6 +8514,14 @@ class Handler(BaseHTTPRequestHandler):
                 "project": project[:120], "version": version[:60],
                 "startedAt": int(time.time()),
             }
+            # Joinable by another tab (GET /scan-attach) while it runs. A
+            # scan of the same id that ended a moment ago is replaced. Whether
+            # it asked for deep CVE matching goes along: a joining tab shows
+            # that step only then, as the starting tab does.
+            _prune_scan_streams()
+            broadcast = _ScanBroadcast(
+                run_id, dict(_scan_started[run_id], deepCve=g("deep_cve") == "true"))
+            _scan_streams[run_id] = broadcast
             if token:
                 _active_upload_tokens.add(token)
         scan_claimed = run_id
@@ -8266,6 +8539,8 @@ class Handler(BaseHTTPRequestHandler):
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
                 _active_upload_tokens.discard(token)
+                if _scan_streams.get(run_id) is broadcast:
+                    del _scan_streams[run_id]
             self._send(400, json.dumps({"error": "invalid run id"}))
             return
         # Claimed above but the try/finally that normally releases both
@@ -8286,8 +8561,9 @@ class Handler(BaseHTTPRequestHandler):
             cancel_state = {"decided": False, "cancelled": False, "ok": False}
 
             def decide_cancel(ok_):
-                """Fix, once, whether this run was cancelled: the client left
-                before the scan ended and the scan did not finish ok. The
+                """Fix, once, whether this run was cancelled: it was told to
+                stop (a tab cancelled it, or no tab followed it for the grace)
+                before it ended, and it did not finish ok. The
                 watcher is stopped first, so the closing of the stream that
                 follows the done event is never read as a cancel."""
                 scan_ended.set()
@@ -8363,9 +8639,13 @@ class Handler(BaseHTTPRequestHandler):
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
                 _active_upload_tokens.discard(token)
+                if _scan_streams.get(run_id) is broadcast:
+                    del _scan_streams[run_id]
             raise
 
-        # Set when the client closes the stream (e.g. the UI's Cancel button), so
+        # Set when the scan is to stop: a tab asked for it (POST /scan-cancel),
+        # or no tab has followed it for SCAN_REATTACH_GRACE_SECONDS (the tab
+        # that started it closed and none joined). The watcher below sets it, so
         # the scan loop can stop the subprocess instead of running it to the end.
         disconnected = [False]
 
@@ -8373,23 +8653,40 @@ class Handler(BaseHTTPRequestHandler):
         # stream take turns.
         write_lock = threading.Lock()
 
-        def sse(event, payload):
+        def owner_write(event, payload):
+            # Only the tab that started the scan; a failed write means it closed
+            # or reloaded, which starts the grace rather than stopping the scan.
+            if not broadcast.owner_alive:
+                return
             try:
                 with write_lock:
                     self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
                     self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, ValueError):
-                disconnected[0] = True
+                broadcast.owner_gone()
+
+        def sse(event, payload):
+            # Kept for a tab that joins later, handed to the ones following it,
+            # and written to the tab that started the scan.
+            broadcast.publish(event, payload)
+            owner_write(event, payload)
 
         def sse_ping():
             # An SSE comment line: EventSource ignores it, and a write to a
-            # closed stream marks the scan as cancelled.
+            # closed stream marks the starting tab as gone.
+            if not broadcast.owner_alive:
+                return
             try:
                 with write_lock:
                     self.wfile.write(b": keepalive\n\n")
                     self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, ValueError):
-                disconnected[0] = True
+                broadcast.owner_gone()
+
+        # The run id comes first, so the tab can cancel this scan by id and put
+        # it in the address for a reload to join again. Not kept for a replay:
+        # /scan-attach sends its own.
+        owner_write("started", json.dumps(dict(broadcast.info, id=run_id, attached=False, droppedLines=0)))
 
         def record_outcome(ok_, error_text=None, warnings=None, refused=None, error_code=None):
             """Save how this run ended into the run folder's sidecar, for the
@@ -8583,13 +8880,17 @@ class Handler(BaseHTTPRequestHandler):
                 yocto_dir = _picked
 
         # Notice a closed tab within a second even while the scan prints
-        # nothing, and stop the containers it started (CANCEL_FORCE_SECONDS).
+        # nothing, and, once no tab has followed the scan for the grace (or a
+        # tab cancelled it), stop the containers it started
+        # (CANCEL_FORCE_SECONDS).
         def _watch_client():
             beats = 0
             while not scan_ended.wait(1.0):
                 if disconnected[0]:
                     return
-                if _peer_closed(self.connection):
+                if broadcast.owner_alive and _peer_closed(self.connection):
+                    broadcast.owner_gone()
+                if broadcast.should_stop():
                     disconnected[0] = True
                     return
                 beats += 1
@@ -9399,6 +9700,9 @@ class Handler(BaseHTTPRequestHandler):
                 # the reasons the declaration step logged, so the failed-scan
                 # card can say why and offer the file. None otherwise.
                 "declarationRefused": None if ok else declaration_refused(run_id, declared_reasons),
+                # Stopped on request or with no tab left following it, so a tab
+                # still following it says so rather than showing a failure.
+                "cancelled": cancel_state["cancelled"],
             }
             # Outcome for the diagnostics summary (GET /diagnostics), which must
             # work for a failed run too: the tracker's scrubbed [ERROR] text, or
@@ -9451,6 +9755,7 @@ class Handler(BaseHTTPRequestHandler):
                 write_cancelled_record(
                     run_id, locals().get("scan_config") or {"project": project, "version": version})
                 discard_cancelled_run(run_out, pre_existing)
+            broadcast.finish(run_id)
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
             # Remove uploaded/cloned/extracted trees; keep generated artifacts

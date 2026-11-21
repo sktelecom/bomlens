@@ -4535,7 +4535,7 @@ SBOM_OUTPUT_DIR="$OUT2" UI_PORT="$PORT2" SBOM_UI_HOST_DIR="$WORK" \
     SBOM_UI_SCAN_ROOTS="$YOCTOROOT|/host/poky-build
 $PLAINROOT|/host/plainroot" \
     SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
-    SBOM_LIB_DIR="$WORK/no-such-lib" \
+    SBOM_LIB_DIR="$WORK/no-such-lib" BOMLENS_REATTACH_GRACE=2 \
     STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
     STUB_ENV_FILE="$WORK/stub-env" \
     DECLARED_COMPONENTS_FILES="$WORK/not-from-the-request.json" DECLARED_COMPONENTS_SKIP=1 \
@@ -5360,10 +5360,13 @@ else
     fail "tar symlink contract violated" "$events"
 fi
 
+# The server runs with BOMLENS_REATTACH_GRACE=2: a scan no tab follows is
+# stopped about two seconds after the last one closed, so the waits below
+# include that grace.
 echo hang > "$STUB_MODE_FILE"
 rm -f "$STUB_HEARTBEAT"
 curl -sN --max-time 2 "$BASE2/scan-stream?project=cancel&version=1.0&source=current-dir" >/dev/null 2>&1 || true
-sleep 3
+sleep 5
 hb1=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
 sleep 1.5
 hb2=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
@@ -5380,7 +5383,7 @@ RUNLIST_PID=$!
 sleep 1
 running=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
 wait "$RUNLIST_PID" 2>/dev/null || true
-sleep 1.5
+sleep 5
 after=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
 if echo "$running" | python3 -c "
 import sys, json
@@ -5396,13 +5399,254 @@ else
     fail "/running-scans contract violated" "during: $running after: $after"
 fi
 
+echo "== /scan-attach and /scan-cancel: follow a running scan from another tab =="
+# A saved SSE body, normalized to the same JSON array sse_events prints.
+sse_file_events() { # $1=file
+    python3 - "$1" <<'PARSE'
+import sys, json
+events, ev, data = [], None, []
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    line = line.rstrip("\n")
+    if line.startswith("event: "):
+        ev = line[len("event: "):]
+    elif line.startswith("data: "):
+        data.append(line[len("data: "):])
+    elif line == "" and ev is not None:
+        try:
+            parsed = json.loads("\n".join(data)) if data else None
+        except ValueError:
+            parsed = "\n".join(data)
+        events.append({"event": ev, "data": parsed})
+        ev, data = None, []
+print(json.dumps(events))
+PARSE
+}
+hb_count() { wc -l < "$STUB_HEARTBEAT" 2>/dev/null | tr -d ' ' || echo 0; }
+
+# The starting tab learns the run id first, from a `started` event.
+echo hang > "$STUB_MODE_FILE"
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 8 "$BASE2/scan-stream?project=follow&version=1.0&source=current-dir" > "$WORK/owner.sse" 2>/dev/null &
+OWNER_PID=$!
+sleep 1.5
+# Two tabs join while it runs: each gets the log so far, then the live lines.
+curl -sN --max-time 2.5 "$BASE2/scan-attach?id=follow_1.0" > "$WORK/tab1.sse" 2>/dev/null &
+TAB1_PID=$!
+curl -sN --max-time 2.5 "$BASE2/scan-attach?id=follow_1.0" > "$WORK/tab2.sse" 2>/dev/null &
+TAB2_PID=$!
+wait "$TAB1_PID" "$TAB2_PID" 2>/dev/null || true
+if sse_file_events "$WORK/owner.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started', evs[:2]
+d = evs[0]['data']
+assert d['id'] == 'follow_1.0' and d['attached'] is False and d['project'] == 'follow', d
+"; then
+    pass "scan-stream opens with a started event that names the run id"
+else
+    fail "scan-stream started event missing" "$(head -c 400 "$WORK/owner.sse")"
+fi
+for tab in tab1 tab2; do
+    if sse_file_events "$WORK/$tab.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started', evs[:2]
+d = evs[0]['data']
+assert d['id'] == 'follow_1.0' and d['attached'] is True and d['version'] == '1.0' and d['droppedLines'] == 0, d
+logs = [e['data'] for e in evs if e['event'] == 'log']
+# Replayed: printed before the tab joined.
+assert any('[stub] scanning follow 1.0' in l for l in logs), logs[:5]
+ticks = [int(l.split()[-1]) for l in logs if l.startswith('[stub] tick')]
+# Live: printed after it joined (1.5 s in, a tick every 0.2 s), with none lost.
+assert ticks and ticks[0] == 0 and max(ticks) >= 12, ticks
+assert ticks == list(range(len(ticks))), ticks
+"; then
+        pass "/scan-attach ($tab) replays the log so far and follows the new lines"
+    else
+        fail "/scan-attach ($tab) replay or follow" "$(head -c 600 "$WORK/$tab.sse")"
+    fi
+done
+
+# Cancel from one tab, once: the scan stops, a following tab gets a done event
+# that says it was cancelled, and the run is no longer listed.
+curl -sN --max-time 8 "$BASE2/scan-attach?id=follow_1.0" > "$WORK/tab3.sse" 2>/dev/null &
+TAB3_PID=$!
+sleep 0.5
+c1=$(curl -s -X POST "$BASE2/scan-cancel?id=follow_1.0")
+c2=$(curl -s -X POST "$BASE2/scan-cancel?id=follow_1.0")
+wait "$TAB3_PID" 2>/dev/null || true
+wait "$OWNER_PID" 2>/dev/null || true
+sleep 1.5
+hb1=$(hb_count); sleep 1; hb2=$(hb_count)
+after=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+if [ "$c1" = '{"cancelling": true}' ] && echo "$c2" | grep -q '"cancelling": false' \
+    && [ "$hb1" = "$hb2" ] && [ ! -e "$OUT2/follow_1.0" ] \
+    && echo "$after" | python3 -c "import sys,json; assert not [x for x in json.load(sys.stdin) if x['id'] == 'follow_1.0']" \
+    && sse_file_events "$WORK/tab3.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+done = [e for e in evs if e['event'] == 'done']
+assert len(done) == 1 and done[0]['data']['ok'] is False and done[0]['data']['cancelled'] is True, done
+"; then
+    pass "/scan-cancel stops the scan once; a following tab gets done with cancelled:true"
+else
+    fail "/scan-cancel contract" "c1=$c1 c2=$c2 hb $hb1->$hb2 after=$after $(tail -c 300 "$WORK/tab3.sse")"
+fi
+if sse_file_events "$WORK/owner.sse" | python3 -c "
+import sys, json
+done = [e for e in json.load(sys.stdin) if e['event'] == 'done']
+assert len(done) == 1 and done[0]['data']['cancelled'] is True, done
+"; then
+    pass "the starting tab gets the same cancelled done event"
+else
+    fail "starting tab did not see the cancel" "$(tail -c 300 "$WORK/owner.sse")"
+fi
+
+# The starting tab closes; a tab that joined keeps the scan running past the
+# grace, and once that tab closes too the scan stops after the grace.
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 1.5 "$BASE2/scan-stream?project=keep&version=1.0&source=current-dir" >/dev/null 2>&1 &
+OWNER_PID=$!
+sleep 0.8
+curl -sN --max-time 6 "$BASE2/scan-attach?id=keep_1.0" > "$WORK/keep.sse" 2>/dev/null &
+KEEP_PID=$!
+wait "$OWNER_PID" 2>/dev/null || true
+sleep 4.5
+hb1=$(hb_count); sleep 0.8; hb2=$(hb_count)
+wait "$KEEP_PID" 2>/dev/null || true
+sleep 4.5
+hb3=$(hb_count); sleep 1; hb4=$(hb_count)
+if [ "$hb2" -gt "$hb1" ] && [ "$hb3" = "$hb4" ] && [ ! -e "$OUT2/keep_1.0" ]; then
+    pass "a joined tab keeps a scan running after the starting tab closed; with no tab left it stops after the grace"
+else
+    fail "reattach grace" "hb $hb1->$hb2 (should grow), $hb3->$hb4 (should stay)"
+fi
+
+# A reload: the starting tab closes and a new one joins within the grace.
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 1 "$BASE2/scan-stream?project=reload&version=1.0&source=current-dir" >/dev/null 2>&1 || true
+sleep 1
+curl -sN --max-time 2 "$BASE2/scan-attach?id=reload_1.0" > "$WORK/reload.sse" 2>/dev/null || true
+if sse_file_events "$WORK/reload.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started' and evs[0]['data']['attached'] is True, evs[:1]
+assert any(e['event'] == 'log' and e['data'].startswith('[stub] tick') for e in evs), evs[:3]
+"; then
+    pass "a reloaded tab joins the scan it started within the grace"
+else
+    fail "reload reattach" "$(head -c 400 "$WORK/reload.sse")"
+fi
+curl -s -X POST "$BASE2/scan-cancel?id=reload_1.0" >/dev/null
+sleep 2
+
+# A scan that just ended still replays to its done event.
+echo ok > "$STUB_MODE_FILE"
+sse_events "project=ended&version=1.0&source=current-dir" >/dev/null
+curl -sN --max-time 3 "$BASE2/scan-attach?id=ended_1.0" > "$WORK/ended.sse" 2>/dev/null || true
+if sse_file_events "$WORK/ended.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started', evs[:1]
+assert evs[-1]['event'] == 'done' and evs[-1]['data']['ok'] is True and evs[-1]['data']['id'] == 'ended_1.0', evs[-1:]
+assert any(e['event'] == 'log' and '[stub] done' in e['data'] for e in evs), evs
+"; then
+    pass "/scan-attach on a scan that just ended replays its log and done event"
+else
+    fail "ended-scan replay" "$(head -c 400 "$WORK/ended.sse")"
+fi
+# ...but cancelling it does nothing.
+cend=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE2/scan-cancel?id=ended_1.0")
+[ "$cend" = "404" ] && pass "/scan-cancel on an ended scan answers 404" || fail "/scan-cancel ended" "$cend"
+
+# Ids are checked strictly; an unknown one is 404, and nothing reads a path.
+bad_ok=1
+for q in "id=..%2F..%2Fetc" "id=..%2Fout" "id=" "id=a%2Fb" "id=%00x"; do
+    a=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-attach?$q")
+    c=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE2/scan-cancel?$q")
+    [ "$a" = "400" ] && [ "$c" = "400" ] || { bad_ok=0; echo "    $q -> attach $a cancel $c"; }
+done
+[ "$bad_ok" = 1 ] && pass "/scan-attach and /scan-cancel refuse a malformed or traversal id with 400" \
+    || fail "bad id not refused"
+a=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-attach?id=nosuch_1.0")
+c=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE2/scan-cancel?id=nosuch_1.0")
+[ "$a" = "404" ] && [ "$c" = "404" ] && pass "an id with no running scan answers 404" \
+    || fail "unknown id" "attach $a cancel $c"
+a=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE2/scan-attach?id=ended_1.0")
+c=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: http://evil.example" "$BASE2/scan-cancel?id=ended_1.0")
+[ "$a" = "403" ] && [ "$c" = "403" ] && pass "a cross-site Origin cannot follow or cancel a scan" \
+    || fail "cross-site attach/cancel" "attach $a cancel $c"
+
+# The buffer is bounded: oldest lines go first and are counted, error events
+# are still replayed, and a follower that falls too far behind is dropped
+# instead of holding the scan up.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+server.SCAN_REPLAY_MAX_EVENTS = 10
+server.SCAN_REPLAY_MAX_BYTES = 10_000
+server.SCAN_ATTACH_QUEUE_MAX = 5
+b = server._ScanBroadcast("x_1", {"project": "x", "version": "1", "startedAt": 1})
+b.publish("error", json.dumps({"detail": "early", "key": None}))
+f, _, _ = b.attach()
+for i in range(30):
+    b.publish("log", json.dumps("line %d" % i))
+b.publish("progress", json.dumps({"percent": 10}))
+b.publish("progress", json.dumps({"percent": 20}))
+g, replay, dropped = b.attach()
+assert dropped == 20, dropped
+assert replay[0] == ("error", json.dumps({"detail": "early", "key": None})), replay[0]
+assert [json.loads(p) for e, p in replay if e == "log"] == ["line %d" % i for i in range(20, 30)]
+assert replay[-1] == ("progress", json.dumps({"percent": 20})), replay[-1]
+# The first follower never drained its queue of 5: it is dropped, not waited on.
+assert f.dropped and f not in b._followers
+# Bytes cap as well as count.
+server.SCAN_REPLAY_MAX_EVENTS = 1000
+server.SCAN_REPLAY_MAX_BYTES = 200
+for i in range(50):
+    b.publish("log", json.dumps("y" * 30))
+assert sum(len(p) for e, p in b._events) <= 200
+b.detach(g)
+# Owner gone and no follower: the grace starts; a cancel is granted once.
+assert not b.should_stop(grace=0)
+b.owner_gone()
+assert b.should_stop(grace=0) and not b.should_stop(grace=60)
+assert b.request_cancel() is True and b.request_cancel() is False and b.should_stop(grace=60)
+# After done, a join gets the replay and no follower; cancel is refused.
+b.publish("done", json.dumps({"ok": True}))
+f2, replay2, _ = b.attach()
+assert f2 is None and replay2[-1][0] == "done"
+c = server._ScanBroadcast("y_1", {})
+c.publish("done", json.dumps({"ok": True}))
+assert c.request_cancel() is False
+# A stream left without a done event gets one, so no follower waits forever.
+e = server._ScanBroadcast("e_1", {})
+fe, _, _ = e.attach()
+e.finish("e_1")
+assert json.loads(fe.events.get_nowait()[1])["ok"] is False
+# Follower limit.
+server.SCAN_ATTACH_MAX_CLIENTS = 2
+d = server._ScanBroadcast("z_1", {})
+assert d.attach() and d.attach() and d.attach() is None
+# The grace setting is bounded and falls back on junk.
+os.environ["X_GRACE"] = "99999"; assert server._bounded_int_env("X_GRACE", 30, 0, 600) == 600
+os.environ["X_GRACE"] = "-5"; assert server._bounded_int_env("X_GRACE", 30, 0, 600) == 30
+os.environ["X_GRACE"] = "7"; assert server._bounded_int_env("X_GRACE", 30, 0, 600) == 7
+PY
+then
+    pass "scan replay buffer is bounded by count and bytes, keeps errors, drops a stalled follower"
+else
+    fail "scan replay buffer bounds"
+fi
+
 # A scan that prints nothing: the closed tab is still noticed within seconds
 # (the watcher polls the connection), the scan stops, and the run folder with
 # its partial artifact is removed.
 echo silent > "$STUB_MODE_FILE"
 rm -f "$STUB_HEARTBEAT"
 curl -sN --max-time 2 "$BASE2/scan-stream?project=cancelsilent&version=1.0&source=current-dir" >/dev/null 2>&1 || true
-sleep 4
+sleep 6
 hb1=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
 sleep 1.5
 hb2=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
