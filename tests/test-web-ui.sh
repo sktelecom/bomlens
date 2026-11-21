@@ -6555,6 +6555,38 @@ else
     fail "claim/release are unbalanced (add=$n_add, discard=$n_del)"
 fi
 
+echo "== the writable source copy is not dot-named =="
+# Gradle names a root project after its folder and refuses a name that starts
+# with a dot, so the copy sits in OUTPUT_DIR/.srccopy/srccopy-<hex>: a plain
+# name for the copy, a dot-named parent that keeps it out of the scan list.
+SC_OUT="$WORK/srccopy-out"; mkdir -p "$SC_OUT/.srccopy-0123456789abcdef" "$WORK/srccopy-src/app"
+echo '{}' > "$WORK/srccopy-src/app/package.json"
+if SBOM_OUTPUT_DIR="$SC_OUT" python3 -I - "$ROOT_DIR" "$SC_OUT" "$WORK/srccopy-src" <<'SCPY'
+import os, re, shutil, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+out, src = sys.argv[2], sys.argv[3]
+d = server.new_source_copy_dir()
+assert os.path.dirname(d) == os.path.join(out, ".srccopy"), d
+assert re.fullmatch(r"srccopy-[0-9a-f]{16}", os.path.basename(d)), d
+assert server.new_source_copy_dir() != d
+server.copy_tree_without(src, d, [])
+assert os.path.isfile(os.path.join(d, "app", "package.json"))
+# Neither the new copy nor a leftover of the old layout is listed as a scan.
+assert server.list_scans() == [], server.list_scans()
+shutil.rmtree(d)
+assert not os.path.exists(d)
+text = open(server.__file__).read()
+assert '".srccopy-" + secrets' not in text
+assert text.count("cleanup_dir = new_source_copy_dir()") == 2
+print("ok")
+SCPY
+then
+    pass "the source copy has a plain folder name under a hidden parent and stays out of the scan list"
+else
+    fail "the source copy is still dot-named or shows up as a scan"
+fi
+
 echo "== sibling image refresh: an already-present image is re-pulled quietly =="
 # _sibling_image_present only means the tag was pulled at SOME point; the sibling
 # firmware/aibom/deep-cve image (and the base scanner image, for on-demand SPDX)

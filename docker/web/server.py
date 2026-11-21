@@ -1463,6 +1463,22 @@ _DEEP_COPY_SKIP = {
 }
 
 
+# A writable copy of a source tree lives in OUTPUT_DIR/.srccopy/srccopy-<16hex>.
+# The copy itself must not start with a dot: Gradle takes a root project's name
+# from its folder and refuses one that starts or ends with a dot. The parent is
+# dot-named, so the copy stays out of the scan list (list_scans) and the
+# sub-project hint (project_info) the same way the earlier .srccopy-<16hex>
+# copies were: both skip any dot-named entry, so a leftover of either layout
+# stays hidden.
+SOURCE_COPY_PARENT = ".srccopy"
+
+
+def new_source_copy_dir():
+    """A fresh, unused path for one scan's writable source copy. The caller
+    copies into it (copytree creates the parent) and removes it in its finally."""
+    return os.path.join(OUTPUT_DIR, SOURCE_COPY_PARENT, "srccopy-" + secrets.token_hex(8))
+
+
 def copy_scan_target_tree(src, dest):
     """Copy a read-only picked folder into a writable tree for a deep (build)
     source scan, skipping heavy re-resolvable dirs (_DEEP_COPY_SKIP).
@@ -4368,8 +4384,9 @@ UPLOAD_TTL_SECONDS = _upload_ttl_seconds()
 # clone that outlives the TTL is not deleted out from under a running scan).
 # fullmatch, not match+$: match()+"$" still accepts a trailing newline.
 #
-# Deliberately out of scope: .srccopy-<8hex> (scan-target-src's deep-copy
-# scratch dir) lives directly under OUTPUT_DIR, not UPLOAD_DIR, so this sweep
+# Deliberately out of scope: .srccopy/srccopy-<16hex> (new_source_copy_dir, the
+# deep-copy and --exclude scratch dir; .srccopy-<16hex> before) lives under
+# OUTPUT_DIR, not UPLOAD_DIR, so this sweep
 # never walks into it at all -- it has no TTL of its own, only the same
 # finally-block rmtree every cleanup_dir here relies on, so a process that
 # dies mid-scan can leave a full source-tree copy behind permanently. Not
@@ -8729,7 +8746,7 @@ class Handler(BaseHTTPRequestHandler):
                 hidden = scan_target_not_visible(scan_dir)
                 if hidden:
                     fail(hidden, code="SCAN_TARGET_NOT_VISIBLE"); return
-                cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                cleanup_dir = new_source_copy_dir()
                 sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
                                       % os.path.basename(copy_src.rstrip("/"))))
                 try:
@@ -9023,7 +9040,7 @@ class Handler(BaseHTTPRequestHandler):
             # them. The launch folder is the user's own: it is copied without them.
             if scan_exclude and env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT"):
                 if source == "current-dir":
-                    cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                    cleanup_dir = new_source_copy_dir()
                     sse("log", json.dumps("▶ Copying the folder without %d excluded path(s) ..." % len(scan_exclude)))
                     try:
                         gone = copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
