@@ -95,8 +95,6 @@ fi
 # is passed to exit again. INT and TERM exit with their own codes so the EXIT
 # trap sees 130/143 and records the run as cancelled; generate_sbom_cdxgen
 # replaces these two while its sibling container runs, then restores them.
-# shellcheck source=docker/lib/owner-handback.sh
-. "$LIBDIR/owner-handback.sh"
 # shellcheck source=docker/lib/engine-result.sh
 . "$LIBDIR/engine-result.sh"
 er_init

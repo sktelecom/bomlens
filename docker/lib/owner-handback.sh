@@ -4,7 +4,7 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # Owner hand-back: should a file this container wrote be chowned to
-# HOST_UID:HOST_GID? Sourced by entrypoint.sh, engine-result.sh, make-plan.sh
+# HOST_UID:HOST_GID? Sourced by engine-result.sh (and so entrypoint.sh), make-plan.sh
 # and deep-license.sh. POSIX sh. build-prep.sh runs alone in a language image
 # and carries its own copy of userns_remapped (tests/test-postprocess.sh keeps
 # the two the same).
