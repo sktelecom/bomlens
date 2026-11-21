@@ -65,7 +65,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 Swift 이미지와 선택형 이미지(`bomlens-firmware`, `bomlens-aibom`, `bomlens-deep-cve`)는 크기가 기록되어 있지 않아 표에 없습니다. AI 모델 스캔은 약 3.5GB를 받습니다([AI 모델 SBOM](../guides/ai-model.ko.md)).
 
-`scan-sbom.sh`는 이미지를 받기 전에 크기를 출력하고, Docker 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 여유 공간, 내려받을 크기, 정리 방법을 알리며 멈춥니다. 웹 UI는 경고만 합니다. `BOMLENS_SKIP_DISK_CHECK=1`을 지정하면 이 점검을 건너뜁니다. 여유 공간을 읽지 못하면 경고만 하고 스캔을 계속합니다. `scripts/check-setup.sh`(Windows는 `check-setup.bat`)는 이 컴퓨터의 BomLens 이미지와 크기, 합계, 엔진의 여유 공간을 보여 줍니다.
+`scan-sbom.sh`는 이미지를 받기 전에 크기를 출력하고, Docker 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 여유 공간, 내려받을 크기, 정리 방법을 알리며 멈춥니다. 웹 UI는 경고만 합니다. `BOMLENS_SKIP_DISK_CHECK=1`을 지정하면 이 점검을 건너뜁니다. 여유 공간을 읽지 못하면 경고만 하고 스캔을 계속합니다. macOS와 Windows에서는 엔진이 가상 머신 안에서 돌고 그 디스크가 호스트의 파일이라, 일부 엔진(Rancher Desktop, WSL 2의 Docker Desktop)은 가상 디스크의 최대 크기를 여유 공간으로 알려 줍니다. 그래서 엔진이 알려 준 값과 홈 폴더가 있는 호스트 디스크의 여유 공간 중 작은 값을 씁니다. `scripts/check-setup.sh`(Windows는 `check-setup.bat`)는 이 컴퓨터의 BomLens 이미지(`SBOM_SCANNER_IMAGE`로 지정한 스캐너 이미지 포함)와 크기, 합계, 엔진의 여유 공간을 보여 줍니다.
 
 ### 디스크 공간은 어떻게 비우나요?
 

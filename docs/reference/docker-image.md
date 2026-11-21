@@ -65,7 +65,7 @@ The scanner image `ghcr.io/sktelecom/bomlens` takes about 1.4 GB on disk once un
 
 The Swift image and the opt-in images (`bomlens-firmware`, `bomlens-aibom`, `bomlens-deep-cve`) are not in this table because no size is recorded for them. An AI model scan downloads about 3.5 GB ([AI model SBOM](../guides/ai-model.md)).
 
-Before it downloads an image, `scan-sbom.sh` prints the size and stops when the Docker engine has less free than that size plus 2 GB, naming the free space, the download size and how to clean up. The web UI only warns. `BOMLENS_SKIP_DISK_CHECK=1` skips the check. Free space that cannot be read gives a warning and the scan goes on. `scripts/check-setup.sh` (and `check-setup.bat`) lists the BomLens images on the machine with their sizes, their total and the engine's free space.
+Before it downloads an image, `scan-sbom.sh` prints the size and stops when the Docker engine has less free than that size plus 2 GB, naming the free space, the download size and how to clean up. The web UI only warns. `BOMLENS_SKIP_DISK_CHECK=1` skips the check. Free space that cannot be read gives a warning and the scan goes on. On macOS and Windows the engine runs in a VM whose disk is a file on the host, and some engines (Rancher Desktop, Docker Desktop on WSL 2) report the VM disk's maximum size, so the free space used is the smaller of the engine's value and the free space on the host disk that holds your home folder. `scripts/check-setup.sh` (and `check-setup.bat`) lists the BomLens images on the machine (and the scanner image `SBOM_SCANNER_IMAGE` names) with their sizes, their total and the engine's free space.
 
 ### How do I free the space?
 

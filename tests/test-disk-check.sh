@@ -41,7 +41,7 @@ case "$1" in
                 [ "${FAKE_HAVE_IMAGES:-0}" = 1 ] && exit 0
                 exit 1 ;;
             ls)
-                printf 'aaa111 ghcr.io/sktelecom/bomlens:1.15.0\naaa111 ghcr.io/sktelecom/bomlens:latest\nbbb222 ghcr.io/cdxgen/cdxgen-python312:13.5.0\n'
+                printf 'aaa111 ghcr.io/sktelecom/bomlens:1.15.0\naaa111 ghcr.io/sktelecom/bomlens:latest\nbbb222 ghcr.io/cdxgen/cdxgen-python312:13.5.0\nccc333 bomlens-retest:main\n'
                 exit 0 ;;
         esac
         exit 0 ;;
@@ -79,6 +79,9 @@ if [ -z "$(image_size_note ghcr.io/example/unknown:1)" ]; then pass "no note for
 
 # --- the verdict
 export PATH="$WORK/bin:$PATH"
+# The host disk under the engine's VM is measured on macOS and Windows; a large
+# stand-in keeps the cases below about the engine's own value.
+export BOMLENS_FAKE_HOST_FREE_MB=999999999
 verdict() {  # verdict <free MB or empty> [image]
     local rc=0
     BOMLENS_FAKE_FREE_MB="$1" disk_check_verdict "${2:-ghcr.io/cdxgen/cdxgen-python312:13.5.0}" || rc=$?
@@ -93,6 +96,14 @@ v="$(unset BOMLENS_FAKE_FREE_MB; FAKE_DF_MB='' verdict '')"
 [ "$v" = 2 ] && pass "free space that cannot be measured is reported as unknown (2)" || fail "unknown verdict" "$v"
 v="$(unset BOMLENS_FAKE_FREE_MB; FAKE_DF_MB=7000 verdict '')"
 [ "$v" = 0 ] && pass "df through the engine is read when no override is set" || fail "df read" "$v"
+v="$(BOMLENS_FAKE_HOST_FREE_MB=3000 verdict 900000)"
+[ "$v" = 1 ] && pass "a host disk with less room than the engine's VM reports decides the verdict" || fail "host smaller verdict" "$v"
+v="$(unset BOMLENS_FAKE_FREE_MB; BOMLENS_FAKE_HOST_FREE_MB=30000 FAKE_DF_MB=973220 engine_free_mb)"
+[ "$v" = 30000 ] && pass "the VM disk's maximum size is not taken as free space when the host has less" || fail "host min" "$v"
+v="$(unset BOMLENS_FAKE_FREE_MB; BOMLENS_FAKE_HOST_FREE_MB=999999 FAKE_DF_MB=7000 engine_free_mb)"
+[ "$v" = 7000 ] && pass "the engine's value is kept when it is the smaller one" || fail "engine min" "$v"
+v="$(unset BOMLENS_FAKE_HOST_FREE_MB; uname() { echo Linux; }; host_vm_disk_free_mb || echo none)"
+[ "$v" = none ] && pass "on Linux the host disk is not measured (the engine's disk is the host's)" || fail "linux host" "$v"
 v="$(FAKE_HAVE_IMAGES=1 verdict 10)"
 [ "$v" = 0 ] && pass "an image that is already here needs no space" || fail "present image verdict" "$v"
 
@@ -131,6 +142,10 @@ case "$out" in *"Free disk space in the Docker engine: 30.0 GB"*"docker image pr
 case "$out" in *"Scanner image is present: ghcr.io/sktelecom/bomlens:latest"*) pass "an unreleased checkout checks the latest tag" ;; *) fail "unstamped tag" "$out" ;; esac
 out="$(setup "$ROOT_DIR/scripts/check-setup.sh" 3000)"
 case "$out" in *"Free disk space in the Docker engine is low: 3.0 GB"*) pass "check-setup flags low free space" ;; *) fail "check-setup low space" "$out" ;; esac
+out="$(BOMLENS_FAKE_HOST_FREE_MB=3000 setup "$ROOT_DIR/scripts/check-setup.sh" 900000)"
+case "$out" in *"Free disk space in the Docker engine is low: 3.0 GB"*) pass "check-setup uses the host disk when it has less room than the VM reports" ;; *) fail "check-setup host disk" "$out" ;; esac
+out="$(SBOM_SCANNER_IMAGE=bomlens-retest:main setup "$ROOT_DIR/scripts/check-setup.sh" 30000)"
+case "$out" in *"bomlens-retest:main"*) pass "check-setup lists the scanner image SBOM_SCANNER_IMAGE names" ;; *) fail "check-setup own image" "$out" ;; esac
 sed 's/@BOMLENS_VERSION@/1.15.0/' "$ROOT_DIR/scripts/check-setup.sh" > "$WORK/check-setup-stamped.sh"
 out="$(setup "$WORK/check-setup-stamped.sh" 30000)"
 case "$out" in *"Scanner image is present: ghcr.io/sktelecom/bomlens:1.15.0"*) pass "a release bundle checks the image of its own version" ;; *) fail "stamped tag" "$out" ;; esac

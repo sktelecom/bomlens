@@ -1805,18 +1805,47 @@ _engine_docker() {
     fi
 }
 
-# engine_free_mb [<probe image>]: free space, in MB, on the disk the container
-# engine stores images on. The root of a short container shows that disk (on
-# Docker Desktop, Rancher Desktop and Colima the disk of the engine's VM, not
-# the host's). The probe image is the one given when it is here, otherwise any
+# host_vm_disk_free_mb: on macOS and Windows the engine runs in a VM whose disk
+# is a file on the host (under the home folder), and the VM disk can be larger
+# than the host disk has room for: Rancher Desktop and Docker Desktop on WSL 2
+# show their maximum size, not what the host can still give. This is the free
+# space, in MB, of the host disk that holds the home folder; elsewhere (Linux,
+# and inside a container) it returns 1 with no output.
+# BOMLENS_FAKE_HOST_FREE_MB stands in for the measurement (a test hook).
+host_vm_disk_free_mb() {
+    local mb
+    if [ -n "${BOMLENS_FAKE_HOST_FREE_MB:-}" ]; then
+        case "$BOMLENS_FAKE_HOST_FREE_MB" in *[!0-9]*) return 1 ;; esac
+        echo "$BOMLENS_FAKE_HOST_FREE_MB"; return 0
+    fi
+    case "$(uname -s 2>/dev/null)" in
+        Darwin|MINGW*|MSYS*|CYGWIN*) ;;
+        *) return 1 ;;
+    esac
+    [ -n "${HOME:-}" ] && [ -d "$HOME" ] || return 1
+    mb="$(df -Pm "$HOME" 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}')"
+    case "$mb" in ''|*[!0-9]*) return 1 ;; esac
+    echo "$mb"
+}
+
+# engine_free_mb [<probe image>]: free space, in MB, the container engine has
+# for images. The root of a short container shows the engine's disk (on Docker
+# Desktop, Rancher Desktop and Colima the disk of the engine's VM); on macOS and
+# Windows the smaller of that and the host disk under it (host_vm_disk_free_mb)
+# is used. The probe image is the one given when it is here, otherwise any
 # image already here; with none, or one without df, the value is unknown and
 # the function returns 1 with no output. BOMLENS_FAKE_FREE_MB stands in for the
-# measurement (a test hook).
+# engine measurement (a test hook); with it, only BOMLENS_FAKE_HOST_FREE_MB
+# stands for the host.
 engine_free_mb() {
-    local probe="${1:-}" out mb
+    local probe="${1:-}" out mb host
     if [ -n "${BOMLENS_FAKE_FREE_MB:-}" ]; then
         case "$BOMLENS_FAKE_FREE_MB" in *[!0-9]*) return 1 ;; esac
-        echo "$BOMLENS_FAKE_FREE_MB"; return 0
+        mb="$BOMLENS_FAKE_FREE_MB"
+        if [ -n "${BOMLENS_FAKE_HOST_FREE_MB:-}" ] && host="$(host_vm_disk_free_mb)" && [ "$host" -lt "$mb" ]; then
+            mb="$host"
+        fi
+        echo "$mb"; return 0
     fi
     command -v docker >/dev/null 2>&1 || return 1
     if [ -z "$probe" ] || ! _engine_docker image inspect "$probe" >/dev/null 2>&1; then
@@ -1826,6 +1855,9 @@ engine_free_mb() {
     out="$(_engine_docker run --rm --pull never --entrypoint df "$probe" -Pm / 2>/dev/null)" || return 1
     mb="$(printf '%s\n' "$out" | tr -d '\r' | awk 'NR==2 {print $4}')"
     case "$mb" in ''|*[!0-9]*) return 1 ;; esac
+    if host="$(host_vm_disk_free_mb)" && [ "$host" -lt "$mb" ]; then
+        mb="$host"
+    fi
     echo "$mb"
 }
 
