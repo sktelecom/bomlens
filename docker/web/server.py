@@ -5750,6 +5750,24 @@ def android_build_dir():
     return real if os.path.isfile(os.path.join(real, "Dockerfile")) else ""
 
 
+def android_host_build_dir():
+    """The host path of the launcher's own docker/android checkout, or ''.
+
+    Only shown in the command the user can run by hand (the CLI prints the same
+    local path); this server never reads or builds from it. scan-sbom.sh --ui
+    passes it as BOMLENS_ANDROID_HOST_BUILD_DIR when its checkout holds the
+    recipe. Accepted only as an absolute POSIX or Windows path with no control
+    characters, so a stray value cannot inject text into the command."""
+    raw = os.environ.get("BOMLENS_ANDROID_HOST_BUILD_DIR", "").strip()
+    if not raw or len(raw) > 1024:
+        return ""
+    if any(ord(c) < 32 or ord(c) == 127 for c in raw):
+        return ""
+    if not (raw.startswith("/") or re.fullmatch(r"[A-Za-z]:[\\/].*", raw)):
+        return ""
+    return raw
+
+
 def android_build_available():
     return bool(android_build_dir()) and docker_cli_present() and docker_capable()
 
@@ -5767,6 +5785,7 @@ def android_status(api):
         "termsUrl": ANDROID_TERMS_URL,
         "buildAvailable": android_build_available(),
         "building": building,
+        "hostBuildDir": android_host_build_dir(),
     }
 
 
@@ -9048,6 +9067,7 @@ class Handler(BaseHTTPRequestHandler):
                         "detail": _msg, "key": "androidSdkImageMissing", "code": ANDROID_ERROR_CODE,
                         "consentRequired": not android_terms_accepted(), "api": _api, "image": _img,
                         "termsUrl": ANDROID_TERMS_URL, "buildAvailable": android_build_available(),
+                        "hostBuildDir": android_host_build_dir(),
                     }))
                     record_outcome(False, _msg, error_code=ANDROID_ERROR_CODE)
                     sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),

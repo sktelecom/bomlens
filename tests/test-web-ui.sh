@@ -7868,6 +7868,38 @@ nc=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_STATE_DIR="$WORK/none" BOMLENS_
 import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
 import server; print(server.build_android_image(34, lambda l: None))" 2>&1)
 [ "$nc" = "(False, 'no-consent', '')" ] && pass "build_android_image refuses without recorded consent" || fail "no-consent" "$nc"
+# The host path of the launcher's recipe only feeds the command shown to the
+# user. scan-sbom.sh --ui passes it; a relative path or one with a control
+# character is dropped, and the status answer and the scan error both carry it.
+if SBOM_OUTPUT_DIR="$WORK/android-out" python3 -I - "$ROOT_DIR" <<'AHPY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+def host(v):
+    os.environ["BOMLENS_ANDROID_HOST_BUILD_DIR"] = v
+    return server.android_host_build_dir()
+assert host("/Users/me/bomlens/docker/android") == "/Users/me/bomlens/docker/android"
+assert host("C:\\bomlens\\docker\\android") == "C:\\bomlens\\docker\\android"
+assert host("/c/Users/me/bomlens/docker/android") == "/c/Users/me/bomlens/docker/android"
+for bad in ("", "docker/android", "/a\nb", "/a\x1bb", "/" + "a" * 1100):
+    assert host(bad) == "", repr(bad)
+host("/r/docker/android")
+assert server.android_status(34)["hostBuildDir"] == "/r/docker/android"
+src = open(server.__file__).read()
+assert '"hostBuildDir": android_host_build_dir(),\n                    }))' in src
+print("ok")
+AHPY
+then
+    pass "the recipe's host path is validated and reported for the manual build command"
+else
+    fail "BOMLENS_ANDROID_HOST_BUILD_DIR is not validated or not reported"
+fi
+if grep -q 'BOMLENS_ANDROID_HOST_BUILD_DIR=$REPO_DIR/docker/android' "$ROOT_DIR/scripts/scan-sbom.sh" \
+   && grep -q '"${UI_ANDROID_FLAGS\[@\]}"' "$ROOT_DIR/scripts/scan-sbom.sh"; then
+    pass "scan-sbom.sh --ui passes the checkout's docker/android host path to the UI"
+else
+    fail "scan-sbom.sh --ui does not pass BOMLENS_ANDROID_HOST_BUILD_DIR"
+fi
 
 echo ""
 echo "== completeness_summary carries the engine's grade and sentences =="

@@ -1480,6 +1480,10 @@ if [ "$UI_MODE" = "true" ]; then
     # same way as for a CLI scan, so they follow SBOM_SCANNER_IMAGE there too.
     UI_IMAGE_FLAGS=(-e SBOM_SCANNER_IMAGE="$POSTPROCESS_IMAGE" -e SBOM_FIRMWARE_IMAGE="$FIRMWARE_IMAGE"
                     -e SBOM_AIBOM_IMAGE="$AIBOM_IMAGE" -e SBOM_DEEP_CVE_IMAGE="$DEEP_CVE_IMAGE")
+    # The Android SDK image recipe in this checkout, by its host path: the UI
+    # shows the same local build command a CLI scan prints (it only displays it).
+    UI_ANDROID_FLAGS=()
+    [ ! -f "$REPO_DIR/docker/android/Dockerfile" ] || UI_ANDROID_FLAGS=(-e "BOMLENS_ANDROID_HOST_BUILD_DIR=$REPO_DIR/docker/android")
     # SBOM_EXTRA_CA_CERTS: the UI container trusts it, and the containers it
     # starts see the same file through --volumes-from.
     UI_CA_FLAGS=()
@@ -1488,7 +1492,7 @@ if [ "$UI_MODE" = "true" ]; then
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_OUT")":/host-output \
         "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
-        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" "${UI_CA_FLAGS[@]}" \
+        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" "${UI_CA_FLAGS[@]}" "${UI_ANDROID_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e BOMLENS_HOST_UI_PORT="$UI_PORT" -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" -e SBOM_UI_OUTPUT_HOST_DIR="$(hostpath "$UI_OUT")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \

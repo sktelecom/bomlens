@@ -1914,7 +1914,7 @@
     },
     "confirmStart": "BomLens is about to build the image {{image}}. This takes time (several minutes or more) and uses disk space (several gigabytes or more) on this computer. Start it when you are ready, or skip.",
     "startBuild": "Start the build",
-    "manualTagNote": "This copy of BomLens does not report its release. Replace <release-tag> with the tag of the BomLens release you run (for example vX.Y.Z), as listed on the project's Releases page."
+    "manualTagNote": "This copy of BomLens does not report its release, so the command reads the recipe from the main branch. If you run a release, you can put its tag (for example vX.Y.Z) in place of main."
   },
   "image": {
     "ready": "The image for this input is already downloaded.",
