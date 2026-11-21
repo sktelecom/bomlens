@@ -92,6 +92,8 @@ During a run the screen shows the project and version, a Cancel button and a Ste
 
 Cancel asks first, because it stops the scan and keeps nothing it found so far. **Keep scanning** leaves the scan running; **Cancel scan** stops it, returns to New scan and says so in a short notice.
 
+When another scan of the same folder is running, from the web UI or the command line, a source scan waits for it to finish and then starts on its own.
+
 The address of the running view names the scan (`#/running/<id>`), so reloading the page, or opening a scan's name on the New scan screen in another tab, shows the same view with the log so far and the new lines, and lands on the result when the scan finishes. Every tab showing the scan can cancel it. A scan that no tab shows for 30 seconds is cancelled, as when its only tab is closed (`BOMLENS_REATTACH_GRACE` sets the seconds).
 
 When a run fails, the title becomes "Scan failed" and a banner leads with what went wrong and what to do, in your language: a repository that was not found or is private, a repository host that could not be reached, a scan tool that could not start (exit code 126, with the tool and runtime named), or an internal error. The Steps box stays and marks the step the run stopped on. **Retry** runs the same scan again; it is offered only when nothing in the scan is single-use, so a scan with an access token or an uploaded file shows a line saying why instead. New scan is always there. The scanner's own message is kept as received in the run log, which stays folded when the banner already explains the cause and opens by itself when it does not. Report a problem opens below with the diagnostics summary, as described in [Reporting a problem](#reporting-a-problem).
