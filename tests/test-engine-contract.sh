@@ -11,7 +11,9 @@
 # id is one the contract documents, and a Trivy failure is reported as a failed
 # step and never as a successful run. That last check is shown to be able to
 # fail: it is run once more against a copy of the scripts with the ScanError
-# rule removed, and must then report the failure as hidden.
+# rule removed, and must then report the failure as hidden. It also runs two web
+# UI SOURCE scans of one folder and checks that they take turns on the folder's
+# lock, which the command line shares.
 #
 # Trivy is replaced by a stub on PATH, so the result does not depend on a
 # vulnerability database or the network. Needs bash 4+, jq and python3;
@@ -2650,6 +2652,192 @@ run_engine "$VN" "$VNLIB" GENERATE_NOTICE=true GENERATE_REPORT=true FETCH_LICENS
     && grep -qF 'generate-notice' "$VN/demo_1.0_conformance.html"; } \
     && pass "a step that fails after the conformance check is listed in its JSON, Markdown and HTML report" \
     || fail "the conformance report misses a step that failed after it" "$(jq -c .pipelineStepsFailed "$VN/demo_1.0_conformance.json" 2>&1)"
+
+echo "== two web UI scans of one source folder take turns (SOURCE flow) =="
+# A copy of entrypoint.sh whose guard-state folder and Docker socket are in this
+# test's folder. The fake docker below runs build-prep.sh's real source-tree
+# guard (guard_snapshot, guard_restore) for the cdxgen sibling and models
+# `cargo generate-lockfile` (a Cargo.lock written when there is none), the way
+# tests/test-cli-portability.sh does for the command line.
+SL="$WORK/source-lock"
+mkdir -p "$SL/bin" "$SL/state" "$SL/stub/running" "$SL/rt"
+SL_ENTRY="$SL/entrypoint.sh"
+sed -e "s#/var/run/docker.sock#$SL/d.sock#g" -e "s#GUARD_STATE_DIR=\"/bomlens-state\"#GUARD_STATE_DIR=\"$SL/state\"#" "$ENTRY" > "$SL_ENTRY"
+python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$SL/d.sock" 2>/dev/null
+cat > "$SL/bin/docker" <<'MOCK'
+#!/bin/bash
+S="${SL_STUB:?}"
+case "$1" in
+    ps)
+        for a in "$@"; do
+            case "$a" in
+                name=^*) n="${a#name=^}"; n="${n%\$}"; [ -f "$S/running/$n" ] && echo "$n" ;;
+                id=*) [ -f "$S/running/${a#id=}" ] && echo "${a#id=}" ;;
+            esac
+        done
+        exit 0 ;;
+    exec) [ -f "$S/running/$2" ] && exit 0; exit 1 ;;
+    run)
+        shift; name=""; gid=""; cidf=""; prev=""; seen_sh=""; rest=()
+        for a in "$@"; do
+            [ "$prev" != "--name" ] || name="$a"
+            [ "$prev" != "--cidfile" ] || cidf="$a"
+            case "$a" in BOMLENS_GUARD_ID=*) gid="${a#BOMLENS_GUARD_ID=}" ;; esac
+            if [ -n "$seen_sh" ]; then rest+=("$a"); fi
+            [ "$prev" != "--entrypoint" ] || seen_sh=1
+            prev="$a"
+        done
+        # rest: <image> <build-prep.sh> <tree> <bom path> <spec>
+        src="${rest[2]:-}"; bom="${rest[3]:-}"
+        [ -n "$cidf" ] && echo "cid-$name" > "$cidf"
+        [ -n "$src" ] || exit 0
+        echo "$name" >> "$S/started"
+        drv="$S/drv.$$.sh"
+        {
+            echo 'log() { echo "[build-prep] $*"; }'
+            echo 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
+            for fn in guard_paths guard_snapshot guard_git_tracked guard_restore; do
+                awk -v fn="$fn" '$0 ~ "^" fn "\\(\\) +\\{" { i = 1 } i { print } i && $0 == "}" { exit }' "${SL_BUILD_PREP:?}"
+            done
+        } > "$drv"
+        (
+            . "$drv"
+            GUARD_DIR=""; GUARD_NOEXEC=""; GUARD_NAMES_VERSION=5
+            GUARD_STATE_ROOT="${SL_STATE:?}"; BOMLENS_GUARD_ID="$gid"; SRC="$src"; OUT=/out/x
+            cd "$src" || exit 1
+            guard_snapshot
+            [ -f Cargo.lock ] || printf '# generated\n' > Cargo.lock
+            sleep "${SL_STAGE1_SECS:-3}"
+            printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[]}' > "$bom"
+            guard_restore
+        ) >> "$S/stage1.log" 2>&1
+        rm -f "$drv"
+        exit 0 ;;
+    *) exit 0 ;;
+esac
+MOCK
+chmod +x "$SL/bin/docker"
+printf '[package]\nname = "rtrep"\nversion = "0.1.0"\n\n[dependencies]\nserde = "1"\n' > "$SL/rt/Cargo.toml"
+SL_SELF=0123456789ab
+# sl_scan <version> [VAR=value ...]: one web UI SOURCE scan of $SL/rt.
+sl_scan() {
+    local v="$1"; shift
+    local d="$SL/out-$v"
+    mkdir -p "$d"
+    ( cd "$d" && env PATH="$SL/bin:$WORK/bin:$PATH" SL_STUB="$SL/stub" SL_STATE="$SL/state" \
+        SL_BUILD_PREP="$ROOT_DIR/docker/lib/build-prep.sh" HOSTNAME="$SL_SELF" \
+        MODE=SOURCE SOURCE_ROOT="$SL/rt" SOURCE_ROOT_HOST="$SL/rt" BOMLENS_SKIP_DISK_CHECK=1 SBOM_PULL=never \
+        PROJECT_NAME=rtrep PROJECT_VERSION="$v" HOST_OUTPUT_DIR="$d" BOMLENS_LIBDIR="$ROOT_DIR/docker/lib" \
+        DETECTION=build UPLOAD_ENABLED=false GENERATE_SECURITY=false SECURITY_ENRICH=false DEEP_CVE=false \
+        ENRICH_EOL=false ENRICH_MALICIOUS=false FETCH_LICENSE=false "$@" bash "$SL_ENTRY" ) > "$d.log" 2>&1
+}
+sl_key() { printf '%s' "$1" | { sha256sum 2>/dev/null || shasum -a 256; } | awk '{print $1}'; }
+SL_LOCK="$SL/state/$(sl_key "$SL/rt").lock"
+SL_FOUND=$(grep -c '^[[:space:]]*take_source_lock$' "$SL_ENTRY")
+if [ "$SL_FOUND" != 1 ] || [ ! -S "$SL/d.sock" ] || ! grep -q "GUARD_STATE_DIR=\"$SL/state\"" "$SL_ENTRY"; then
+    fail "could not set up the copy of entrypoint.sh for the source-folder lock (take_source_lock call, socket or guard-state path moved)"
+else
+    sl_scan 1 & SL1=$!
+    for _ in $(seq 1 50); do [ -f "$SL/rt/Cargo.lock" ] && break; sleep 0.1; done
+    sl_scan 2 & SL2=$!
+    wait "$SL1"; SL1_RC=$?
+    wait "$SL2"; SL2_RC=$?
+    if [ "$SL1_RC" = 0 ] && [ "$SL2_RC" = 0 ] \
+       && grep -q '^\[INFO\] Another scan of this folder is running (a web UI scan); this scan waits for it to finish' "$SL/out-2.log" \
+       && grep -q '^\[INFO\] The earlier scan of this folder has finished; this scan starts now.' "$SL/out-2.log" \
+       && ! grep -q 'Another scan of this folder' "$SL/out-1.log" \
+       && ! grep -q 'still be running\|still working in this folder' "$SL/out-1.log" "$SL/out-2.log" \
+       && [ "$(wc -l < "$SL/stub/started" | tr -d ' ')" = 2 ]; then
+        pass "a second web UI scan of the same folder with another version says it waits, then runs"
+    else
+        fail "same-folder second UI scan" "rc=$SL1_RC/$SL2_RC $(grep -h 'INFO\] Another\|INFO\] The earlier\|WARN\|ERROR' "$SL/out-1.log" "$SL/out-2.log" | head -n 6)"
+    fi
+    if [ ! -e "$SL/rt/Cargo.lock" ] && [ "$(ls -A "$SL/rt")" = "Cargo.toml" ]; then
+        pass "no generated lock file or other build file is left in the scanned folder"
+    else
+        fail "files left in the scanned folder" "$(ls -la "$SL/rt")"
+    fi
+    if jq -e 'any(.metadata.properties[]?; .name == "bomlens:lockfile-missing")' "$SL/out-1/rtrep_1_bom.json" >/dev/null 2>&1 \
+       && jq -e 'any(.metadata.properties[]?; .name == "bomlens:lockfile-missing")' "$SL/out-2/rtrep_2_bom.json" >/dev/null 2>&1; then
+        pass "each UI scan is graded on the folder as it is (no Cargo.lock there)"
+    else
+        fail "grades" "1=$(jq -c '[.metadata.properties[]? | select(.name | test("lockfile"))]' "$SL/out-1/rtrep_1_bom.json" 2>&1 | head -c 200) 2=$(jq -c '[.metadata.properties[]? | select(.name | test("lockfile"))]' "$SL/out-2/rtrep_2_bom.json" 2>&1 | head -c 200)"
+    fi
+    if [ ! -e "$SL_LOCK" ] && [ -z "$(find "$SL/state" -maxdepth 1 -name '*.lock')" ]; then
+        pass "both UI scans free the folder's lock"
+    else
+        fail "folder lock left behind" "$(find "$SL/state" -maxdepth 2)"
+    fi
+    # Stale locks: a scan in this container whose process is gone, and one
+    # from another container that no longer runs, are taken over at once.
+    ( exit 0 ) & SL_DEAD=$!; wait "$SL_DEAD"
+    mkdir -p "$SL_LOCK"; echo "$SL_DEAD" > "$SL_LOCK/pid"; echo "container $SL_SELF" > "$SL_LOCK/origin"
+    sl_scan 3 SL_STAGE1_SECS=0; SL3_RC=$?
+    mkdir -p "$SL_LOCK"; echo 7 > "$SL_LOCK/pid"; echo "container fedcba987654" > "$SL_LOCK/origin"
+    sl_scan 4 SL_STAGE1_SECS=0; SL4_RC=$?
+    if [ "$SL3_RC" = 0 ] && [ "$SL4_RC" = 0 ] && ! grep -q 'Another scan of this folder' "$SL/out-3.log" "$SL/out-4.log" \
+       && [ ! -e "$SL_LOCK" ] && [ ! -e "$SL/rt/Cargo.lock" ]; then
+        pass "a folder lock whose scan is gone (same container, or a container that no longer runs) is taken over and freed"
+    else
+        fail "stale folder lock" "rc=$SL3_RC/$SL4_RC $(grep -h 'INFO\] Another\|ERROR' "$SL/out-3.log" "$SL/out-4.log" | head -n 4)"
+    fi
+    # A lock from a container that still runs, with its scan process still
+    # there, is waited for (the fake docker exec answers 0 for a running one).
+    mkdir -p "$SL_LOCK"; echo 7 > "$SL_LOCK/pid"; echo "container fedcba987654" > "$SL_LOCK/origin"
+    : > "$SL/stub/running/fedcba987654"
+    : > "$SL/stub/started"
+    sl_scan 5 SL_STAGE1_SECS=0 & SL5=$!
+    sleep 2
+    SL5_EARLY="$(wc -l < "$SL/stub/started" | tr -d ' ')"
+    rm -f "$SL/stub/running/fedcba987654"
+    wait "$SL5"; SL5_RC=$?
+    if [ "$SL5_RC" = 0 ] && [ "$SL5_EARLY" = 0 ] && grep -q 'Another scan of this folder is running (a web UI scan)' "$SL/out-5.log" \
+       && [ ! -e "$SL_LOCK" ]; then
+        pass "a lock held by a scan in another running container is waited for"
+    else
+        fail "running-container lock" "rc=$SL5_RC early=$SL5_EARLY $(grep -h 'INFO\] Another\|ERROR' "$SL/out-5.log" | head -n 3)"
+    fi
+    # A command-line scan's lock: its process cannot be seen from the
+    # container, so the UI scan waits until the lock is freed, and says how to
+    # clear one a stopped scan left.
+    mkdir -p "$SL_LOCK"; echo "$$" > "$SL_LOCK/pid"; echo cli > "$SL_LOCK/origin"
+    : > "$SL/stub/started"
+    sl_scan 6 SL_STAGE1_SECS=0 & SL6=$!
+    sleep 2
+    SL6_EARLY="$(wc -l < "$SL/stub/started" | tr -d ' ')"
+    rm -rf "$SL_LOCK"
+    wait "$SL6"; SL6_RC=$?
+    if [ "$SL6_RC" = 0 ] && [ "$SL6_EARLY" = 0 ] \
+       && grep -q "Another scan of this folder is running (a command-line scan, process $$ on this computer)" "$SL/out-6.log" \
+       && grep -q 'the next command-line scan of the folder clears it' "$SL/out-6.log" \
+       && grep -q 'The earlier scan of this folder has finished' "$SL/out-6.log" \
+       && [ "$(wc -l < "$SL/stub/started" | tr -d ' ')" = 1 ]; then
+        pass "a command-line scan's lock is respected: the UI scan waits, then runs"
+    else
+        fail "command-line lock" "rc=$SL6_RC early=$SL6_EARLY $(grep -h 'INFO\] Another\|ERROR' "$SL/out-6.log" | head -n 3)"
+    fi
+    # The command line and the web UI find the same lock for the same folder:
+    # the two source_lock_key functions agree, and put a Windows path in one
+    # form (Git Bash hands C:/Users/..., the desktop app C:\Users\...).
+    sl_keys() { # <file>
+        ( eval "$(awk '$0 ~ "^guard_hash\\(\\) \\{" { i = 1 } i { print } i && $0 == "}" { exit }' "$1")"
+          eval "$(awk '$0 ~ "^source_lock_key\\(\\) \\{" { i = 1 } i { print } i && $0 == "}" { exit }' "$1")"
+          for p in 'C:/Users/Dev/rt' 'C:\Users\Dev\rt' 'c:/users/dev/rt/' 'C:\Users\Dev\rt\' 'C:' 'C:/' '/home/u/rt' '/home/u/rt/'; do
+              printf '%s\n' "$(source_lock_key "$p")"
+          done )
+    }
+    SL_CLI_KEYS="$(sl_keys "$ROOT_DIR/scripts/scan-sbom.sh")"
+    SL_UI_KEYS="$(sl_keys "$ENTRY")"
+    SL_WIN="$(printf '%s\n' "$SL_UI_KEYS" | sed -n 1,4p | sort -u | wc -l | tr -d ' ')"
+    SL_ROOT="$(printf '%s\n' "$SL_UI_KEYS" | sed -n 5,6p | sort -u | wc -l | tr -d ' ')"
+    SL_POSIX="$(printf '%s\n' "$SL_UI_KEYS" | sed -n 7,8p | sort -u | wc -l | tr -d ' ')"
+    if [ -n "$SL_CLI_KEYS" ] && [ "$SL_CLI_KEYS" = "$SL_UI_KEYS" ] && [ "$SL_WIN" = 1 ] && [ "$SL_ROOT" = 1 ] && [ "$SL_POSIX" = 1 ] \
+       && [ "$(printf '%s\n' "$SL_UI_KEYS" | sed -n 7p)" = "$(sl_key /home/u/rt)" ]; then
+        pass "the command line and the web UI key one folder's lock the same way (Windows drive paths in one form)"
+    else
+        fail "lock keys differ" "cli=$(printf '%s' "$SL_CLI_KEYS" | tr '\n' ' ' | head -c 200) ui=$(printf '%s' "$SL_UI_KEYS" | tr '\n' ' ' | head -c 200)"
+    fi
+fi
 
 echo "== every step label in entrypoint.sh is documented =="
 missing=""
