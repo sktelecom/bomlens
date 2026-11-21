@@ -3926,11 +3926,14 @@ SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 
 def running_scans():
     """Scans running now, newest first: id, project, version and start time.
-    Read-only. Another tab joins one through GET /scan-attach?id=."""
+    Read-only. Another tab joins one through GET /scan-attach?id=. A scan
+    whose stream has sent its done event has stopped and is not listed, even
+    while it still holds its folder for the cleanup that follows."""
     with _scan_lock:
         rows = [
             {"id": rid, **_scan_started.get(rid, {"project": rid, "version": "", "startedAt": 0})}
             for rid in _scan_active
+            if not (rid in _scan_streams and _scan_streams[rid].ended_at is not None)
         ]
         for stale in [k for k in _scan_started if k not in _scan_active]:
             del _scan_started[stale]
