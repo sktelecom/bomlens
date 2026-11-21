@@ -6811,6 +6811,69 @@ STUB
         && pass "a partly failed jar fetch is only logged, with the count" \
         || fail "a partly failed jar fetch: [$_mh_out]"
     rm -rf "$WORK/mh-home/.m2/repository/g" "$WORK/mh-home/.m2/repository/org"
+
+    # Offline with the user's Maven local repository (MAVEN_USER_REPO_OFFLINE).
+    _mo_repo="$WORK/mo-user-repo"; mkdir -p "$_mo_repo/g"
+    _mo_run() {  # <dir> [fail]: the block offline, then MVN_CMD and CDXGEN_JVM_TOOL_PINNED
+        rm -f "$WORK/mh-calls"
+        ( cd "$1" && PATH="$_mh_bin:$PATH" HOME="$WORK/mh-home" MH_CALLS="$WORK/mh-calls" MH_FAIL="${2:-}" \
+            MH_LIST="${MH_LIST:-}" MAVEN_SETTINGS_ARGS="" MAVEN_OPTS="" MVN_CMD="" CDXGEN_JVM_TOOL_PINNED="" \
+            MAVEN_USER_REPO="$_mo_repo" MAVEN_USER_REPO_OFFLINE=probe \
+            bash -c "$_mh_prelude; $_mh_block"'
+                echo "RESULT MVN_CMD=${MVN_CMD:-} PINNED=${CDXGEN_JVM_TOOL_PINNED:-}"' )
+    }
+    _mo_plugin() { mkdir -p "$_mo_repo/org/apache/maven/plugins/maven-dependency-plugin/3.6.1"; : > "$_mo_repo/org/apache/maven/plugins/maven-dependency-plugin/3.6.1/maven-dependency-plugin-3.6.1.jar"; }
+    _mo_out=$(_mo_run "$WORK/mh-proj")
+    { printf '%s' "$_mo_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && printf '%s' "$_mo_out" | grep -q "This scan needs maven-dependency-plugin in your Maven local repository: run 'mvn dependency:tree' once" \
+        && [ ! -f "$WORK/mh-calls" ]; } \
+        && pass "offline, no maven-dependency-plugin in either repository: maven-dependency-tree failed, said, and the jar fetch skipped" \
+        || fail "offline without maven-dependency-plugin: [$_mo_out] calls [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    mkdir -p "$WORK/mh-home/.m2/repository/org/apache/maven/plugins/maven-dependency-plugin/3.11.0"
+    : > "$WORK/mh-home/.m2/repository/org/apache/maven/plugins/maven-dependency-plugin/3.11.0/maven-dependency-plugin-3.11.0.jar"
+    _mo_out=$(_mo_run "$WORK/mh-proj")
+    { ! printf '%s' "$_mo_out" | grep -q "MARK-FAILED" && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ]; } \
+        && pass "offline, maven-dependency-plugin in BomLens's cache: the jar fetch runs, nothing failed" \
+        || fail "offline with the plugin in the cache: [$_mo_out]"
+    rm -rf "$WORK/mh-home/.m2/repository/org"
+    _mo_plugin
+    _mo_out=$(MH_LIST="$_mh_two" _mo_run "$WORK/mh-proj" error)
+    { printf '%s' "$_mo_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && ! printf '%s' "$_mo_out" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && printf '%s' "$_mo_out" | grep -q "none of the 2 resolved jars is in your Maven local repository or BomLens's Maven cache, so the dependency tree is missing"; } \
+        && pass "offline, none of the resolved jars found: the dependency tree is said to be missing and recorded" \
+        || fail "offline with no resolved jar: [$_mo_out]"
+    mkdir -p "$WORK/mo-old/.mvn/wrapper" "$WORK/mo-old-gradle/.mvn/wrapper" "$WORK/mo-old-gradle/app" "$WORK/mo-39/.mvn/wrapper"
+    touch "$WORK/mo-old/pom.xml" "$WORK/mo-old-gradle/pom.xml" "$WORK/mo-old-gradle/app/build.gradle" "$WORK/mo-39/pom.xml"
+    for _d in mo-old mo-old-gradle mo-39; do cp "$_mh_bin/mvn" "$WORK/$_d/mvnw"; done
+    for _d in mo-old mo-old-gradle; do
+        echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.6/apache-maven-3.8.6-bin.zip' \
+            > "$WORK/$_d/.mvn/wrapper/maven-wrapper.properties"
+    done
+    echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip' \
+        > "$WORK/mo-39/.mvn/wrapper/maven-wrapper.properties"
+    _mo_out=$(_mo_run "$WORK/mo-old")
+    { printf '%s' "$_mo_out" | grep -q "RESULT MVN_CMD=mvn PINNED=true" \
+        && ! printf '%s' "$_mo_out" | grep -q "MARK-FAILED" \
+        && printf '%s' "$_mo_out" | grep -q "mvnw runs Maven 3.8.6, which offline cannot read your Maven local repository" \
+        && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ]; } \
+        && pass "offline, a mvnw of Maven 3.8: the image's mvn runs instead, for cdxgen too (MVN_CMD, CDXGEN_JVM_TOOL_PINNED)" \
+        || fail "offline with a Maven 3.8 wrapper: [$_mo_out] calls [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mo_out=$(_mo_run "$WORK/mo-old-gradle")
+    { printf '%s' "$_mo_out" | grep -q "RESULT MVN_CMD= PINNED=$" \
+        && printf '%s' "$_mo_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ]; } \
+        && pass "offline, a mvnw of Maven 3.8 beside a Gradle build: wrappers left to cdxgen, maven-dependency-tree failed" \
+        || fail "offline with a Maven 3.8 wrapper and Gradle: [$_mo_out]"
+    _mo_out=$(_mo_run "$WORK/mo-39")
+    { printf '%s' "$_mo_out" | grep -q "RESULT MVN_CMD= PINNED=$" && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ]; } \
+        && pass "offline, a mvnw of Maven 3.9: the wrapper is used as before" \
+        || fail "offline with a Maven 3.9 wrapper: [$_mo_out]"
+    _mh_run "$WORK/mo-old" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
+        && pass "online, a mvnw of Maven 3.8 is used as before" \
+        || fail "online with a Maven 3.8 wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    rm -rf "$_mo_repo"
 fi
 echo "== maven-duplicates: a pom.xml Maven 3.10 refuses gets a Maven that reads it, or is recorded =="
 # Maven 3.10 and later refuse a dependency declared twice in one POM; 3.9 only
@@ -7288,6 +7351,9 @@ if command -v node >/dev/null 2>&1; then
     _uf="$WORK/uf"; rm -rf "$_uf"; mkdir -p "$_uf/bin" "$_uf/src" "$_uf/out" "$_uf/home" "$_uf/root/m2"
     _uf_repo="$_uf/root/m2/repository"; mkdir -p "$_uf_repo/com/x/lib/1.0" "$_uf_repo/com/x/parent/1"
     : > "$_uf_repo/com/x/lib/1.0/lib-1.0.jar"
+    # A repository a dependency:tree run filled holds maven-dependency-plugin.
+    mkdir -p "$_uf_repo/org/apache/maven/plugins/maven-dependency-plugin/3.11.0"
+    : > "$_uf_repo/org/apache/maven/plugins/maven-dependency-plugin/3.11.0/maven-dependency-plugin-3.11.0.jar"
     printf '<project><parent><groupId>com.x</groupId><artifactId>parent</artifactId><version>1</version></parent><artifactId>lib</artifactId><version>1.0</version></project>\n' > "$_uf_repo/com/x/lib/1.0/lib-1.0.pom"
     printf '<project><groupId>com.x</groupId><artifactId>parent</artifactId><version>1</version><licenses><license><name>Apache-2.0</name></license></licenses></project>\n' > "$_uf_repo/com/x/parent/1/parent-1.pom"
     # A mirror nothing listens on: refused at once, so the run is offline.

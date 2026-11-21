@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Python source scan with a complete lock file at the scan root (`poetry.lock`, `uv.lock`, `pdm.lock` or `Pipfile.lock`) reads the lock file and not an installed environment beside it, also when the package index does not answer, and logs one line saying so.
 - A Node.js workspace whose lock file written at install is not read (an npm workspace root, a pnpm lock with more than one importer) is recorded as the failed step `npm-installed-lock` or `pnpm-installed-lock`, so the result is graded partial and the dependency graph `incomplete`. A workspace root with no lock file no longer logs that it keeps the full graph.
 - A Node.js source scan with no lock file asks the configured npm registry once before resolving the production set; when it does not answer, the resolve and its retries are skipped at once, the log says dependency relations are not available, and only `npm-production-set` in `bomlens:pipeline-step-failed` is recorded.
+- A Maven source scan that runs offline with your Maven local repository uses the image's Maven in place of a `mvnw` older than 3.9 (for cdxgen too, unless the tree has a Gradle build, when `maven-dependency-tree` is recorded as failed). It records `maven-dependency-tree` as failed, with a log line saying what to run, when neither repository holds `maven-dependency-plugin`, and when none of the resolved jars is in either repository.
 
 ## [v1.15.0] - 2026-11-15
 
