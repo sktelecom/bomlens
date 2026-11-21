@@ -1684,7 +1684,7 @@ if command -v jq >/dev/null 2>&1; then
         echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)." >&2
         # The npm production set was resolved, so the project declares no
         # runtime dependencies; its development-only ones are left out.
-        if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set")' "$OUTPUT_FILE" >/dev/null 2>&1; then
+        if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set") and (any(.name == "bomlens:pipeline-step-failed" and .value == "npm-production-set") | not)' "$OUTPUT_FILE" >/dev/null 2>&1; then
             echo "       The lock file was read: this project has no runtime dependencies, and its development-only dependencies are left out."
             echo "       Set BOMLENS_NODE_FULL_GRAPH=1 to list them as well."
         fi

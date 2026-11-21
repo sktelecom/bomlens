@@ -23,7 +23,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+SRV_PID=""
+trap '[ -z "$SRV_PID" ] || kill "$SRV_PID" 2>/dev/null; rm -rf "$WORK"' EXIT
 PASS=0; FAIL=0
 pass() { echo "  PASS: $1"; PASS=$((PASS + 1)); }
 fail() { echo "  FAIL: $1"; [ -n "${2:-}" ] && echo "        $2"; FAIL=$((FAIL + 1)); return 0; }
@@ -178,7 +179,7 @@ _ps="$WORK/prodset.sh"
     printf '%s\n' 'log() { echo "[build-prep] $*"; }'
     printf '%s\n' 'mark_prep_applied() { PREP_APPLIED="${PREP_APPLIED:+$PREP_APPLIED }$1"; }'
     printf '%s\n' 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
-    printf '%s\n' 'prep_step() { echo "PREP_STEP_CALLED:$1"; return 1; }'
+    printf '%s\n' 'prep_step() { echo "PREP_STEP_CALLED:$1" >&2; return 1; }'
     printf '%s\n' 'npm() { echo "NPM_CALLED"; return 1; }'
     printf '%s\n' 'PREP_APPLIED=""; PREP_TIMEOUT_DEFAULT=60; NODE_INSTALLED_ROOT=npm'
     sed -n '/^NODE_PROD_SET=""$/,/^# --- build the cdxgen argument list/p' "$PREP"
@@ -290,6 +291,65 @@ jq '.dependencies = {"ms": "^2.1.2"}' "$p/package.json" > "$p/p.json" && mv "$p/
 touch -t 202601010000 "$p/node_modules/.pnpm/lock.yaml"
 o=$(run_section "$p")
 check "both locks: the newer (npm) one is read" "$(line "$o" APPLIED)|$( [ -f "$p/pnpm-lock.yaml" ] && echo pnpm)" "npm-installed-lock|"
+
+echo "== no lock file at all: the npm registry is asked once first =="
+# A yarn or bun install leaves no lock this scan reads. The registry probe
+# decides whether the production set resolve runs at all.
+_ps2="$WORK/prodset-nolock.sh"
+{
+    printf '%s\n' 'log() { echo "[build-prep] $*"; }'
+    printf '%s\n' 'mark_prep_applied() { PREP_APPLIED="${PREP_APPLIED:+$PREP_APPLIED }$1"; }'
+    printf '%s\n' 'mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }'
+    printf '%s\n' 'unmark_prep_failed() { :; }'
+    printf '%s\n' 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
+    printf '%s\n' 'prep_step() { echo "PREP_STEP_CALLED:$1" >&2; mark_prep_applied "$1"; mark_prep_failed "$1"; return 1; }'
+    printf '%s\n' 'run_supervised_timeout() { echo "RETRY_CALLED"; return 1; }'
+    printf '%s\n' 'npm() { if [ "$1" = config ]; then echo "$TEST_NPM_REGISTRY"; else echo "NPM_CALLED"; return 1; fi; }'
+    printf '%s\n' 'PREP_APPLIED=""; PREP_FAILED=""; PREP_TIMEOUT_DEFAULT=60; NODE_INSTALLED_ROOT=""; BOMLENS_LICENSE_PROBE_TIMEOUT=3'
+    sed -n '/^# --- licence lookup probe ---$/,/^# --- end licence lookup probe ---$/p' "$PREP"
+    sed -n '/^NODE_PROD_SET=""$/,/^# --- build the cdxgen argument list/p' "$PREP"
+    # shellcheck disable=SC2016
+    printf '%s\n' 'echo "APPLIED:$PREP_APPLIED"; echo "FAILED:$PREP_FAILED"'
+} > "$_ps2"
+grep -q '^npm_registry_url() {' "$_ps2" || fail "could not extract npm_registry_url from build-prep.sh"
+cat > "$WORK/srv.js" <<'JS'
+const http = require("http");
+const fs = require("fs");
+const ok = http.createServer((req, res) => { res.writeHead(404); res.end(); });
+const closed = http.createServer();
+closed.listen(0, "127.0.0.1", () => { const shut = closed.address().port; closed.close(() =>
+  ok.listen(0, "127.0.0.1", () => fs.writeFileSync(process.argv[2], ok.address().port + " " + shut))); });
+setTimeout(() => process.exit(0), 60000);
+JS
+node "$WORK/srv.js" "$WORK/ports" &
+SRV_PID=$!
+n=0; while [ ! -s "$WORK/ports" ] && [ "$n" -lt 50 ]; do sleep 0.1; n=$((n + 1)); done
+read -r OK_PORT CLOSED_PORT < "$WORK/ports"
+p="$WORK/yarn-installed"; mkdir -p "$p/node_modules/debug"
+printf '{"name":"app","version":"1.0.0","dependencies":{"debug":"^4.3.4"}}\n' > "$p/package.json"
+printf '# yarn installed state\n' > "$p/node_modules/.yarn-integrity"
+_t0=$(date +%s)
+o=$( (cd "$p" && TEST_NPM_REGISTRY="http://user:secret@127.0.0.1:$CLOSED_PORT/" sh "$_ps2") 2>&1)
+_t1=$(date +%s)
+check "a registry that does not answer: only npm-production-set failed, not applied" "$(line "$o" APPLIED)|$(line "$o" FAILED)" "|npm-production-set"
+if printf '%s\n' "$o" | grep -qE 'PREP_STEP_CALLED|RETRY_CALLED|NPM_CALLED'; then
+    fail "the resolve ran although the registry did not answer" "$o"
+else
+    pass "the resolve and its retries are skipped"
+fi
+printf '%s\n' "$o" | grep -qF "node: no lock file, and the npm registry 127.0.0.1:$CLOSED_PORT did not answer" \
+    && pass "one log line names the registry, without its login" || fail "the unreachable registry is not logged" "$o"
+printf '%s\n' "$o" | grep -q "using full graph" \
+    && fail "the log still says it uses the full graph" "$o" || pass "the log does not claim a full graph"
+[ $((_t1 - _t0)) -lt 15 ] && pass "the skip is immediate" || fail "the skip took $((_t1 - _t0))s"
+o=$( (cd "$p" && TEST_NPM_REGISTRY="http://127.0.0.1:$OK_PORT/" sh "$_ps2") 2>&1)
+printf '%s\n' "$o" | grep -q "PREP_STEP_CALLED:npm-production-set" \
+    && pass "a registry that answers: the resolve runs as before" || fail "the resolve did not run with a registry that answers" "$o"
+printf '%s\n' 'lockfile v1' > "$p/yarn.lock"
+o=$( (cd "$p" && TEST_NPM_REGISTRY="http://127.0.0.1:$CLOSED_PORT/" sh "$_ps2") 2>&1)
+printf '%s\n' "$o" | grep -q "PREP_STEP_CALLED:npm-production-set" \
+    && pass "with a yarn.lock the registry is not asked first" || fail "a yarn.lock project skipped the resolve" "$o"
+kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null; SRV_PID=""
 
 echo "== bomlens:node-lock-source on the SBOM =="
 _rec="$WORK/record.sh"

@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When the registry license lookup was skipped (`license-fetch`), the CLI no longer warns that the SBOM may lack dependencies: it prints one `[INFO]` line saying licenses come from lock files and package metadata. A warning for other failed preprocessing steps names only those. The web UI shows the skipped lookup as an information note on the Overview and the conformance check, not as "Some data may be incomplete".
 - A Python source scan with a complete lock file at the scan root (`poetry.lock`, `uv.lock`, `pdm.lock` or `Pipfile.lock`) reads the lock file and not an installed environment beside it, also when the package index does not answer, and logs one line saying so.
 - A Node.js workspace whose lock file written at install is not read (an npm workspace root, a pnpm lock with more than one importer) is recorded as the failed step `npm-installed-lock` or `pnpm-installed-lock`, so the result is graded partial and the dependency graph `incomplete`. A workspace root with no lock file no longer logs that it keeps the full graph.
+- A Node.js source scan with no lock file asks the configured npm registry once before resolving the production set; when it does not answer, the resolve and its retries are skipped at once, the log says dependency relations are not available, and only `npm-production-set` in `bomlens:pipeline-step-failed` is recorded.
 
 ## [v1.15.0] - 2026-11-15
 
