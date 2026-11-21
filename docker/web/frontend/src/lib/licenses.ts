@@ -3,7 +3,7 @@
 
 /**
  * License grouping and restriction review for the Licenses section. The review
- * classes (behavioral-use / non-commercial / no-derivatives) come from the component's
+ * classes (behavioral-use / non-commercial / no-derivatives / proprietary) come from the component's
  * bomlens:licenseReview property (set by normalize-sbom.sh via the shared
  * license-flags.jq), so the badge and the NOTICE's review section never
  * disagree. Pure and unit tested.
@@ -382,7 +382,7 @@ export function licenseRiskSummary(
 }
 
 // Most-restrictive first.
-const REVIEW_ORDER: LicenseReview[] = ["behavioral-use", "non-commercial", "no-derivatives"];
+const REVIEW_ORDER: LicenseReview[] = ["behavioral-use", "non-commercial", "no-derivatives", "proprietary"];
 
 /** Components grouped by their restriction class — empty when none need review. */
 export function reviewGroups(components: ComponentItem[]): ReviewGroup[] {

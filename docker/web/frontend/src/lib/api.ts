@@ -86,7 +86,7 @@ export interface ComponentItem {
   scope?: "direct" | "transitive";
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
-  licenseReview?: "behavioral-use" | "non-commercial" | "no-derivatives";
+  licenseReview?: "behavioral-use" | "non-commercial" | "no-derivatives" | "proprietary";
   /** A known-malicious package (bundled OSV snapshot). Not a severity: this one
    *  is removed rather than upgraded, so it is kept out of maxSeverity/vulnCount
    *  and shown as its own signal. */
@@ -738,6 +738,9 @@ export interface AiProfile {
     nonCommercial: number;
     /** Absent in a profile written before the no-derivatives flag existed. */
     noDerivatives?: number;
+    /** Commercial or proprietary terms. Absent in a profile written before the
+     *  proprietary flag existed. */
+    proprietary?: number;
   };
   /** Card-view crosswalk coverage (no per-element detail). */
   regulatoryCrosswalk: {
