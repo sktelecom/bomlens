@@ -273,6 +273,7 @@ CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1
 | TLS를 검사하는 프록시(자체 CA로 HTTPS를 다시 서명함) | 1, 2 | `BOMLENS_EXTRA_CA_CERTS`, 프록시 CA 번들(PEM)의 컨테이너 안 경로. 두 단계의 `env_passthrough`에 모두 들어 있지만 계획에는 이 파일의 마운트가 없으므로, 지정한 경로에 호출자가 직접 읽기 전용으로 마운트함(CLI는 `/bomlens-ca/extra.pem`을 씀). 각 단계는 `/tmp` 아래에서 시스템 번들, Node.js, JDK 트러스트 스토어 사본에 이를 추가함 |
 | 패키지 레지스트리(pip, npm, Maven 등) | 1 | 프록시를 거침. 각 패키지 관리자의 미러 설정도 평소대로 쓸 수 있음 |
 | cdxgen의 라이선스 조회 | 1 | `FETCH_LICENSE=false`로 끔 |
+| CocoaPods trunk podspec(pod 라이선스) | 2 | 계획은 1단계의 `FETCH_LICENSE`를 2단계에도 넘기며, `false`면 꺼짐. 미러는 `COCOAPODS_CDN_URL` |
 | Trivy 취약점 데이터베이스 | 2 | `trivy-db` 마운트(네트워크가 전혀 필요 없음). 또는 미러를 `TRIVY_DB_REPOSITORY`, `TRIVY_JAVA_DB_REPOSITORY`로 지정. 컨테이너에 설정된 그 밖의 `TRIVY_*` 변수도 Trivy가 읽음(CLI는 가진 것을 모두 넘김) |
 | EPSS와 CISA KEV | 2 | 계획에서는 꺼져 있음(2단계 `env`가 `SECURITY_ENRICH=false`). CLI와 이미지를 단독으로 쓰면 켜져 있음. 미러는 `EPSS_API`, `KEV_URL` |
 | deps.dev(레지스트리 라이선스, 버전 경과 기간) | 2 | 요청할 때만 켜짐(`LICENSE_REGISTRY`, `STALENESS_ENRICH`). 미러는 `LICENSE_REGISTRY_API` |

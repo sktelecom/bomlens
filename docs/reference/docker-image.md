@@ -257,6 +257,8 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1 and CC-BY-NC ids | SPDX ids whose single occurrence is checked against the registry, space- or comma-separated |
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (`unavailable`) |
+| `COCOAPODS_CDN_URL` | - | `https://cdn.cocoapods.org` | Source scans with `FETCH_LICENSE` on: base URL of the CocoaPods trunk CDN, or of a mirror with the same `Specs/` layout, that pod licenses are read from. When it does not answer, the pods keep no license and the log says so |
+| `COCOAPODS_LICENSE_BUDGET` | - | `120` | Seconds the CocoaPods podspec lookups may take in total. Pods it does not reach keep no license |
 | `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network |
 | `MODEL_RESOLVE` | - | `false` | Source scans (the script's `--resolve-models`): read each Hugging Face model the code references from the hub. Uses the network; `HF_ENDPOINT` points at a mirror and `HF_TOKEN` reads private models |
 | `MODEL_RESOLVE_MAX` | - | `20` | Models looked up in one scan. The rest are marked `not-attempted` |
