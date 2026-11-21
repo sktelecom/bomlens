@@ -42,6 +42,7 @@ import {
   type ScanConfig,
   type ScanHandlers,
   type ScanParams,
+  type ScanWaiting,
   type Severity,
 } from "@/lib/api";
 import { failureKeyForCode } from "@/lib/failureExplain";
@@ -158,6 +159,9 @@ export function NextApp() {
   const { toast } = useToast();
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  // The running scan waits for another scan of the same folder (the server's
+  // `waiting` event, replayed to a tab that joins while it waits).
+  const [waiting, setWaiting] = useState<ScanWaiting | null>(null);
   // The failure message surfaced on the Scan-running screen when a scan can't
   // run (stream/launch error), so it isn't buried in the log.
   const [scanError, setScanError] = useState<string | null>(null);
@@ -309,6 +313,7 @@ export function NextApp() {
     loadedIdRef.current = null;
     setStatus("idle");
     setLogs([]);
+    setWaiting(null);
     setResult(null);
     setLiveProject(undefined);
     setOpening(null);
@@ -570,6 +575,7 @@ export function NextApp() {
     setOpening(null);
     setStatus("running");
     setLogs([]);
+    setWaiting(null);
     setScanError(null);
     setScanErrorKey(null);
     setAndroidNeed(null);
@@ -600,8 +606,10 @@ export function NextApp() {
       if (window.location.hash !== target) window.history.replaceState(null, "", target);
     },
     onLog: (line) => setLogs((prev) => [...prev, line]),
+    onWaiting: setWaiting,
     onDone: (done) => {
       streamRef.current = null;
+      setWaiting(null);
       // Cancelled from another tab: nothing was kept, so there is no result
       // to land on. This tab's own Cancel closes the stream before this.
       if (scanEndOf(done) === "cancelled") {
@@ -662,6 +670,7 @@ export function NextApp() {
     setOpening(null);
     setStatus("running");
     setLogs([]);
+    setWaiting(null);
     setScanError(null);
     setScanErrorKey(null);
     setAndroidNeed(null);
@@ -959,6 +968,7 @@ export function NextApp() {
         <>
         <ScanRunning
           logs={logs}
+          waiting={waiting}
           status={status === "error" ? "error" : "running"}
           projectLabel={projectText(projectInfo) || undefined}
           errorMessage={scanError}

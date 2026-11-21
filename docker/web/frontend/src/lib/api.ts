@@ -9,6 +9,7 @@
  *   GET /results?id=<run>      → ResultFile[] (scoped to one run folder)
  *   GET /file?id=<run>&name=<n> → raw file (download / inline view)
  *   GET /scan-stream?…         → SSE: `started` (ScanStarted), `log` (string line) + `done` (DoneEvent)
+ *                                and `waiting` (ScanWaiting) while it waits for another scan of its folder
  *   GET /scan-attach?id=<run>  → SSE: the same events for a scan another request started
  *   POST /scan-cancel?id=<run> → {cancelling}: stop a running scan, from any tab
  *   GET /advisory?id=<id>              → AdvisoryResult (one CVE/GHSA/… lookup)
@@ -1102,6 +1103,29 @@ export interface ScanHandlers {
   onProgress?: (p: ScanProgress) => void;
   /** The scan's run id and name, first on the stream. */
   onStarted?: (info: ScanStarted) => void;
+  /** The scan waits for another scan of the same folder (a wait under way),
+   *  or that wait has ended (null). A joining tab is sent a wait still under
+   *  way after the log so far. */
+  onWaiting?: (w: ScanWaiting | null) => void;
+}
+
+/** A `waiting` event: this scan waits for another scan of the same source
+ *  folder, from the web UI or the command line, to finish before it starts. */
+export interface ScanWaiting {
+  /** Why it waits, as a code the screen has wording for
+   *  (`SAME_FOLDER_SCAN_RUNNING`). */
+  code: string;
+  /** The scanner's own line, masked by the server. */
+  detail: string;
+}
+
+/** Read a `waiting` payload: the wait under way, or null when it has ended
+ *  (or the payload is not one). */
+export function parseScanWaiting(raw: unknown): ScanWaiting | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.waiting !== true || typeof r.code !== "string" || !r.code) return null;
+  return { code: r.code, detail: typeof r.detail === "string" ? r.detail : "" };
 }
 
 /** The first event of a scan stream (`started`): which run it is. */
@@ -2275,6 +2299,14 @@ function wireScanStream(es: EventSource, handlers: ScanHandlers): void {
       }
     } catch {
       /* ignore malformed progress */
+    }
+  });
+
+  es.addEventListener("waiting", (e) => {
+    try {
+      handlers.onWaiting?.(parseScanWaiting(JSON.parse((e as MessageEvent).data)));
+    } catch {
+      /* ignore a malformed waiting event */
     }
   });
 

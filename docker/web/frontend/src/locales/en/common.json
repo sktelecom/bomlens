@@ -866,6 +866,7 @@
     "cancelKeep": "Keep scanning",
     "cancelled": "The scan was cancelled",
     "cancelledElsewhere": "The scan was cancelled in another tab",
+    "waitingSameFolder": "Waiting for another scan of this folder to finish. This scan starts on its own when that one ends; cancel it to stop waiting.",
     "attachTrimmed_one": "({{count}} earlier log line is not shown)",
     "attachTrimmed_other": "({{count}} earlier log lines are not shown)",
     "failGitPrivateCause": "The repository was not found, or it is private.",
