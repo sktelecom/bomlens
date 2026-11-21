@@ -38,6 +38,50 @@ mark_document_status() {
     fi
 }
 
+# Remove a document-level status property (every entry of that name). The
+# counterpart of mark_document_status, for a fact that describes this run and
+# must not be read from an SBOM an earlier run stamped.
+clear_document_status() {
+    local file="$1" name="$2" tmp
+    [ -n "$file" ] && [ -f "$file" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    jq -e --arg n "$name" 'any((.metadata.properties // [])[]?; .name? == $n)' "$file" >/dev/null 2>&1 || return 0
+    tmp="${file}.docstatus.tmp"
+    if jq --arg n "$name" '.metadata.properties = [(.metadata.properties // [])[] | select(.name? != $n)]' \
+        "$file" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"
+    fi
+}
+
+# mark_vulnerability_check <sbom> <out_prefix> [reason] [step status]: after a
+# security scan that was asked for, stamp bomlens:vulnerability-check-failed on
+# the SBOM when it gave no result, so the completeness verdict
+# (assess-completeness.sh) of every report written afterwards says so. The
+# reason is the one given (the scan could not start), else the error Trivy
+# wrote into the security report (ScanError, as "Trivy: <message>", the same
+# text scan-security.sh passes for its own report), else that the step failed
+# (step status "failed", from run_optional_step) or wrote no report. A report
+# that holds a result stamps nothing. Prints the reason it stamped.
+mark_vulnerability_check() {
+    local file="$1" prefix="$2" reason="${3:-}" status="${4:-}" err=""
+    [ -n "$file" ] && [ -f "$file" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    if [ -z "$reason" ] && [ -f "${prefix}_security.json" ]; then
+        err="$(jq -r '.ScanError.Message // empty' "${prefix}_security.json" 2>/dev/null)" || err=""
+        [ -z "$err" ] || reason="Trivy: $err"
+    fi
+    if [ -z "$reason" ] && [ "$status" = "failed" ]; then
+        reason="the security scan step failed"
+    elif [ -z "$reason" ] && [ ! -f "${prefix}_security.json" ]; then
+        reason="the security scan wrote no report"
+    fi
+    [ -n "$reason" ] || return 0
+    mark_document_status "$file" "bomlens:vulnerability-check-failed" "$reason"
+    printf '%s\n' "$reason"
+}
+
 # Record that a best-effort post-process step failed. Distinct from the
 # bomlens:sbom-tool-degraded signal (a shallow syft *generation* fallback); this
 # marks that an enrichment/normalize/conformance *step* did not complete, so a
@@ -61,15 +105,22 @@ mark_pipeline_warning() {
 # return 0 so the run continues with a valid SBOM.
 # When the run keeps a result manifest (engine-result.sh), the step's outcome
 # and time span are recorded there too.
+# OPTIONAL_STEP_STATUS holds the outcome of the last call (ok or failed), for
+# a caller that reads more of it afterwards.
+OPTIONAL_STEP_STATUS=""
 run_optional_step() {
     local label="$1"; shift
     local _started=""
     declare -F er_record >/dev/null && _started="$(er_now)"
     declare -F er_event >/dev/null && er_event step.start "$label"
     if "$@"; then
+        # shellcheck disable=SC2034  # read by the script that sources this file
+        OPTIONAL_STEP_STATUS=ok
         [ -n "$_started" ] && er_record "$label" ok "" "" "$_started"
         return 0
     fi
+    # shellcheck disable=SC2034  # read by the script that sources this file
+    OPTIONAL_STEP_STATUS=failed
     echo "[WARN] post-process step '$label' failed; continuing with a valid SBOM, but this step's output may be missing or incomplete." >&2
     mark_pipeline_warning "${OUTPUT_FILE:-}" "$label"
     [ -n "$_started" ] && er_record "$label" failed failed "" "$_started"

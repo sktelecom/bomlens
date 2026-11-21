@@ -15859,6 +15859,116 @@ else
     fail "completeness/maven: the Maven block of the jar-fetch test is not available to this section"
 fi
 
+echo "== completeness: a vulnerability check that was asked for and did not run or failed =="
+# A Trivy run that stopped (a DNS error on the database download, say) wrote
+# "SCAN FAILED" in the security report while the result read as complete. The
+# security report passes the failure to its own completeness verdict, and the
+# entrypoint stamps it on the SBOM (bomlens:vulnerability-check-failed) for the
+# reports written after it. A scan with the security check off never carries it.
+VCD="$WORK/vulncheck"
+mkdir -p "$VCD/bin"
+cat > "$VCD/bin/trivy" <<'SH'
+#!/bin/sh
+echo "2026-11-21T00:00:00Z	FATAL	Fatal error	init error: DB error: failed to download vulnerability DB: dial tcp: lookup ghcr.io: no such host" >&2
+exit 1
+SH
+chmod +x "$VCD/bin/trivy"
+vc_sha() { { shasum -a 256 "$1" 2>/dev/null || sha256sum "$1"; } | cut -d' ' -f1; }
+jq -c '.metadata.properties = []' "$FIX/journey/java-license-exceptions/sbom-exceptions.cdx.json" > "$VCD/clean.json"
+bash "$LIB/assess-completeness.sh" "$VCD/clean.json" "$VCD/clean" >/dev/null 2>&1
+[ "$(jq -r .grade "$VCD/clean_completeness.json" 2>/dev/null)" = complete ] \
+    && pass "vulncheck: the control SBOM is complete" \
+    || fail "vulncheck: the control SBOM is not complete" "$(cat "$VCD/clean_completeness.json" 2>&1)"
+cp "$VCD/clean.json" "$VCD/sec.json"
+vc_sum_before="$(vc_sha "$VCD/sec.json")"
+PATH="$VCD/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$VCD/sec.json" "$VCD/sec" proj >/dev/null 2>&1
+vc_reason="$(jq -r '[.reasons[] | select(.code == "vulnerability-check-failed")][0] | "\(.grade) \(.detail)"' "$VCD/sec_completeness.json" 2>/dev/null)"
+case "$vc_reason" in
+    "partial Trivy: "*"no such host"*) pass "vulncheck: a failed Trivy run makes the security report's verdict partial, naming Trivy's error" ;;
+    *) fail "vulncheck: the security report's verdict does not carry the failed check" "$vc_reason" ;;
+esac
+{ grep -qF "Result completeness: Partial" "$VCD/sec_security.md" \
+    && grep -qF "The vulnerability check was asked for but did not run or failed" "$VCD/sec_security.md" \
+    && grep -qF "SBOM_EXTRA_CA_CERTS" "$VCD/sec_security.md" \
+    && grep -qF "Result completeness: Partial" "$VCD/sec_security.html"; } \
+    && pass "vulncheck: the security report shows the partial grade with the reason and its fix" \
+    || fail "vulncheck: the security report does not show the reason" "$(grep -n -i "completeness" "$VCD/sec_security.md" | head -3)"
+[ "$(vc_sha "$VCD/sec.json")" = "$vc_sum_before" ] \
+    && pass "vulncheck: scan-security.sh leaves the SBOM as it is" \
+    || fail "vulncheck: scan-security.sh changed the SBOM"
+# The entrypoint's stamp, from the report Trivy left: the same words, so every
+# later report states the same reason.
+# shellcheck disable=SC1090,SC1091
+vc_stamp="$(. "$LIB/pipeline-step.sh"; mark_vulnerability_check "$VCD/sec.json" "$VCD/sec" "" ok)"
+bash "$LIB/assess-completeness.sh" "$VCD/sec.json" "$VCD/after" >/dev/null 2>&1
+{ [ "$vc_stamp" = "$(jq -r '"Trivy: " + .ScanError.Message' "$VCD/sec_security.json")" ] \
+    && [ "$(jq -c '[.reasons[] | .message.en]' "$VCD/after_completeness.json")" = "$(jq -c '[.reasons[] | .message.en]' "$VCD/sec_completeness.json")" ]; } \
+    && pass "vulncheck: the stamp on the SBOM gives the later reports the same reason sentence as the security report" \
+    || fail "vulncheck: the stamped SBOM and the security report disagree" "$vc_stamp"
+bash "$LIB/generate-notice.sh" "$VCD/sec.json" "$VCD/after" proj >/dev/null 2>&1
+grep -qF "The vulnerability check was asked for but did not run or failed" "$VCD/after_NOTICE.txt" \
+    && pass "vulncheck: a NOTICE written after the stamp carries the reason" \
+    || fail "vulncheck: the NOTICE lacks the reason" "$(head -20 "$VCD/after_NOTICE.txt" 2>&1)"
+# The other ways a check gives no result, and the one that stamps nothing.
+cp "$VCD/clean.json" "$VCD/m.json"
+# shellcheck disable=SC1090,SC1091
+vc_out="$(. "$LIB/pipeline-step.sh"
+  mark_vulnerability_check "$VCD/m.json" "$VCD/none" "Trivy is not in this image" ok
+  mark_vulnerability_check "$VCD/m.json" "$VCD/none" "" failed
+  mark_vulnerability_check "$VCD/m.json" "$VCD/none" "" ok)"
+[ "$vc_out" = "$(printf 'Trivy is not in this image\nthe security scan step failed\nthe security scan wrote no report')" ] \
+    && [ "$(jq '[.metadata.properties[] | select(.name == "bomlens:vulnerability-check-failed")] | length' "$VCD/m.json")" = 1 ] \
+    && pass "vulncheck: a given reason, a failed step and a missing report are each stamped, as one property" \
+    || fail "vulncheck: mark_vulnerability_check stamped the wrong reasons" "$vc_out"
+printf '{"Results":[{"Target":"bom","Vulnerabilities":[]}]}' > "$VCD/okrep_security.json"
+cp "$VCD/clean.json" "$VCD/okrep.json"
+# shellcheck disable=SC1090,SC1091
+vc_out="$(. "$LIB/pipeline-step.sh"; mark_vulnerability_check "$VCD/okrep.json" "$VCD/okrep" "" ok)"
+{ [ -z "$vc_out" ] && cmp -s "$VCD/okrep.json" "$VCD/clean.json"; } \
+    && pass "vulncheck: a report that holds a result stamps nothing" \
+    || fail "vulncheck: a successful check was stamped" "$vc_out"
+# A stamp a previous run or a supplier left is removed before the conformance
+# check, and an --analyze input as received is not read for it.
+# shellcheck disable=SC1090,SC1091
+(. "$LIB/pipeline-step.sh"; clear_document_status "$VCD/m.json" bomlens:vulnerability-check-failed)
+bash "$LIB/assess-completeness.sh" "$VCD/m.json" "$VCD/m" >/dev/null 2>&1
+[ "$(jq -r .grade "$VCD/m_completeness.json")" = complete ] \
+    && pass "vulncheck: clear_document_status removes the stamp and the result is complete again" \
+    || fail "vulncheck: the stamp survived clear_document_status" "$(jq -c .reasons "$VCD/m_completeness.json")"
+BOMLENS_SBOM_SUPPLIED=true bash "$LIB/assess-completeness.sh" "$VCD/sec.json" "$VCD/sup" >/dev/null 2>&1
+BOMLENS_SBOM_SUPPLIED=true BOMLENS_VULNERABILITY_CHECK_FAILED="Trivy: x" \
+    bash "$LIB/assess-completeness.sh" "$VCD/clean.json" "$VCD/sup2" >/dev/null 2>&1
+{ ! jq -e '.reasons[] | select(.code == "vulnerability-check-failed")' "$VCD/sup_completeness.json" >/dev/null \
+    && jq -e '.reasons[] | select(.code == "vulnerability-check-failed" and .detail == "Trivy: x")' "$VCD/sup2_completeness.json" >/dev/null; } \
+    && pass "vulncheck: the stamp in a received SBOM is not read; the fact this run passes is" \
+    || fail "vulncheck: the received-input rule is wrong"
+jq -e '.reasons["vulnerability-check-failed"] | .grade == "partial" and (.en | contains("{detail}")) and (.ko | contains("{detail}")) and (.fixEn | contains("TRIVY_DB_REPOSITORY")) and (.fixKo | contains("TRIVY_DB_REPOSITORY"))' \
+    "$LIB/completeness-reasons.json" >/dev/null \
+    && pass "vulncheck: the reason has an English and a Korean sentence and fix" \
+    || fail "vulncheck: the registry entry is incomplete"
+# The entrypoint's order: the stamp is cleared before the conformance check,
+# set after the security scan, and NOTICE and the refreshed conformance check
+# come after it.
+EPF="$ROOT_DIR/docker/entrypoint.sh"
+vc_line() { grep -nF -- "$1" "$EPF" | head -1 | cut -d: -f1; }
+vc_l_clear="$(vc_line 'clear_document_status "$OUTPUT_FILE" bomlens:vulnerability-check-failed')"
+vc_l_conf="$(vc_line 'run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE"')"
+vc_l_sec="$(vc_line 'run_optional_step scan-security ')"
+vc_l_mark="$(vc_line 'mark_vulnerability_check "$OUTPUT_FILE"')"
+vc_l_notice="$(vc_line 'run_optional_step generate-notice ')"
+vc_l_risk="$(vc_line 'run_optional_step generate-risk-report ')"
+vc_l_refresh="$(grep -n '^refresh_conformance$' "$EPF" | head -1 | cut -d: -f1)"
+vc_l_refresh2="$(grep -n '^refresh_conformance$' "$EPF" | tail -1 | cut -d: -f1)"
+if [ -n "$vc_l_clear" ] && [ -n "$vc_l_conf" ] && [ -n "$vc_l_sec" ] && [ -n "$vc_l_mark" ] && [ -n "$vc_l_notice" ] \
+   && [ -n "$vc_l_refresh" ] && [ -n "$vc_l_risk" ] \
+   && [ "$vc_l_clear" -lt "$vc_l_conf" ] && [ "$vc_l_sec" -lt "$vc_l_mark" ] && [ "$vc_l_mark" -lt "$vc_l_notice" ] \
+   && [ "$vc_l_notice" -lt "$vc_l_refresh" ] && [ "$vc_l_refresh" -lt "$vc_l_risk" ] && [ "$vc_l_risk" -lt "$vc_l_refresh2" ]; then
+    pass "vulncheck: entrypoint order is clear, conformance, security, stamp, NOTICE, refreshed conformance, risk report, refresh again"
+else
+    fail "vulncheck: entrypoint order" "clear=$vc_l_clear conf=$vc_l_conf sec=$vc_l_sec mark=$vc_l_mark notice=$vc_l_notice refresh=$vc_l_refresh risk=$vc_l_risk refresh2=$vc_l_refresh2"
+fi
+
 echo "== build-prep: the registry license lookup is turned off when its registry does not answer =="
 # The probe block of build-prep.sh run as it is, against local servers: one
 # that answers, one that accepts connections and never answers, and a closed
