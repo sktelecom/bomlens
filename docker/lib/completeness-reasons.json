@@ -85,7 +85,27 @@
       "en": "A lock file is missing ({detail}), so the versions listed may differ from the ones you build with, or some dependencies may not be listed at all.",
       "ko": "락 파일이 없어({detail}) 나열된 버전이 실제 빌드에 쓰는 버전과 다르거나 일부 의존성이 아예 빠졌을 수 있습니다.",
       "fixEn": "Create the lock file with the package manager (for example npm install, pod install or swift package resolve), keep it in the project folder and scan again.",
-      "fixKo": "패키지 관리 도구로 락 파일을 만들고(예: npm install, pod install, swift package resolve) 프로젝트 폴더에 둔 뒤 다시 스캔하세요."
+      "fixKo": "패키지 관리 도구로 락 파일을 만들고(예: npm install, pod install, swift package resolve) 프로젝트 폴더에 둔 뒤 다시 스캔하세요.",
+      "fixEnCommands": "Create the lock file with the package manager ({commands}), keep it in the project folder and scan again.",
+      "fixKoCommands": "패키지 관리 도구로 락 파일을 만들고({commands}) 프로젝트 폴더에 둔 뒤 다시 스캔하세요.",
+      "lockCommands": {
+        "Podfile.lock": "pod install",
+        "Package.resolved": "swift package resolve",
+        "Gemfile.lock": "bundle lock",
+        "go.sum": "go mod tidy",
+        "Cargo.lock": "cargo generate-lockfile",
+        "composer.lock": "composer update",
+        "package-lock.json": "npm install",
+        "npm": "npm install",
+        "pypi": "uv lock, poetry lock, pip freeze > requirements.txt"
+      }
+    },
+    "manifest-not-read": {
+      "grade": "partial",
+      "en": "The source declares C/C++ dependencies in a manifest this scan does not read ({detail}), so they are not in this SBOM.",
+      "ko": "소스의 C/C++ 의존성이 이번 스캔이 읽지 않는 매니페스트에 선언되어 있어({detail}) 이 SBOM에 없습니다.",
+      "fixEn": "The scanner reads conanfile.txt, conan.lock and CMake find_package names, not vcpkg.json or conanfile.py. List these dependencies with their versions in sbom-declared.cdx.json at the project root (or commit a conan.lock beside conanfile.py) and scan again.",
+      "fixKo": "스캐너는 conanfile.txt, conan.lock, CMake find_package 이름을 읽고 vcpkg.json과 conanfile.py는 읽지 않습니다. 프로젝트 최상위 폴더의 sbom-declared.cdx.json에 이 의존성을 버전과 함께 적거나 conanfile.py 옆에 conan.lock을 둔 뒤 다시 스캔하세요."
     },
     "installed-environment-unsure": {
       "grade": "partial",

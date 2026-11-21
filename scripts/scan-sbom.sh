@@ -3606,7 +3606,8 @@ if [ "$MODE" = "SOURCE" ]; then
             log_warn "  Dependencies that come from the Apple platform (UIKit, Foundation) or from Xcode project settings are not resolved here: this scan runs in a Linux container. They are missing from the result, not zero."
         fi
         if [ "$LANG_DET" = "cpp" ]; then
-            log_warn "C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
+            log_warn "C/C++: dependencies are read from conanfile.txt, conan.lock and the package names in CMake files."
+            log_warn "  vcpkg.json and conanfile.py are not read; list their dependencies in sbom-declared.cdx.json at the project root."
             log_warn "  Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers."
             log_warn "  For open source copied (vendored) into the sources, add --identify-vendored (opt-in image)."
         fi

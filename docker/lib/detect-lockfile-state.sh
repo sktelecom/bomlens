@@ -18,6 +18,19 @@
 #                              lock file beside it ("Podfile: no Podfile.lock")
 #   bomlens:lockfile-corrupt   a lock file that is not readable
 #                              ("Package.resolved cannot be parsed")
+#   bomlens:manifest-not-read  a C/C++ manifest the scan does not read, with the
+#                              dependencies it declares that no component in the
+#                              SBOM names ("vcpkg.json: fmt, curl"). cdxgen reads
+#                              conanfile.txt, conan.lock and the package names of
+#                              CMake files; it reads vcpkg.json and conanfile.py
+#                              only in a C/C++-only run with source analysis,
+#                              which the source scan does not use.
+#
+# The manifest/lock pairs checked: Podfile, Package.swift, Gemfile, go.mod
+# (go.sum), Cargo.toml (Cargo.lock beside it or in a folder above it, for a
+# workspace member) and composer.json (composer.lock). Each counts only when it
+# declares a dependency, so a crate with an empty [dependencies] table or a
+# composer.json that requires only php is not reported.
 #
 # npm and Python manifests without a lock file are already recorded by
 # detect-version-pinning.sh (bomlens:source:versionPinning), which
@@ -50,7 +63,8 @@ rel() { local p="${1#"$SRC"}"; p="${p#/}"; printf '%s' "$p"; }
 find_named() {
     find "$SRC" -maxdepth "$DEPTH" \
         \( -name .git -o -name node_modules -o -name Pods -o -name Carthage -o -name vendor \
-           -o -name build -o -name .build -o -name DerivedData -o -name target \) -prune \
+           -o -name build -o -name .build -o -name DerivedData -o -name target \
+           -o -name vcpkg_installed -o -path '*/vcpkg/ports' \) -prune \
         -o -type f -name "$1" -print 2>/dev/null | sort
 }
 
@@ -84,6 +98,98 @@ EOF
 check_pair Podfile Podfile.lock '^[[:space:]]*pod[[:space:]]+["'"'"']'
 check_pair Package.swift Package.resolved '\.package\('
 check_pair Gemfile Gemfile.lock '^[[:space:]]*gem[[:space:]]+["'"'"']'
+check_pair go.mod go.sum '^[[:space:]]*require([[:space:]]|\()'
+
+# Cargo: the lock file of a workspace member is the one at the workspace root,
+# so a Cargo.lock in any folder above it, up to the scan root, counts.
+cargo_declares() { # <Cargo.toml>: a dependency table with at least one entry
+    awk '
+        /^[[:space:]]*\[/ {
+            s = ($0 ~ /^[[:space:]]*\[(target\.[^]]+\.)?(dev-|build-)?dependencies\][[:space:]]*(#.*)?$/ \
+                 || $0 ~ /^[[:space:]]*\[workspace\.dependencies\][[:space:]]*(#.*)?$/)
+            if ($0 ~ /^[[:space:]]*\[(target\.[^]]+\.)?(dev-|build-)?dependencies\.[^]]+\]/) f = 1
+            next
+        }
+        s && /^[[:space:]]*["A-Za-z0-9_-][^=]*=/ { f = 1 }
+        END { exit !f }' "$1" 2>/dev/null
+}
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    d="$(dirname "$f")"
+    locked=""
+    while :; do
+        if [ -f "$d/Cargo.lock" ]; then locked=1; break; fi
+        [ "$d" != "$SRC" ] && [ "$d" != "/" ] && [ "$d" != "." ] || break
+        d="$(dirname "$d")"
+    done
+    [ -z "$locked" ] || continue
+    cargo_declares "$f" || continue
+    add_missing "$(rel "$f"): no Cargo.lock"
+done <<EOF
+$(find_named Cargo.toml)
+EOF
+
+# Composer: a package requirement has a vendor name ("vendor/package"); php,
+# ext-* and lib-* are platform requirements that need no lock file.
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -f "$(dirname "$f")/composer.lock" ] && continue
+    jq -e '(.require // {}) | type == "object" and any(keys[]; contains("/"))' "$f" >/dev/null 2>&1 || continue
+    add_missing "$(rel "$f"): no composer.lock"
+done <<EOF
+$(find_named composer.json)
+EOF
+
+# C/C++ manifests the scan does not read. A declared name counts as read when a
+# component of the SBOM has it (case aside): CMake's find_package or a component
+# listed in sbom-declared.cdx.json can carry it.
+NOTREAD=""
+add_notread() { NOTREAD="${NOTREAD:+$NOTREAD; }$(clean "$1")"; }
+SBOM_NAMES="$(jq -c '[.components[]? | recurse(.components[]?) | .name | strings | ascii_downcase] | unique' "$SBOM" 2>/dev/null)"
+[ -n "$SBOM_NAMES" ] || SBOM_NAMES='[]'
+unlisted() { # <json array of declared names>: prints those no component names, comma-separated
+    jq -rn --argjson have "$SBOM_NAMES" --argjson want "$1" \
+        '[$want[] | select(. as $n | $have | index($n | ascii_downcase) | not)] | unique | join(", ")' 2>/dev/null
+}
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    # The ports a build uses; a host dependency (a build tool) and vcpkg's own
+    # helper ports (vcpkg-cmake, vcpkg-cmake-config) are not part of the product.
+    if ! names="$(jq -c '[(.dependencies // [])[]
+            | if type == "string" then . elif type == "object" and (.host != true) then .name else empty end
+            | strings | select(length > 0 and (startswith("vcpkg-") | not))]' "$f" 2>/dev/null)"; then
+        add_notread "$(rel "$f"): cannot be parsed"
+        continue
+    fi
+    miss="$(unlisted "$names")"
+    [ -z "$miss" ] || add_notread "$(rel "$f"): $miss"
+done <<EOF
+$(find_named vcpkg.json)
+EOF
+# conanfile.py: a conan.lock beside it is read instead. The references are the
+# quoted "name/version" strings of its requires (not tool_requires,
+# build_requires, test_requires or python_requires, which are build tools).
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -f "$(dirname "$f")/conan.lock" ] && continue
+    names="$(awk '
+        /(tool|build|test|python)_requires/ { inreq = 0; next }
+        /(^|[^A-Za-z0-9_])requires[[:space:]]*(=|\()/ { inreq = 1 }
+        inreq {
+            line = $0
+            while (match(line, /["'"'"'][A-Za-z0-9_.+-]+\/[^"'"'"'@]+(@[^"'"'"']*)?["'"'"']/)) {
+                ref = substr(line, RSTART + 1, RLENGTH - 2); sub(/\/.*/, "", ref)
+                printf "%s\n", ref
+                line = substr(line, RSTART + RLENGTH)
+            }
+            if ($0 ~ /[)\]][[:space:]]*(#.*)?$/ || $0 !~ /[(\[,][[:space:]]*(#.*)?$/) inreq = 0
+        }' "$f" 2>/dev/null | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    [ -n "$names" ] || continue
+    miss="$(unlisted "$names")"
+    [ -z "$miss" ] || add_notread "$(rel "$f"): $miss"
+done <<EOF
+$(find_named conanfile.py)
+EOF
 
 # A lock file that is there and cannot be read.
 while IFS= read -r f; do
@@ -112,21 +218,24 @@ $(find_named Podfile.lock)
 EOF
 
 # Nothing found and nothing of an earlier run to remove: leave the file alone.
-if [ -z "$MISSING" ] && [ -z "$CORRUPT" ] \
-   && ! jq -e 'any(.metadata.properties[]?; .name == "bomlens:lockfile-missing" or .name == "bomlens:lockfile-corrupt")' "$SBOM" >/dev/null 2>&1; then
+OWN_PROPS='["bomlens:lockfile-missing", "bomlens:lockfile-corrupt", "bomlens:manifest-not-read"]'
+if [ -z "$MISSING" ] && [ -z "$CORRUPT" ] && [ -z "$NOTREAD" ] \
+   && ! jq -e --argjson own "$OWN_PROPS" 'any(.metadata.properties[]?; .name as $n | $own | index($n))' "$SBOM" >/dev/null 2>&1; then
     exit 0
 fi
 TMP="${SBOM}.lockstate.tmp"
-if jq --arg miss "$MISSING" --arg bad "$CORRUPT" '
+if jq --arg miss "$MISSING" --arg bad "$CORRUPT" --arg unread "$NOTREAD" --argjson own "$OWN_PROPS" '
       ((.metadata.properties // [])
-        | map(select(.name != "bomlens:lockfile-missing" and .name != "bomlens:lockfile-corrupt"))) as $keep
+        | map(select(.name as $n | $own | index($n) | not))) as $keep
       | .metadata.properties = ($keep
           + (if $miss != "" then [{name: "bomlens:lockfile-missing", value: $miss}] else [] end)
-          + (if $bad != "" then [{name: "bomlens:lockfile-corrupt", value: $bad}] else [] end))
+          + (if $bad != "" then [{name: "bomlens:lockfile-corrupt", value: $bad}] else [] end)
+          + (if $unread != "" then [{name: "bomlens:manifest-not-read", value: $unread}] else [] end))
     ' "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"
     [ -z "$MISSING" ] || echo "[lockfile] lock file missing: $MISSING"
     [ -z "$CORRUPT" ] || echo "[lockfile] lock file not readable: $CORRUPT"
+    [ -z "$NOTREAD" ] || echo "[lockfile] dependencies declared in a manifest the scan does not read are not in the SBOM: $NOTREAD. Fix: list them in sbom-declared.cdx.json at the project root and scan again."
 else
     rm -f "$TMP"
     echo "[lockfile] could not record the lock file state" >&2

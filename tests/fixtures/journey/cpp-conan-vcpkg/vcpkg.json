@@ -1,0 +1,9 @@
+{
+  "name": "journey",
+  "version": "1.0.0",
+  "dependencies": [
+    "fmt",
+    { "name": "curl", "features": ["ssl"] },
+    { "name": "vcpkg-cmake", "host": true }
+  ]
+}
