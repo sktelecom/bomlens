@@ -50,3 +50,17 @@ export function ancestorDirs(path: string | null): Set<string> {
   for (let i = 1; i < parts.length; i++) out.add(parts.slice(0, i).join("/"));
   return out;
 }
+
+/**
+ * A file row's accessible name: the name and the licence labels as the row
+ * shows them (two, then "+N"), so it holds the visible words in order. The
+ * folded licences follow in parentheses for a screen reader.
+ */
+export function fileRowName(n: Pick<FileNode, "name" | "licenses">): string {
+  const { name, licenses } = n;
+  if (licenses.length === 0) return name;
+  const shown = licenses.slice(0, 2);
+  const rest = licenses.slice(2);
+  const labels = rest.length ? [...shown, `+${rest.length}`] : shown;
+  return `${[name, ...labels].join(", ")}${rest.length ? ` (${rest.join(", ")})` : ""}`;
+}

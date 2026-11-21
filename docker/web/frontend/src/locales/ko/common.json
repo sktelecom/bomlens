@@ -447,7 +447,6 @@
     "vulnLayout": "배치",
     "vulnLayoutList": "목록",
     "vulnLayoutPackage": "패키지별",
-    "pkgGroupToggle": "{{pkg}}의 CVE 펼치기 또는 접기",
     "pkgGroupCount_one": "CVE {{n}}건",
     "pkgGroupCount_other": "CVE {{n}}건",
     "pkgGroupUpgrade": "{{fixed}} 버전으로 올리면 {{count}}건 해소",

@@ -218,15 +218,22 @@ export function Sidebar({
                     <SectionIcon />
                   </NavList.LeadingVisual>
                   <span data-nav-label={s.id}>{t(s.labelKey)}</span>
+                  {/* The name is the label and the count, joined with a space;
+                      the visible text keeps that space too (it collapses at the
+                      line end), so the two read as separate words, not "Licenses12". */}
+                  {count !== undefined && " "}
                   {count !== undefined && (
                     <NavList.TrailingVisual>
                       <span className="bl-count" title={note} data-testid={`nav-count-${s.id}`}>
                         {typeof count === "number" ? (
                           fmt(count)
                         ) : said(s.id, count) ? (
+                          // The pair stays in the name as shown ("6/65"), so the
+                          // name holds the visible text; the spelled-out meaning
+                          // follows it for a screen reader.
                           <>
-                            <span aria-hidden>{count}</span>
-                            <span className="bl-visually-hidden">{said(s.id, count)}</span>
+                            {count}
+                            <span className="bl-visually-hidden">, {said(s.id, count)}</span>
                           </>
                         ) : (
                           count

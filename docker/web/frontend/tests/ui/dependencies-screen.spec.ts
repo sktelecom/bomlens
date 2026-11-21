@@ -128,7 +128,10 @@ async function openScreen(page: Page, hashQuery = "", opts: Options = {}) {
 }
 
 const tree = (page: Page) => page.getByRole("tree");
-const treeItem = (page: Page, name: string) => page.getByRole("treeitem", { name, exact: true });
+/** A row's name starts with the package and version; the severity and licence
+ *  labels it shows follow, so the name holds the visible words. */
+const rowName = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`);
+const treeItem = (page: Page, name: string) => page.getByRole("treeitem", { name: rowName(name) });
 const canvas = (page: Page) => page.locator("[data-zoom]");
 const zoomOf = async (page: Page) => Number(await canvas(page).getAttribute("data-zoom"));
 
@@ -200,6 +203,7 @@ test("Tree shows direct dependencies open, the vulnerable, cycle and licence mar
   const openssl = treeItem(page, "openssl 3.0.0");
   await expect(openssl).toHaveAttribute("aria-level", "1");
   await expect(openssl).toHaveAttribute("aria-expanded", "true");
+  await expect(openssl).toHaveAccessibleName("openssl 3.0.0 Critical Apache-2.0");
   // A top-level row has no visible "Direct" label; the word is in its description
   // together with severity and licences, and the box head counts them.
   await expect(openssl).toHaveAccessibleDescription(/Direct.*Critical.*Apache-2\.0/);
@@ -218,6 +222,7 @@ test("Tree shows direct dependencies open, the vulnerable, cycle and licence mar
   await expect(multi.getByText("MIT", { exact: true })).toBeVisible();
   await expect(multi.getByText("ISC", { exact: true })).toBeVisible();
   await expect(multi.getByText("+2", { exact: true })).toHaveAttribute("title", "BSD-3-Clause, Zlib");
+  await expect(multi).toHaveAccessibleName("multi-license 2.0 MIT ISC +2");
 
   // A cycle is marked and has no expander. Its first visit is open under
   // libloop-a; open libloop-b to reach the repeat.
@@ -226,7 +231,7 @@ test("Tree shows direct dependencies open, the vulnerable, cycle and licence mar
   const loopB = treeItem(page, "libloop-b 1.0");
   await loopB.focus();
   await page.keyboard.press("ArrowRight");
-  const repeat = loopB.getByRole("treeitem", { name: "libloop-a 1.0", exact: true });
+  const repeat = loopB.getByRole("treeitem", { name: rowName("libloop-a 1.0") });
   await expect(repeat).toHaveCount(1);
   await expect(repeat).toContainText("cycle");
   await expect(repeat).not.toHaveAttribute("aria-expanded", /.*/);
@@ -337,7 +342,7 @@ test("an SBOM without relationships says so in the graph and lists flat in the t
   await page.getByTestId("deps-view-tree").click();
   await expect(page.getByTestId("deps-flat-note")).toHaveText("This SBOM has no dependency graph; showing a flat component list.");
   await expect(page.getByRole("treeitem")).toHaveCount(5);
-  await expect(page.getByRole("treeitem", { name: "openssl 3.0.0" })).toHaveAttribute("aria-level", "1");
+  await expect(treeItem(page, "openssl 3.0.0")).toHaveAttribute("aria-level", "1");
 });
 
 test("an SBOM with no packages says so in the tree", async ({ page }) => {

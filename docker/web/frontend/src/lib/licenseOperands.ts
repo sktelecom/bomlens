@@ -26,3 +26,14 @@ export function licenseOperands(licenses: string[]): string[] {
   }
   return out;
 }
+
+/**
+ * What a row's licence labels show: the first two operands and a "+N" for the
+ * rest, or every operand with `all`. A row's accessible name repeats these
+ * words, so it holds the text on screen.
+ */
+export function shownLicenseLabels(licenses: string[], all = false): string[] {
+  const operands = licenseOperands(licenses);
+  if (all || operands.length <= 2) return operands;
+  return [...operands.slice(0, 2), `+${operands.length - 2}`];
+}

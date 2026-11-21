@@ -472,11 +472,14 @@ test("the severity cells link to that severity and a cell with no findings is di
   const bar = panel.getByRole("img");
   await expect(bar).toHaveAttribute("aria-label", /Critical 1, High 1, Medium 0, Low 0, Unknown 0/);
   await expect(bar.getByRole("link")).toHaveCount(0);
-  const high = panel.getByRole("link", { name: "High 1" });
+  const high = panel.getByRole("link", { name: "1 High" });
   await expect(high).toHaveAttribute("href", /#\/scan\/demo_1\.0\/vulnerabilities\?severity=HIGH$/);
   // Shape marker plus the word: colour is never the only signal.
   await expect(high.locator("svg[data-marker]")).toHaveCount(1);
-  await expect(panel.getByRole("link", { name: "Medium 0" })).toHaveCount(0);
+  // A grade with no findings is a disabled link, not one that opens anything.
+  const medium = panel.getByRole("link", { name: "0 Medium" });
+  await expect(medium).toHaveAttribute("aria-disabled", "true");
+  await expect(medium).not.toHaveAttribute("href", /.*/);
   const none = panel.locator('[role="link"][aria-disabled="true"]');
   await expect(none).toHaveCount(3);
   await expect(none.first()).toContainText("Medium");
