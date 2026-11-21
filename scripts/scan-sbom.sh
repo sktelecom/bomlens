@@ -2023,6 +2023,9 @@ pp_env() {
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
         "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY" "$REACHABILITY_NONCE"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
+    # CocoaPods pods get their licence from the trunk podspecs in post-processing
+    # (identify-cocoapods.sh), under the same switch as the language scan's lookup.
+    printf ' -e FETCH_LICENSE=%s -e COCOAPODS_CDN_URL -e COCOAPODS_LICENSE_BUDGET' "${FETCH_LICENSE:-true}"
     printf ' -e ANALYZE_CPE_INDEX=%s' "${ANALYZE_CPE_INDEX:-false}"
     printf ' -e MODEL_RESOLVE=%s -e MODEL_RESOLVE_MAX -e MODEL_RESOLVE_BUDGET' "${MODEL_RESOLVE:-false}"
     # The hub lookup reads private and gated models with the token, and a mirror
