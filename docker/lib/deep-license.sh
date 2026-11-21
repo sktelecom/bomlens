@@ -41,6 +41,8 @@ set -u
 
 SRC="${1:?source dir}"
 OUT="${2:?output json}"
+# shellcheck source=docker/lib/owner-handback.sh
+. "$(dirname "$0")/owner-handback.sh"
 SCANCODE="${BOMLENS_SCANCODE:-scancode}"
 MAX_FILES="${DEEP_LICENSE_MAX_FILES:-20000}"
 TIMEOUT_S="${DEEP_LICENSE_TIMEOUT:-600}"
@@ -142,7 +144,7 @@ fi
 chmod 644 "$tmp" 2>/dev/null
 mv "$tmp" "$OUT" || exit 1
 tmp=""
-if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+if owner_handback_wanted; then
     chown "${HOST_UID}:${HOST_GID}" "$OUT" 2>/dev/null || true
 fi
 if [ "$rc" -eq 1 ]; then

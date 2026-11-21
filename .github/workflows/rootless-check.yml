@@ -1,0 +1,258 @@
+name: Rootless ownership check
+
+# Runs a source scan under rootless Docker and under the regular (rootful)
+# daemon, then lists every file in the output folder and in the scanned
+# source copy that the runner user does not own, and tries to delete the
+# output and the scanned folder as that user. The job fails unless the verdict
+# is NOT REPRODUCED. The scan runs this branch's CLI and container scripts.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - .github/workflows/rootless-check.yml
+      - docker/lib/owner-handback.sh
+      - docker/lib/build-prep.sh
+      - docker/entrypoint.sh
+      - docker/lib/make-plan.sh
+      - docker/lib/deep-license.sh
+      - docker/lib/engine-result.sh
+      - scripts/scan-sbom.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rootless-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ownership:
+    name: Ownership (${{ matrix.daemon }}${{ matrix.cli_check == 'off' && ', container guard only' || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        daemon: [ rootless, rootful ]
+        cli_check: [ 'on' ]
+        include:
+          # The CLI's own rootless check bypassed (HANDBACK_UID/HANDBACK_GID
+          # preset to the runner's ids, as a CLI without that check sends), so
+          # only the containers' guard stands between the files and a
+          # subordinate uid.
+          - daemon: rootless
+            cli_check: 'off'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Switch to rootless Docker
+        if: matrix.daemon == 'rootless'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq uidmap dbus-user-session slirp4netns
+          # The runner's Docker does not come from Docker's apt repository, so
+          # take the rootless helpers (dockerd-rootless.sh, rootlesskit) from the
+          # static bundle that matches the installed dockerd.
+          ver="$(dockerd --version | sed -E 's/^Docker version ([0-9.]+).*/\1/')"
+          echo "dockerd version: $ver"
+          extras="$RUNNER_TEMP/rootless-extras"
+          mkdir -p "$extras"
+          curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-rootless-extras-${ver}.tgz" \
+            | tar -xz -C "$extras" --strip-components=1
+          # The setup tool checks the daemon with a docker CLI next to itself.
+          ln -sf "$(command -v docker)" "$extras/docker"
+          ls -l "$extras"
+          export PATH="$extras:$PATH"
+          echo "$extras" >> "$GITHUB_PATH"
+          command -v dockerd-rootless.sh rootlesskit
+          # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor,
+          # which rootlesskit needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          me="$(id -un)"
+          grep -q "^${me}:" /etc/subuid || echo "${me}:100000:65536" | sudo tee -a /etc/subuid
+          grep -q "^${me}:" /etc/subgid || echo "${me}:100000:65536" | sudo tee -a /etc/subgid
+          echo "subuid: $(grep "^${me}:" /etc/subuid)"
+          echo "subgid: $(grep "^${me}:" /etc/subgid)"
+          sudo systemctl disable --now docker.service docker.socket
+          sudo rm -f /var/run/docker.sock
+          # Run the daemon as a systemd user service, the documented setup: the
+          # user manager gives rootless containers a delegated cgroup, which the
+          # systemd cgroup driver needs to start them.
+          uid="$(id -u)"
+          sudo loginctl enable-linger "$me"
+          xdg="/run/user/$uid"
+          for _ in $(seq 1 30); do
+            [ -S "$xdg/bus" ] && break
+            sleep 1
+          done
+          ls -la "$xdg"
+          export XDG_RUNTIME_DIR="$xdg"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$xdg/bus"
+          {
+            echo "XDG_RUNTIME_DIR=$xdg"
+            echo "DBUS_SESSION_BUS_ADDRESS=unix:path=$xdg/bus"
+            echo "DOCKER_HOST=unix://$xdg/docker.sock"
+          } >> "$GITHUB_ENV"
+          dockerd-rootless-setuptool.sh install
+          for _ in $(seq 1 60); do
+            if DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          if ! DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
+            echo "rootless daemon did not come up"
+            journalctl --user -u docker.service --no-pager | tail -50 || true
+            exit 1
+          fi
+
+      - name: Show daemon mode
+        id: daemon
+        run: |
+          set -euo pipefail
+          opts="$(docker info --format '{{json .SecurityOptions}}')"
+          echo "SecurityOptions: $opts"
+          docker info --format 'Root dir: {{.DockerRootDir}}  Storage: {{.Driver}}'
+          if printf '%s' "$opts" | grep -q 'name=rootless'; then
+            echo "mode=rootless" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=rootful" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ matrix.daemon }}" = rootless ] && ! printf '%s' "$opts" | grep -q 'name=rootless'; then
+            echo "expected a rootless daemon"
+            exit 1
+          fi
+
+      # The published image with this branch's entrypoint.sh and docker/lib on
+      # top (the paths docker/Dockerfile copies them to), so the scan runs the
+      # container code under test. build-prep.sh is mounted from the checkout.
+      - name: Build overlay image
+        run: |
+          set -euo pipefail
+          ctx="$RUNNER_TEMP/overlay"
+          rm -rf "$ctx"
+          mkdir -p "$ctx"
+          cp docker/entrypoint.sh "$ctx/entrypoint.sh"
+          cp -R docker/lib "$ctx/lib"
+          cat > "$ctx/Dockerfile" <<'EOF'
+          FROM ghcr.io/sktelecom/bomlens:latest
+          COPY entrypoint.sh /usr/local/bin/run-scan
+          COPY lib/ /usr/local/lib/sbom/
+          RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh
+          EOF
+          docker build -q -t bomlens-overlay:check "$ctx"
+
+      - name: Scan examples/nodejs
+        run: |
+          set -uo pipefail
+          src="$RUNNER_TEMP/src"
+          out="$RUNNER_TEMP/out"
+          rm -rf "$src" "$out"
+          cp -R examples/nodejs "$src"
+          # Nested folders, so a hand-back to the wrong owner also blocks
+          # deleting what is inside them.
+          mkdir -p "$src/lib/util"
+          printf 'module.exports = {};\n' > "$src/lib/util/helpers.js"
+          mkdir -p "$out"
+          echo "SRC_DIR=$src" >> "$GITHUB_ENV"
+          echo "OUT_DIR=$out" >> "$GITHUB_ENV"
+          rc=0
+          if [ "${{ matrix.cli_check }}" = off ]; then
+            export HANDBACK_UID HANDBACK_GID
+            HANDBACK_UID="$(id -u)"
+            HANDBACK_GID="$(id -g)"
+          fi
+          SBOM_SCANNER_IMAGE=bomlens-overlay:check \
+            bash scripts/scan-sbom.sh --project rootless --version 1.0 \
+              --target "$src" --generate-only --output-dir "$out" || rc=$?
+          echo "scan exit code: $rc"
+          # A failed stage keeps its log in /tmp; show it.
+          for f in /tmp/tmp.*; do
+            [ -f "$f" ] || continue
+            echo "::group::kept log $f"
+            tail -120 "$f"
+            echo "::endgroup::"
+          done
+          echo "SCAN_RC=$rc" >> "$GITHUB_ENV"
+
+      - name: Check ownership and deletion
+        run: |
+          set -uo pipefail
+          uid="$(id -u)"
+          gid="$(id -g)"
+          echo "runner user: $(id)"
+          report="$RUNNER_TEMP/foreign.txt"
+          : > "$report"
+          for d in "$OUT_DIR" "$SRC_DIR"; do
+            echo "::group::files in $d"
+            find "$d" -printf '%u:%g %m %p\n' | head -200
+            echo "::endgroup::"
+            find "$d" \( ! -user "$uid" -o ! -group "$gid" \) -printf '%u:%g %p\n' >> "$report"
+          done
+          foreign="$(wc -l < "$report" | tr -d ' ')"
+          echo "files not owned by ${uid}:${gid}: $foreign"
+          head -100 "$report"
+          rm_rc=0
+          rm -rf "$OUT_DIR" 2> "$RUNNER_TEMP/rm.err" || rm_rc=$?
+          rm_err="$(head -5 "$RUNNER_TEMP/rm.err")"
+          left=0
+          [ -e "$OUT_DIR" ] && left="$(find "$OUT_DIR" | wc -l | tr -d ' ')"
+          echo "rm -rf output: exit $rm_rc, entries left: $left"
+          [ -n "$rm_err" ] && echo "$rm_err"
+          # The scanned folder is the user's own project: can they still add a
+          # file to it and delete it?
+          src_write=ok
+          touch "$SRC_DIR/.bomlens-write-probe" 2>/dev/null || src_write=failed
+          src_rm_rc=0
+          rm -rf "$SRC_DIR" 2> "$RUNNER_TEMP/rm-src.err" || src_rm_rc=$?
+          src_left=0
+          [ -e "$SRC_DIR" ] && src_left="$(find "$SRC_DIR" | wc -l | tr -d ' ')"
+          echo "write a file into the scanned folder: $src_write"
+          echo "rm -rf scanned folder: exit $src_rm_rc, entries left: $src_left"
+          head -5 "$RUNNER_TEMP/rm-src.err"
+          if [ "$foreign" -gt 0 ] || [ "$rm_rc" -ne 0 ] || [ "$src_rm_rc" -ne 0 ] || [ "$src_write" != ok ]; then
+            verdict=REPRODUCED
+          elif [ "$SCAN_RC" -ne 0 ]; then
+            verdict="INCONCLUSIVE (scan failed)"
+          else
+            verdict="NOT REPRODUCED"
+          fi
+          {
+            echo "## Ownership check: ${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }} (${{ steps.daemon.outputs.mode }})"
+            echo
+            echo "- Verdict: **$verdict**"
+            echo "- Scan exit code: $SCAN_RC"
+            echo "- Runner user: $(id -un) ($uid:$gid)"
+            echo "- Files in output and source copy not owned by the runner user: $foreign"
+            echo "- \`rm -rf\` of the output folder: exit $rm_rc, entries left: $left"
+            echo "- Writing a file into the scanned folder: $src_write"
+            echo "- \`rm -rf\` of the scanned folder: exit $src_rm_rc, entries left: $src_left"
+            if [ -n "$rm_err" ]; then
+              echo
+              echo '```'
+              echo "$rm_err"
+              echo '```'
+            fi
+            if [ "$foreign" -gt 0 ]; then
+              echo
+              echo '```'
+              head -50 "$report"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "VERDICT (${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }}): $verdict"
+          if [ "$verdict" != "NOT REPRODUCED" ]; then
+            echo "::error::Ownership check ${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }}: $verdict"
+            exit 1
+          fi
+
+      - name: Show rootless daemon log
+        if: always() && matrix.daemon == 'rootless'
+        run: journalctl --user -u docker.service --no-pager | tail -50 || true

@@ -2063,7 +2063,7 @@ sync_artifacts() {
                 echo "[WARN] copy failed for $art (available in container at: $art)" >&2
                 continue
             fi
-            if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+            if owner_handback_wanted; then
                 chown "${HOST_UID}:${HOST_GID}" "$dest" 2>/dev/null || true
             fi
         done
@@ -3050,6 +3050,7 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; 
     [ -f "${OUT_PREFIX}_security_trivy.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security_trivy.json")
     [ -f "${OUT_PREFIX}_security.md" ] && ARTIFACTS+=("${OUT_PREFIX}_security.md")
     [ -f "${OUT_PREFIX}_security.html" ] && ARTIFACTS+=("${OUT_PREFIX}_security.html")
+    [ -f "${OUT_PREFIX}_security_epss.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security_epss.json")
     sync_artifacts
 fi
 # A security scan that was asked for and gave no result (Trivy failed, its

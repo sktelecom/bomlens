@@ -34,6 +34,8 @@ LIBDIR="$(cd "$(dirname "$0")" && pwd)"
 . "$LIBDIR/cdx-version.sh"
 # shellcheck source=docker/lib/input-fingerprint.sh
 . "$LIBDIR/input-fingerprint.sh"
+# shellcheck source=docker/lib/owner-handback.sh
+. "$LIBDIR/owner-handback.sh"
 
 # The plan follows the same engine contract as the result manifest: one
 # version, kept in engine-result.sh (ENGINE_CONTRACT_VERSION).
@@ -202,7 +204,7 @@ jq -n \
       ] end)
     }' > "$OUTDIR/bomlens-plan.json"
 
-if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+if owner_handback_wanted; then
     chown -R "$HOST_UID:$HOST_GID" "$OUTDIR/bomlens-plan" "$OUTDIR/bomlens-plan.json" 2>/dev/null || true
 fi
 echo "[plan] $status: $lang${image:+ -> $image@$digest}${detail:+ ($detail)}"

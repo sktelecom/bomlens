@@ -7491,6 +7491,40 @@ fi
     && pass "the probe file is removed" || fail "probe file left behind"
 chmod 755 "$_co_t/ro"
 
+echo "== owner hand-back: a rootless (uid-remapped) container skips the chown =="
+_oh_t="$WORK/oh"; rm -rf "$_oh_t"; mkdir -p "$_oh_t"
+printf '         0          0 4294967295\n' > "$_oh_t/identity"
+printf '         0       1001          1\n         1     165536      65536\n' > "$_oh_t/rootless"
+_oh_want() { # UID_MAP HOST_UID -> prints the rc of owner_handback_wanted, then its stderr
+    BOMLENS_UID_MAP="$1" HOST_UID="$2" HOST_GID="$2" sh -c '. "$1"; owner_handback_wanted; echo $?' _ "$LIB/owner-handback.sh" 2>&1
+}
+[ "$(_oh_want "$_oh_t/identity" 1001)" = 0 ] \
+    && pass "an identity uid map hands files back to HOST_UID" || fail "identity uid map skipped the hand-back"
+_oh_out="$(_oh_want "$_oh_t/rootless" 1001)"
+{ [ "$(printf '%s\n' "$_oh_out" | tail -1)" = 1 ] && printf '%s' "$_oh_out" | grep -q "runs in a user namespace"; } \
+    && pass "a remapped uid 0 skips the hand-back and says why" || fail "remapped uid map" "$_oh_out"
+[ "$(_oh_want "$_oh_t/none" 1001)" = 0 ] \
+    && pass "an unreadable uid map keeps the hand-back" || fail "unreadable uid map skipped the hand-back"
+[ "$(_oh_want "$_oh_t/identity" "")" = 1 ] \
+    && pass "no HOST_UID: no hand-back" || fail "empty HOST_UID was handed back"
+[ "$(_oh_want "$_oh_t/identity" "1x")" = 1 ] \
+    && pass "a HOST_UID that is not a number: no hand-back" || fail "non-numeric HOST_UID was handed back"
+# build-prep.sh runs alone in a language image with its own copy of the check.
+_oh_fn() { sed -n '/^userns_remapped() {/,/^}/p' "$1"; }
+[ -n "$(_oh_fn "$PREP")" ] && [ "$(_oh_fn "$PREP")" = "$(_oh_fn "$LIB/owner-handback.sh")" ] \
+    && pass "build-prep.sh carries the same userns_remapped as owner-handback.sh" \
+    || fail "userns_remapped differs" "$(diff <(_oh_fn "$PREP") <(_oh_fn "$LIB/owner-handback.sh"))"
+[ "$(BOMLENS_UID_MAP="$_oh_t/rootless" sh -c "$_co_fn"'
+userns_remapped; echo $?')" = 0 ] \
+    && pass "build-prep.sh's copy reads a remapped uid map" || fail "build-prep.sh userns_remapped"
+grep -q 'HOST_GID:-}" \] && userns_remapped; then' "$PREP" \
+    && pass "build-prep.sh skips the project and cache hand-back under a remapped uid map" \
+    || fail "build-prep.sh hand-back is not guarded"
+# Every other chown to HOST_UID goes through owner_handback_wanted.
+_oh_raw="$(grep -n 'HOST_UID:-}" =~' "$ROOT_DIR/docker/entrypoint.sh" "$LIB/engine-result.sh" "$LIB/make-plan.sh" "$LIB/deep-license.sh")"
+[ -z "$_oh_raw" ] && pass "entrypoint, engine-result, make-plan and deep-license chown through owner_handback_wanted" \
+    || fail "a chown to HOST_UID skips owner_handback_wanted" "$_oh_raw"
+
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
 # team found the old `{ grep -x releaseRuntimeClasspath || cat; }` idiom dropped
@@ -11239,14 +11273,15 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
 # same kind: the launcher sets them with a value only when it hands stage 1 a
 # govulncheck binary. BOMLENS_GUARD_STATE_ROOT only points the tests at a
-# folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
+# folder other than /bomlens-state, and BOMLENS_UID_MAP at a uid map file.
+# BOMLENS_EXTRA_CA_CERTS: the launcher
 # mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
 # BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
 # BOMLENS_PYTHON_VENV_READER, BOMLENS_CONDA_READER: the web UI path copies
 # the venv reader and identify-conda.py next to the prep file and sets their
 # paths itself.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER|CONDA_READER)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|UID_MAP|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER|CONDA_READER)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \

@@ -66,6 +66,19 @@ case "${1:-}" in
   info)
     # DOCKER_STUB_NO_ENGINE=1 models a Docker CLI whose engine is not running.
     [ "${DOCKER_STUB_NO_ENGINE:-0}" != "1" ] || exit 1
+    # DOCKER_STUB_ROOTLESS=1 models a rootless engine in `docker info
+    # --format '{{json .SecurityOptions}}'`. DOCKER_STUB_PODMAN_ROOTLESS=1
+    # models rootless Podman's CLI: that template fails, and
+    # `{{.Host.Security.Rootless}}` prints true.
+    case "$*" in
+      *SecurityOptions*)
+        [ "${DOCKER_STUB_PODMAN_ROOTLESS:-0}" != "1" ] || exit 125
+        [ "${DOCKER_STUB_ROOTLESS:-0}" != "1" ] || echo '["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]'
+        exit 0 ;;
+      *Host.Security.Rootless*)
+        [ "${DOCKER_STUB_PODMAN_ROOTLESS:-0}" != "1" ] && exit 125
+        echo true; exit 0 ;;
+    esac
     # `docker info --format '{{.MemTotal}}'`: the engine's memory in bytes.
     # DOCKER_STUB_MEMTOTAL models it; unset prints nothing, as an engine whose
     # value cannot be read would.
@@ -1730,6 +1743,30 @@ _dl_name1="$(dl_line | sed -n 's/.*--name \(bomlens-deep-license-[0-9]*-[0-9]*\)
     && pp_line | grep -qE -- '-e BOMLENS_DEEP_LICENSE_ENDED=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z'; } \
   && pass "the licence scan runs with --init, a run-specific name, the scan label and HOST_UID, and its end time is handed on" \
   || { fail "licence scan container options" "$(dl_line)"; show; }
+# A rootless engine: the containers' root is this user already, so every
+# stage gets 0:0 and no file is handed to a subordinate uid.
+if [ "$(id -u)" != 0 ]; then
+  DOCKER_STUB_ROOTLESS=1 optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+  { dl_line | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 " && pp_line | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 " \
+      && grep -F -- "build-prep.sh" "$LOG" | grep -F -- "docker run" | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 "; } \
+    && pass "under a rootless engine every stage gets HOST_UID=0 HOST_GID=0" \
+    || { fail "rootless engine HOST_UID" "$(grep -F -- 'HOST_UID' "$LOG" | sed 's/.*\(-e HOST_UID=[^ ]* -e HOST_GID=[^ ]*\).*/\1/' | tr '\n' ' ')"; show; }
+  DOCKER_STUB_PODMAN_ROOTLESS=1 optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+  { [ "$RC" = 0 ] && dl_line | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 " && pp_line | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 " \
+      && grep -F -- "build-prep.sh" "$LOG" | grep -F -- "docker run" | grep -qF -- "-e HOST_UID=0 -e HOST_GID=0 "; } \
+    && pass "under rootless Podman (no SecurityOptions field) every stage gets HOST_UID=0 HOST_GID=0" \
+    || { fail "rootless Podman HOST_UID" "rc=$RC $(grep -F -- 'HOST_UID' "$LOG" | sed 's/.*\(-e HOST_UID=[^ ]* -e HOST_GID=[^ ]*\).*/\1/' | tr '\n' ' ')"; show; }
+  HANDBACK_UID='1;x' HANDBACK_GID=1 optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+  { pp_line | grep -qF -- "-e HOST_UID=$(id -u) -e HOST_GID=$(id -g) " && ! grep -qF -- '1;x' "$LOG"; } \
+    && pass "a HANDBACK_UID override that is not digits is ignored" \
+    || { fail "non-digit HANDBACK_UID override" "$(pp_line)"; show; }
+  # Every docker info call made for this run: one on Docker (engine check and
+  # rootless answer together).
+  scan_in "$d" --project SC --version 1 --target . --generate-only
+  [ "$(grep -c '^docker info' "$LOG")" = 1 ] \
+    && pass "Docker is asked once (docker info) for the engine check and the rootless answer" \
+    || { fail "docker info calls" "$(grep '^docker info' "$LOG" | tr '\n' '|')"; show; }
+fi
 optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
 _dl_name2="$(dl_line | sed -n 's/.*--name \(bomlens-deep-license-[0-9]*-[0-9]*\) .*/\1/p')"
 [ -n "$_dl_name2" ] && [ "$_dl_name1" != "$_dl_name2" ] \

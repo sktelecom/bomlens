@@ -18,6 +18,9 @@
 # disabled (a setting turned it off). A step that does not apply to the mode at
 # all (CPE enrichment of an AI model) is not recorded.
 
+# owner_handback_wanted (er_finish's chown), for entrypoint.sh too.
+# shellcheck source=docker/lib/owner-handback.sh
+. "$(dirname "${BASH_SOURCE[0]}")/owner-handback.sh"
 ENGINE_CONTRACT_VERSION="1.4.0"
 ENGINE_RESULT_NAME="bomlens-result.json"
 
@@ -445,7 +448,7 @@ er_finish() {
         fi
     fi
     mv "$tmp" "$outdir/$ENGINE_RESULT_NAME" || rm -f "$tmp"
-    if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+    if owner_handback_wanted; then
         chown "${HOST_UID}:${HOST_GID}" "$outdir/$ENGINE_RESULT_NAME" ${ER_EVENTS_FILE:+"$ER_EVENTS_FILE"} 2>/dev/null || true
     fi
     rm -f "$ER_STEPS"
