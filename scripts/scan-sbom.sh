@@ -1400,7 +1400,7 @@ if [ "$UI_MODE" = "true" ]; then
     MOUNT_FLAGS=(); SCAN_ROOTS=""; SEEN_NAMES=" "
     for m in "${UI_MOUNTS[@]}"; do
         [ -d "$m" ] || { log_error "--mount path is not a directory: $m"; exit 1; }
-        abs="$(cd "$m" && pwd)"
+        abs="$(cd "$m" && pwd -P)"
         name="$(printf '%s' "$(basename "$abs")" | tr -c 'A-Za-z0-9._-' '-')"
         case "$name" in ''|-|.|..) name="root" ;; esac
         n=2; uniq="$name"
