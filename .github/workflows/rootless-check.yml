@@ -161,7 +161,20 @@ jobs:
           rm_err="$(head -5 "$RUNNER_TEMP/rm.err")"
           left=0
           [ -e "$OUT_DIR" ] && left="$(find "$OUT_DIR" | wc -l | tr -d ' ')"
-          if [ "$foreign" -gt 0 ] || [ "$rm_rc" -ne 0 ]; then
+          echo "rm -rf output: exit $rm_rc, entries left: $left"
+          [ -n "$rm_err" ] && echo "$rm_err"
+          # The scanned folder is the user's own project: can they still add a
+          # file to it and delete it?
+          src_write=ok
+          touch "$SRC_DIR/.bomlens-write-probe" 2>/dev/null || src_write=failed
+          src_rm_rc=0
+          rm -rf "$SRC_DIR" 2> "$RUNNER_TEMP/rm-src.err" || src_rm_rc=$?
+          src_left=0
+          [ -e "$SRC_DIR" ] && src_left="$(find "$SRC_DIR" | wc -l | tr -d ' ')"
+          echo "write a file into the scanned folder: $src_write"
+          echo "rm -rf scanned folder: exit $src_rm_rc, entries left: $src_left"
+          head -5 "$RUNNER_TEMP/rm-src.err"
+          if [ "$foreign" -gt 0 ] || [ "$rm_rc" -ne 0 ] || [ "$src_rm_rc" -ne 0 ] || [ "$src_write" != ok ]; then
             verdict=REPRODUCED
           elif [ "$SCAN_RC" -ne 0 ]; then
             verdict="INCONCLUSIVE (scan failed)"
@@ -176,6 +189,8 @@ jobs:
             echo "- Runner user: $(id -un) ($uid:$gid)"
             echo "- Files in output and source copy not owned by the runner user: $foreign"
             echo "- \`rm -rf\` of the output folder: exit $rm_rc, entries left: $left"
+            echo "- Writing a file into the scanned folder: $src_write"
+            echo "- \`rm -rf\` of the scanned folder: exit $src_rm_rc, entries left: $src_left"
             if [ -n "$rm_err" ]; then
               echo
               echo '```'
