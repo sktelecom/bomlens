@@ -203,7 +203,7 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 감지 파일: `go.mod` + `go.sum`
 
-> 주의: `go.sum`이 있어야 정확한 버전 해시가 들어갑니다. `go mod tidy`를 먼저 실행한 뒤 시도하세요.
+> 주의: `go.sum`이 있어야 정확한 버전 해시가 들어갑니다. `go mod tidy`를 먼저 실행한 뒤 시도하세요. 모듈을 require하는 `go.mod` 옆에 `go.sum`이 없으면 스캔할 때 버전을 새로 해석하므로 결과는 부분(사유 `lockfile-missing`)이 되고, 해결 방법에 `go mod tidy`가 나옵니다.
 
 ---
 
@@ -215,7 +215,7 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 감지 파일: `Gemfile.lock`
 
-> 주의: `Gemfile.lock`이 커밋되어 있지 않으면 BomLens가 스캔 전에 `bundle lock`을 실행합니다. SBOM이 배포 구성과 일치하도록 잠금 파일을 커밋하세요.
+> 주의: `Gemfile.lock`이 커밋되어 있지 않으면 BomLens가 스캔 전에 `bundle lock`을 실행하고, 결과는 부분(사유 `lockfile-missing`)이 됩니다. SBOM이 배포 구성과 일치하도록 잠금 파일을 커밋하세요.
 
 > 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다. 스캔 루트 아래에 다른 `Gemfile`이나 `Gemfile.lock`이 있거나 프로젝트 어디든 `.gemspec` 파일이 있어도 같습니다. 같은 gem을 운영용으로 선언했을 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`(설치된 gem이 있는 `vendor/bundle` 포함), `node_modules`, `.git`, `.venv`, `venv`는 건너뜁니다. 이들 밖에 더 깊은 폴더가 있어도 gem을 하나도 빼지 않습니다.
 
@@ -231,7 +231,7 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 감지 파일: `composer.lock`
 
-> 주의: `composer.lock`이 커밋돼 있지 않으면 BomLens가 스캔 전에 직접 해석합니다(`composer update --no-dev`, `require-dev`와 `config.lock`을 뺀 `composer.json` 사본으로, 플랫폼 요구사항은 무시합니다). Ruby의 `Gemfile.lock`을 처리하는 방식과 같습니다. 스캔이 끝나면 원래 `composer.json`을 되돌려 놓습니다. PHP 버전을 강제하지 않으므로, 프로젝트가 선언한 것보다 새로운 PHP를 요구하는 의존성 버전이 선택될 수 있습니다. cdxgen은 이미 각 composer 컴포넌트에 해석된 스코프를 붙여서 줍니다(`require`는 required, `require-dev`는 optional). BomLens는 Maven과 같은 방식으로 이 정보를 이용해 SBOM을 required 대상으로 걸러냅니다. require와 require-dev를 합친 전체 그래프를 그대로 두려면 `BOMLENS_PHP_FULL_GRAPH=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
+> 주의: `composer.lock`이 커밋돼 있지 않으면 BomLens가 스캔 전에 직접 해석합니다(`composer update --no-dev`, `require-dev`와 `config.lock`을 뺀 `composer.json` 사본으로, 플랫폼 요구사항은 무시합니다). Ruby의 `Gemfile.lock`을 처리하는 방식과 같으며, `composer.json`이 패키지를 require하면 결과는 부분(사유 `lockfile-missing`)이 됩니다. 스캔이 끝나면 원래 `composer.json`을 되돌려 놓습니다. PHP 버전을 강제하지 않으므로, 프로젝트가 선언한 것보다 새로운 PHP를 요구하는 의존성 버전이 선택될 수 있습니다. cdxgen은 이미 각 composer 컴포넌트에 해석된 스코프를 붙여서 줍니다(`require`는 required, `require-dev`는 optional). BomLens는 Maven과 같은 방식으로 이 정보를 이용해 SBOM을 required 대상으로 걸러냅니다. require와 require-dev를 합친 전체 그래프를 그대로 두려면 `BOMLENS_PHP_FULL_GRAPH=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
 
 > 참고: `vendor/` 안의 `package-lock.json`(예: 프레임워크의 오류 화면용 파일)은 스캔에서 제외하므로, 그 안의 npm 패키지가 프로젝트의 의존성으로 나타나지 않습니다.
 
@@ -244,6 +244,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 ```
 
 감지 파일: `Cargo.lock`
+
+> 주의: `Cargo.toml` 옆이나 워크스페이스 루트에 `Cargo.lock`이 없으면 BomLens가 `cargo generate-lockfile`을 실행합니다. 이 명령은 크레이트마다 호환되는 가장 새 버전을 고르므로 결과는 부분(사유 `lockfile-missing`)이 됩니다. `Cargo.lock`을 커밋한 뒤 다시 스캔하세요.
 
 > 주의: cdxgen은 라이선스 정보가 없는 `Cargo.lock`만 읽으므로, BomLens는 각 크레이트 자신의 매니페스트를 읽는 `cargo metadata`로 라이선스를 채웁니다(스캔 대상 자신의 워크스페이스 크레이트 포함). 이를 위해 컨테이너가 크레이트 저장소(crates.io 또는 사내 미러)에 닿아야 합니다. 닿지 않으면 SBOM에 라이선스가 기록되는 Cargo 패키지가 거의 없고 스캔으로 만든 고지문이 거의 빕니다. 이때 스캔은 `cargo-license-metadata` 단계를 SBOM에 실패로 기록하며 결과 화면과 적합성 검사 보고서가 이를 보여 주고, 로그에는 `could not read crate licenses`가 남습니다. 라이선스를 파일로만 선언한 크레이트(`license-file`)는 채우지 못합니다. `MIT OR Apache-2.0` 같은 택일 표기는 고정된 순서로 적어, 크레이트가 어떻게 쓰든 같은 조합이 고지문에서 한 항목이 되게 하고, SPDX 표현식이 아닌 값은 라이선스 이름 그대로 둡니다. 번들 예제는 라이브러리 147개 중 146개에 라이선스가 있습니다. `BOMLENS_NO_CARGO_LICENSE=1`로 끌 수 있고, 명령줄에서는 `FETCH_LICENSE=false`도 같은 효과가 있습니다. `--deep-license`는 도움이 되지 않습니다. 이 옵션은 의존성이 아니라 스캔 대상 자신의 소스 파일을 훑고 별도 보고서를 씁니다.
 

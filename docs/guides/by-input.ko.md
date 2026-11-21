@@ -104,7 +104,7 @@ cd ~/project/c-dev
 $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 ```
 
-- 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
+- Conan의 `conanfile.txt`나 `conan.lock`에 선언된 의존성과 CMake 파일의 패키지 이름(`find_package`)은 SBOM에 들어갑니다. vcpkg의 `vcpkg.json`과 Conan의 `conanfile.py`는 읽지 않습니다. 여기에 선언된 의존성이 어느 컴포넌트에도 없으면 결과는 부분(사유 `manifest-not-read`)이 되고, 사유에 해당 매니페스트와 의존성 이름이 나옵니다. 프로젝트 최상위 폴더의 `sbom-declared.cdx.json`에 버전과 함께 적거나([선언 구성요소](declared-components.ko.md)) `conanfile.py` 옆에 `conan.lock`을 커밋한 뒤 다시 스캔하세요.
 - 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 결과 품질 묶음의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 오픈소스 위험 보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 오픈소스 위험 보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
