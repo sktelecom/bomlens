@@ -1,3 +1,10 @@
+# Text files are stored and checked out with LF on every platform. Git for
+# Windows defaults to core.autocrlf=true, which would otherwise check out CRLF;
+# the image build copies docker/ as checked out, and jq, Python and the shell
+# in the container read CRLF as part of the program. Binary files are detected
+# and left alone. The rules below override this for files that need CRLF.
+*           text=auto eol=lf
+
 # Keep shell scripts LF even on Windows checkouts. Git for Windows defaults to
 # core.autocrlf=true, which would otherwise rewrite *.sh with CRLF on clone; CRLF
 # in a script breaks `#!/bin/bash` and string comparisons under MSYS2/Git Bash,
