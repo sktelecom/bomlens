@@ -23,13 +23,21 @@ concurrency:
 
 jobs:
   ownership:
-    name: Ownership (${{ matrix.daemon }})
+    name: Ownership (${{ matrix.daemon }}${{ matrix.cli_check == 'off' && ', container guard only' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         daemon: [ rootless, rootful ]
+        cli_check: [ 'on' ]
+        include:
+          # The CLI's own rootless check bypassed (HANDBACK_UID/HANDBACK_GID
+          # preset to the runner's ids, as a CLI without that check sends), so
+          # only the containers' guard stands between the files and a
+          # subordinate uid.
+          - daemon: rootless
+            cli_check: 'off'
 
     steps:
       - name: Checkout repository
@@ -150,6 +158,11 @@ jobs:
           echo "SRC_DIR=$src" >> "$GITHUB_ENV"
           echo "OUT_DIR=$out" >> "$GITHUB_ENV"
           rc=0
+          if [ "${{ matrix.cli_check }}" = off ]; then
+            export HANDBACK_UID HANDBACK_GID
+            HANDBACK_UID="$(id -u)"
+            HANDBACK_GID="$(id -g)"
+          fi
           SBOM_SCANNER_IMAGE=bomlens-overlay:check \
             bash scripts/scan-sbom.sh --project rootless --version 1.0 \
               --target "$src" --generate-only --output-dir "$out" || rc=$?
@@ -206,7 +219,7 @@ jobs:
             verdict="NOT REPRODUCED"
           fi
           {
-            echo "## Ownership check: ${{ matrix.daemon }} (${{ steps.daemon.outputs.mode }})"
+            echo "## Ownership check: ${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }} (${{ steps.daemon.outputs.mode }})"
             echo
             echo "- Verdict: **$verdict**"
             echo "- Scan exit code: $SCAN_RC"
@@ -228,7 +241,7 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "VERDICT (${{ matrix.daemon }}): $verdict"
+          echo "VERDICT (${{ matrix.daemon }}, CLI check ${{ matrix.cli_check }}): $verdict"
 
       - name: Show rootless daemon log
         if: always() && matrix.daemon == 'rootless'
