@@ -4746,8 +4746,23 @@ def display_path_of(container_path):
         if p == base:
             return host
         if p.startswith(base + os.sep):
-            return os.path.join(host, os.path.relpath(p, base))
-    return host_path_of(p) or os.path.normpath(container_path)
+            return _host_display_join(host, os.path.relpath(p, base))
+    shown = host_path_of(p)
+    if shown and _WINDOWS_HOST_PATH_RE.match(shown):
+        return shown.replace("/", "\\")
+    return shown or os.path.normpath(container_path)
+
+
+# A Windows host path (C:\... or C:/...): shown with backslashes throughout.
+_WINDOWS_HOST_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _host_display_join(host, rel):
+    """host + rel for display, in the host's own separator: a Windows host path
+    gets backslashes for the added part too, so the user sees one form."""
+    if _WINDOWS_HOST_PATH_RE.match(host) or "\\" in host:
+        return host.rstrip("\\/").replace("/", "\\") + "\\" + rel.replace("/", "\\")
+    return os.path.join(host, rel)
 
 
 # One scan at a time per source folder, shared with the command line: the lock

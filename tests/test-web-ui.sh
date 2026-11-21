@@ -8806,5 +8806,27 @@ else
 fi
 
 echo ""
+echo "== a picked folder's path is shown in the host's own separator =="
+if SBOM_UI_HOST_DIR='C:\\Users\\a\\out' python3 - "$SERVER" <<'DISPPY'
+import importlib.util, os, sys, tempfile
+spec = importlib.util.spec_from_file_location("server", sys.argv[1])
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+root = tempfile.mkdtemp()
+os.makedirs(os.path.join(root, "rust", "src"))
+server.EXTRA_SCAN_ROOTS[:] = [{"path": root, "hostPath": "C:\\Users\\a\\r2"}]
+assert server.display_path_of(root) == "C:\\Users\\a\\r2"
+assert server.display_path_of(os.path.join(root, "rust")) == "C:\\Users\\a\\r2\\rust", server.display_path_of(os.path.join(root, "rust"))
+assert server.display_path_of(os.path.join(root, "rust", "src")) == "C:\\Users\\a\\r2\\rust\\src"
+server.EXTRA_SCAN_ROOTS[:] = [{"path": root, "hostPath": "/Users/a/r2"}]
+assert server.display_path_of(os.path.join(root, "rust")) == "/Users/a/r2/rust"
+DISPPY
+then
+    pass "display_path_of joins a sub-folder with backslashes under a Windows host path and slashes under a POSIX one"
+else
+    fail "display_path_of separators"
+fi
+
+echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
