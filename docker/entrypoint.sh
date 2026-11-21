@@ -566,9 +566,13 @@ source_lock_holder_gone() {
 }
 # take_source_lock: wait for and take the lock of the folder SOURCE_ROOT_HOST
 # names. Returns without a lock when there is no guard-state mount or no
-# SOURCE_ROOT_HOST (the scan then runs as before).
+# SOURCE_ROOT_HOST (the scan then runs as before). The web server takes the
+# lock of the user's folder itself, before it copies the folder, and names it
+# in BOMLENS_SOURCE_LOCK_HELD: this scan then already holds its folder's lock
+# and does not wait on it (the server frees it when the scan has ended).
 SELF_CONTAINER_ID=""
 take_source_lock() {
+    [[ "${BOMLENS_SOURCE_LOCK_HELD:-}" =~ ^[0-9a-f]{64}$ ]] && return 0
     [ -n "${SOURCE_ROOT_HOST:-}" ] || return 0
     [ -d "$GUARD_STATE_DIR" ] || return 0
     local key pid origin who said=0 empty_polls=0

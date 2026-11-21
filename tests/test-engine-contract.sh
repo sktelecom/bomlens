@@ -2816,6 +2816,26 @@ else
     else
         fail "command-line lock" "rc=$SL6_RC early=$SL6_EARLY $(grep -h 'INFO\] Another\|ERROR' "$SL/out-6.log" | head -n 3)"
     fi
+    # The web server took the folder's lock itself before it copied the folder
+    # and names it in BOMLENS_SOURCE_LOCK_HELD: the scan does not wait on the
+    # lock it already holds, and leaves it for the server to free.
+    SL_HELD_KEY="$(sl_key /host/the-users-folder)"
+    mkdir -p "$SL/state/$SL_HELD_KEY.lock"; echo 7 > "$SL/state/$SL_HELD_KEY.lock/pid"
+    echo "container fedcba987654" > "$SL/state/$SL_HELD_KEY.lock/origin"
+    : > "$SL/stub/running/fedcba987654"
+    mkdir -p "$SL_LOCK"; echo 7 > "$SL_LOCK/pid"; echo "container fedcba987654" > "$SL_LOCK/origin"
+    sl_scan 7 SL_STAGE1_SECS=0 BOMLENS_SOURCE_LOCK_HELD="$SL_HELD_KEY" & SL7=$!
+    SL7_DONE=no
+    for _ in $(seq 1 50); do kill -0 "$SL7" 2>/dev/null || { SL7_DONE=yes; break; }; sleep 0.1; done
+    [ "$SL7_DONE" = yes ] || kill "$SL7" 2>/dev/null
+    wait "$SL7"; SL7_RC=$?
+    if [ "$SL7_DONE" = yes ] && [ "$SL7_RC" = 0 ] && ! grep -q 'Another scan of this folder' "$SL/out-7.log" \
+       && [ -d "$SL/state/$SL_HELD_KEY.lock" ] && [ "$(cat "$SL_LOCK/pid" 2>/dev/null)" = 7 ]; then
+        pass "a scan whose folder lock the web server holds does not wait on it and leaves it in place"
+    else
+        fail "lock held by the server" "done=$SL7_DONE rc=$SL7_RC $(grep -h 'INFO\] Another\|ERROR' "$SL/out-7.log" | head -n 3)"
+    fi
+    rm -rf "$SL/state/$SL_HELD_KEY.lock" "$SL_LOCK" "$SL/stub/running/fedcba987654"
     # The command line and the web UI find the same lock for the same folder:
     # the two source_lock_key functions agree, and put a Windows path in one
     # form (Git Bash hands C:/Users/..., the desktop app C:\Users\...).
