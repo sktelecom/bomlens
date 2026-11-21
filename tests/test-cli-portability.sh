@@ -311,15 +311,21 @@ if command -v shasum >/dev/null 2>&1 || command -v sha256sum >/dev/null 2>&1; th
     rt_real="$(cd "$WORK/rt" && pwd -P)"
     if command -v sha256sum >/dev/null 2>&1; then gkey="$(printf '%s' "$rt_real" | sha256sum | awk '{print $1}')"
     else gkey="$(printf '%s' "$rt_real" | shasum -a 256 | awk '{print $1}')"; fi
+    # The folder lock is keyed on the host path in one form (source_lock_key):
+    # C:/users/... under Git Bash, the path as it is elsewhere.
+    rt_lock_path="$rt_real"
+    command -v cygpath >/dev/null 2>&1 && rt_lock_path="$(cygpath -m "$rt_real" | tr '[:upper:]' '[:lower:]')"
+    if command -v sha256sum >/dev/null 2>&1; then lkey="$(printf '%s' "$rt_lock_path" | sha256sum | awk '{print $1}')"
+    else lkey="$(printf '%s' "$rt_lock_path" | shasum -a 256 | awk '{print $1}')"; fi
     ( exit 0 ) & DEAD_PID=$!; wait "$DEAD_PID"
-    mkdir -p "$GUARD_ROOT/$gkey.lock"
-    echo "$DEAD_PID" > "$GUARD_ROOT/$gkey.lock/pid"; echo cli > "$GUARD_ROOT/$gkey.lock/origin"
+    mkdir -p "$GUARD_ROOT/$lkey.lock"
+    echo "$DEAD_PID" > "$GUARD_ROOT/$lkey.lock/pid"; echo cli > "$GUARD_ROOT/$lkey.lock/origin"
     STUB_STAGE1_SECS=0 gscan 3 "$WORK/g3.out"; G3_RC=$?
-    mkdir -p "$GUARD_ROOT/$gkey.lock"
-    echo 7 > "$GUARD_ROOT/$gkey.lock/pid"; echo "container 0123abcd" > "$GUARD_ROOT/$gkey.lock/origin"
+    mkdir -p "$GUARD_ROOT/$lkey.lock"
+    echo 7 > "$GUARD_ROOT/$lkey.lock/pid"; echo "container 0123abcd" > "$GUARD_ROOT/$lkey.lock/origin"
     STUB_STAGE1_SECS=0 gscan 4 "$WORK/g4.out"; G4_RC=$?
     if [ "$G3_RC" = 0 ] && [ "$G4_RC" = 0 ] && ! grep -q 'Another scan of this folder' "$WORK/g3.out" "$WORK/g4.out" \
-       && [ ! -e "$GUARD_ROOT/$gkey.lock" ]; then
+       && [ ! -e "$GUARD_ROOT/$lkey.lock" ]; then
         pass "a folder lock whose scan is gone is taken over and freed"
     else
         fail "stale folder lock" "rc=$G3_RC/$G4_RC $(grep -h 'INFO\|ERROR' "$WORK/g3.out" "$WORK/g4.out" | head -n 4)"
@@ -349,14 +355,38 @@ if command -v shasum >/dev/null 2>&1 || command -v sha256sum >/dev/null 2>&1; th
         SCAN_INPUT_DIR="$WORK/rt"
         # shellcheck disable=SC2034
         DOCKER_ENV=()
+        hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
         eval "$(extract_fn "$SCRIPT" guard_hash)"
+        eval "$(extract_fn "$SCRIPT" source_lock_key)"
         eval "$(extract_fn "$SCRIPT" source_lock_holder_gone)"
         eval "$(extract_fn "$SCRIPT" take_source_lock)"
-        mkdir -p "$GUARD_ROOT/$gkey.lock"; echo "$$" > "$GUARD_ROOT/$gkey.lock/pid"
+        mkdir -p "$GUARD_ROOT/$lkey.lock"; echo "$$" > "$GUARD_ROOT/$lkey.lock/pid"
         take_source_lock && [ "$SOURCE_LOCK_HELD" = 1 ] && echo took
     ) 2>&1 )"
-    rm -rf "$GUARD_ROOT/$gkey.lock"
+    rm -rf "$GUARD_ROOT/$lkey.lock"
     if [ "$out" = took ]; then pass "a folder lock this same process wrote before an exec is taken back"; else fail "own folder lock" "$out"; fi
+    # A web UI container that still runs: its lock is gone only when the scan
+    # process inside it has ended (docker exec answers 1).
+    out="$( (
+        # shellcheck disable=SC2034
+        DOCKER_ENV=()
+        docker() {
+            case "$1" in
+                ps) echo 0123abcd0123 ;;
+                exec) [ "$7" = 41 ] && return 0; [ "$7" = 42 ] && return 1; return 126 ;;
+            esac
+        }
+        eval "$(extract_fn "$SCRIPT" source_lock_holder_gone)"
+        a=running; source_lock_holder_gone 41 "container 0123abcd0123" && a=gone
+        b=running; source_lock_holder_gone 42 "container 0123abcd0123" && b=gone
+        c=running; source_lock_holder_gone 43 "container 0123abcd0123" && c=gone
+        echo "$a $b $c"
+    ) 2>&1 )"
+    if [ "$out" = "running gone running" ]; then
+        pass "a running web UI container's lock is taken over only when its scan process has ended"
+    else
+        fail "web UI container lock" "$out"
+    fi
 else
     echo "  SKIP: no sha256sum or shasum here; the stale folder lock cases did not run"
 fi

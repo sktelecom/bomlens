@@ -2047,25 +2047,51 @@ release_source_lock() {
 # known to have ended. A lock this process wrote before an exec of itself
 # (same PID) counts as gone, so the rerun takes it back.
 source_lock_holder_gone() {
-    local pid="$1" origin="$2" ps_out
+    local pid="$1" origin="$2" ps_out rc
     case "$origin" in
         container\ *)
             # Written by a scan inside a container (the web UI): gone when
-            # that container no longer runs. Unconfirmed counts as running.
+            # that container no longer runs, or when the scan process in it
+            # has ended. Unconfirmed counts as running.
             command -v docker >/dev/null 2>&1 || return 1
             ps_out=$("${DOCKER_ENV[@]}" docker ps -q --no-trunc --filter "id=${origin#container }" 2>/dev/null) || return 1
-            [ -z "$ps_out" ] ;;
+            [ -n "$ps_out" ] || return 0
+            # The container runs; the scan in it may have been stopped
+            # outright while the container stayed up (the web UI's own one).
+            rc=0
+            "${DOCKER_ENV[@]}" docker exec "${origin#container }" sh -c 'kill -0 "$1" 2>/dev/null || [ -d "/proc/$1" ]' _ "$pid" >/dev/null 2>&1 || rc=$?
+            [ "$rc" = 1 ] ;;
         *)
             [ "$pid" = "$$" ] && return 0
             ! kill -0 "$pid" 2>/dev/null ;;
     esac
 }
+# source_lock_key PATH: the key of a folder's lock, from its host path
+# (hostpath: C:/Users/... under Git Bash). The path is put in one form first, so
+# the command line and the web UI (docker/entrypoint.sh, which hashes the host
+# path the web server hands it) find the same lock for the same folder:
+# backslashes become slashes, a Windows drive path is lower-cased (names are not
+# case-sensitive there), and a trailing slash is dropped. The same function is
+# in docker/entrypoint.sh; keep the two in step.
+source_lock_key() {
+    local p
+    p=$(printf '%s' "$1" | tr '\\' '/')
+    case "$p" in
+        [A-Za-z]:|[A-Za-z]:/*) p=$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]') ;;
+    esac
+    while [ "${#p}" -gt 1 ] && [ "${p%/}" != "$p" ]; do
+        case "$p" in [a-z]:/) break ;; esac
+        p="${p%/}"
+    done
+    case "$p" in [a-z]:) p="$p/" ;; esac
+    printf '%s' "$p" | guard_hash
+}
 take_source_lock() {
     [ "${#CLEANUP_DIRS[@]}" -eq 0 ] || return 0
     mkdir -p "$GUARD_STATE_DIR" 2>/dev/null || return 0
-    local target_real key pid origin said=0 empty_polls=0
+    local target_real key pid origin who said=0 empty_polls=0
     target_real=$(cd "$SCAN_INPUT_DIR" 2>/dev/null && pwd -P) || return 0
-    key=$(printf '%s' "$target_real" | guard_hash) || return 0
+    key=$(source_lock_key "$(hostpath "$target_real")") || return 0
     [ -n "$key" ] || return 0
     SOURCE_LOCK_DIR="$GUARD_STATE_DIR/$key.lock"
     while :; do
@@ -2092,7 +2118,11 @@ take_source_lock() {
             rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
             continue
         elif [ "$said" = 0 ]; then
-            echo "[INFO] Another scan of this folder is running (process $pid); this scan waits for it to finish, so that neither one sees the other's build files. Press Ctrl+C to stop waiting."
+            case "$origin" in
+                container\ *) who="a web UI scan" ;;
+                *) who="process $pid" ;;
+            esac
+            echo "[INFO] Another scan of this folder is running ($who); this scan waits for it to finish, so that neither one sees the other's build files. Press Ctrl+C to stop waiting."
             said=1
         fi
         sleep 1
