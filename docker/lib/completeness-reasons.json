@@ -46,6 +46,7 @@
     },
     "android-release-classpath-unresolved": {
       "grade": "unreliable",
+      "general": true,
       "en": "Gradle failed before it read the app's release runtime classpath, so the app's dependencies are not in this SBOM. The components of the build's other configurations (build and test tooling) were left out, because the app does not ship them.",
       "ko": "Gradle이 앱의 릴리스 런타임 클래스패스를 읽기 전에 실패해 앱의 의존성이 이 SBOM에 없습니다. 빌드의 다른 구성에서 나온 컴포넌트(빌드 도구와 테스트 도구)는 앱에 포함되지 않으므로 제외했습니다.",
       "fixEn": "Fix the Gradle error named in the scan log (./gradlew :app:dependencies in the project shows it too) and scan again.",
