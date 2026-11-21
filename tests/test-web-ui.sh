@@ -3201,7 +3201,9 @@ if command -v jq >/dev/null 2>&1; then
           {name:"bomlens:assessment:axes",value:"license"},
           {name:"bomlens:assessment:license",value:"conditional"},
           {name:"bomlens:assessment:license:keys",value:"llama-community"},
-          {name:"bomlens:assessment:reasons",value:"Llama community license"}])' \
+          {name:"bomlens:assessment:reasons",value:"Llama community license"}])
+        | .components += [{type:"library",name:"vendor-sdk",version:"1.0",
+            properties:[{name:"bomlens:licenseReview",value:"proprietary"}]}]' \
         "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" > "$OUT/aip_1.0_bom.json"
     bash "$ROOT_DIR/docker/lib/generate-ai-profile.sh" "$OUT/aip_1.0" "aip" >/dev/null 2>&1
     if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
@@ -3219,7 +3221,9 @@ assert {"cluster", "total", "present", "gap", "review"} <= set(g7["clusters"][0]
 # Light payload: the big arrays are dropped from the card summary.
 assert "reviewItems" not in g7, "reviewItems must be dropped from the card summary"
 lic = p["licenseReview"]
-assert lic["total"] >= 1 and lic["behavioral"] >= 1, lic
+assert lic["total"] >= 2 and lic["behavioral"] >= 1, lic
+assert lic["proprietary"] == 1, ("proprietary count not passed through", lic)
+assert lic["noDerivatives"] == 0, lic
 assert "items" not in lic, "licenseReview.items must be dropped from the card summary"
 xw = p["regulatoryCrosswalk"]
 assert xw["disclaimer"], "crosswalk disclaimer missing"
@@ -3255,10 +3259,12 @@ fi
 
 echo "== license review property (normalize -> sbom_summary) =="
 # Normalize the AI-license fixture (adds bomlens:licenseReview), then check
-# sbom_summary surfaces the behavioral-use / non-commercial / no-derivatives
-# class per component.
+# sbom_summary surfaces the behavioral-use / non-commercial / no-derivatives /
+# proprietary class per component.
 if command -v jq >/dev/null 2>&1; then
-    cp "$ROOT_DIR/tests/fixtures/notice-ai-licenses.json" "$OUT/lic_1.0_bom.json"
+    jq '.components += [{type:"library",name:"vendor-sdk",version:"1.0",
+          licenses:[{license:{name:"Proprietary"}}]}]' \
+        "$ROOT_DIR/tests/fixtures/notice-ai-licenses.json" > "$OUT/lic_1.0_bom.json"
     bash "$ROOT_DIR/docker/lib/normalize-sbom.sh" "$OUT/lic_1.0_bom.json" >/dev/null 2>&1
     if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os
@@ -3268,10 +3274,11 @@ rows = {r["name"]: r for r in server.sbom_summary("lic_1.0")["componentList"]}
 assert rows["some-llama-model"]["licenseReview"] == "behavioral-use", rows["some-llama-model"]
 assert rows["some-nc-dataset"]["licenseReview"] == "non-commercial", rows["some-nc-dataset"]
 assert rows["some-nd-dataset"]["licenseReview"] == "no-derivatives", rows["some-nd-dataset"]
+assert rows["vendor-sdk"]["licenseReview"] == "proprietary", rows["vendor-sdk"]
 assert "licenseReview" not in rows["ordinary-lib"], rows["ordinary-lib"]
 PY
     then
-        pass "licenseReview surfaced (behavioral-use / non-commercial / no-derivatives; MIT unflagged)"
+        pass "licenseReview surfaced (behavioral-use / non-commercial / no-derivatives / proprietary; MIT unflagged)"
     else
         fail "licenseReview not surfaced correctly"
     fi
