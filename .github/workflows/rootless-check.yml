@@ -65,12 +65,25 @@ jobs:
           echo "subgid: $(grep "^${me}:" /etc/subgid)"
           sudo systemctl disable --now docker.service docker.socket
           sudo rm -f /var/run/docker.sock
-          xdg="$RUNNER_TEMP/xdg"
-          mkdir -p "$xdg"
-          chmod 700 "$xdg"
-          echo "XDG_RUNTIME_DIR=$xdg" >> "$GITHUB_ENV"
-          echo "DOCKER_HOST=unix://$xdg/docker.sock" >> "$GITHUB_ENV"
-          XDG_RUNTIME_DIR="$xdg" nohup dockerd-rootless.sh > "$RUNNER_TEMP/dockerd-rootless.log" 2>&1 &
+          # Run the daemon as a systemd user service, the documented setup: the
+          # user manager gives rootless containers a delegated cgroup, which the
+          # systemd cgroup driver needs to start them.
+          uid="$(id -u)"
+          sudo loginctl enable-linger "$me"
+          xdg="/run/user/$uid"
+          for _ in $(seq 1 30); do
+            [ -S "$xdg/bus" ] && break
+            sleep 1
+          done
+          ls -la "$xdg"
+          export XDG_RUNTIME_DIR="$xdg"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$xdg/bus"
+          {
+            echo "XDG_RUNTIME_DIR=$xdg"
+            echo "DBUS_SESSION_BUS_ADDRESS=unix:path=$xdg/bus"
+            echo "DOCKER_HOST=unix://$xdg/docker.sock"
+          } >> "$GITHUB_ENV"
+          dockerd-rootless-setuptool.sh install
           for _ in $(seq 1 60); do
             if DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
               break
@@ -79,7 +92,7 @@ jobs:
           done
           if ! DOCKER_HOST="unix://$xdg/docker.sock" docker info >/dev/null 2>&1; then
             echo "rootless daemon did not come up"
-            cat "$RUNNER_TEMP/dockerd-rootless.log"
+            journalctl --user -u docker.service --no-pager | tail -50 || true
             exit 1
           fi
 
@@ -178,4 +191,4 @@ jobs:
 
       - name: Show rootless daemon log
         if: always() && matrix.daemon == 'rootless'
-        run: tail -50 "$RUNNER_TEMP/dockerd-rootless.log" || true
+        run: journalctl --user -u docker.service --no-pager | tail -50 || true
