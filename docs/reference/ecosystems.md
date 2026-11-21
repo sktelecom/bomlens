@@ -203,7 +203,7 @@ Detected file: `requirements.txt`, or `pyproject.toml` + `poetry.lock`
 
 Detected file: `go.mod` + `go.sum`
 
-> Note: `go.sum` is required for accurate version hashes. Run `go mod tidy` first, then try again.
+> Note: `go.sum` is required for accurate version hashes. Run `go mod tidy` first, then try again. A `go.mod` that requires modules and has no `go.sum` beside it is resolved at scan time, so the result is partial with the reason `lockfile-missing`, and its fix names `go mod tidy`.
 
 ---
 
@@ -215,7 +215,7 @@ Detected file: `go.mod` + `go.sum`
 
 Detected file: `Gemfile.lock`
 
-> Note: with no `Gemfile.lock` committed, BomLens runs `bundle lock` before scanning. Commit the lock file so the SBOM matches what you deploy.
+> Note: with no `Gemfile.lock` committed, BomLens runs `bundle lock` before scanning, and the result is partial with the reason `lockfile-missing`. Commit the lock file so the SBOM matches what you deploy.
 
 > Note: cdxgen does not mark Bundler groups, so BomLens reads the `Gemfile` at the scan root itself. A gem declared only in the `development` and `test` groups (in a `group ... do` block or with a `group:` or `groups:` option) is dropped, along with what only those gems need, unless a production gem also needs it. The `Gemfile` is read conservatively: a condition, `gemspec`, `eval_gemfile`, a declaration over several lines or any other line the reader does not recognise, or a `Gemfile.lock` that names a gem the `Gemfile` does not, leaves every gem in place, and the log says `Gemfile groups not read`. So does another `Gemfile` or `Gemfile.lock` below the scan root, or a `.gemspec` file anywhere in the project, since it may declare the same gems for production. That search goes 8 folders deep and skips `vendor` (with the installed gems in `vendor/bundle`), `node_modules`, `.git`, `.venv` and `venv`; a deeper folder outside those also leaves every gem in place.
 
@@ -231,7 +231,7 @@ Detected file: `Gemfile.lock`
 
 Detected file: `composer.lock`
 
-> Note: with no `composer.lock` committed, BomLens resolves one itself (`composer update --no-dev`, on a copy of `composer.json` without `require-dev` and `config.lock`, with platform requirements ignored) before scanning, the same as it does for Ruby's `Gemfile.lock`. Your `composer.json` is put back afterwards. A dependency version that needs a newer PHP than the project declares can be picked, because the PHP version is not enforced. cdxgen already tags each composer component with its resolved scope (`require` becomes required, `require-dev` becomes optional), so BomLens filters the SBOM to the required set, the same way it does for Maven. To keep the full require-plus-require-dev graph instead, set `BOMLENS_PHP_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+> Note: with no `composer.lock` committed, BomLens resolves one itself (`composer update --no-dev`, on a copy of `composer.json` without `require-dev` and `config.lock`, with platform requirements ignored) before scanning, the same as it does for Ruby's `Gemfile.lock`, and the result is partial with the reason `lockfile-missing` when `composer.json` requires a package. Your `composer.json` is put back afterwards. A dependency version that needs a newer PHP than the project declares can be picked, because the PHP version is not enforced. cdxgen already tags each composer component with its resolved scope (`require` becomes required, `require-dev` becomes optional), so BomLens filters the SBOM to the required set, the same way it does for Maven. To keep the full require-plus-require-dev graph instead, set `BOMLENS_PHP_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
 
 > Note: a `package-lock.json` inside `vendor/` (for example a framework's error page) is left out of the scan, so its npm packages do not appear as dependencies of the project.
 
@@ -244,6 +244,8 @@ Detected file: `composer.lock`
 ```
 
 Detected file: `Cargo.lock`
+
+> Note: with no `Cargo.lock` beside `Cargo.toml` or at the workspace root, BomLens runs `cargo generate-lockfile`, which picks the newest compatible version of every crate, so the result is partial with the reason `lockfile-missing`. Commit `Cargo.lock` and scan again.
 
 > Note: cdxgen reads only `Cargo.lock`, which carries no licenses, so BomLens fills them from `cargo metadata`, which reads each crate's own manifest (your own workspace crates included). The container needs a route to the crate registry (crates.io or your mirror) for this. Without one, the SBOM records a license for almost no Cargo packages and the notice file built from the scan is nearly empty. The scan then records the step `cargo-license-metadata` as failed on the SBOM, which the result screen and the conformance check report show, and the log says `could not read crate licenses`. A crate that declares its license only as a file (`license-file`) stays without one. Alternatives such as `MIT OR Apache-2.0` are written in a fixed order, so the same pair is one entry in the notice however a crate spells it, and a value that is not an SPDX expression is kept as a plain license name. The bundled example lists 147 libraries and 146 of them carry a license. `BOMLENS_NO_CARGO_LICENSE=1` turns this off, and so does `FETCH_LICENSE=false` on the command line. `--deep-license` does not help here: it scans your own source files, not the dependencies, and writes a separate report.
 
