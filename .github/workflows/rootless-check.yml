@@ -51,6 +51,8 @@ jobs:
           mkdir -p "$extras"
           curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-rootless-extras-${ver}.tgz" \
             | tar -xz -C "$extras" --strip-components=1
+          # The setup tool checks the daemon with a docker CLI next to itself.
+          ln -sf "$(command -v docker)" "$extras/docker"
           ls -l "$extras"
           export PATH="$extras:$PATH"
           echo "$extras" >> "$GITHUB_PATH"
