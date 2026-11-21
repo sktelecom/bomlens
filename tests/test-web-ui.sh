@@ -8143,6 +8143,33 @@ else
     fail "stop_sibling fallback"
 fi
 
+echo ""
+echo "== entrypoint SOURCE mode prints the CLI's iOS/Swift notes =="
+# The CLI prints the UIKit note in scan-sbom.sh, so a web UI scan (which runs the
+# entrypoint in SOURCE mode) never showed it. The entrypoint now prints the same
+# two sentences in its SOURCE branch only: a CLI run reaches it in POSTPROCESS
+# mode, so the CLI log does not get them twice.
+EP="$ROOT_DIR/docker/entrypoint.sh"
+CLI="$ROOT_DIR/scripts/scan-sbom.sh"
+src_branch=$(awk '/^    SOURCE\)$/{on=1} /^    POSTPROCESS\)$/{on=0} on' "$EP")
+cli_info=$(grep -o 'iOS/Swift: SPM (Package.resolved) and CocoaPods[^"]*' "$CLI" | head -n 1)
+cli_warn=$(grep -o 'Dependencies that come from the Apple platform (UIKit[^"]*' "$CLI" | head -n 1)
+pp_branch=$(awk '/^    POSTPROCESS\)$/{on=1} /^    ANALYZE\)$/{on=0} on' "$EP")
+if [ -n "$cli_info" ] && [ -n "$cli_warn" ] \
+   && printf '%s\n' "$src_branch" | grep -qF "[INFO] $cli_info" \
+   && printf '%s\n' "$src_branch" | grep -qF "[WARN]   $cli_warn" \
+   && printf '%s\n' "$src_branch" | grep -q 'if \[ "$(detect_lang "$SRC_ROOT")" = "swift" \]' \
+   && ! printf '%s\n' "$pp_branch" | grep -qF "UIKit" \
+   && grep -q -- '-e MODE=POSTPROCESS' "$CLI"; then
+    pass "a web UI Swift scan logs the same UIKit note as the CLI, and a CLI run does not log it twice"
+else
+    fail "the entrypoint's SOURCE branch does not print the CLI's iOS/Swift notes"
+fi
+# The note is keyed on the pipeline's own detection: an iOS example reads as swift.
+sw_lang=$(bash -c '. "$1"; detect_lang "$2"' _ "$ROOT_DIR/docker/lib/source-detect.sh" "$ROOT_DIR/examples/swift" 2>/dev/null)
+[ "$sw_lang" = "swift" ] && pass "examples/swift is detected as swift, the case the note is printed for" \
+    || fail "examples/swift detected as '$sw_lang', not swift"
+
 # Scan-target path handling has its own No-Docker suite; run it here so the
 # existing CI step for this file covers it.
 echo ""
