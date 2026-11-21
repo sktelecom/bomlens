@@ -16,7 +16,6 @@ import "./lookup.css";
  *  rest of the record opens inside the row. */
 function AdvisoryRow({ advisory: a, open }: { advisory: AdvisoryRecord; open?: boolean }) {
   const { t, i18n } = useTranslation();
-  const base = useId();
   const affected = a.affected
     .map((x) => `${x.name}${x.ranges?.length ? ` ${x.ranges.map(formatRange).filter(Boolean).join("; ")}` : ""}`)
     .join(", ");
@@ -30,13 +29,13 @@ function AdvisoryRow({ advisory: a, open }: { advisory: AdvisoryRecord; open?: b
           <span className="bl-lk-chev" aria-hidden>
             <ChevronRightIcon size={16} />
           </span>
-          <span id={`${base}-id`} className="bl-mono bl-lk-id">{a.id}</span>{" "}
-          <span id={`${base}-sev`}>
+          <span className="bl-mono bl-lk-id">{a.id}</span>{" "}
+          <span>
             {/* A missing grade is Unknown, never a reassuring None. */}
             <SeverityLabel severity={a.severity === "NONE" ? "UNKNOWN" : a.severity} />
           </span>{" "}
           <span className="bl-lk-titlecell">
-            <span id={`${base}-title`} className="bl-lk-title">
+            <span className="bl-lk-title">
               {a.withdrawn && (
                 <Label variant="attention" className="bl-lk-lbl bl-lk-withdrawn">
                   {t("lookup.withdrawn")}{" "}
@@ -45,7 +44,7 @@ function AdvisoryRow({ advisory: a, open }: { advisory: AdvisoryRecord; open?: b
               <span className={a.withdrawn ? "bl-lk-struck" : undefined}>{a.title || a.id}</span>
             </span>{" "}
             {affected && (
-              <span id={`${base}-aff`} className="bl-mono bl-lk-aff">
+              <span className="bl-mono bl-lk-aff">
                 {affected}
               </span>
             )}

@@ -1746,8 +1746,7 @@ for (const lang of ["en", "ko"] as const) {
     // runs into its count; all three overrun the budget.
     const { checked, overrun } = await page.evaluate((badge) => {
       for (const b of document.querySelectorAll('[data-testid^="nav-count-"]')) {
-        const visible = b.querySelector("[aria-hidden]") ?? b;
-        visible.textContent = badge;
+        b.textContent = badge;
       }
       // Read a layout property to flush the mutations before measuring.
       void document.body.offsetHeight;

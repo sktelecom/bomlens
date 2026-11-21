@@ -101,7 +101,7 @@ export function Distribution({
               {href ? (
                 <a className="bl-licrow" href={href}>
                   {inner}{" "}
-                  <span className="bl-visually-hidden">. {t("result.licenseRowHint")}</span>
+                  <span className="bl-visually-hidden">{t("result.licenseRowHint")}</span>
                 </a>
               ) : (
                 <div className="bl-licrow">{inner}</div>

@@ -204,9 +204,9 @@ test("Tree shows direct dependencies open, the vulnerable, cycle and licence mar
   await expect(openssl).toHaveAttribute("aria-level", "1");
   await expect(openssl).toHaveAttribute("aria-expanded", "true");
   await expect(openssl).toHaveAccessibleName("openssl 3.0.0 Critical Apache-2.0");
-  // A top-level row has no visible "Direct" label; the word is in its description
-  // together with severity and licences, and the box head counts them.
-  await expect(openssl).toHaveAccessibleDescription(/Direct.*Critical.*Apache-2\.0/);
+  // A top-level row has no visible "Direct" label; the word is in its description,
+  // which repeats nothing the name already holds, and the box head counts them.
+  await expect(openssl).toHaveAccessibleDescription("Direct");
   await expect(openssl.getByText("Critical", { exact: true })).toBeVisible();
   await expect(openssl.getByText("Apache-2.0", { exact: true })).toBeVisible();
   // Its child is shown at level 2 and is not direct.

@@ -108,8 +108,10 @@ export function DependencyTree({
     );
   }
 
+  // The description adds only what the name does not hold: "Direct", which a
+  // top-level row does not show, and the licences folded into "+N".
   const describe = (node: TreeNode, level: number) =>
-    [level === 1 ? t("deps.direct") : null, node.vuln ? t(severityLabelKey(node.vuln)) : null, ...licenseOperands(node.licenses)]
+    [level === 1 ? t("deps.direct") : null, ...licenseOperands(node.licenses).slice(2)]
       .filter(Boolean)
       .join(", ");
 
@@ -163,7 +165,7 @@ export function DependencyTree({
           {/* The visible trailing part is aria-hidden in Primer, so what it shows
               is also given as the row's description (its `label`): a direct
               dependency has no visible label (it sits at the top level), so the
-              word is there for assistive technology, with severity and licences. */}
+              word is there for assistive technology, with the folded licences. */}
           <TreeView.TrailingVisual label={describe(node, level)}>
             <span className="bl-dep-trail">
               {node.vuln && (
