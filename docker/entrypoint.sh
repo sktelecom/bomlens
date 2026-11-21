@@ -1015,12 +1015,29 @@ case "$SCAN_MODE" in
         # Reading a large tree to choose the scan path can take a while; say so
         # first, so the log is not silent until the next step.
         echo "[INFO] Detecting the project type in $SRC_ROOT"
-        # The same iOS/Swift note scan-sbom.sh prints for its own source scans
-        # (a CLI run reaches this container in POSTPROCESS mode, so it is not
-        # printed twice). Keep the two in step.
-        if [ "$(detect_lang "$SRC_ROOT")" = "swift" ]; then
+        # The same iOS/Swift, C/C++ and no-manifest notes scan-sbom.sh prints for
+        # its own source scans (a CLI run reaches this container in POSTPROCESS
+        # mode, so they are not printed twice). Keep the two in step.
+        _src_lang="$(detect_lang "$SRC_ROOT")"
+        if [ "$_src_lang" = "swift" ]; then
             echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
             echo "[WARN]   Dependencies that come from the Apple platform (UIKit, Foundation) or from Xcode project settings are not resolved here: this scan runs in a Linux container. They are missing from the result, not zero." >&2
+        fi
+        if [ "$_src_lang" = "cpp" ]; then
+            echo "[WARN] C/C++: dependencies are read from conanfile.txt, conan.lock and the package names in CMake files." >&2
+            echo "[WARN]   vcpkg.json and conanfile.py are not read; list their dependencies in sbom-declared.cdx.json at the project root." >&2
+            echo "[WARN]   Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers." >&2
+            echo "[WARN]   For open source copied (vendored) into the sources, add --identify-vendored (opt-in image)." >&2
+        fi
+        if [ "$_src_lang" = "unknown" ]; then
+            # The all-in-one image runs only where a sibling container can start;
+            # elsewhere the syft line below says what reads the folder.
+            if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
+                echo "[WARN] No package manifest detected; using cdxgen all-in-one (results may be sparse)." >&2
+            else
+                echo "[WARN] No package manifest detected (results may be sparse)." >&2
+            fi
+            echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)." >&2
         fi
         _static_why=""
         case "${DETECTION:-auto}" in
