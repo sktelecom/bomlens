@@ -71,6 +71,8 @@ case "$(uname -s 2>/dev/null)" in
         DOCKER_MSYS="MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "
         DOCKER_ENV=(env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*')
         hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
+        # A path printed for the user to open: C:\Users\... on Windows.
+        shownpath() { cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; }
         # A POSIX path this shell can mkdir/read directly; hostpath() (above)
         # still does the cygpath -m conversion when this needs to reach a
         # docker -v flag, same as every other mount in this script.
@@ -78,6 +80,7 @@ case "$(uname -s 2>/dev/null)" in
         BOMLENS_CACHE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/cache" ;;
     *)
         hostpath() { printf '%s' "$1"; }
+        shownpath() { printf '%s' "$1"; }
         GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard"
         BOMLENS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/bomlens" ;;
 esac
@@ -3792,7 +3795,7 @@ GRADLE_USER_CACHE_EOF
     # before it is gone, and the exit code itself comes from `docker wait`,
     # not the backgrounded command's own status.
     STAGE1_LOG=$(mktemp)
-    echo "      (live log: $STAGE1_LOG; it is deleted when this stage succeeds, and kept when it fails)"
+    echo "      (live log: $(shownpath "$STAGE1_LOG"); it is deleted when this stage succeeds, and kept when it fails)"
     STAGE1_CONTAINER="$RUNNING_CONTAINER_NAME"
     # Mounted only when the file is there: a bundle without it would make
     # Docker create an empty folder at that path on this machine.
@@ -3829,7 +3832,7 @@ GRADLE_USER_CACHE_EOF
     # `wait` now returns ITS exit code -- a crash would trip `set -e` right
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
-    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (live log: $STAGE1_LOG)" "$STAGE1_LOG"
+    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (live log: $(shownpath "$STAGE1_LOG"))" "$STAGE1_LOG"
     drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
@@ -3870,7 +3873,7 @@ GRADLE_USER_CACHE_EOF
     # --- stage 1 passes done
     if [ -n "$STAGE1_FIRST_SBOM" ]; then
         if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-            log_warn "The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
+            log_warn "The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $(shownpath "$STAGE1_LOG")); keeping the result from $STAGE1_FIRST_IMG."
             "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
             mv -f "$STAGE1_FIRST_SBOM" "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
             STAGE1_RC="$STAGE1_FIRST_RC"; STAGE1_LOG="$STAGE1_FIRST_LOG"; CDX_IMG="$STAGE1_FIRST_IMG"
@@ -3906,15 +3909,15 @@ GRADLE_USER_CACHE_EOF
         STAGE1_FAIL_REASON="$(stage1_fail_reason "$STAGE1_OOM" "$STAGE1_LOG" "$STAGE1_RC")"
         case "$STAGE1_FAIL_REASON" in
             oom)
-                log_warn "cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $(shownpath "$STAGE1_LOG")" ;;
             disk-space)
-                log_warn "cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $(shownpath "$STAGE1_LOG")" ;;
             tls-trust)
-                log_warn "cdxgen could not download dependencies: a package registry's TLS certificate was not trusted (rc=$STAGE1_RC). Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen could not download dependencies: a package registry's TLS certificate was not trusted (rc=$STAGE1_RC). Full cdxgen log: $(shownpath "$STAGE1_LOG")" ;;
             registry-auth)
-                log_warn "cdxgen could not download dependencies: the package registry refused the login (HTTP 401/403, rc=$STAGE1_RC). Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen could not download dependencies: the package registry refused the login (HTTP 401/403, rc=$STAGE1_RC). Full cdxgen log: $(shownpath "$STAGE1_LOG")" ;;
             network)
-                log_warn "cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG" ;;
+                log_warn "cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $(shownpath "$STAGE1_LOG")" ;;
             cdxgen-unavailable)
                 log_warn "cdxgen could not be started in its image (rc=$STAGE1_RC, command not found); see $STAGE1_LOG. Falling back to a manifest-only scan (direct dependencies only)." ;;
             *)
@@ -3960,7 +3963,7 @@ GRADLE_USER_CACHE_EOF
             if mask_log_secrets "$STAGE1_LOG" "$_s1_kept"; then
                 rm -f "$STAGE1_LOG"
                 STAGE1_LOG="$_s1_kept"
-                _s1_where="cdxgen log (a diagnostic file with credentials in URLs masked, not meant for distribution): $STAGE1_LOG"
+                _s1_where="cdxgen log (a diagnostic file with credentials in URLs masked, not meant for distribution): $(shownpath "$STAGE1_LOG")"
             else
                 rm -f "$STAGE1_LOG" "$_s1_kept"
                 STAGE1_LOG=""
@@ -3972,6 +3975,16 @@ GRADLE_USER_CACHE_EOF
             esac
             if [ -n "$_s1_other" ] || [ -z "$_s1_steps" ]; then
                 log_warn "cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
+                # Composer leaves out a version a security advisory covers when
+                # there is no composer.lock; the cause is only in the cdxgen
+                # log, and the more vulnerable the project, the emptier the SBOM.
+                if [ -n "$STAGE1_LOG" ] && grep -q 'affected by security advisories' "$STAGE1_LOG" 2>/dev/null; then
+                    log_warn "Composer did not install some versions because security advisories cover them, so they and what depends on them are missing from the SBOM:"
+                    grep -o 'found [^ ]*\[[^]]*\] but these were not loaded, because they are affected by security advisories' "$STAGE1_LOG" 2>/dev/null \
+                        | sed 's/^found \([^ ]*\) but.*/\1/' | sort -u | head -n 5 | sed 's/^/        /' >&2
+                    echo "        Scan with the project's composer.lock, or set \"config\": {\"audit\": {\"block-insecure\": false}} in composer.json for the scan, so the SBOM lists the versions the project uses." >&2
+                    echo "        Composer가 보안 권고가 걸린 버전을 설치하지 않아 SBOM에서 빠졌습니다. composer.lock을 함께 두고 스캔하세요." >&2
+                fi
             else
                 echo "[INFO] ${_s1_where}"
             fi
@@ -4102,7 +4115,7 @@ GRADLE_USER_CACHE_EOF
     if [ -n "$STAGE1_FAILED" ] \
        && [ -z "$("${DOCKER_ENV[@]}" docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}' "$PP_IMAGE" 2>/dev/null | grep -v '<no value>')" ]; then
         log_error "cdxgen produced no SBOM, and the post-processing image $PP_IMAGE is older than this CLI: it cannot run the manifest-only fallback."
-        echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $STAGE1_LOG" >&2
+        echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $(shownpath "$STAGE1_LOG")" >&2
         exit 1
     fi
     # What stage 1 ran with, for the input fingerprint stage 2 records in the
@@ -4160,7 +4173,7 @@ EOF
             log_error "Static detection failed. Scan again with --detection build."
         fi
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-            log_error "SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
+            log_error "SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $(shownpath "$STAGE1_LOG")"
         fi
         # What stage 1 wrote has not been post-processed. Keep it under a name no
         # one reads as a finished SBOM.
@@ -4175,9 +4188,9 @@ EOF
         # The fallback reads manifests only. When it found no component, "direct
         # dependencies only" would say the opposite of what the SBOM holds.
         if sbom_has_components "$OUTPUT_HOST_DIR/$OUTPUT_FILE"; then
-            log_warn "Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+            log_warn "Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $(shownpath "$STAGE1_LOG")"
         else
-            log_warn "Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $STAGE1_LOG"
+            log_warn "Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $(shownpath "$STAGE1_LOG")"
         fi
     fi
 else
@@ -4492,7 +4505,10 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 [ -n "$sum_code" ] || continue
                 log_warn "${sum_code}: ${sum_fix}"
             done <<< "$sum_complete_fix"
-            echo "  To fail a CI run on this, add --fail-on incomplete-result (or incomplete-result=unreliable)."
+            # Only for a run that does not gate on its result already.
+            if [ "${#FAIL_ON[@]}" -eq 0 ] && [ "$FAIL_ON_CONFORMANCE" != "true" ]; then
+                echo "  To fail a CI run on this, add --fail-on incomplete-result (or incomplete-result=unreliable)."
+            fi
             ;;
     esac
 fi
