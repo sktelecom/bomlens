@@ -76,6 +76,45 @@ run_optional_step() {
     return 0
 }
 
+# refresh_summary_failed_steps <sbom> <summary.result>: rewrite the failedSteps
+# line of the CLI's closing-summary sidecar from the SBOM as it is now.
+# validate-sbom.sh writes the sidecar during the conformance step, so a
+# post-process step that fails after it (generate-notice, the security scan,
+# the risk report) was missing from the list. Same reading and caps as
+# validate-sbom.sh: each label once in order, at most 100 characters, 20 shown
+# and the rest counted, control characters replaced. A document jq cannot read
+# leaves the sidecar as it is.
+refresh_summary_failed_steps() {
+    local sbom="$1" summary="$2" line tmp
+    [ -n "$sbom" ] && [ -f "$sbom" ] && [ -n "$summary" ] && [ -f "$summary" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    line=$(jq -r '
+      ([ (((.metadata // {}).properties) // [])[]?
+         | select(type=="object" and .name=="bomlens:pipeline-step-failed")
+         | .value
+         | select(type=="string" and length>0)
+       ] | .[0:2000]) as $raw
+      | (reduce $raw[] as $v ({seen:{}, out:[]};
+           if .seen[$v] then . else {seen: (.seen + {($v): true}), out: (.out + [$v])} end)).out
+      | map(.[0:100]) as $steps
+      | ([($steps | length) - 20, 0] | max) as $more
+      | if ($steps | length) > 0
+        then "failedSteps\t\($steps[0:20] | map(gsub("\\p{Cc}"; " ")) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)"
+        else empty end' "$sbom" 2>/dev/null) || return 0
+    tmp="${summary}.steps.tmp"
+    # In place of the old line (appended when there was none), so the other
+    # lines keep their order. The line goes through the environment, not
+    # awk -v, which would read backslashes in a label as escapes.
+    if _RSFS_LINE="$line" awk 'BEGIN { l = ENVIRON["_RSFS_LINE"]; seen = 0 }
+            /^failedSteps\t/ { if (!seen && l != "") print l; seen = 1; next }
+            { print }
+            END { if (!seen && l != "") print l }' "$summary" > "$tmp" 2>/dev/null; then
+        cat "$tmp" > "$summary"
+    fi
+    rm -f "$tmp"
+    return 0
+}
+
 # Print the host's architecture and return 0 when this container is an amd64
 # image run under user-mode emulation on an ARM host (uname says x86_64, but the
 # kernel's /proc/cpuinfo describes ARM cores); return 1 otherwise. A core of

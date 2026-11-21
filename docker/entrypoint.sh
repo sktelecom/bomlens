@@ -3299,6 +3299,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
             # accurate report, not the pre-signing snapshot. Re-copying files
             # this run already sent to the host (the SBOM, NOTICE, ...) is a
             # harmless no-op (see sync_artifacts's own comment).
+            refresh_summary_failed_steps "$OUTPUT_FILE" "${OUT_PREFIX}_summary.result"
             sync_artifacts
             exit 1
         fi
@@ -3333,6 +3334,9 @@ fi
 # call's real job is the tail end: SPDX, signatures, conformance, risk-report
 # and the AI profile.
 # ========================================================
+# The closing summary's failed steps, from the SBOM as it is now: the sidecar
+# was written by the conformance step, before NOTICE and the security scan.
+refresh_summary_failed_steps "$OUTPUT_FILE" "${OUT_PREFIX}_summary.result"
 sync_artifacts
 
 # A refused --component-versions file: everything above is written, without
