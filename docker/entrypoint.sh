@@ -35,6 +35,12 @@ set -e
 # ========================================================
 
 SCAN_MODE="${MODE:-POSTPROCESS}"
+# How the conformance check ran (the document it read, whether that document is
+# a received one, the MODE it was given), so refresh_conformance can run it
+# again the same way once later steps have changed what it reports.
+CONFORMANCE_INPUT=""
+CONFORMANCE_SUPPLIED=false
+CONFORMANCE_RUN_MODE=""
 # BOMLENS_LIBDIR lets tests/test-engine-contract.sh run this script from a
 # checkout against the repository's docker/lib, without building the image.
 LIBDIR="${BOMLENS_LIBDIR:-/usr/local/lib/sbom}"
@@ -1546,6 +1552,7 @@ EOF
         # BOMLENS_SBOM_SUPPLIED: the input is read before conversion, so it has
         # not been stamped bomlens:sbom-supplied yet (assess-completeness.sh).
         BOMLENS_SBOM_SUPPLIED=true run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
+        CONFORMANCE_INPUT="$ANALYZE_SBOM"; CONFORMANCE_SUPPLIED=true
         fi
         # Describe the document the supplier actually sent, before conversion
         # rewrites it: the format and version it was written in, the tool that
@@ -2564,17 +2571,58 @@ case "$SCAN_MODE" in
     SOURCE|POSTPROCESS|ROOTFS|IMAGE|BINARY|FIRMWARE|MERGE) CONFORMANCE_GEN_MODE=true ;;
     *) CONFORMANCE_GEN_MODE=false ;;
 esac
+# Whether the vulnerability check failed is a fact of this run, stamped after the
+# security scan below: an SBOM a previous run or a supplier stamped does not say it.
+clear_document_status "$OUTPUT_FILE" bomlens:vulnerability-check-failed
 if [ "$AI_MODEL_SCAN" = "true" ]; then
     echo "[2/2] ai: G7 minimum-element conformance"
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    CONFORMANCE_INPUT="$OUTPUT_FILE"
 elif [ "$CONFORMANCE_GEN_MODE" = "true" ]; then
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    CONFORMANCE_INPUT="$OUTPUT_FILE"
 elif [ "$YOCTO_FROM_BUILD" = "true" ] && [ ! -f "${OUT_PREFIX}_conformance.json" ]; then
     # A Yocto build directory: the SBOM read from the build is what the supplier
     # submits. Judged as a firmware SBOM is (MODE=YOCTO): it records the packages
     # installed, not a dependency graph.
     MODE="$CONFORMANCE_MODE" run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    CONFORMANCE_INPUT="$OUTPUT_FILE"; CONFORMANCE_RUN_MODE="$CONFORMANCE_MODE"
 fi
+# What the conformance report and the closing summary were written from: the
+# failed steps and the vulnerability-check stamp on the SBOM. Steps that run
+# later (NOTICE, the security scan, the risk report) can change either, and
+# refresh_conformance then writes both again.
+conformance_facts() {
+    jq -c '[(.metadata.properties // [])[]? | select(type == "object"
+             and (.name == "bomlens:pipeline-step-failed" or .name == "bomlens:vulnerability-check-failed"))
+           | [.name, .value]]' "$OUTPUT_FILE" 2>/dev/null || true
+}
+CONFORMANCE_FACTS="$(conformance_facts)"
+# refresh_conformance: run the conformance check again, the way it ran above,
+# when the facts it reports have changed since, so its failed-step list and
+# completeness row match the SBOM as it is now. Not a step of its own (a
+# failure is said and leaves the earlier report), and it never writes the SBOM.
+# For --analyze the check reads the received document, which does not carry
+# this run's stamps, so the vulnerability-check fact is passed to it.
+refresh_conformance() {
+    local facts vc=""
+    [ -n "$CONFORMANCE_INPUT" ] && [ -f "$CONFORMANCE_INPUT" ] && [ -f "${OUT_PREFIX}_conformance.json" ] || return 0
+    facts="$(conformance_facts)"
+    [ "$facts" != "$CONFORMANCE_FACTS" ] || return 0
+    CONFORMANCE_FACTS="$facts"
+    if [ "$CONFORMANCE_SUPPLIED" = true ]; then
+        vc="$(jq -r '[(.metadata.properties // [])[]? | select(.name? == "bomlens:vulnerability-check-failed") | .value | strings][0] // empty' "$OUTPUT_FILE" 2>/dev/null)" || vc=""
+    fi
+    (
+        [ -z "$CONFORMANCE_RUN_MODE" ] || export MODE="$CONFORMANCE_RUN_MODE"
+        [ "$CONFORMANCE_SUPPLIED" != true ] || export BOMLENS_SBOM_SUPPLIED=true
+        [ -z "$vc" ] || export BOMLENS_VULNERABILITY_CHECK_FAILED="$vc"
+        bash "$LIBDIR/validate-sbom.sh" "$CONFORMANCE_INPUT" "$OUT_PREFIX" "$PROJECT_NAME" >/dev/null
+    ) || echo "[WARN] could not refresh the conformance check report with the steps that ran after it; it lists the failed steps as they were when it ran." >&2
+    # The check rewrote the completeness file and the summary from the document
+    # it read; the result's own verdict is the final SBOM's.
+    assess_result_completeness
+}
 # --no-report skips the block that collects the conformance sidecars below, but the
 # CLI's closing summary still needs its facts on the host.
 if [ "${GENERATE_REPORT:-false}" != "true" ] && [ -f "${OUT_PREFIX}_summary.result" ]; then
@@ -2754,9 +2802,11 @@ sync_artifacts
 # and the conformance check all state, and that the web layer can read without
 # recomputing it. Not a pipeline step: it never marks the SBOM, and a failure
 # only leaves the file out.
-if [ -s "$OUTPUT_FILE" ]; then
+# Called again whenever the conformance check is refreshed below, since that
+# check rewrites both files from the document it judges.
+assess_result_completeness() {
+    [ -s "$OUTPUT_FILE" ] || return 0
     bash "$LIBDIR/assess-completeness.sh" "$OUTPUT_FILE" "$OUT_PREFIX" >/dev/null || true
-    [ -f "${OUT_PREFIX}_completeness.json" ] && ARTIFACTS+=("${OUT_PREFIX}_completeness.json")
     # The CLI's closing summary states this same verdict. validate-sbom.sh wrote
     # its own earlier from a CycloneDX document only, so redo the completeness keys
     # from the final file (a received SPDX SBOM is judged here, after conversion).
@@ -2774,18 +2824,10 @@ if [ -s "$OUTPUT_FILE" ]; then
         fi
         rm -f "$_sum_tmp"
     fi
-fi
-
-if [ "${GENERATE_NOTICE:-false}" != "true" ]; then
-    er_record generate-notice disabled
-fi
-if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
-    run_optional_step generate-notice bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
-    [ -f "${OUT_PREFIX}_NOTICE.txt" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt")
-    [ -f "${OUT_PREFIX}_NOTICE.html" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.html")
-    # PDF is produced only when a renderer is in the image (SBOM_PDF=true).
-    [ -f "${OUT_PREFIX}_NOTICE.pdf" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.pdf")
-    sync_artifacts
+}
+if [ -s "$OUTPUT_FILE" ]; then
+    assess_result_completeness
+    [ -f "${OUT_PREFIX}_completeness.json" ] && ARTIFACTS+=("${OUT_PREFIX}_completeness.json")
 fi
 
 if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
@@ -2919,12 +2961,22 @@ export BOMLENS_DEEP_CVE_STATUS_FILE
 # afterwards means scan-security.sh never reached the match.
 BOMLENS_GO_VULNDB_STATUS_FILE="$(mktemp 2>/dev/null)" || BOMLENS_GO_VULNDB_STATUS_FILE=""
 export BOMLENS_GO_VULNDB_STATUS_FILE
+_ss_status=""
 if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
+    # A report an earlier run left in this folder is not this run's.
+    rm -f "${OUT_PREFIX}_security.json"
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    _ss_status="$OPTIONAL_STEP_STATUS"
     # Trivy's database download refused for an untrusted certificate (a
     # proxy that inspects TLS): one line naming SBOM_EXTRA_CA_CERTS.
     _ss_scan_error="$(jq -r '.ScanError.Message // empty' "${OUT_PREFIX}_security.json" 2>/dev/null || true)"
     [ -z "$_ss_scan_error" ] || tls_trust_hint "security scan (Trivy)" - <<< "$_ss_scan_error"
+    # scan-security.sh returns 0 when Trivy itself failed (the report says so),
+    # but the step did not give its result: list it with the failed steps. The
+    # result manifest reads the same ScanError (engine-result.sh).
+    if [ -n "$_ss_scan_error" ] && [ "$_ss_status" = ok ]; then
+        mark_pipeline_warning "$OUTPUT_FILE" scan-security
+    fi
     _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"
     case "$_trivy_db_max" in ''|*[!0-9]*) _trivy_db_max=7 ;; esac
     if [[ "$_trivy_db_age" =~ ^[0-9]+$ ]] && [ "$_trivy_db_age" -gt "$_trivy_db_max" ] \
@@ -2937,6 +2989,22 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; 
     [ -f "${OUT_PREFIX}_security.md" ] && ARTIFACTS+=("${OUT_PREFIX}_security.md")
     [ -f "${OUT_PREFIX}_security.html" ] && ARTIFACTS+=("${OUT_PREFIX}_security.html")
     sync_artifacts
+fi
+# A security scan that was asked for and gave no result (Trivy failed, its
+# database was missing, the step failed, or Trivy is not in the image) makes the
+# result partial: the SBOM is stamped (bomlens:vulnerability-check-failed), so
+# the NOTICE, the risk report, the refreshed conformance check and the closing
+# summary written below state it as the security report does. A database that
+# is only old is not stamped: the check ran (it is recorded as degraded above).
+if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
+    _vc_reason=""
+    if [ "$_trivy_db_ready" != true ]; then
+        _vc_reason="no Trivy database in the trivy-db mount"
+    elif [ "$_ss_status" = ok ] && [ ! -f "${OUT_PREFIX}_security.json" ] && ! command -v trivy >/dev/null 2>&1; then
+        _vc_reason="Trivy is not in this image"
+    fi
+    _vc_stamped="$(mark_vulnerability_check "$OUTPUT_FILE" "$OUT_PREFIX" "$_vc_reason" "$_ss_status")"
+    [ -z "$_vc_stamped" ] || echo "[WARN] the vulnerability check did not run or failed (${_vc_stamped}); the result is graded partial. Fix: let the scan reach the vulnerability database (SBOM_EXTRA_CA_CERTS for a proxy that inspects HTTPS, TRIVY_DB_REPOSITORY for a mirror) and scan again." >&2
 fi
 # Deep CVE matching (--deep-cve): scan-security.sh runs grype's CPE matcher
 # when grype is in this image (the deep-cve image) and DEEP_CVE is not false.
@@ -3053,6 +3121,25 @@ else
 fi
 if [ -n "$BOMLENS_GO_VULNDB_STATUS_FILE" ]; then rm -f "$BOMLENS_GO_VULNDB_STATUS_FILE"; fi
 
+# NOTICE: after the security scan, so the completeness notice it carries
+# includes a vulnerability check that did not run or failed (stamped above).
+if [ "${GENERATE_NOTICE:-false}" != "true" ]; then
+    er_record generate-notice disabled
+fi
+if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
+    run_optional_step generate-notice bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    [ -f "${OUT_PREFIX}_NOTICE.txt" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt")
+    [ -f "${OUT_PREFIX}_NOTICE.html" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.html")
+    # PDF is produced only when a renderer is in the image (SBOM_PDF=true).
+    [ -f "${OUT_PREFIX}_NOTICE.pdf" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.pdf")
+    sync_artifacts
+fi
+
+# The conformance report was written before NOTICE and the security scan: bring
+# its failed steps and completeness row up to date before the --fail-on gate and
+# the risk report read it.
+refresh_conformance
+
 # A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
 # SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are
 # left as they are. An explicit request the document cannot satisfy is said
@@ -3131,6 +3218,9 @@ if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; the
     [ -f "${OUT_PREFIX}_risk-report.md" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.md")
     [ -f "${OUT_PREFIX}_risk-report.html" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.html")
 fi
+# Once more for a risk report that failed (refresh_conformance is a no-op when
+# nothing it reports has changed).
+refresh_conformance
 
 # SBOM body size cap: a scan run against --target (not through the web UI's
 # upload) never passes through docker/web/server.py's MAX_BYTES["sbom"] check,

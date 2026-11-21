@@ -149,6 +149,13 @@
       "ko": "이 생태계(패키지 관리 체계)는 취약점 조회에 쓰는 자료원이 없어 해당 컴포넌트를 확인하지 못했습니다({detail}). 취약점이 없다는 결과는 이 컴포넌트를 포함하지 않습니다.",
       "fixEn": "Review these dependencies against the project's own security advisories until a data source is available.",
       "fixKo": "자료원이 지원될 때까지 해당 라이브러리의 보안 공지를 별도로 확인하세요."
+    },
+    "vulnerability-check-failed": {
+      "grade": "partial",
+      "en": "The vulnerability check was asked for but did not run or failed ({detail}), so no component was checked for known vulnerabilities. That this result lists no vulnerability does not mean the components have none.",
+      "ko": "취약점 확인을 요청했지만 실행되지 않았거나 실패해({detail}) 어떤 컴포넌트도 알려진 취약점을 확인하지 못했습니다. 결과에 취약점이 나오지 않았다고 해서 컴포넌트에 취약점이 없는 것은 아닙니다.",
+      "fixEn": "Let the scan reach the vulnerability database (Trivy downloads it from ghcr.io). Behind a proxy that inspects HTTPS, give its certificate with SBOM_EXTRA_CA_CERTS; where ghcr.io is blocked, name a mirror with TRIVY_DB_REPOSITORY or mount a database. Then scan again.",
+      "fixKo": "스캔이 취약점 데이터베이스에 접속할 수 있게 하세요(Trivy는 ghcr.io에서 내려받습니다). HTTPS를 검사하는 프록시를 거친다면 그 인증서를 SBOM_EXTRA_CA_CERTS로 지정하고, ghcr.io가 막혀 있다면 TRIVY_DB_REPOSITORY로 미러를 지정하거나 데이터베이스를 마운트하세요. 그런 다음 다시 스캔하세요."
     }
   }
 }

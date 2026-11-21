@@ -2609,6 +2609,47 @@ else
     echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
 fi
 
+echo "== a failed vulnerability check makes every report partial; later failed steps reach the conformance report =="
+# Trivy stops on its database download: the completeness verdict, the NOTICE,
+# the security and risk reports, the conformance report and the closing summary
+# all say partial with the same reason, and scan-security is listed as failed.
+VC="$(new_run vulncheck)"
+run_engine "$VC" "$ROOT_DIR/docker/lib" TRIVY_STUB=fail GENERATE_NOTICE=true GENERATE_REPORT=true FETCH_LICENSE=false
+vc_bad=""
+[ "$(jq -c '[.grade, [.reasons[].code]]' "$VC/demo_1.0_completeness.json" 2>/dev/null)" = '["partial",["vulnerability-check-failed"]]' ] \
+    || vc_bad="$vc_bad completeness.json"
+for vc_f in NOTICE.txt security.md risk-report.md; do
+    grep -qF "The vulnerability check was asked for but did not run or failed" "$VC/demo_1.0_$vc_f" 2>/dev/null || vc_bad="$vc_bad $vc_f"
+done
+jq -e '(.pipelineStepsFailed | index("scan-security")) and any(.checks[]; .id == "result-completeness" and (.detail | startswith("Partial: vulnerability-check-failed")))' \
+    "$VC/demo_1.0_conformance.json" >/dev/null 2>&1 || vc_bad="$vc_bad conformance.json"
+grep -qx "$(printf 'completenessReasons\tvulnerability-check-failed')" "$VC/demo_1.0_summary.result" 2>/dev/null \
+    && grep -qx "$(printf 'failedSteps\tscan-security')" "$VC/demo_1.0_summary.result" || vc_bad="$vc_bad summary.result"
+[ -z "$vc_bad" ] && pass "a failed Trivy run grades the result partial in every report, with scan-security listed as failed" \
+    || fail "a failed Trivy run is not stated in:$vc_bad" "$(grep -n 'WARN' "$VC.log" | head -5)"
+# The same SBOM with the security check off, carrying a stamp an earlier run
+# left: no reason, complete.
+VO="$(new_run vulncheck-off)"
+jq '.metadata.properties = ((.metadata.properties // []) + [{"name":"bomlens:vulnerability-check-failed","value":"an earlier run"}])' \
+    "$FIX/good-cyclonedx.json" > "$VO/demo_1.0_bom.json"
+run_engine "$VO" "$ROOT_DIR/docker/lib" GENERATE_SECURITY=false GENERATE_NOTICE=true GENERATE_REPORT=true FETCH_LICENSE=false
+{ [ "$(jq -r .grade "$VO/demo_1.0_completeness.json" 2>/dev/null)" = complete ] \
+    && ! jq -e 'any(.metadata.properties[]?; .name == "bomlens:vulnerability-check-failed")' "$VO/demo_1.0_bom.json" >/dev/null 2>&1; } \
+    && pass "with the security check off the reason is not given, and a stamp an earlier run left is removed" \
+    || fail "a scan with the security check off carries the failed-check reason" "$(jq -c . "$VO/demo_1.0_completeness.json" 2>&1 | head -c 300)"
+# A step that fails after the conformance check (here NOTICE, from a copy of
+# the scripts whose notice step fails) is in the conformance report's list.
+VN="$(new_run vulncheck-notice)"
+VNLIB="$WORK/lib-notice-fails"
+cp -R "$ROOT_DIR/docker/lib" "$VNLIB"
+printf '#!/bin/bash\nexit 1\n' > "$VNLIB/generate-notice.sh"
+run_engine "$VN" "$VNLIB" GENERATE_NOTICE=true GENERATE_REPORT=true FETCH_LICENSE=false
+{ jq -e '.pipelineStepsFailed == ["generate-notice"]' "$VN/demo_1.0_conformance.json" >/dev/null 2>&1 \
+    && grep -qF '`generate-notice`' "$VN/demo_1.0_conformance.md" \
+    && grep -qF 'generate-notice' "$VN/demo_1.0_conformance.html"; } \
+    && pass "a step that fails after the conformance check is listed in its JSON, Markdown and HTML report" \
+    || fail "the conformance report misses a step that failed after it" "$(jq -c .pipelineStepsFailed "$VN/demo_1.0_conformance.json" 2>&1)"
+
 echo "== every step label in entrypoint.sh is documented =="
 missing=""
 for id in $(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_record|er_phase) [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u); do

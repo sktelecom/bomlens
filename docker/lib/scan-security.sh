@@ -564,6 +564,13 @@ UNCHECKED_MAX=200
 
 # Whether the result can be read as complete (assess-completeness.sh): an empty
 # or partial SBOM must not come out of this report as "no known vulnerabilities".
+# A failed Trivy run is one of the reasons. This script leaves the SBOM as it
+# is, so the fact goes to the assessment here, in the same words entrypoint.sh
+# stamps on the SBOM afterwards (mark_vulnerability_check) for the later reports.
+if [ -n "$SCAN_ERR" ]; then
+    BOMLENS_VULNERABILITY_CHECK_FAILED="Trivy: $SCAN_ERR"
+    export BOMLENS_VULNERABILITY_CHECK_FAILED
+fi
 report_completeness_load "$SBOM" "$OUT_PREFIX"
 INCOMPLETE=false
 if report_completeness_incomplete; then INCOMPLETE=true; fi

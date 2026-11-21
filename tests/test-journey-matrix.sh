@@ -53,9 +53,10 @@ JLOG="$WORK/judgments.log"
 broke() { echo "$1: $2" >> "$JLOG"; }
 has() { grep -qF -- "$2" "$1" 2>/dev/null; }
 
-# judge <id> <dir> <want grade, or any>: the reports are <dir>/<id>_*.
+# judge <id> <dir> <want grade, or any> [reason code that must be listed]: the
+# reports are <dir>/<id>_*.
 judge() {
-    local id="$1" p="$2/$1" want="$3" f grade label title msg
+    local id="$1" p="$2/$1" want="$3" want_code="${4:-}" f grade label title msg
     if [ ! -f "${p}_completeness.json" ]; then
         broke "$id" "no completeness file was written"
         return 0
@@ -64,6 +65,9 @@ judge() {
     label="$(jq -r .gradeLabel.en "${p}_completeness.json")"
     if [ "$want" != any ] && [ "$grade" != "$want" ]; then
         broke "$id" "grade is $grade, expected $want"
+    fi
+    if [ -n "$want_code" ] && ! jq -e --arg c "$want_code" 'any(.reasons[]; .code == $c)' "${p}_completeness.json" >/dev/null 2>&1; then
+        broke "$id" "the reasons do not include $want_code"
     fi
     title="$(jq -r .labels.title.en "$LIB_REAL/completeness-reasons.json")"
     if [ "$grade" = complete ]; then
@@ -126,8 +130,14 @@ PY
 
 # --- tier 1 ----------------------------------------------------------------
 FAKEBIN="$WORK/fakebin"; mkdir -p "$FAKEBIN"
+# MATRIX_TRIVY_FAIL=1: Trivy stops on its database download, as it does when
+# the network cannot resolve the registry.
 cat > "$FAKEBIN/trivy" <<'SH'
 #!/bin/sh
+if [ "${MATRIX_TRIVY_FAIL:-}" = 1 ]; then
+    echo "2026-11-21T00:00:00Z	FATAL	Fatal error	init error: DB error: failed to download vulnerability DB: dial tcp: lookup ghcr.io: no such host" >&2
+    exit 1
+fi
 out=""
 while [ $# -gt 0 ]; do
     [ "$1" = "--output" ] && { out="$2"; shift; }
@@ -145,7 +155,7 @@ empty_props() { printf '%s' "$EMPTY" | jq -c --argjson p "$1" '.metadata.propert
 # Writes <dir>/<id>/<id>_bom.json for every input and prints "<id> <grade>".
 matrix_inputs() {
     local d="$1"
-    add() { mkdir -p "$d/$1"; cat > "$d/$1/$1_bom.json"; echo "$1 $2"; }
+    add() { mkdir -p "$d/$1"; cat > "$d/$1/$1_bom.json"; echo "$1 $2 ${3:-}"; }
     add resolved-java complete < "$JAVA"
     printf '%s' "$EMPTY" | add nothing-declared partial
     empty_props '[{"name":"bomlens:sbom-supplied","value":"true"}]' | add supplier-empty unreliable
@@ -160,27 +170,40 @@ matrix_inputs() {
     with_props '[{"name":"bomlens:pipeline-step-failed","value":"gradle-dependencies"}]' | add step-failed partial
     # A failed step with the cause the build tool reported and a hint.
     with_props '[{"name":"bomlens:pipeline-step-failed","value":"maven-dependency-tree"},{"name":"bomlens:pipeline-step-cause","value":"maven-dependency-tree: Non-resolvable parent POM example.mm:parent:1.0.0 (../pom.xml is outside the scanned folder)"},{"name":"bomlens:resolution-hint","value":"maven-parent-outside-scan"}]' | add step-cause-hint partial
+    # A resolved project whose vulnerability check failed (Trivy could not
+    # download its database), and one more failed check on a result that was
+    # already partial: both reasons are stated.
+    add security-failed partial vulnerability-check-failed < "$JAVA"
+    with_props '[{"name":"bomlens:lockfile-missing","value":"package-lock.json"}]' | add security-failed-lockfile partial vulnerability-check-failed
     empty_props '[{"name":"bomlens:sbom-empty-with-manifests","value":"app/build.gradle"},{"name":"bomlens:pipeline-step-failed","value":"android-release-classpath"},{"name":"bomlens:pipeline-step-cause","value":"android-release-classpath: Execution failed for task '"'"':app:dependencies'"'"'. Configuration `:app:debugRuntimeClasspath` contains AndroidX dependencies, but the `android.useAndroidX` property is not enabled, which may cause runtime issues."},{"name":"bomlens:resolution-hint","value":"android-useandroidx-missing"},{"name":"bomlens:resolution-hint","value":"android-release-classpath-unresolved"}]' | add android-unresolved unreliable
 }
 
+# The entrypoint's order: the conformance check, the security scan and the stamp
+# of a check that gave no result (mark_vulnerability_check), NOTICE, the
+# conformance check again with what came after it (refresh_conformance), the
+# risk report.
 run_reports() { # <dir> <id>
-    local d="$1/$2" n="$2"
+    local d="$1/$2" n="$2" trivy_fail=""
+    case "$n" in security-failed*) trivy_fail=1 ;; esac
     ( cd "$d" || exit 1
-      export PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+      export PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MATRIX_TRIVY_FAIL="$trivy_fail"
       bash "$LIB/assess-completeness.sh" "${n}_bom.json" "$n" >/dev/null 2>&1
       bash "$LIB/validate-sbom.sh" "${n}_bom.json" "$n" proj >/dev/null 2>&1
       bash "$LIB/scan-security.sh" "${n}_bom.json" "$n" proj >/dev/null 2>&1
+      # shellcheck disable=SC1091
+      ( . "$LIB/pipeline-step.sh" && mark_vulnerability_check "${n}_bom.json" "$n" "" ok ) >/dev/null 2>&1
       bash "$LIB/generate-notice.sh" "${n}_bom.json" "$n" proj >/dev/null 2>&1
+      bash "$LIB/validate-sbom.sh" "${n}_bom.json" "$n" proj >/dev/null 2>&1
       bash "$LIB/generate-risk-report.sh" "$n" proj >/dev/null 2>&1 ) || true
 }
 
 run_tier1() { # <dir>: the broken rules are left in $JLOG
-    local d="$1" id g ids=""
+    local d="$1" id g code ids=""
     mkdir -p "$d"
     : > "$JLOG"
-    while read -r id g; do
+    while read -r id g code; do
         run_reports "$d" "$id"
-        judge "$id" "$d/$id" "$g"
+        judge "$id" "$d/$id" "$g" "$code"
         ids="$ids $id"
     done < <(matrix_inputs "$d")
     # shellcheck disable=SC2086

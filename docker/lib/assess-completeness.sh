@@ -60,6 +60,23 @@
 #   bomlens:python-environment-unsure             (installed-environment-unsure: the Python
 #                                                 part was read from an installed environment
 #                                                 and some of it could not be settled)
+#   bomlens:vulnerability-check-failed            (vulnerability-check-failed: the security
+#                                                 scan was asked for and did not run or
+#                                                 failed; the value says why). Stamped by
+#                                                 entrypoint.sh after the scan
+#                                                 (mark_vulnerability_check in
+#                                                 pipeline-step.sh) and removed before the
+#                                                 conformance check, so a scan with
+#                                                 --no-security never carries it. Two callers
+#                                                 judge without that stamp and pass the fact
+#                                                 in BOMLENS_VULNERABILITY_CHECK_FAILED: the
+#                                                 security report of the failed scan itself,
+#                                                 and the refreshed conformance check of
+#                                                 --analyze, which reads the input as
+#                                                 received (with BOMLENS_SBOM_SUPPLIED=true the
+#                                                 input's own stamp, a supplier's run, is not read).
+#                                                 A Trivy database that is only old is not a
+#                                                 reason: the check ran against it.
 #   components of a package ecosystem no vulnerability source covers
 #                                                 (unchecked-ecosystem)
 #
@@ -98,7 +115,7 @@ fi
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 # shellcheck disable=SC2016  # jq program, not shell
-if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
+if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --arg vuln_env "${BOMLENS_VULNERABILITY_CHECK_FAILED:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   # Text that comes from the document is cut to a short single line: a supplier
   # SBOM (--analyze) is not trusted, and these strings reach a terminal and HTML.
   def clean($n): (tostring | gsub("\\p{Cc}"; " ") | .[0:$n]);
@@ -136,6 +153,11 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   | ([ prop("bomlens:lockfile-corrupt")[] | clean(200) ]) as $corrupt
   | (prop("bomlens:manifest-not-read") | first // null) as $notread
   | (prop("bomlens:python-environment-unsure") | first // null) as $venv_unsure
+  # The input of --analyze as received (BOMLENS_SBOM_SUPPLIED=true) may carry
+  # the stamp of the run of the supplier, which says nothing about this one.
+  | (if $vuln_env != "" then $vuln_env
+     elif $supplied_env == "true" then null
+     else (prop("bomlens:vulnerability-check-failed") | first // null) end) as $vuln_failed
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
   | ((.metadata.component.type // "") | IN("machine-learning-model", "data")) as $model_root
@@ -153,6 +175,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
       (if ($corrupt | length) > 0 then {code: "lockfile-corrupt", detail: ($corrupt | join("; ") | .[0:200])} else empty end),
       (if $notread != null and $empty == null then {code: "manifest-not-read", detail: ($notread | clean(200))} else empty end),
       (if $venv_unsure != null then {code: "installed-environment-unsure", detail: ($venv_unsure | clean(200))} else empty end),
+      (if $vuln_failed != null then {code: "vulnerability-check-failed", detail: ($vuln_failed | clean(200))} else empty end),
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
     # A failed step may carry the cause the build tool reported and hints,
