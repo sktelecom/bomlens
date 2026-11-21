@@ -76,6 +76,20 @@ describe("reviewGroups", () => {
     ]);
   });
 
+  it("puts proprietary last", () => {
+    const nd = c({ name: "nd-data", licenses: ["CC-BY-ND-4.0"], licenseReview: "no-derivatives" });
+    const pr = c({ name: "vendor-sdk", licenses: ["LicenseRef-Proprietary"], licenseReview: "proprietary" });
+    const groups = reviewGroups([pr, nd, ...COMPONENTS]);
+    expect(groups.map((g) => g.flag)).toEqual([
+      "behavioral-use",
+      "non-commercial",
+      "no-derivatives",
+      "proprietary",
+    ]);
+    expect(groups[3].components.map((x) => x.name)).toEqual(["vendor-sdk"]);
+    expect(reviewCount([pr, nd, ...COMPONENTS])).toBe(4);
+  });
+
   it("is empty when nothing needs review", () => {
     expect(reviewGroups([c({ licenses: ["MIT"] })])).toEqual([]);
     expect(reviewCount(COMPONENTS)).toBe(2);

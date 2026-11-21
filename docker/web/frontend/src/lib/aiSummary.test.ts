@@ -109,6 +109,17 @@ describe("computeAiSummary", () => {
     expect(s.crosswalk).toEqual({ frameworkCount: 2, present: 24, total: 38 });
   });
 
+  it("counts proprietary licenses in the license review total", () => {
+    const result = makeResult({
+      aiProfile: {
+        ...PROFILE,
+        licenseReview: { total: 3, behavioral: 1, nonCommercial: 0, noDerivatives: 0, proprietary: 2 },
+        riskAssessment: ASSESS_SINGLE,
+      },
+    });
+    expect(computeAiSummary(result, "en").risk?.licenseReviewCount).toBe(3);
+  });
+
   it("reads the Korean summary and disclaimer when the session language is Korean", () => {
     const result = makeResult({
       sbom: {

@@ -16,6 +16,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   conformance: "pipelineSteps.conformance",
   "resolve-purl": "pipelineSteps.resolvePurl",
   "license-registry": "pipelineSteps.licenseRegistry",
+  "cocoapods-licenses": "pipelineSteps.cocoapodsLicenses",
   "describe-input": "pipelineSteps.describeInput",
   "suggest-vendored": "pipelineSteps.suggestVendored",
   docmeta: "pipelineSteps.docmeta",

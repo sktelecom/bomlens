@@ -117,6 +117,15 @@ describe("splitFailedSteps", () => {
     expect(hasIncompleteSteps(["enrich-cpe", "license-fetch"])).toBe(true);
   });
 
+  it("treats a degraded CocoaPods license lookup like the registry license lookup", () => {
+    expect(pipelineStepLabelKey("cocoapods-licenses")).toBe("pipelineSteps.cocoapodsLicenses");
+    expect(splitFailedSteps(["cocoapods-licenses", "license-registry"])).toEqual({
+      incomplete: ["cocoapods-licenses", "license-registry"],
+      licenseLookupSkipped: false,
+    });
+    expect(hasIncompleteSteps(["cocoapods-licenses"])).toBe(true);
+  });
+
   it("counts steps past the listed cap as incomplete", () => {
     expect(hasIncompleteSteps(["license-fetch"], 2)).toBe(true);
   });

@@ -356,9 +356,20 @@ describe("profileCard", () => {
       licenseBehavioral: 1,
       licenseNonCommercial: 1,
       licenseNoDerivatives: 0,
+      licenseProprietary: 0,
       frameworkCount: 2,
       crosswalk: { total: 14, present: 8, gap: 4, review: 2, failed: 0 },
     });
+  });
+
+  it("passes the no-derivatives and proprietary counts through when the profile has them", () => {
+    const card = profileCard({
+      ...profile,
+      licenseReview: { total: 5, behavioral: 1, nonCommercial: 1, noDerivatives: 1, proprietary: 2 },
+    });
+    expect(card.licenseTotal).toBe(5);
+    expect(card.licenseNoDerivatives).toBe(1);
+    expect(card.licenseProprietary).toBe(2);
   });
 });
 
