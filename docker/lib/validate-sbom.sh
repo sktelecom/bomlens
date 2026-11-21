@@ -2241,7 +2241,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_VER=$(kstr aiprofile.th_version); C_TH_LIC=$(kstr aiprofile.th_license)
     C_TH_FLAG=$(kstr aiprofile.th_flag); C_LIC_NONE=$(kstr aiprofile.lic_none_html)
     C_FLAG_B=$(kstr aiprofile.flag_behavioral); C_FLAG_N=$(kstr aiprofile.flag_noncommercial)
-    C_FLAG_D=$(kstr aiprofile.flag_noderivatives)
+    C_FLAG_D=$(kstr aiprofile.flag_noderivatives); C_FLAG_P=$(kstr aiprofile.flag_proprietary)
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
     C_H2_EXPLAINED=$(kstr conformance.h2_explained)
@@ -2281,9 +2281,9 @@ else
     C_TH_FAILED="Failed"
     C_H2_LIC="Licenses flagged for review"
     C_TH_COMP="Component"; C_TH_VER="Version"; C_TH_LIC="License"; C_TH_FLAG="Flag"
-    C_LIC_NONE="No components carry an AI behavioral-use, non-commercial or no-derivatives license flag."
+    C_LIC_NONE="No components carry an AI behavioral-use, non-commercial, no-derivatives or proprietary license flag."
     # The English report shows the flag value itself.
-    C_FLAG_B="behavioral-use"; C_FLAG_N="non-commercial"; C_FLAG_D="no-derivatives"
+    C_FLAG_B="behavioral-use"; C_FLAG_N="non-commercial"; C_FLAG_D="no-derivatives"; C_FLAG_P="proprietary"
     C_SUBMIT_INTRO="What the SBOM itself has to carry. The same bar applies however the SBOM was produced, and a single mandatory failure makes the overall result a failure."
     C_H2_G7CHK="G7 minimum elements"
     C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
@@ -2682,9 +2682,9 @@ HTMLHEAD
         echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_LIC}</h2><span class=\"counter\">$(report_num "$LIC_REVIEW_N")</span></div>"
         if [ "$LIC_REVIEW_N" -gt 0 ]; then
             echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr></thead><tbody>"
-            echo "$LIC_REVIEW" | jq -r --arg fb "$C_FLAG_B" --arg fn "$C_FLAG_N" --arg fd "$C_FLAG_D" '.[] |
+            echo "$LIC_REVIEW" | jq -r --arg fb "$C_FLAG_B" --arg fn "$C_FLAG_N" --arg fd "$C_FLAG_D" --arg fp "$C_FLAG_P" '.[] |
                 (if .flag=="behavioral-use" then $fb elif .flag=="non-commercial" then $fn
-                 elif .flag=="no-derivatives" then $fd else .flag end) as $label |
+                 elif .flag=="no-derivatives" then $fd elif .flag=="proprietary" then $fp else .flag end) as $label |
                 "<tr><td class=\"grow\">" + (.name|tostring|@html) + "</td><td class=\"ver\">" + (.version|tostring|@html) + "</td>"
                 + "<td>" + (.license|tostring|@html) + "</td><td>" + ($label|tostring|@html) + "</td></tr>"'
             echo "</tbody></table></div>"

@@ -10,7 +10,10 @@
 # does NOT already make obvious and that the AI guidance (OpenChain 3.5, G7)
 # calls out — behavioral-use restrictions (RAIL/OpenRAIL, Llama/Gemma/Falcon
 # community licenses), non-commercial terms (CC-BY-NC…) and no-derivatives
-# terms (CC-BY-ND…). Permissive (MIT,
+# terms (CC-BY-ND…), and a license text that names no open source license
+# but a commercial or proprietary one ("commercial", "Proprietary", "Other/
+# Proprietary License", "All rights reserved"), which grants only what the
+# vendor's own terms say. Permissive (MIT,
 # Apache) and ordinary copyleft (GPL/LGPL) are intentionally NOT flagged here, so
 # a normal software scan's NOTICE is unchanged.
 #
@@ -21,6 +24,7 @@ def license_flag($s):
   if   ($n | test("openrail|\\brail\\b|responsible ai|community license|\\bllama|\\bgemma\\b|falcon llm")) then "behavioral-use"
   elif ($n | test("cc by nc|non ?commercial")) then "non-commercial"
   elif ($n | test("cc by nd|no ?deriv(ative)?s|no derivative works")) then "no-derivatives"
+  elif ($n | test("\\bcommercial\\b|\\bproprietary\\b|all rights reserved|closed source")) then "proprietary"
   else "" end;
 
 # ---------------------------------------------------------------------------
