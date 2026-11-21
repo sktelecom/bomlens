@@ -4451,6 +4451,22 @@ write_bom() {
 case "$mode" in
     ok) write_bom; echo "[stub] done" ;;
     progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
+    waitturn|waithang)
+        # The scanner waiting for another scan of the same folder
+        # (docker/entrypoint.sh), then starting once that one has ended.
+        echo "[INFO] Another scan of this folder is running (a command-line scan, process 4242 on this computer); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting."
+        if [ "$mode" = waithang ]; then
+            i=0
+            while [ "$i" -lt 100 ]; do
+                date +%s >> "$STUB_HEARTBEAT"
+                sleep 0.2
+                i=$((i + 1))
+            done
+        fi
+        sleep 0.5
+        echo "[INFO] The earlier scan of this folder has finished; this scan starts now."
+        write_bom
+        ;;
     deepcve-progress) echo "[deep-cve-progress] 55%"; write_bom ;;
     fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
     # entrypoint.sh's declared-components refusal: the step's reasons, its
@@ -5621,6 +5637,97 @@ fi
 # ...but cancelling it does nothing.
 cend=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE2/scan-cancel?id=ended_1.0")
 [ "$cend" = "404" ] && pass "/scan-cancel on an ended scan answers 404" || fail "/scan-cancel ended" "$cend"
+
+# A scan waiting for another scan of the same folder: the scanner's wait line
+# becomes a `waiting` event the running view shows, and its "starts now" line
+# ends the wait. The [INFO] lines stay in the log and are not warnings.
+echo waitturn > "$STUB_MODE_FILE"
+events=$(sse_events "project=waitturn&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+kinds = [(e['event'], e['data']) for e in evs]
+wi = [i for i, (k, d) in enumerate(kinds) if k == 'waiting']
+assert len(wi) == 2, kinds
+first, last = kinds[wi[0]][1], kinds[wi[1]][1]
+assert first['waiting'] is True and first['code'] == 'SAME_FOLDER_SCAN_RUNNING', first
+assert first['detail'].startswith('[INFO] Another scan of this folder is running (a command-line scan'), first
+assert last == {'waiting': False, 'code': 'SAME_FOLDER_SCAN_RUNNING'}, last
+logs = [(i, d) for i, (k, d) in enumerate(kinds) if k == 'log']
+wait_log = [i for i, d in logs if 'Another scan of this folder is running' in d]
+end_log = [i for i, d in logs if 'this scan starts now' in d]
+# Each event follows its own log line.
+assert wait_log and wait_log[0] < wi[0] < end_log[0] < wi[1], (wait_log, wi, end_log)
+done = [d for k, d in kinds if k == 'done'][0]
+assert done['ok'] is True, done
+assert not any('this folder' in w for w in (done.get('warnings') or [])), done.get('warnings')
+"; then
+    pass "the same-folder wait line gives a waiting event, the starts-now line clears it, neither is a warning"
+else
+    fail "same-folder waiting events" "$events"
+fi
+
+# A tab that joins while the scan waits is sent the wait after the log so far.
+echo waithang > "$STUB_MODE_FILE"
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 6 "$BASE2/scan-stream?project=waitjoin&version=1.0&source=current-dir" > /dev/null 2>&1 &
+WOWNER_PID=$!
+sleep 1.5
+curl -sN --max-time 1.5 "$BASE2/scan-attach?id=waitjoin_1.0" > "$WORK/waitjoin.sse" 2>/dev/null || true
+curl -s -X POST "$BASE2/scan-cancel?id=waitjoin_1.0" >/dev/null
+wait "$WOWNER_PID" 2>/dev/null || true
+if sse_file_events "$WORK/waitjoin.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started' and evs[0]['data']['attached'] is True, evs[:1]
+kinds = [e['event'] for e in evs]
+assert kinds.count('waiting') == 1, kinds
+w = evs[kinds.index('waiting')]['data']
+assert w['waiting'] is True and w['code'] == 'SAME_FOLDER_SCAN_RUNNING', w
+wait_log = [i for i, e in enumerate(evs) if e['event'] == 'log' and 'Another scan of this folder' in e['data']]
+assert wait_log and wait_log[0] < kinds.index('waiting'), kinds
+"; then
+    pass "/scan-attach replays a same-folder wait still under way after the log so far"
+else
+    fail "/scan-attach waiting replay" "$(head -c 600 "$WORK/waitjoin.sse")"
+fi
+sleep 1.5
+echo ok > "$STUB_MODE_FILE"
+
+# The replay keeps only a wait still under way: one that has ended, or a scan
+# that has ended, sends none. Lines that are not the scanner's wait give none.
+if python3 - "$ROOT_DIR" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+wait = "[INFO] Another scan of this folder is running (a web UI scan); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting."
+end = "[INFO] The earlier scan of this folder has finished; this scan starts now."
+on = server.same_folder_wait_event(wait)
+assert on["waiting"] is True and on["code"] == "SAME_FOLDER_SCAN_RUNNING" and on["detail"] == wait, on
+assert server.same_folder_wait_event(end) == {"waiting": False, "code": "SAME_FOLDER_SCAN_RUNNING"}
+for other in ("[INFO] scanning", "[WARN] a previous scan of this folder (x) appears to still be running", None, 3,
+              "[stub] [INFO] Another scan of this folder is running"):
+    assert server.same_folder_wait_event(other) is None, other
+b = server._ScanBroadcast("w_1", {})
+b.publish("log", json.dumps(wait))
+b.publish("waiting", json.dumps(on))
+b.publish("progress", json.dumps({"phase": "pull", "complete": 1, "total": 2}))
+_, replay, _ = b.attach()
+assert ("waiting", json.dumps(on)) in replay, replay
+assert [e for e, _ in replay].index("waiting") > [e for e, _ in replay].index("log"), replay
+b.publish("waiting", json.dumps(server.same_folder_wait_event(end)))
+_, replay, _ = b.attach()
+assert not [e for e, _ in replay if e == "waiting"], replay
+b.publish("waiting", json.dumps(on))
+b.publish("done", json.dumps({"ok": False}))
+_, replay, _ = b.attach()
+assert not [e for e, _ in replay if e == "waiting"] and replay[-1][0] == "done", replay
+PY
+then
+    pass "the replay keeps a same-folder wait only while it is under way"
+else
+    fail "same-folder wait replay rules"
+fi
 
 # Ids are checked strictly; an unknown one is 404, and nothing reads a path.
 bad_ok=1

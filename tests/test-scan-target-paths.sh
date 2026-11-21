@@ -430,19 +430,27 @@ else
     fail "cancelled record checks failed (see assertion above)"
 fi
 
-echo "== the same-folder warning gets a code =="
+echo "== the same-folder wait gets a code =="
 if python3 -I - "$ROOT_DIR" <<'PY'
 import os, sys
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
 import server
-line = "[WARN] a previous scan of this folder (bomlens-sib-1174) appears to still be running; not touching its leftovers."
-assert server._SAME_FOLDER_SCAN_RE.search(line)
+line = ("[INFO] Another scan of this folder is running (a web UI scan); this scan waits for it to finish, "
+        "so that neither one sees the other's build files. Cancel this scan to stop waiting.")
+w = server.same_folder_wait_event(line)
+assert w and w["waiting"] is True and w["code"] == "SAME_FOLDER_SCAN_RUNNING", w
+end = server.same_folder_wait_event("[INFO] The earlier scan of this folder has finished; this scan starts now.")
+assert end == {"waiting": False, "code": "SAME_FOLDER_SCAN_RUNNING"}, end
+assert server.same_folder_wait_event("[WARN] no package manifest detected") is None
+# An older scanner image's warning is still recognized.
+old = "[WARN] a previous scan of this folder (bomlens-sib-1174) appears to still be running; not touching its leftovers."
+assert server._SAME_FOLDER_SCAN_RE.search(old)
 assert not server._SAME_FOLDER_SCAN_RE.search("[WARN] no package manifest detected")
 PY
 then
-    pass "the scanner's same-folder note is recognized"
+    pass "the scanner's same-folder wait and its end are recognized, and the older warning still is"
 else
-    fail "same-folder warning pattern failed"
+    fail "same-folder wait pattern failed"
 fi
 
 echo ""
