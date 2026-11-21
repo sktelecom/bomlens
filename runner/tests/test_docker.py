@@ -323,11 +323,17 @@ class Running(unittest.TestCase):
     def test_create_that_fails_still_looks_for_the_container(self):
         backend, cli = make(cli_kw={"create_result": done(-1, err="timed out")})
         out, _ = run(backend)
-        self.assertEqual(out.start_error, "Docker: the container could not be created")
+        self.assertEqual(out.start_error, "Docker: the container could not be created (timed out)")
         ps = next(c for c in cli.calls if c[0] == "ps")
         self.assertIn("name=^/bomlens-s1-2-stage1$", ps)
         self.assertIn("label=example.com/instance=prod", ps)
         self.assertIn(["rm", "--force", "cid-left"], cli.calls)
+
+    def test_create_error_carries_the_daemons_message(self):
+        msg = "Error response from daemon: mounts denied: the path /private/tmp is not shared"
+        backend, _ = make(cli_kw={"create_result": done(1, err="warning\n" + msg + "\x1b[0m")})
+        out, _ = run(backend)
+        self.assertEqual(out.start_error, f"Docker: the container could not be created ({msg} [0m)")
 
     def test_missing_secret_resolver(self):
         backend, _ = make(secrets=None)

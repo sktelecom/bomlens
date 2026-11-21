@@ -107,6 +107,14 @@ SCAN_OPTION_NAMES = frozenset((
     "CYCLONEDX_SPEC_VERSION", "CYCLONEDX_SPEC_VERSIONS", "SPDX_SPEC_VERSIONS", "NS_ADVISORY_TYPES",
 ))
 
+# What an image scan (MODE=IMAGE) takes beyond the scan options: a proxy, an
+# extra CA bundle and the age limit of the Trivy database, for a network that
+# only reaches an old copy of it.
+IMAGE_SCAN_NAMES = SCAN_OPTION_NAMES | frozenset((
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    "BOMLENS_EXTRA_CA_CERTS", "BOMLENS_TRIVY_DB_MAX_AGE_DAYS",
+))
+
 _VALUE_MAX = 4096
 
 # Names the runner sets itself. A caller value for one is refused.
@@ -171,6 +179,10 @@ class RunnerPolicy:
     # Folders or files for the caller's mount roles (cache-maven,
     # maven-settings, ...), under the workspace volume.
     caller_mounts: Mapping[str, Path] = field(default_factory=dict)
+    # A PEM file of extra CA certificates under the workspace volume, for a
+    # proxy that inspects TLS. An image scan mounts it read-only and points
+    # BOMLENS_EXTRA_CA_CERTS at it.
+    extra_ca_file: Path | None = None
     deep_license: bool = False
     deep_cve: bool = False
 
@@ -204,8 +216,7 @@ class RunnerPolicy:
         object.__setattr__(self, "stage2_env", _check_env(
             self.stage2_env, STAGE_PASSTHROUGH_ALLOWED[2] | SCAN_OPTION_NAMES, "stage 2"))
         object.__setattr__(self, "image_env", _check_env(
-            self.image_env, frozenset(PROXY_ENV_NAMES) | SCAN_OPTION_NAMES | frozenset(("BOMLENS_EXTRA_CA_CERTS",)),
-            "image scan"))
+            self.image_env, IMAGE_SCAN_NAMES, "image scan"))
         from .plan import CALLER_ROLES
         for role in self.caller_mounts:
             if role not in CALLER_ROLES:

@@ -41,7 +41,7 @@ from .images import _split, check_image, image_target, require_allowed
 from .manifest import MANIFEST_NAME, EngineResult, load_manifest
 from .plan import (PLAN_FILE, PLAN_FILES_DIR, PROXY_ENV_NAMES, STAGE_PASSTHROUGH_ALLOWED, Plan, Stage,
                    load_plan)
-from .policy import RUNNER_OWNED, SCAN_OPTION_NAMES, RunnerPolicy
+from .policy import IMAGE_SCAN_NAMES, RUNNER_OWNED, SCAN_OPTION_NAMES, RunnerPolicy
 
 STAGE1_LOG_NAME = "bomlens-stage1.log"
 STAGE1_LOG_MAX = 2 * 1024 * 1024
@@ -49,6 +49,7 @@ LINE_MAX = 64 * 1024
 LOG_BUDGET = 16 * 1024 * 1024
 PLAN_FILE_MAX = 4 * 1024 * 1024
 TRIVY_DB_TARGET = "/trivy-db"
+EXTRA_CA_TARGET = "/bomlens-ca/extra.pem"
 EXIT_NOT_RUN = 127
 
 _TRIVY_OFFLINE = {"TRIVY_SKIP_DB_UPDATE": "true", "TRIVY_SKIP_JAVA_DB_UPDATE": "true",
@@ -652,9 +653,12 @@ def run_image_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, ta
     scan.prepare()
     out_dir = scan.fresh(scan.engine_dir / "out")
     result = RunResult("image", out_dir, None)
-    allowed = set(SCAN_OPTION_NAMES) | set(PROXY_ENV_NAMES) | {"BOMLENS_EXTRA_CA_CERTS"}
     env = {"GENERATE_SECURITY": "true", "SECURITY_ENRICH": "false"}
-    env.update(scan.caller_env(dict(policy.image_env), allowed))
+    env.update(scan.caller_env(dict(policy.image_env), IMAGE_SCAN_NAMES))
+    mounts = [scan.ws(out_dir, "/host-output", False), scan.trivy_mount()]
+    if policy.extra_ca_file is not None:
+        mounts.append(scan.ws(Path(policy.extra_ca_file), EXTRA_CA_TARGET, True))
+        env["BOMLENS_EXTRA_CA_CERTS"] = EXTRA_CA_TARGET
     env.update({"MODE": "IMAGE", "TARGET_IMAGE": ref, "PROJECT_NAME": project_token(project, "project"),
                 "PROJECT_VERSION": project_token(version, "0"), "HOST_OUTPUT_DIR": "/host-output",
                 "UPLOAD_ENABLED": "false", "DEEP_LICENSE": "false",
@@ -664,7 +668,7 @@ def run_image_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, ta
         env.update({"TRIVY_CACHE_DIR": TRIVY_DB_TARGET, **_TRIVY_OFFLINE})
     outcome, _, rec = scan.run_or_cancel(
         "trivy", "engine-image", policy.images.engine.run_ref, user=scan.nonroot_user, workdir="/host-output",
-        env=env, mounts=[scan.ws(out_dir, "/host-output", False), scan.trivy_mount()],
+        env=env, mounts=mounts,
         network=b.NETWORK_EGRESS, read_only_root=policy.read_only_root, root=False, timeout=policy.timeouts.image)
     result.stages["image"] = rec
     if outcome.timed_out:

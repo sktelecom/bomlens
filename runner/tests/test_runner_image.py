@@ -5,6 +5,7 @@
 import copy
 import json
 import unittest
+from pathlib import Path
 
 from _support import FIXTURES, FakeBackend, Workspace
 
@@ -66,6 +67,23 @@ class ImageScan(unittest.TestCase):
         env = self.backend.spec("engine-image").env
         self.assertEqual(env["HTTPS_PROXY"], "http://p.corp:1")
         self.assertNotIn("HTTP_PROXY", env)
+
+    def test_trivy_database_age_limit_is_taken(self):
+        self.scan(self.ws.policy(image_env={"BOMLENS_TRIVY_DB_MAX_AGE_DAYS": "400"}))
+        self.assertEqual(self.backend.spec("engine-image").env["BOMLENS_TRIVY_DB_MAX_AGE_DAYS"], "400")
+
+    def test_extra_ca_file_is_mounted_read_only(self):
+        ca = self.ws.scan_dir / "ca.pem"
+        ca.write_text("-----BEGIN CERTIFICATE-----\n")
+        self.scan(self.ws.policy(extra_ca_file=ca, image_env={"BOMLENS_EXTRA_CA_CERTS": "/elsewhere.pem"}))
+        spec = self.backend.spec("engine-image")
+        mount = next(m for m in spec.mounts if m.target == "/bomlens-ca/extra.pem")
+        self.assertTrue(mount.read_only)
+        self.assertEqual(spec.env["BOMLENS_EXTRA_CA_CERTS"], "/bomlens-ca/extra.pem")
+
+    def test_extra_ca_file_outside_the_workspace_is_refused(self):
+        with self.assertRaises(PolicyError):
+            self.scan(self.ws.policy(extra_ca_file=Path("/etc/passwd")))
 
     def test_timeout(self):
         self.backend.outcomes["engine-image"] = b.ContainerOutcome(started=True, exit_code=137, timed_out=True)
