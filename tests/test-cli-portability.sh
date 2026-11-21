@@ -5,7 +5,8 @@
 #
 # test-cli-portability.sh - No-Docker tests for the CLI on macOS's default bash 3.2
 # and for what a failed run leaves behind: bash 3.2 syntax guards, the folders a
-# failed run removes, the progress line of a long image scan, the container's
+# failed run removes, two scans of one result or one source folder at once
+# (the second waits, the folder is left as it was), the progress line of a long image scan, the container's
 # [ERROR]/[WARN] lines on stderr, a Gradle root whose folder name starts with a
 # dot, the Xcode-held Package.resolved, and check-setup's own-UI port.
 # A fake `docker` on PATH answers the few calls these paths make.
@@ -175,6 +176,189 @@ if ! grep -q 'already running' "$WORK/err" && [ ! -e "$WORK/o4/same_1/.bomlens-s
     pass "a lock whose scan is gone is taken over and freed"
 else
     fail "stale lock" "rc=$RC err=$(head -c 300 "$WORK/err")"
+fi
+# The rerun after an exec of itself (--detection build keeps the process id)
+# takes its own result lock back instead of refusing to start.
+out="$( (
+    SCAN_LOCK_DIR="$WORK/own-result.lock"; SCAN_LOCK_HELD=0
+    eval "$(extract_fn "$SCRIPT" take_scan_lock)"
+    mkdir -p "$SCAN_LOCK_DIR"; echo "$$" > "$SCAN_LOCK_DIR/pid"
+    take_scan_lock && [ "$SCAN_LOCK_HELD" = 1 ] && echo took
+) 2>&1 )"
+if [ "$out" = took ]; then pass "a result lock this same process wrote before an exec is taken back"; else fail "own result lock" "$out"; fi
+
+# --- 3c) two scans of one source folder with different versions
+# This stand-in runs build-prep.sh's real source-tree guard (guard_snapshot,
+# guard_restore) on the mounted folder in stage 1 and models `cargo
+# generate-lockfile` (writes a Cargo.lock when there is none); stage 2 grades
+# the folder as it finds it (complete with a Cargo.lock, partial without).
+echo "== a second scan of the same source folder waits for the first"
+mkdir -p "$WORK/gbin" "$WORK/gstub"
+cat > "$WORK/gbin/docker" <<'MOCK'
+#!/bin/bash
+S="${STUB_STATE:?}"
+mkdir -p "$S/running"
+case "$1" in
+    wait) cat "$S/rc.$2" 2>/dev/null || echo 0; exit 0 ;;
+    ps)
+        for a in "$@"; do
+            case "$a" in
+                name=^*) n="${a#name=^}"; n="${n%\$}"; [ -f "$S/running/$n" ] && echo "$n" ;;
+                id=*) [ -f "$S/running/${a#id=}" ] && echo "${a#id=}" ;;
+            esac
+        done
+        exit 0 ;;
+    run)
+        shift; name=""; app=""; state=""; out=""; src=""; hout=""; gid=""; ronly=""; prev=""; bom=""
+        for a in "$@"; do
+            a="${a%\"}"; a="${a#\"}"
+            [ "$prev" != "--name" ] || name="$a"
+            case "$a" in
+                *:/app) app="${a%:/app}" ;;
+                *:/bomlens-state) state="${a%:/bomlens-state}" ;;
+                *:/out) out="${a%:/out}" ;;
+                *:/src) src="${a%:/src}" ;;
+                *:/host-output) hout="${a%:/host-output}" ;;
+                BOMLENS_GUARD_ID=*) gid="${a#BOMLENS_GUARD_ID=}" ;;
+                BOMLENS_GUARD_RESTORE_ONLY=1) ronly=1 ;;
+                /out/*_bom.json) bom="${a##*/}" ;;
+            esac
+            prev="$a"
+        done
+        if [ -n "$app" ]; then
+            [ -z "$name" ] || : > "$S/running/$name"
+            drv="$S/drv.$$.sh"
+            {
+                echo 'log() { echo "[build-prep] $*"; }'
+                echo 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
+                for fn in guard_paths guard_snapshot guard_git_tracked guard_restore; do
+                    awk -v fn="$fn" '$0 ~ "^" fn "\\(\\) +\\{" { i = 1 } i { print } i && $0 == "}" { exit }' "${STUB_BUILD_PREP:?}"
+                done
+            } > "$drv"
+            (
+                . "$drv"
+                GUARD_DIR=""; GUARD_NOEXEC=""; GUARD_NAMES_VERSION=5
+                GUARD_STATE_ROOT="${state:-/nonexistent}"; BOMLENS_GUARD_ID="$gid"; SRC="$app"; OUT=/out/x
+                cd "$app" || exit 1
+                if [ -n "$ronly" ]; then
+                    GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
+                    [ ! -f "$GUARD_DIR/names.version" ] || guard_restore
+                    exit 0
+                fi
+                guard_snapshot
+                [ -f Cargo.lock ] || head -c 3138 /dev/zero | tr '\0' x > Cargo.lock
+                sleep "${STUB_STAGE1_SECS:-3}"
+                [ -z "$bom" ] || printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "$out/$bom"
+                guard_restore
+            ) >> "$S/stage1.log" 2>&1
+            rm -f "$drv" "$S/running/$name"
+            [ -z "$name" ] || echo 0 > "$S/rc.$name"
+            exit 0
+        fi
+        if [ -n "$src" ] && [ -n "$hout" ]; then
+            if [ -f "$src/Cargo.lock" ]; then echo complete > "$hout/grade.txt"; else echo partial > "$hout/grade.txt"; fi
+        fi
+        exit 0 ;;
+    *) exit 0 ;;
+esac
+MOCK
+chmod +x "$WORK/gbin/docker"
+mkdir -p "$WORK/rt" "$WORK/gout" "$WORK/ghome"
+printf '[package]\nname = "rtrep"\nversion = "0.1.0"\n\n[dependencies]\nserde = "1"\n' > "$WORK/rt/Cargo.toml"
+# Where scan-sbom.sh keeps the guard state: LOCALAPPDATA under Git Bash,
+# XDG_STATE_HOME elsewhere.
+GSTATE_HOME="$WORK/ghome/state"
+GSTATE_LAD="$GSTATE_HOME"
+command -v cygpath >/dev/null 2>&1 && GSTATE_LAD="$(cygpath -w "$GSTATE_HOME" 2>/dev/null || printf '%s' "$GSTATE_HOME")"
+GUARD_ROOT="$GSTATE_HOME/bomlens/guard"
+gscan() { # <version> <stdout file>
+    ( cd "$WORK/rt" && PATH="$WORK/gbin:$PATH" HOME="$WORK/ghome" XDG_STATE_HOME="$GSTATE_HOME" LOCALAPPDATA="$GSTATE_LAD" \
+        STUB_STATE="$WORK/gstub" STUB_BUILD_PREP="$ROOT_DIR/docker/lib/build-prep.sh" SBOM_PULL=never \
+        bash "$SCRIPT" --project rtrep --version "$1" --generate-only -o "$WORK/gout" ) >"$2" 2>&1
+}
+gscan 1 "$WORK/g1.out" & G1=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
+    [ -f "$WORK/rt/Cargo.lock" ] && break
+    sleep 0.2
+done
+gscan 2 "$WORK/g2.out" & G2=$!
+wait "$G1"; G1_RC=$?
+wait "$G2"; G2_RC=$?
+if [ "$G1_RC" = 0 ] && [ "$G2_RC" = 0 ] && grep -q '^\[INFO\] Another scan of this folder is running' "$WORK/g2.out" \
+   && ! grep -q 'still be running' "$WORK/g1.out" "$WORK/g2.out"; then
+    pass "a second scan of the same folder with another version says it waits, then runs"
+else
+    fail "same-folder second scan" "rc=$G1_RC/$G2_RC $(grep -h 'INFO\|WARN\|ERROR' "$WORK/g1.out" "$WORK/g2.out" | head -n 6)"
+fi
+if [ ! -e "$WORK/rt/Cargo.lock" ] && [ "$(ls -A "$WORK/rt")" = "Cargo.toml" ]; then
+    pass "no lock file or other build file is left in the scanned folder"
+else
+    fail "files left in the scanned folder" "$(ls -la "$WORK/rt")"
+fi
+if [ "$(cat "$WORK/gout/rtrep_1/grade.txt" 2>/dev/null)" = partial ] && [ "$(cat "$WORK/gout/rtrep_2/grade.txt" 2>/dev/null)" = partial ]; then
+    pass "each scan is graded on the folder as it is (no lock file there)"
+else
+    fail "grades" "1=$(cat "$WORK/gout/rtrep_1/grade.txt" 2>&1) 2=$(cat "$WORK/gout/rtrep_2/grade.txt" 2>&1)"
+fi
+if [ -z "$(find "$GUARD_ROOT" -maxdepth 1 -name '*.lock' 2>/dev/null)" ]; then
+    pass "both scans free the folder's lock"
+else
+    fail "folder lock left behind" "$(find "$GUARD_ROOT" -maxdepth 2 2>/dev/null)"
+fi
+# A folder lock whose scan is gone, from this machine or from a web UI
+# container that no longer runs, is taken over without waiting.
+if command -v shasum >/dev/null 2>&1 || command -v sha256sum >/dev/null 2>&1; then
+    rt_real="$(cd "$WORK/rt" && pwd -P)"
+    if command -v sha256sum >/dev/null 2>&1; then gkey="$(printf '%s' "$rt_real" | sha256sum | awk '{print $1}')"
+    else gkey="$(printf '%s' "$rt_real" | shasum -a 256 | awk '{print $1}')"; fi
+    ( exit 0 ) & DEAD_PID=$!; wait "$DEAD_PID"
+    mkdir -p "$GUARD_ROOT/$gkey.lock"
+    echo "$DEAD_PID" > "$GUARD_ROOT/$gkey.lock/pid"; echo cli > "$GUARD_ROOT/$gkey.lock/origin"
+    STUB_STAGE1_SECS=0 gscan 3 "$WORK/g3.out"; G3_RC=$?
+    mkdir -p "$GUARD_ROOT/$gkey.lock"
+    echo 7 > "$GUARD_ROOT/$gkey.lock/pid"; echo "container 0123abcd" > "$GUARD_ROOT/$gkey.lock/origin"
+    STUB_STAGE1_SECS=0 gscan 4 "$WORK/g4.out"; G4_RC=$?
+    if [ "$G3_RC" = 0 ] && [ "$G4_RC" = 0 ] && ! grep -q 'Another scan of this folder' "$WORK/g3.out" "$WORK/g4.out" \
+       && [ ! -e "$GUARD_ROOT/$gkey.lock" ]; then
+        pass "a folder lock whose scan is gone is taken over and freed"
+    else
+        fail "stale folder lock" "rc=$G3_RC/$G4_RC $(grep -h 'INFO\|ERROR' "$WORK/g3.out" "$WORK/g4.out" | head -n 4)"
+    fi
+    # A scan container an earlier, stopped scan left running: waited for, and
+    # named with the command that ends it, instead of a warning.
+    mkdir -p "$GUARD_ROOT/$gkey"
+    echo bomlens-scan-orphan > "$GUARD_ROOT/$gkey/owner"; echo "$rt_real" > "$GUARD_ROOT/$gkey/path"
+    echo img > "$GUARD_ROOT/$gkey/image"
+    mkdir -p "$WORK/gstub/running"; : > "$WORK/gstub/running/bomlens-scan-orphan"
+    ( sleep 3; rm -f "$WORK/gstub/running/bomlens-scan-orphan"; rm -rf "${GUARD_ROOT:?}/$gkey" ) &
+    STUB_STAGE1_SECS=0 gscan 5 "$WORK/g5.out"; G5_RC=$?
+    if [ "$G5_RC" = 0 ] && grep -q 'This scan waits for it to end. To end a leftover one now: docker stop bomlens-scan-orphan' "$WORK/g5.out" \
+       && ! grep -q 'still be running' "$WORK/g5.out" && [ ! -e "$WORK/rt/Cargo.lock" ]; then
+        pass "a scan container left running in the folder is waited for and named with how to end it"
+    else
+        fail "left-running scan container" "rc=$G5_RC $(grep -h 'INFO\|WARN' "$WORK/g5.out" | head -n 4)"
+    fi
+    # The rerun after an exec of itself (same process id) takes its own lock back.
+    out="$( (
+        # Read by the functions the evals below define.
+        # shellcheck disable=SC2034
+        GUARD_STATE_DIR="$GUARD_ROOT"
+        # shellcheck disable=SC2034
+        CLEANUP_DIRS=()
+        # shellcheck disable=SC2034
+        SCAN_INPUT_DIR="$WORK/rt"
+        # shellcheck disable=SC2034
+        DOCKER_ENV=()
+        eval "$(extract_fn "$SCRIPT" guard_hash)"
+        eval "$(extract_fn "$SCRIPT" source_lock_holder_gone)"
+        eval "$(extract_fn "$SCRIPT" take_source_lock)"
+        mkdir -p "$GUARD_ROOT/$gkey.lock"; echo "$$" > "$GUARD_ROOT/$gkey.lock/pid"
+        take_source_lock && [ "$SOURCE_LOCK_HELD" = 1 ] && echo took
+    ) 2>&1 )"
+    rm -rf "$GUARD_ROOT/$gkey.lock"
+    if [ "$out" = took ]; then pass "a folder lock this same process wrote before an exec is taken back"; else fail "own folder lock" "$out"; fi
+else
+    echo "  SKIP: no sha256sum or shasum here; the stale folder lock cases did not run"
 fi
 
 # --- 4) the progress line while an image is read
