@@ -6122,6 +6122,18 @@ else
     else
         pass "no production-set marker -> no development-only note"
     fi
+    # The production-set step ran but failed: nothing says the project has no
+    # runtime dependencies.
+    printf '{"components":[],"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"},{"name":"bomlens:pipeline-step-failed","value":"npm-production-set"}]}}' > "$WORK/prodset-failed.json"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/prodset-failed.json"
+    NRH_LOG7="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG7" | grep -q "SBOM has 0 components" \
+        && ! printf '%s' "$NRH_LOG7" | grep -q "no runtime dependencies"; then
+        pass "a failed npm production set -> the generic warning only, no development-only note"
+    else
+        fail "the development-only note appeared although npm-production-set failed" "$NRH_LOG7"
+    fi
 fi
 unset OUTPUT_FILE
 
@@ -13263,6 +13275,21 @@ JSON
     [ "$(mca_agg "$WORK/mca-source-complete.json")" = "complete" ] \
         && pass "SOURCE with applied lock evidence + components + an edge declares complete" \
         || fail "expected complete" "$(mca_agg "$WORK/mca-source-complete.json")"
+
+    # SOURCE, a Node.js workspace whose lock written at install was not read:
+    # the members' dependencies are missing, whatever else looks complete.
+    for _mca_step in npm-installed-lock pnpm-installed-lock; do
+        cat > "$WORK/mca-source-$_mca_step.json" <<JSON
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"go-mod-tidy"},
+                            {"name":"bomlens:pipeline-step-failed","value":"$_mca_step"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+        SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-$_mca_step.json"
+        [ "$(mca_agg "$WORK/mca-source-$_mca_step.json")" = "incomplete" ] \
+            && pass "SOURCE with $_mca_step failed declares incomplete, even with lock evidence and edges" \
+            || fail "expected incomplete for $_mca_step" "$(mca_agg "$WORK/mca-source-$_mca_step.json")"
+    done
 
     # SOURCE, no matching prep-step-applied label at all -- Maven's shape: no
     # signal distinguishes a resolved graph from a degraded one for it
