@@ -587,6 +587,11 @@ jobs:
       - name: UX heuristics
         run: bash scripts/check-ux-heuristics.sh
 
+      # A Windows clone (core.autocrlf=true) must get LF for everything the
+      # image and Git Bash read; only .bat and .ps1 are CRLF.
+      - name: Line endings
+        run: bash scripts/check-line-endings.sh
+
   # PR-only path detection for the path-filtered heavy jobs below. Plain git
   # diff against the PR base (no third-party action): base.sha is the base at
   # sync time and HEAD is the virtual merge commit of base + head, so
