@@ -41,11 +41,20 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq uidmap dbus-user-session
-          if ! command -v dockerd-rootless.sh >/dev/null 2>&1; then
-            sudo apt-get install -y -qq docker-ce-rootless-extras
-          fi
-          command -v dockerd-rootless.sh
+          sudo apt-get install -y -qq uidmap dbus-user-session slirp4netns
+          # The runner's Docker does not come from Docker's apt repository, so
+          # take the rootless helpers (dockerd-rootless.sh, rootlesskit) from the
+          # static bundle that matches the installed dockerd.
+          ver="$(dockerd --version | sed -E 's/^Docker version ([0-9.]+).*/\1/')"
+          echo "dockerd version: $ver"
+          extras="$RUNNER_TEMP/rootless-extras"
+          mkdir -p "$extras"
+          curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-rootless-extras-${ver}.tgz" \
+            | tar -xz -C "$extras" --strip-components=1
+          ls -l "$extras"
+          export PATH="$extras:$PATH"
+          echo "$extras" >> "$GITHUB_PATH"
+          command -v dockerd-rootless.sh rootlesskit
           # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor,
           # which rootlesskit needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
