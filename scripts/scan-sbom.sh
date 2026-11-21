@@ -1648,7 +1648,9 @@ take_scan_lock() {
     fi
     other="$(cat "$SCAN_LOCK_DIR/pid" 2>/dev/null || true)"
     case "$other" in ''|*[!0-9]*) other="" ;; esac
-    if [ -n "$other" ] && ! kill -0 "$other" 2>/dev/null; then
+    # The same process id: this scan before an exec of itself (the rerun with
+    # --detection build), which ran no trap to free it.
+    if [ -n "$other" ] && { [ "$other" = "$$" ] || ! kill -0 "$other" 2>/dev/null; }; then
         rm -rf -- "$SCAN_LOCK_DIR" 2>/dev/null || true
         if mkdir "$SCAN_LOCK_DIR" 2>/dev/null; then
             echo "$$" > "$SCAN_LOCK_DIR/pid" 2>/dev/null || true
@@ -1837,6 +1839,7 @@ cleanup() {
         fi
     done
     release_scan_lock
+    release_source_lock
     # A run that ended in failure leaves no result folder holding nothing but
     # its own .scanmeta.json: an empty folder reads as a scan that produced
     # something. Only a per-run folder (not the flat layout, not the folder the
@@ -1923,33 +1926,48 @@ setup_guard_state() {
             return 0
         fi
         if [ -n "$ps_out" ]; then
-            log_warn "a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
-            return 0
+            # This scan holds the folder's lock (take_source_lock), so no other
+            # command-line scan of it is running: this is a container an
+            # earlier scan left running when it was stopped outright, or a web
+            # UI scan of the same folder. It still changes the folder, so wait
+            # for it; when it ends it puts the folder back itself.
+            echo "[INFO] Another scan container is still working in this folder ($owner): one an earlier scan left running when it was stopped, or a web UI scan of the same folder. This scan waits for it to end. To end a leftover one now: docker stop $owner"
+            while [ -n "$ps_out" ]; do
+                sleep 2
+                ps_out=$("${DOCKER_ENV[@]}" docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null) || {
+                    log_warn "could not confirm whether the earlier scan container ($owner) is still running; leaving its leftovers in place this time. Run the scan again once it has ended (docker ps)."
+                    return 0
+                }
+            done
+            # It finished on its own and removed its record: nothing to clean up.
+            [ -f "$owner_file" ] || owner=""
         fi
-        # Confirmed gone and the path matches: finish what it started
-        # (guard_restore, reused via build-prep.sh's restore-only mode)
-        # before this run's own guard takes over the same slot. Reuses that
-        # run's own cdxgen image (recorded below), or the already-local
-        # postprocess image, rather than pulling anything new just for
-        # cleanup — an offline host must not fail a scan over this.
-        recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
-        cleanup_image=""
-        if [ -n "$recorded_image" ] && "${DOCKER_ENV[@]}" docker image inspect "$recorded_image" >/dev/null 2>&1; then
-            cleanup_image="$recorded_image"
-        elif "${DOCKER_ENV[@]}" docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1; then
-            cleanup_image="$POSTPROCESS_IMAGE"
+        if [ -n "$owner" ]; then
+            # Confirmed gone and the path matches: finish what it started
+            # (guard_restore, reused via build-prep.sh's restore-only mode)
+            # before this run's own guard takes over the same slot. Reuses that
+            # run's own cdxgen image (recorded below), or the already-local
+            # postprocess image, rather than pulling anything new just for
+            # cleanup: an offline host must not fail a scan over this.
+            recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
+            cleanup_image=""
+            if [ -n "$recorded_image" ] && "${DOCKER_ENV[@]}" docker image inspect "$recorded_image" >/dev/null 2>&1; then
+                cleanup_image="$recorded_image"
+            elif "${DOCKER_ENV[@]}" docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1; then
+                cleanup_image="$POSTPROCESS_IMAGE"
+            fi
+            if [ -z "$cleanup_image" ]; then
+                log_warn "no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+                return 0
+            fi
+            echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
+            "${DOCKER_ENV[@]}" docker run --rm -u 0:0 \
+                -v "$(hostpath "$SCAN_INPUT_DIR")":/app \
+                -v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state \
+                -v "$(hostpath "$BUILD_PREP")":/tmp/build-prep.sh:ro \
+                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+                --entrypoint sh "$cleanup_image" /tmp/build-prep.sh /app >/dev/null 2>&1 || true
         fi
-        if [ -z "$cleanup_image" ]; then
-            log_warn "no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
-            return 0
-        fi
-        echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
-        "${DOCKER_ENV[@]}" docker run --rm -u 0:0 \
-            -v "$(hostpath "$SCAN_INPUT_DIR")":/app \
-            -v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state \
-            -v "$(hostpath "$BUILD_PREP")":/tmp/build-prep.sh:ro \
-            -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-            --entrypoint sh "$cleanup_image" /tmp/build-prep.sh /app >/dev/null 2>&1 || true
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
     printf '%s\n' "$RUNNING_CONTAINER_NAME" > "$GUARD_STATE_DIR/$key/owner" 2>/dev/null || return 0
@@ -1971,6 +1989,81 @@ drop_unused_guard_state() {
         rm -rf -- "$d"
     fi
     GUARD_ID=""
+}
+
+# One scan at a time per source folder. Stage 1 resolves dependencies in the
+# folder itself (a Cargo.lock or go.sum is written there and removed again by
+# the source-tree guard), and later steps read the folder to grade the result.
+# A second scan of the same folder, with another --version or other options,
+# waits here until the first has finished, so neither one records or reads the
+# other's working files. The lock sits beside the guard-state record, keyed the
+# same way, and holds the scan's process id and where it runs ("cli" here). A
+# lock whose scan is gone (killed outright, so no trap ran) is taken over, as
+# take_scan_lock does for the result folder. Scope: the same as
+# setup_guard_state, a folder the user named, not a --git clone or archive
+# extract (a new temp folder each run).
+SOURCE_LOCK_DIR=""
+SOURCE_LOCK_HELD=0
+release_source_lock() {
+    if [ "${SOURCE_LOCK_HELD:-0}" = "1" ]; then
+        rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+        SOURCE_LOCK_HELD=0
+    fi
+}
+# source_lock_holder_gone PID ORIGIN: true when the scan that holds the lock is
+# known to have ended. A lock this process wrote before an exec of itself
+# (same PID) counts as gone, so the rerun takes it back.
+source_lock_holder_gone() {
+    local pid="$1" origin="$2" ps_out
+    case "$origin" in
+        container\ *)
+            # Written by a scan inside a container (the web UI): gone when
+            # that container no longer runs. Unconfirmed counts as running.
+            command -v docker >/dev/null 2>&1 || return 1
+            ps_out=$("${DOCKER_ENV[@]}" docker ps -q --no-trunc --filter "id=${origin#container }" 2>/dev/null) || return 1
+            [ -z "$ps_out" ] ;;
+        *)
+            [ "$pid" = "$$" ] && return 0
+            ! kill -0 "$pid" 2>/dev/null ;;
+    esac
+}
+take_source_lock() {
+    [ "${#CLEANUP_DIRS[@]}" -eq 0 ] || return 0
+    mkdir -p "$GUARD_STATE_DIR" 2>/dev/null || return 0
+    local target_real key pid origin said=0 empty_polls=0
+    target_real=$(cd "$SCAN_INPUT_DIR" 2>/dev/null && pwd -P) || return 0
+    key=$(printf '%s' "$target_real" | guard_hash) || return 0
+    [ -n "$key" ] || return 0
+    SOURCE_LOCK_DIR="$GUARD_STATE_DIR/$key.lock"
+    while :; do
+        if mkdir "$SOURCE_LOCK_DIR" 2>/dev/null; then
+            echo "$$" > "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true
+            echo "cli" > "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true
+            SOURCE_LOCK_HELD=1
+            [ "$said" = 0 ] || echo "[INFO] The earlier scan of this folder has finished; this scan starts now."
+            return 0
+        fi
+        pid="$(cat "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true)"
+        origin="$(cat "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true)"
+        case "$pid" in *[!0-9]*) pid="" ;; esac
+        if [ -z "$pid" ]; then
+            # Another scan made the lock a moment ago and has not written its
+            # id yet; one left without an id for longer is taken over.
+            empty_polls=$((empty_polls + 1))
+            if [ "$empty_polls" -ge 10 ]; then
+                rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+                empty_polls=0
+                continue
+            fi
+        elif source_lock_holder_gone "$pid" "$origin"; then
+            rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+            continue
+        elif [ "$said" = 0 ]; then
+            echo "[INFO] Another scan of this folder is running (process $pid); this scan waits for it to finish, so that neither one sees the other's build files. Press Ctrl+C to stop waiting."
+            said=1
+        fi
+        sleep 1
+    done
 }
 
 # A reproducible (--byte-stable) build must not resolve dependency licenses over
@@ -3531,6 +3624,11 @@ SRC_TREE_EXCLUDE=""
 case "$OUTPUT_HOST_DIR" in
     "$SCAN_INPUT_DIR"/*) SRC_TREE_EXCLUDE="$RUN_NAME" ;;
 esac
+
+# A second scan of this same folder waits here for the first (take_source_lock),
+# before anything below reads the folder: the --exclude copy, language and
+# lock-file detection, the build and the grading all see it as it is.
+[ "$MODE" != "SOURCE" ] || take_source_lock
 
 # --exclude: scan a copy of the tree that lacks the named paths, so every step
 # below (language detection, build, cdxgen, license and vendored-code scans, the
