@@ -33,6 +33,12 @@ docker build -t sbom-scanner:local .
 # 빌드 시간: 약 10-15분 (네트워크 속도에 따라 다름)
 ```
 
+로컬 빌드에는 버전 정보가 없어서, 이 이미지로 만든 SBOM은 CLI와 웹 UI 모두 도구 버전을 `unknown`으로 적습니다(스캔 로그에는 `[docmeta] tool=BomLens@unknown`으로 나옵니다). 버전을 남기려면 빌드할 때 넘겨 주십시오.
+
+```bash
+docker build --build-arg BOMLENS_VERSION="$(git describe --tags)" -t sbom-scanner:local .
+```
+
 ### 빌드 확인
 
 이미지에 실제로 들어 있는 도구로 확인합니다. cdxgen은 이 이미지에 없습니다. 소스 스캔의 cdxgen은 `scan-sbom.sh`가 필요할 때 언어별 공식 이미지를 따로 받아 실행합니다.
