@@ -11273,14 +11273,15 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
 # same kind: the launcher sets them with a value only when it hands stage 1 a
 # govulncheck binary. BOMLENS_GUARD_STATE_ROOT only points the tests at a
-# folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
+# folder other than /bomlens-state, and BOMLENS_UID_MAP at a uid map file.
+# BOMLENS_EXTRA_CA_CERTS: the launcher
 # mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
 # BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
 # BOMLENS_PYTHON_VENV_READER, BOMLENS_CONDA_READER: the web UI path copies
 # the venv reader and identify-conda.py next to the prep file and sets their
 # paths itself.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER|CONDA_READER)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|UID_MAP|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED|PYTHON_VENV_READER|CONDA_READER)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
