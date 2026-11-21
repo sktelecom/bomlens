@@ -67,9 +67,9 @@ jq -r '.components[].name' PHPExample_1.0.0/PHPExample_1.0.0_bom.json | sort -u
 
 ## Common Issues
 
-### composer.lock missing
+### composer.lock
 
-cdxgen reads `composer.json`, but a committed `composer.lock` pins exact versions. If it is absent, run `composer install` first for the most precise SBOM.
+This example commits `composer.lock`, which pins exact versions, so the result is graded complete. In your own project without one, the scan resolves versions afresh and the result is partial (`lockfile-missing`); run `composer update` to write it.
 
 ## Next Steps
 
