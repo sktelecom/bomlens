@@ -2440,7 +2440,7 @@ license_lookup_probe() {
 # and what could not be settled (bomlens:python-environment-unsure).
 # BOMLENS_PYTHON_VENV=false (or 0) turns it off.
 PY_VENV_READER="${BOMLENS_PYTHON_VENV_READER:-/tmp/read-python-venv.py}"
-PY_VENV_DIR=""; PY_VENV_SITE=""; PY_VENV_USED=""; PY_VENV_REASON=""; PY_VENV_SBOM=""
+PY_VENV_DIR=""; PY_VENV_SITE=""; PY_VENV_USED=""; PY_VENV_REASON=""; PY_VENV_SBOM=""; PY_PIP_SKIP=""
 
 # An installed environment is not the project's code, so cdxgen is never
 # pointed at it, whether it is read here or not, and also with
@@ -2560,13 +2560,19 @@ python_lock_complete() {
 # Before pip install: find the environment and, when there is one, probe the
 # package index; one that does not answer means the environment is read. A
 # complete lock file at the scan root is read instead of the environment, which
-# may hold other versions than the lock.
+# may hold other versions than the lock. The index is still asked then: one
+# that does not answer sets PY_PIP_SKIP, so pip is not run (offline it retries
+# every requirement) and the lock alone is read.
 python_venv_before_pip() {
     python_venv_find
     [ -n "$PY_VENV_DIR" ] || return 0
     if _pvb_lock="$(python_lock_complete)"; then
         log "python: $_pvb_lock is the authority; the installed environment $PY_VENV_DIR/ is not read"
         PY_VENV_DIR=""; PY_VENV_SITE=""
+        if [ -f requirements.txt ] && ! registry_probe "$(python_index_url)"; then
+            PY_PIP_SKIP=1
+            log "python: $_pvb_lock is read; pip is not run because the package index $REGISTRY_PROBE_HOST did not answer ($REGISTRY_PROBE_WHY)"
+        fi
         return 0
     fi
     if ! registry_probe "$(python_index_url)"; then
@@ -2736,7 +2742,7 @@ fi
 # answer (pip is then not run: offline it retries every requirement) or when
 # pip install fails (see the installed python environment section above).
 python_venv_before_pip
-if [ -z "$PY_VENV_USED" ] && [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
+if [ -z "$PY_VENV_USED" ] && [ -z "$PY_PIP_SKIP" ] && [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
     log "pip install requirements"
     prep_step pip-install "$PREP_TIMEOUT_DEFAULT" sh "$_pip_script"
 fi

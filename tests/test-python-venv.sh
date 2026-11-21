@@ -290,7 +290,7 @@ JS
             '"$_lp_block"'
             '"$_pv_block"'
             python_venv_before_pip
-            [ -n "$PY_VENV_USED" ] || { echo "PIP-STEP"; PREP_FAILED="'"$pf"'"; }
+            [ -n "$PY_VENV_USED" ] || [ -n "$PY_PIP_SKIP" ] || { echo "PIP-STEP"; PREP_FAILED="'"$pf"'"; }
             python_venv_after_pip
             echo "USED=$PY_VENV_USED REASON=$PY_VENV_REASON DIR=$PY_VENV_DIR FAILED=$PREP_FAILED APPLIED=$PREP_APPLIED SITE=${BOMLENS_PYTHON_VENV_SITE:+set}"
             [ -z "$PY_VENV_SBOM" ] || jq -r "[.components[].name] | join(\" \")" "$PY_VENV_SBOM"' ) 2>&1
@@ -326,9 +326,14 @@ JS
             *) printf '[[package]]\nname = "idna"\nversion = "3.7"\n\n[metadata]\nlock-version = "2.0"\n' > "$G3/$lk" ;;
         esac
         out="$(gate "$G3" "pip-install" PIP_INDEX_URL="http://127.0.0.1:$CLOSED_PORT/simple/")"
-        check "a committed $lk: the environment is not read, the lock path stays" "$(printf '%s\n' "$out" | grep -E '^(PIP-STEP|USED=)')" \
-            "$(printf 'PIP-STEP\nUSED= REASON= DIR= FAILED=pip-install APPLIED= SITE=')"
-        check "a committed $lk: one log line says so" "$(printf '%s\n' "$out" | grep -c "python: $lk is the authority; the installed environment .venv/ is not read")" "1"
+        check "a committed $lk, an index that does not answer: the environment is not read, pip is not run, nothing failed" \
+            "$(printf '%s\n' "$out" | grep -E '^(PIP-STEP|USED=)')" "USED= REASON= DIR= FAILED= APPLIED= SITE="
+        check "a committed $lk: one log line says the environment is not read" "$(printf '%s\n' "$out" | grep -c "python: $lk is the authority; the installed environment .venv/ is not read")" "1"
+        check "a committed $lk: one log line says pip is not run" \
+            "$(printf '%s\n' "$out" | grep -c "python: $lk is read; pip is not run because the package index 127.0.0.1:$CLOSED_PORT did not answer")" "1"
+        out="$(gate "$G3" "" PIP_INDEX_URL="http://127.0.0.1:$OK_PORT/simple/")"
+        check "a committed $lk, an index that answers: pip runs as today, the environment is not read" \
+            "$(printf '%s\n' "$out" | grep -E '^(PIP-STEP|USED=)')" "$(printf 'PIP-STEP\nUSED= REASON= DIR= FAILED= APPLIED= SITE=')"
     done
     : > "$WORK/gate-lock-poetry.lock/poetry.lock"
     out="$(gate "$WORK/gate-lock-poetry.lock" "" PIP_INDEX_URL="http://127.0.0.1:$CLOSED_PORT/simple/")"
@@ -352,6 +357,7 @@ JS
 fi
 grep -q '^    set -- "$@" --exclude-type python$' "$PREP" \
     && grep -q 'python_venv_before_pip$' "$PREP" && grep -q 'python_venv_after_pip$' "$PREP" \
+    && grep -q '^if \[ -z "\$PY_VENV_USED" \] && \[ -z "\$PY_PIP_SKIP" \] && \[ -f requirements.txt \]' "$PREP" \
     && grep -q '"\$PY_VENV_READER" merge "\$OUT" "\$PY_VENV_SBOM"' "$PREP" \
     && pass "build-prep.sh leaves cdxgen's python cataloger out and merges the environment" \
     || fail "build-prep.sh: the exclusion, the gate calls or the merge are missing"
