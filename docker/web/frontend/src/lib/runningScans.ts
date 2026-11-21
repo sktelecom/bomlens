@@ -30,7 +30,47 @@ export function attachedLogStart(
   return info.attached && info.droppedLines > 0 ? [note(info.droppedLines)] : [];
 }
 
-/** The scans running on the server, refreshed while `active` is true. */
+/** How often the new-scan screen asks again while it lists a scan this tab
+ *  saw stopped (cancelled here or in another tab): the server lists it until
+ *  it has stopped, which takes a moment, and the notice should go then. */
+export const STOPPING_POLL_MS = 1000;
+/** How long a stopped scan is asked about at the faster pace. */
+export const STOPPING_WATCH_MS = 120_000;
+
+// Run id -> when this tab saw it stopped. Module-level, as the new-scan
+// screen mounts only after the progress screen that saw the cancel is gone.
+const stopping = new Map<string, number>();
+
+/** Note that this tab saw a scan stopped, so the running-scans notice asks
+ *  about it more often until the server no longer lists it. */
+export function noteScanStopping(id: string, now: number = Date.now()): void {
+  if (id) stopping.set(id, now);
+}
+
+/** Forget every noted scan (tests). */
+export function clearStoppingScans(): void {
+  stopping.clear();
+}
+
+/** The delay before the next running-scans poll: short while the list holds a
+ *  scan this tab saw stopped (noted less than STOPPING_WATCH_MS ago), the
+ *  usual interval otherwise. Notes that are old or no longer listed go. */
+export function nextRunningPoll(
+  rows: Pick<RunningScan, "id">[],
+  now: number = Date.now(),
+): number {
+  const listed = new Set(rows.map((r) => r.id));
+  let fast = false;
+  for (const [id, at] of stopping) {
+    if (!listed.has(id) || now - at >= STOPPING_WATCH_MS) stopping.delete(id);
+    else fast = true;
+  }
+  return fast ? STOPPING_POLL_MS : RUNNING_POLL_MS;
+}
+
+/** The scans running on the server, refreshed while `active` is true: at
+ *  once, again whenever the tab is shown, and on the interval nextRunningPoll
+ *  gives. A reply that arrives after a newer request was sent is ignored. */
 export function useRunningScans(active: boolean): RunningScan[] {
   const [rows, setRows] = useState<RunningScan[]>([]);
   useEffect(() => {
@@ -39,16 +79,26 @@ export function useRunningScans(active: boolean): RunningScan[] {
       return;
     }
     let live = true;
+    let seq = 0;
+    let timer: number | undefined;
     const load = () => {
+      window.clearTimeout(timer);
+      const mine = ++seq;
       void listRunningScans().then((r) => {
-        if (live) setRows(r);
+        if (!live || mine !== seq) return;
+        setRows(r);
+        timer = window.setTimeout(load, nextRunningPoll(r));
       });
     };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
     load();
-    const timer = window.setInterval(load, RUNNING_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       live = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [active]);
   return rows;

@@ -154,6 +154,58 @@ test("a scan cancelled in another tab returns a following tab to New scan and sa
   await expect(page).toHaveURL(/#\/new$/);
 });
 
+for (const via of ["this tab", "another tab"] as const) {
+  test(`the running-scans notice goes once a scan cancelled in ${via} has stopped, without a reload`, async ({ page }) => {
+    await seedThemeLang(page, "light", "en");
+    await stub(page);
+    // The server lists the scan for a moment after the cancel, while it stops.
+    let listed = true;
+    await page.route("**/running-scans", (r) =>
+      r.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(listed ? [{ id: "acme_1.0", project: "acme", version: "1.0", startedAt: 1700000000 }] : []),
+      }),
+    );
+    await page.route("**/scan-cancel**", (r) =>
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ cancelling: true }) }),
+    );
+    await fakeStream(page);
+    await page.goto("/#/running/acme_1.0");
+    expect(await streamUrl(page)).toBe("/scan-attach?id=acme_1.0");
+    await emit(page, "started", started("acme_1.0", "acme", true));
+    if (via === "this tab") {
+      await page.getByTestId("run-cancel").click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Cancel scan" }).click();
+    } else {
+      await emit(page, "done", { ok: false, id: "acme_1.0", cancelled: true, results: [], sbom: null, security: null, conformance: null });
+    }
+    await expect(page.getByRole("heading", { name: "What do you want to scan?" })).toBeVisible();
+    const notice = page.getByTestId("running-scans");
+    await expect(notice).toContainText("acme 1.0");
+    listed = false;
+    // Well inside the usual five-second interval: the tab asks again sooner.
+    await expect(notice).toHaveCount(0, { timeout: 2500 });
+  });
+}
+
+test("the running-scans notice asks again when the tab is shown", async ({ page }) => {
+  await seedThemeLang(page, "light", "en");
+  await stub(page);
+  let listed = true;
+  await page.route("**/running-scans", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(listed ? [{ id: "acme_1.0", project: "acme", version: "1.0", startedAt: 1700000000 }] : []),
+    }),
+  );
+  await page.goto("/#/new");
+  const notice = page.getByTestId("running-scans");
+  await expect(notice).toContainText("acme 1.0");
+  listed = false;
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(notice).toHaveCount(0, { timeout: 2500 });
+});
+
 test("a scan that is no longer running opens as a past scan instead", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   await stub(page);

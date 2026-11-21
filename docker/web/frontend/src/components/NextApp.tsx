@@ -65,7 +65,7 @@ import {
   scanHash,
   type RouteQuery,
 } from "@/lib/route";
-import { attachedLogStart, scanEndOf } from "@/lib/runningScans";
+import { attachedLogStart, noteScanStopping, scanEndOf } from "@/lib/runningScans";
 import { formatNumber } from "@/lib/format";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 import { type ProjectName, projectText, scanProjectName } from "@/lib/scanTitle";
@@ -605,6 +605,8 @@ export function NextApp() {
       // Cancelled from another tab: nothing was kept, so there is no result
       // to land on. This tab's own Cancel closes the stream before this.
       if (scanEndOf(done) === "cancelled") {
+        // Listed as running until the server has finished stopping it.
+        noteScanStopping(done.id || runningIdRef.current || "");
         toast(t("run.cancelledElsewhere"));
         resetToHome();
         setHomeView("new");
@@ -971,7 +973,10 @@ export function NextApp() {
             // Stopped by id, so a cancel from a joined tab works the same as
             // from the one that started it; the server stops it once.
             const id = runningIdRef.current;
-            if (id) void cancelScan(id);
+            if (id) {
+              void cancelScan(id);
+              noteScanStopping(id);
+            }
             closeStream();
             resetToHome();
             setHomeView("new");
