@@ -1718,7 +1718,7 @@ if command -v jq >/dev/null 2>&1; then
         # runtime dependencies; its development-only ones are left out.
         if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set") and (any(.name == "bomlens:pipeline-step-failed" and .value == "npm-production-set") | not)' "$OUTPUT_FILE" >/dev/null 2>&1; then
             echo "       The lock file was read: this project has no runtime dependencies, and its development-only dependencies are left out."
-            echo "       Set BOMLENS_NODE_FULL_GRAPH=1 to list them as well."
+            echo "       Set BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 to list them as well."
         fi
         # A directory --target that is not itself a root filesystem but
         # has one a level or two below it (a delivery folder wrapping the

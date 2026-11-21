@@ -2042,6 +2042,7 @@ done
 mkdir -p "$FX/yarn"; cp "$FX/link-in/package.json" "$FX/yarn/"; echo '# yarn lockfile v1' > "$FX/yarn/yarn.lock"
 expect_fp '[false,["registry-resolution"]]' "$(fp_case yarn "$FX/yarn")" "a yarn project with no package-lock.json is registry-resolution (npm re-resolves for the production set)"
 expect_fp '[true,[]]' "$(fp_case yarn-full "$FX/yarn" BOMLENS_NODE_FULL_GRAPH=1)" "with BOMLENS_NODE_FULL_GRAPH=1 the yarn project is reusable"
+expect_fp '[true,[]]' "$(fp_case yarn-dev "$FX/yarn" BOMLENS_INCLUDE_DEV_DEPENDENCIES=1)" "with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 the yarn project is reusable"
 # Gradle: a lock file counts only when locking is on.
 mkdir -p "$FX/gl/app"; printf "include 'app'\n" > "$FX/gl/settings.gradle"
 printf "dependencies { implementation 'a:b:1.+' }\ndependencyLocking { lockAllConfigurations() }\n" | tee "$FX/gl/build.gradle" > "$FX/gl/app/build.gradle"

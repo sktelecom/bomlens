@@ -632,11 +632,12 @@ def node_reresolves(tree, settings):
     """True when build-prep's production filter resolves the root package.json
     again with `npm install --package-lock-only`: no package-lock.json at the
     root (npm-shrinkwrap.json is not copied for it), not a workspace root, and
-    BOMLENS_NODE_FULL_GRAPH not set."""
+    neither BOMLENS_NODE_FULL_GRAPH nor BOMLENS_INCLUDE_DEV_DEPENDENCIES set."""
     if "package.json" not in tree.names or "package-lock.json" in tree.names:
         return False
-    if settings.get("BOMLENS_NODE_FULL_GRAPH", "") in ("1", "true"):
-        return False
+    for name in ("BOMLENS_NODE_FULL_GRAPH", "BOMLENS_INCLUDE_DEV_DEPENDENCIES"):
+        if settings.get(name, "") in ("1", "true"):
+            return False
     if "pnpm-workspace.yaml" in tree.names:
         return False
     try:
