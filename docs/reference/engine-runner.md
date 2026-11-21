@@ -77,6 +77,7 @@ The runner never reads its own environment for a container. Each value a contain
 | `limits`, `timeouts` | memory, CPU and `/tmp` size per container; the time limit of each container and of an image pull |
 | `uid`, `gid` | the user the plan, stage 2 and image containers run as, and `HOST_UID`/`HOST_GID` for the files stage 1 writes. Give the runner's own user: the files it writes for the containers are readable by their owner only |
 | `stage1_env`, `stage2_env`, `image_env` | values for each container, by name. A name the runner sets itself, or one the container does not take, is refused. A value can be a `SecretRef` to a Kubernetes Secret key, so it is never written into a Job; `NVD_API_KEY`, `TRIVY_USERNAME`, `TRIVY_PASSWORD`, `TRIVY_REGISTRY_TOKEN` and a proxy address with a user name or password are taken only that way |
+| `extra_ca_file` | a PEM file of extra CA certificates under the workspace volume, for a proxy that inspects TLS. An image scan mounts it read-only and sets `BOMLENS_EXTRA_CA_CERTS` to it. An image scan also takes `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` in `image_env`, for a network that only reaches an old copy of the Trivy database |
 | `caller_mounts` | folders or files for the plan's caller roles (`cache-maven`, `cache-gradle`, `maven-settings` and the other settings roles) |
 | `labels` | added to every Job and Pod |
 | `stage2_network` | gives stage 2 the `egress` label, for lookups that need the network (stage 2 has none by default) |

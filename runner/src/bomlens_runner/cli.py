@@ -89,6 +89,7 @@ def load_policy(path: Path) -> tuple[RunnerPolicy, "KubernetesOptions | DockerOp
         labels=doc.get("labels", {}),
         stage1_env=_env(doc.get("stage1_env")), stage2_env=_env(doc.get("stage2_env")),
         image_env=_env(doc.get("image_env")),
+        extra_ca_file=Path(doc["extra_ca_file"]) if doc.get("extra_ca_file") else None,
         caller_mounts={k: Path(v) for k, v in (doc.get("caller_mounts") or {}).items()},
         deep_license=doc.get("deep_license", False), deep_cve=doc.get("deep_cve", False),
     )

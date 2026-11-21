@@ -77,6 +77,7 @@ print(result.manifest.run_status, result.output_dir)
 | `limits`, `timeouts` | 컨테이너별 메모리, CPU, `/tmp` 크기와, 컨테이너별 시간 제한 및 이미지 pull 시간 제한 |
 | `uid`, `gid` | 실행 계획, 2단계, 이미지 스캔 컨테이너를 실행할 사용자이자, 1단계가 쓴 파일의 소유자(`HOST_UID`/`HOST_GID`). 실행기 자신의 사용자를 주세요. 실행기가 컨테이너용으로 쓰는 파일은 소유자만 읽을 수 있습니다 |
 | `stage1_env`, `stage2_env`, `image_env` | 컨테이너별로 넘길 값. 실행기가 직접 정하는 이름이나 그 컨테이너가 받지 않는 이름은 거부합니다. 값으로 쿠버네티스 Secret 키를 가리키는 `SecretRef`를 주면 값이 Job에 적히지 않습니다. `NVD_API_KEY`, `TRIVY_USERNAME`, `TRIVY_PASSWORD`, `TRIVY_REGISTRY_TOKEN`, 사용자 이름이나 비밀번호가 들어간 프록시 주소는 이 방법으로만 받습니다 |
+| `extra_ca_file` | TLS를 가로채는 프록시를 위한 추가 CA 인증서 PEM 파일로, 작업 공간 볼륨 안에 있어야 합니다. 이미지 스캔이 읽기 전용으로 마운트하고 `BOMLENS_EXTRA_CA_CERTS`를 그 파일로 정합니다. 이미지 스캔은 `image_env`에서 `BOMLENS_TRIVY_DB_MAX_AGE_DAYS`도 받으므로, 오래된 Trivy 데이터베이스만 닿는 네트워크에서 쓸 수 있습니다 |
 | `caller_mounts` | 실행 계획의 호출자 역할(`cache-maven`, `cache-gradle`, `maven-settings`와 그 밖의 설정 역할)에 마운트할 폴더나 파일 |
 | `labels` | 모든 Job과 Pod에 붙일 라벨 |
 | `stage2_network` | 2단계에 `egress` 라벨을 붙입니다. 네트워크가 필요한 조회를 켤 때 씁니다(기본값은 네트워크 없음) |
