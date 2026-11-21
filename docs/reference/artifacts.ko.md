@@ -28,7 +28,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_ai-profile.json` / `.md` | AI SBOM (`--model`, 또는 모델 컴포넌트가 있는 SBOM에 `--analyze`) | AI 준수 개요: G7 요약, 메울 수 있는 공백과 참고 링크, 라이선스 표시 컴포넌트, 규제 크로스워크, 모델 위험 판정(`riskAssessment`: 모델별 ok/conditional/caution/review 판정과 조건, 근거, 사용 형태. 법적 자문이 아닌 안내). 같은 요약이 적합성 검사 보고서 HTML 맨 위에 나오므로 별도 HTML은 만들지 않는다 |
 | `{Project}_{Version}_scancode.json` | `--deep-license` | scancode 원본 결과 |
 | `{Project}_{Version}_files.json` | 소스를 갖는 스캔(펌웨어 스캔은 항상, 다른 모드는 `--deep-license`가 아직 `_scancode.json`을 만들지 않은 경우) | 소스 트리 뷰를 뒷받침하는 ScanCode 형식 파일 트리 인벤토리(구조만, 라이선스 없음) |
-| `{Project}_{Version}_source.json` | 소스를 갖는 스캔 | 스캔한 트리의 파일 내용 스냅샷, 파일 뷰어를 뒷받침(스캔한 트리 자체는 컨테이너 종료와 함께 사라짐) |
+| `{Project}_{Version}_source.json` | 소스를 갖는 스캔 | 스캔한 트리의 파일 내용 스냅샷, 파일 뷰어를 뒷받침(스캔한 트리 자체는 컨테이너 종료와 함께 사라짐). 파일 내용의 자격 증명(레지스트리 토큰, URL과 설정 파일의 비밀번호 등)은 가려서 저장하며, 값을 가린 파일에는 `"masked": true`가 붙고 `totals.maskedFiles`에 그 수가 들어감 |
 | `{Project}_{Version}_input.json` | `--analyze` | CycloneDX 변환이 덮어쓰기 전, 공급사 SBOM 원본의 포맷·스펙 버전·도구·작성 정보를 보존 |
 | `{Project}_{Version}_yocto_vex.json` | Yocto 빌드(빌드 디렉터리를 직접 지정하거나 그 위에 `--analyze`) | 빌드가 이미 패치했거나 무관하다고 판정한 CVE 건수 — CycloneDX 결과나 보안보고서에는 미해결 항목만 남아 있어 이 수치를 알 수 없다 |
 | `{Project}_{Version}_vex.json` | 웹 UI 전용, 취약점 화면에서 CVE에 판단(영향 있음/영향 없음/이미 고침/조사 중, 근거 메모는 선택)을 저장할 때 생긴다 | 이 스캔에 저장된 판단을 컴포넌트와 CVE 기준으로 담는다. CLI는 만들지 않으며, 해당 스캔에 첫 판단을 저장하기 전에는 없다. 다른 파일과 달리 스캔이 다시 만들지 않고, 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다. 이전 스캔에 남긴 판단은 재스캔 뒤에도 그대로 남는다 |
