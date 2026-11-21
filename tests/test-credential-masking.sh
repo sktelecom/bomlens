@@ -101,5 +101,79 @@ grep -q 'git+ssh://git@github.com/org/a.git' "$WORK/sbom.json" && grep -q 'https
     && pass "a plain git user and the rest of each URL are kept" || fail "normalize changed more than credentials" "$(jq -c '.components[0].externalReferences' "$WORK/sbom.json")"
 
 echo ""
+echo "== credentials do not reach the source snapshot (<prefix>_source.json) =="
+SNAP="$LIB/source-snapshot.py"
+# The snapshot masker and the log masker give the same output for the log lines.
+if [ -n "$MASKER" ]; then
+    python3 -I - "$SNAP" "$WORK/fake.log" > "$WORK/py-masked.log" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snap", sys.argv[1])
+snap = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(snap)
+with open(sys.argv[2], encoding="utf-8") as fh:
+    sys.stdout.write(snap.mask_secrets(fh.read()))
+PY
+    if diff -u "$WORK/kept.log" "$WORK/py-masked.log" > "$WORK/mask.diff"; then
+        pass "source-snapshot.py masks the log lines exactly as mask_log_stream does"
+    else
+        fail "source-snapshot.py and mask_log_stream mask differently" "$(head -20 "$WORK/mask.diff")"
+    fi
+fi
+
+T="$WORK/tree"
+mkdir -p "$T/.docker" "$T/.m2" "$T/src"
+cat > "$T/.npmrc" <<'EOF'
+registry=https://npm.internal.example/
+//registry.npmjs.org/:_authToken=NPMTOKEN-4f9a1c
+//npm.internal.example/:_auth=ZGVtbzpwYXNzd29yZA==
+//npm.internal.example/:_password="RkFLRVBBU1M="
+EOF
+cat > "$T/.yarnrc.yml" <<'EOF'
+npmRegistryServer: "https://npm.internal.example"
+npmAuthToken: NPMTOKEN-4f9a1c
+npmAuthIdent: "deploy:FAKEIDENT-31k"
+EOF
+printf '[global]\nindex-url = https://deploy:PIPPASS-77x@pypi.internal.example/simple\n' > "$T/pip.conf"
+printf '[pypi]\nusername = __token__\npassword = FAKEPYPI-66t\n' > "$T/.pypirc"
+printf '<settings><servers><server><id>corp</id><password>MVNPASS-91q</password></server></servers></settings>\n' > "$T/.m2/settings.xml"
+printf 'org.gradle.jvmargs=-Xmx2g\nmavenPassword=FAKEGRADLE-12g\n' > "$T/gradle.properties"
+printf 'machine git.internal.example login deploy password FAKENETRC-40n\n' > "$T/.netrc"
+printf '{"auths":{"registry.internal.example":{"auth":"RkFLRURPQ0tFUi1hdXRo"}}}\n' > "$T/.docker/config.json"
+cat > "$T/nuget.config" <<'EOF'
+<configuration><packageSourceCredentials><corp>
+<add key="Username" value="deploy" />
+<add key="ClearTextPassword" value="FAKENUGET-25u" />
+</corp></packageSourceCredentials></configuration>
+EOF
+printf 'DATABASE_URL=postgres://app:FAKEDB-90d@db.internal.example/app\nAWS_SECRET_ACCESS_KEY=FAKEAWS-73a\nLOG_LEVEL=debug\n' > "$T/.env"
+printf 'url = "https://deploy:PIPPASS-77x@git.internal.example/a.git"\nprint("hello")\n' > "$T/src/app.py"
+printf '{"name":"demo","version":"1.0.0","dependencies":{"left-pad":"^1.3.0"}}\n' > "$T/package.json"
+(cd "$T" && find . -type f | sed 's#^\./##' | sort) \
+    | jq -R '{path: ., type: "file"}' | jq -s '{files: .}' > "$WORK/snap_files.json"
+python3 -I "$SNAP" "$T" "$WORK/snap_files.json" "$WORK/snap_source.json" > "$WORK/snap.out" 2>&1
+SNAP_SECRETS="$SECRETS RkFLRVBBU1M= FAKEIDENT-31k FAKEPYPI-66t FAKEGRADLE-12g FAKENETRC-40n RkFLRURPQ0tFUi1hdXRo FAKENUGET-25u FAKEDB-90d FAKEAWS-73a"
+if [ -s "$WORK/snap_source.json" ]; then
+    SECRETS="$SNAP_SECRETS" check_clean "the source snapshot" "$WORK/snap_source.json"
+    got=$(jq -r '[.files[] | select(.masked) | .path] | sort | join(",")' "$WORK/snap_source.json")
+    want=".docker/config.json,.env,.m2/settings.xml,.netrc,.npmrc,.pypirc,.yarnrc.yml,gradle.properties,nuget.config,pip.conf,src/app.py"
+    [ "$got" = "$want" ] && pass "every file that held a credential is marked masked, and only those" \
+        || fail "masked files: got '$got', want '$want'"
+    [ "$(jq -r '.totals.maskedFiles' "$WORK/snap_source.json")" = 11 ] \
+        && pass "totals.maskedFiles counts them" || fail "totals.maskedFiles is wrong"
+    npmrc=$(jq -r '.files[] | select(.path == ".npmrc") | .content' "$WORK/snap_source.json")
+    case "$npmrc" in
+        *"registry=https://npm.internal.example/"*"//registry.npmjs.org/:_authToken=***"*)
+            pass "the rest of .npmrc stays readable, only the token is replaced" ;;
+        *) fail ".npmrc lost more than the credential" "$npmrc" ;;
+    esac
+    jq -e '.files[] | select(.path == ".env") | .content | test("LOG_LEVEL=debug")' "$WORK/snap_source.json" >/dev/null \
+        && jq -e '.files[] | select(.path == "package.json") | (.masked | not) and (.content | test("left-pad"))' "$WORK/snap_source.json" >/dev/null \
+        && pass "lines and files without a credential are untouched" \
+        || fail "the snapshot changed text that holds no credential"
+else
+    fail "source-snapshot.py wrote no snapshot" "$(cat "$WORK/snap.out")"
+fi
+
+echo ""
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

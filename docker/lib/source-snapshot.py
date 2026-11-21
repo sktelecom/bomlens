@@ -32,11 +32,16 @@
 # manifests — are taken first, so the budget is spent on the evidence a reviewer
 # actually opens. Every drop is counted in `totals` and logged, never silent.
 #
+# Credentials in the captured text (a token in .npmrc, a password in a URL or
+# in settings.xml) are masked before the snapshot is written, the same forms
+# the scan log masks; a masked file carries "masked": true.
+#
 # Best-effort: any failure leaves no snapshot and never breaks a scan. The output
 # carries no timestamp, so a repeated scan of the same tree is byte-identical.
 
 import json
 import os
+import re
 import sys
 
 def cap(name, default):
@@ -107,6 +112,73 @@ def read_text(path, limit):
     return raw.decode("utf-8", "replace"), size, size > limit
 
 
+# Credential masking, applied to every text file before it is written. The
+# first five rules are mask_log_stream in source-detect.sh, written for Python
+# (tests/test-credential-masking.sh checks both give the same output): the user
+# and password of a URL, an Authorization value, a Bearer or Basic credential,
+# the value given to a token, password, secret, API key or npmrc _auth name, and
+# a <password>, <passphrase>, <token> or <secret> element. Whitespace is matched
+# within a line only, as sed sees it.
+_WS = r"[ \t\r\f\v]"
+_Q = "[\"']"
+_LOG_RULES = [
+    # The lookbehind starts a scheme only where a run of scheme characters
+    # starts, as sed's leftmost match does, and keeps a long run linear.
+    (re.compile(r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*://)[^/\s\"']+@"), r"\1***@"),
+    (re.compile(r"([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]" + _Q + "?"
+                + _WS + "*[:=]" + _WS + "*" + _Q + r"?)([A-Za-z]+" + _WS + r"+)?[^\s\"',;]+"),
+     r"\1\2***"),
+    (re.compile(r"([Bb]earer|[Bb]asic)" + _WS + r"+[A-Za-z0-9._~+/=-]{8,}"), r"\1 ***"),
+    (re.compile(r"((token|password|passwd|secret|api[_-]?key|_auth)" + _Q + "?" + _WS
+                + "*[:=]" + _WS + "*" + _Q + r"?)[^\s\"',;&]+", re.IGNORECASE), r"\1***"),
+    (re.compile(r"(<(password|passphrase|token|secret|Password|Passphrase|Token|Secret)>)"
+                r"[^<]+(</)"), r"\1***\3"),
+]
+
+# Files that hold registry, index or service credentials get three more rules,
+# for forms the log rules leave alone: a key whose name says it is a credential
+# (npmAuthIdent, AWS_SECRET_ACCESS_KEY, mavenPassword; the name is bounded so a
+# long line stays cheap), the password of a .netrc
+# entry, and the value of a nuget.config <add key="...Password" value="..."/>.
+_CREDENTIAL_FILE_NAMES = {
+    ".npmrc", ".yarnrc", ".yarnrc.yml", "pip.conf", "pip.ini", ".pypirc",
+    "settings.xml", "settings-security.xml", "gradle.properties", ".netrc",
+    "_netrc", "nuget.config", ".git-credentials", ".pgpass", "credentials",
+}
+_CREDENTIAL_RULES = [
+    (re.compile(r"^(" + _WS + r"*(?:export" + _WS + r"+)?[\"']?[A-Za-z0-9_.-]{0,128}?"
+                r"(?:secret|token|password|passwd|pwd|credential|auth|api[_-]?key|"
+                r"access[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,128}[\"']?" + _WS
+                + r"*[=:]" + _WS + r"*)(?=\S)[^\n]*$", re.IGNORECASE | re.MULTILINE),
+     r"\1***"),
+    (re.compile(r"(\b(?:password|passwd|account)" + _WS + r"+)\S+", re.IGNORECASE),
+     r"\1***"),
+    (re.compile(r"(key=" + _Q + r"[^\"']*(?:password|token|apikey|secret)[^\"']*" + _Q
+                + _WS + r"+value=" + _Q + r")[^\"']+", re.IGNORECASE), r"\1***"),
+]
+
+
+def is_credential_file(rel):
+    """A config file that can carry credentials: by name, any .env file, and a
+    Docker client config.json."""
+    name = os.path.basename(rel).lower()
+    if name in _CREDENTIAL_FILE_NAMES or name == ".env" or name.startswith(".env."):
+        return True
+    return name == "config.json" and os.path.basename(os.path.dirname(rel)) == ".docker"
+
+
+def mask_secrets(text, credential_file=False):
+    """The text with what can identify a credential replaced by ***."""
+    for pattern, repl in _LOG_RULES:
+        text = pattern.sub(repl, text)
+    if credential_file:
+        for pattern, repl in _CREDENTIAL_RULES:
+            text = pattern.sub(repl, text)
+        # A Docker config.json "auth" holds base64 user:password.
+        text = re.sub(r"(\"auth\"" + _WS + r"*:" + _WS + r"*\")[^\"]+", r"\1***", text)
+    return text
+
+
 def main():
     if len(sys.argv) < 4:
         sys.exit(0)
@@ -142,7 +214,7 @@ def main():
 
     files = []
     used = 0
-    skipped_binary = skipped_budget = skipped_error = truncated_files = 0
+    skipped_binary = skipped_budget = skipped_error = truncated_files = masked_files = 0
 
     for rel in paths:
         full = os.path.realpath(os.path.join(root, rel))
@@ -175,12 +247,18 @@ def main():
             skipped_binary += 1
             continue
         text, size, cut = result
-        files.append({
+        masked = mask_secrets(text, is_credential_file(rel))
+        entry = {
             "path": rel,
             "size": size,
-            "content": text,
+            "content": masked,
             "truncated": cut,
-        })
+        }
+        if masked != text:
+            entry["masked"] = True
+            masked_files += 1
+        text = masked
+        files.append(entry)
         if cut:
             truncated_files += 1
         used += len(text.encode("utf-8", "replace"))
@@ -214,6 +292,7 @@ def main():
             "links": len(links),
             "bytes": used,
             "truncatedFiles": truncated_files,
+            "maskedFiles": masked_files,
             "skippedBinary": skipped_binary,
             "skippedBudget": skipped_budget,
             "skippedUnreadable": skipped_error,
@@ -237,6 +316,9 @@ def main():
     if truncated_files:
         print("[INFO] source-snapshot: %d file(s) shown only up to %d KiB."
               % (truncated_files, MAX_FILE_BYTES // 1024))
+    if masked_files:
+        print("[INFO] source-snapshot: credentials masked in %d file(s)."
+              % masked_files)
     if skipped_binary:
         print("[INFO] source-snapshot: %d binary file(s) listed without a preview."
               % skipped_binary)
