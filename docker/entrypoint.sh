@@ -3032,7 +3032,13 @@ else
     case "$_gv_status" in
         ok) er_record go-vulndb ok "" "" "" "" "$_gv_counts" ;;
         degraded)
-            echo "[WARN] go-vulndb: ${_gv_detail}. Go advisories published since are not reported. Allow the download (vuln.go.dev, or a mirror in BOMLENS_GO_VULNDB_URL), refresh the image, or mount a newer vulndb.zip with BOMLENS_GO_VULNDB_PATH." >&2
+            case "$_gv_detail" in
+                "the downloaded "*)
+                    # The download worked; the source itself offered an old copy.
+                    echo "[WARN] go-vulndb: ${_gv_detail}. A newer copy was downloaded, but the source (vuln.go.dev, or the mirror in BOMLENS_GO_VULNDB_URL) offered no newer one, so Go advisories published since may be missing. Check the mirror, or raise the limit with BOMLENS_GO_VULNDB_MAX_AGE_DAYS." >&2 ;;
+                *)
+                    echo "[WARN] go-vulndb: ${_gv_detail}. Go advisories published since are not reported. Allow the download (vuln.go.dev, or a mirror in BOMLENS_GO_VULNDB_URL), refresh the image, or mount a newer vulndb.zip with BOMLENS_GO_VULNDB_PATH." >&2 ;;
+            esac
             er_record go-vulndb degraded unavailable "$_gv_detail" "" "" "$_gv_counts" ;;
         no_input) er_record go-vulndb skipped no_input "$_gv_detail" "" "" "$_gv_counts" ;;
         *) er_record go-vulndb failed failed "${_gv_detail:-the Go vulnerability database match failed}" ;;
