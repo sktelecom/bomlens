@@ -92,3 +92,20 @@ export function rememberScanRoot(
   const root = roots.find((r) => r.path === path);
   if (root) write(store, LAST_KEY, idOf(root));
 }
+
+/**
+ * The scan location the form shows and submits. The list offers the launch
+ * folder ("") only when `offersLaunch`, then the added folders. A choice the
+ * list does not offer (none made yet, the launch folder when it is hidden, or a
+ * folder that went away) falls back to the first entry, which is the one a
+ * select element shows, so the value sent is always the one on screen.
+ */
+export function effectiveScanRoot(
+  chosen: string,
+  roots: ScanRootEntry[],
+  offersLaunch: boolean,
+): string {
+  if (roots.length === 0) return "";
+  if (chosen === "" ? offersLaunch : roots.some((r) => r.path === chosen)) return chosen;
+  return offersLaunch ? "" : roots[0].path;
+}
