@@ -284,6 +284,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 - Swift Package Manager: `Package.resolved` (없으면 `swift package resolve`를 먼저 실행).
 - CocoaPods: `Podfile.lock` (`pod install`로 생성). BomLens가 이 파일을 직접 파싱하므로 스캔 장비에 macOS나 CocoaPods 설치가 필요 없습니다.
 
+> 참고: `Podfile.lock`에는 라이선스가 적혀 있지 않습니다. `FETCH_LICENSE`가 켜져 있으면(기본값) BomLens는 CocoaPods trunk가 그 버전에 대해 공개한 podspec(`cdn.cocoapods.org`)에서 각 pod의 라이선스를 읽고 `bomlens:licenseSource` = `CocoaPods trunk podspec`으로 표시합니다. `Moya/Core` 같은 subspec은 상위 pod의 라이선스를 따릅니다. lock 파일의 `SPEC REPOS`에서 trunk 아래에 있는 pod만 조회합니다. 사설 spec 저장소나 git, 경로 소스에서 온 pod는 라이선스 없이 남습니다. 이름이 같은 trunk pod가 다른 프로젝트일 수 있기 때문입니다. TLS를 검사하는 프록시 뒤에서는 그 프록시의 CA를 `SBOM_EXTRA_CA_CERTS`로 넘깁니다. 같은 구조의 미러에만 닿는 네트워크에서는 `COCOAPODS_CDN_URL`을 지정합니다. CDN이 응답하지 않으면 로그에 `[WARN] [cocoapods] ... did not answer`가 남고 pod는 라이선스 없이 남습니다. `FETCH_LICENSE=false`와 `--byte-stable`은 이 조회를 끕니다.
+
 > 주의: UIKit 등 Xcode가 관리하는 플랫폼 의존성은 macOS가 필요하며 Linux 스캐너에서는 해석되지 않습니다.
 
 > 참고: 최상위에 매니페스트가 없어도 세 단계 아래까지 Xcode 프로젝트(`*.xcodeproj`), `Package.swift`, `Podfile`, `Package.resolved`가 있으면(예: `App/App.xcodeproj`) Swift로 스캔합니다. 다른 언어의 루트 매니페스트가 있는 트리는 그 언어를 유지합니다. Swift 의존성 해석 단계와 `cdxgen` 실행은 `BOMLENS_PREP_TIMEOUT`초(기본 900초)가 지나면 멈추고, 저장소 내려받기가 로그인 입력을 요구하지 않도록 설정되어 있어서, 끝나지 않는 의존성 내려받기가 스캔을 붙잡지 않고 해당 단계만 끝납니다.
