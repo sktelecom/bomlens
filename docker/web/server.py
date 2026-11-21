@@ -50,7 +50,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -5867,6 +5867,24 @@ _scan_started = {}
 _active_upload_tokens = set()
 
 
+def client_local_now(tz_offset, now_utc=None):
+    """The time the user sees, from the browser's Date.getTimezoneOffset().
+
+    The container runs in UTC, so datetime.now() here is not the user's clock.
+    The offset is minutes to ADD to local time to get UTC (positive west of
+    UTC, as JavaScript reports it). Only a plain integer within the real range
+    (UTC-12 to UTC+14, so -840..720) is accepted; anything else returns None
+    and the caller keeps the server's own clock."""
+    raw = str(tz_offset or "").strip()
+    if not re.fullmatch(r"-?[0-9]{1,3}", raw):
+        return None
+    minutes = int(raw)
+    if not -840 <= minutes <= 720:
+        return None
+    base = now_utc or datetime.now(timezone.utc)
+    return (base - timedelta(minutes=minutes)).replace(tzinfo=None)
+
+
 def claim_run_id(prefix, active, now=None, force_suffix=False):
     """Pick a free run folder for `prefix`, given the folders in flight.
 
@@ -8135,6 +8153,7 @@ class Handler(BaseHTTPRequestHandler):
         # the life of the process.
         with _scan_lock:
             run_id = claim_run_id(prefix, _scan_active,
+                                  now=client_local_now(g("tz_offset")),
                                   force_suffix=g("timestamp") == "true")
             _scan_active.add(run_id)
             _scan_started[run_id] = {
