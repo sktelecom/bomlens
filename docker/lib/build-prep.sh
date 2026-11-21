@@ -432,6 +432,19 @@ prep_step() {
             echo "[build-prep] $_ps_label: failed (rc=$_ps_rc)" >&2
         fi
         if [ -s "$_ps_err" ]; then
+            # Gradle's own error (its "* What went wrong:" block) comes first:
+            # the last lines of a long failure are often only a list of
+            # dependency paths and "BUILD FAILED".
+            _ps_wrong=$(gradle_what_went_wrong "$_ps_err" 2>/dev/null)
+            if [ -n "$_ps_wrong" ]; then
+                echo "[build-prep] $_ps_label: Gradle reported:" >&2
+                printf '%s\n' "$_ps_wrong" | sed 's/^/[build-prep]   /' >&2
+                prep_cause "$_ps_label" "$(gradle_error_cause "$_ps_err")"
+                if grep -q 'android\.useAndroidX' "$_ps_err" 2>/dev/null; then
+                    prep_hint android-useandroidx-missing
+                    echo "[build-prep] $_ps_label: the build uses AndroidX libraries, but android.useAndroidX=true is not set. Add the line android.useAndroidX=true to gradle.properties in the project's top-level folder and scan again." >&2
+                fi
+            fi
             echo "[build-prep] $_ps_label said (last 20 lines):" >&2
             tail -20 "$_ps_err" | sed 's/^/[build-prep]   /' >&2
         fi
@@ -466,6 +479,62 @@ mark_prep_failed() {
         *" $1 "*) ;;
         *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1" ;;
     esac
+}
+
+# Why a failed step failed, for the person reading the result. PREP_CAUSES
+# holds one "label: sentence" line per step (the first cause found for it),
+# PREP_HINTS a space-separated list of hint codes, each naming a cause with a
+# fix of its own (resolutionHints in completeness-reasons.json). Both are
+# recorded on the SBOM with the failed steps (bomlens:pipeline-step-cause,
+# bomlens:resolution-hint), so the completeness result can name the cause and
+# its fix in place of the general advice.
+PREP_CAUSES=""
+PREP_HINTS=""
+prep_cause() {  # prep_cause <label> <sentence>
+    [ -n "$2" ] || return 0
+    _pc_nl='
+'
+    case "$_pc_nl$PREP_CAUSES" in *"$_pc_nl$1: "*) return 0 ;; esac
+    PREP_CAUSES="${PREP_CAUSES:+$PREP_CAUSES$_pc_nl}$1: $2"
+}
+prep_hint() {
+    case " $PREP_HINTS " in
+        *" $1 "*) ;;
+        *) PREP_HINTS="${PREP_HINTS:+$PREP_HINTS }$1" ;;
+    esac
+}
+
+# The "* What went wrong:" block of a Gradle failure in FILE, up to its first
+# blank line or "* Try:", at most 12 lines (a long list of dependency paths
+# is cut there). Nothing when the file has no such block.
+gradle_what_went_wrong() {
+    awk '
+        /^\* What went wrong:/ { on = 1; next }
+        on && (/^[[:space:]]*$/ || /^\* (Try|Exception is|Get more help)/) { exit }
+        on { if (++n > 12) { print "..."; exit } print }
+    ' "$1" 2>/dev/null
+}
+
+# One sentence that names the cause of a Gradle failure in FILE: the first
+# line of its "* What went wrong:" block and, when that line only says where
+# it failed (a task, a configuration, a project), the first nested "> " line
+# under it that says why (the last one when every one only says where).
+# Control characters taken out, at most 300 characters.
+gradle_error_cause() {
+    gradle_what_went_wrong "$1" | awk '
+        function where(x) { return x ~ /^(Execution failed for task|Could not resolve all (files|dependencies|artifacts|task dependencies) for configuration|A problem occurred (configuring|evaluating)|Could not determine the dependencies of task)/ }
+        NR == 1 { first = $0; generic = where($0); next }
+        generic && /^[[:space:]]*> / {
+            why = $0; sub(/^[[:space:]]*> /, "", why)
+            if (!where(why)) exit
+        }
+        END {
+            s = first
+            if (why != "") s = s " " why
+            gsub(/[[:cntrl:]]/, " ", s); gsub(/[[:space:]]+/, " ", s)
+            sub(/^ /, "", s); sub(/ $/, "", s)
+            print substr(s, 1, 300)
+        }'
 }
 
 # Take LABEL off PREP_FAILED: a step that failed once and then succeeded
@@ -1297,6 +1366,106 @@ maven_dependency_plugin_present() {
     [ -n "$_mdp_meta" ] || return 2
     return 0
 }
+# The coordinates of one POM as group:artifact:version, with the group and
+# version taken from its <parent> when the POM leaves them out; a version
+# written with a property (${revision}) prints as *. The project's own
+# elements are read before the first section that holds other coordinates
+# (dependencies, build, profiles and the like). Nothing when no artifactId is
+# read.
+maven_pom_coords() {
+    xml_without_comments "$1" | awk '
+        function tag(x, name,   i, j, v) {
+            i = index(x, "<" name ">"); if (i == 0) return ""
+            v = substr(x, i + length(name) + 2)
+            j = index(v, "</" name ">"); if (j == 0) return ""
+            v = substr(v, 1, j - 1); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            return v
+        }
+        {
+            s = $0; p = ""
+            i = index(s, "<parent>"); j = index(s, "</parent>")
+            if (i > 0 && j > i) { p = substr(s, i + 8, j - i - 8); s = substr(s, 1, i - 1) substr(s, j + 9) }
+            n = split("dependencies dependencyManagement build profiles properties modules reporting repositories pluginRepositories distributionManagement", sec, " ")
+            cut = length(s) + 1
+            for (k = 1; k <= n; k++) if (match(s, "<" sec[k] "[ >/]") && RSTART < cut) cut = RSTART
+            s = substr(s, 1, cut - 1)
+            a = tag(s, "artifactId"); if (a == "") exit
+            g = tag(s, "groupId"); if (g == "") g = tag(p, "groupId")
+            v = tag(s, "version"); if (v == "") v = tag(p, "version")
+            if (v == "" || index(v, "${") > 0) v = "*"
+            if (g != "" && index(g, "${") == 0) print g ":" a ":" v
+        }'
+}
+# The coordinates of the POMs of this build (maven_pom_coords), one per line:
+# pom.xml files eight folders deep, outside .git, node_modules, build output
+# (target) and source folders (a POM under src/ is test data, not a module).
+maven_reactor_coords() {
+    find . -maxdepth 8 \( -name .git -o -name node_modules -o -name target -o -name src \) -prune -o -type f -name pom.xml -print 2>/dev/null \
+        | while IFS= read -r _mrc; do maven_pom_coords "$_mrc"; done | LC_ALL=C sort -u
+}
+# The artifacts Maven named in the [ERROR] lines of FILE, each once, as
+# "R <artifactId>" for a module of this build (maven_reactor_coords) and
+# "X <coordinates>" for any other. The project an error is about ("for project
+# ...") and the plugin a goal failed in are not counted.
+maven_error_artifacts() {
+    _mea_coords=$(mktemp)
+    maven_reactor_coords > "$_mea_coords"
+    grep '^\[ERROR\]' "$1" 2>/dev/null \
+        | sed -E 's/Failed to execute goal [^ ]+ \([^)]*\)//; s/for project [A-Za-z0-9_.:-]+//' \
+        | grep -oE '[A-Za-z0-9_.-]+(:[A-Za-z0-9_.-]+){2,4}' \
+        | awk -v coords="$_mea_coords" '
+            BEGIN { while ((getline l < coords) > 0) { split(l, c, ":"); ga[c[1] ":" c[2]] = c[3] } }
+            {
+                n = split($0, f, ":")
+                key = f[1] ":" f[2]; v = f[n]
+                if ((key in ga) && (ga[key] == "*" || ga[key] == v)) out = "R " f[2]; else out = "X " $0
+                if (!(out in seen)) { seen[out] = 1; print out }
+            }'
+    rm -f "$_mea_coords"
+}
+# Whether every artifact Maven could not resolve (FILE, maven_error_artifacts)
+# is a module of this build, which a run without a build cannot fetch from a
+# repository: a sibling module is looked up in the repositories only because
+# it has not been built. Prints the artifactIds of those modules on one line.
+# Returns 1 when an error names any other artifact, when it names none (a
+# failure this cannot judge), or when no error says a dependency was not
+# resolved.
+maven_errors_reactor_only() {
+    grep -Eq 'Could not resolve dependencies|Could not find artifact|could not be resolved' "$1" 2>/dev/null || return 1
+    _mer_list=$(maven_error_artifacts "$1")
+    [ -n "$_mer_list" ] || return 1
+    ! printf '%s\n' "$_mer_list" | grep -q '^X ' || return 1
+    printf '%s\n' "$_mer_list" | sed -n 's/^R //p' | tr '\n' ',' | sed 's/,$//; s/,/, /g'
+    echo
+}
+# The project pom.xml names a parent POM by a relative path (Maven's default
+# is ../pom.xml) that leads out of the scanned folder, and Maven could not
+# read that parent: prints "group:artifact:version<TAB>path". An empty
+# <relativePath/> means the parent comes from a repository, which is not this.
+maven_parent_outside() {
+    grep -q 'Non-resolvable parent POM' "$1" 2>/dev/null || return 1
+    xml_without_comments pom.xml | awk '
+        function tag(x, name,   i, j, v) {
+            if (index(x, "<" name "/>") > 0 || index(x, "<" name " />") > 0) return "\001"
+            i = index(x, "<" name ">"); if (i == 0) return ""
+            v = substr(x, i + length(name) + 2)
+            j = index(v, "</" name ">"); if (j == 0) return ""
+            v = substr(v, 1, j - 1); gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            return v
+        }
+        {
+            i = index($0, "<parent>"); j = index($0, "</parent>")
+            if (i == 0 || j <= i) exit 1
+            p = substr($0, i + 8, j - i - 8)
+            r = tag(p, "relativePath")
+            if (r == "\001") exit 1
+            if (r == "") r = "../pom.xml"
+            if (r !~ /^\.\.(\/|$)/) exit 1
+            print tag(p, "groupId") ":" tag(p, "artifactId") ":" tag(p, "version") "\t" r
+            found = 1
+        }
+        END { exit found ? 0 : 1 }'
+}
 sha512_tool() {
     for _st in sha512sum shasum openssl; do
         if command -v "$_st" >/dev/null 2>&1; then echo "$_st"; return 0; fi
@@ -1481,6 +1650,23 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
         _mvn_total=${_mvn_counts% *}; _mvn_have=${_mvn_counts#* }
         if [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"; then
             log "maven: fetched dependency jars for component hashes ($_mvn_have of $_mvn_total in the local repository)"
+        elif _mvn_parent=$(maven_parent_outside "$_mvn_err"); then
+            # A module scanned without the folder of its parent POM: Maven
+            # cannot read the project at all, so there is no dependency tree.
+            _mvn_parent_path=$(printf '%s\n' "$_mvn_parent" | cut -f2)
+            _mvn_parent=$(printf '%s\n' "$_mvn_parent" | cut -f1)
+            echo "[build-prep] maven: [WARN] pom.xml names the parent POM $_mvn_parent at $_mvn_parent_path, outside the scanned folder, and no repository has it, so Maven cannot read the project: the dependency tree is missing and the SBOM lists only the dependencies written in pom.xml. Scan the top-level folder of the multi-module build (the one that holds the parent POM) instead." >&2
+            grep '^\[ERROR\]' "$_mvn_err" | grep 'Non-resolvable parent POM' | head -1 | sed 's/^/[build-prep]   /'
+            _mvn_tree_failed=1
+            mark_prep_failed maven-dependency-tree
+            prep_cause maven-dependency-tree "Non-resolvable parent POM $_mvn_parent ($_mvn_parent_path is outside the scanned folder)"
+            prep_hint maven-parent-outside-scan
+        elif _mvn_reactor=$(maven_errors_reactor_only "$_mvn_err"); then
+            # The errors name only modules of this build: a sibling module a
+            # module depends on is not built by this run, so Maven looks for
+            # it in the repositories. cdxgen reads the modules from the
+            # reactor, so nothing is missing from the SBOM.
+            log "maven: fetched dependency jars for component hashes ($_mvn_have of $_mvn_total in the local repository); the modules of this build ($_mvn_reactor) are not built by the scan, so they are not fetched"
         elif [ -n "${MAVEN_USER_REPO_OFFLINE:-}" ] && [ "${_mvn_total:-0}" -gt 0 ] && [ "${_mvn_have:-0}" -eq 0 ] && [ -z "$_mvn_tree_failed" ]; then
             # Offline, a run that found none of its jars in either repository
             # cannot have found the POMs the dependency tree needs either.
@@ -1501,6 +1687,8 @@ if [ -f pom.xml ] && { { [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; } |
             if grep -Eq 'Could not (find|transfer) artifact|Could not resolve dependencies|Failed to collect dependencies' "$_mvn_err"; then
                 log "maven: a dependency could not be found or downloaded, so the SBOM may lack it and its transitive dependencies; check the repository address and credentials (settings.xml)"
                 mark_prep_failed maven-dependency-resolve
+                _mvn_ext=$(maven_error_artifacts "$_mvn_err" | sed -n 's/^X //p' | head -3 | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+                [ -z "$_mvn_ext" ] || prep_cause maven-dependency-resolve "Maven could not resolve $_mvn_ext"
             fi
         fi
         rm -f "$_mvn_err" "$_mvn_list"
@@ -1722,8 +1910,24 @@ fi
 # end of this script filters the generated SBOM down to that set.
 # GRADLE_RUNTIME_SET is the same for a java-gradle build: the runtime classpath
 # of every project.
+# ANDROID_RELEASE_UNRESOLVED=1 when the Gradle build of an Android app failed
+# before its release runtime classpath was read: the same filter then keeps no
+# component a Gradle configuration gave (only the app's own modules).
 ANDROID_RELEASE_SET=""
+ANDROID_RELEASE_UNRESOLVED=""
 GRADLE_RUNTIME_SET=""
+
+# The tree holds an Android Gradle build: a build file that applies an Android
+# Gradle plugin (by id or through a version catalog alias), or a module with
+# src/main/AndroidManifest.xml. Three folders deep, build output left out.
+android_build_in_tree() {
+    find . -maxdepth 3 \( -name .git -o -name build -o -name node_modules -o -name .gradle \) -prune -o -type f \
+        \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null \
+        | while IFS= read -r _abt; do
+            grep -lE 'com\.android\.(application|library|dynamic-feature|test)|plugins\.android\.(application|library|dynamic[.-]feature|test)' "$_abt" 2>/dev/null
+        done | grep -q . && return 0
+    [ -n "$(find . -maxdepth 4 \( -name .git -o -name build -o -name node_modules \) -prune -o -type f -path '*/src/main/AndroidManifest.xml' -print 2>/dev/null | head -1)" ]
+}
 
 # awk function shared by the two readers below: one dependency line of a
 # Gradle `dependencies` report to group:artifact:version, or "" for a line that
@@ -2095,9 +2299,9 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
         # listing subprojects or resolving one module's dependencies.
         # Their output goes to a file, not $(...): prep_step records the label
         # in this shell, which a command substitution's subshell would lose.
-        _aout=$(mktemp); _atimeout=""; _aunres=$(mktemp)
+        _aout=$(mktemp); _atimeout=""; _afailed=""; _aunres=$(mktemp)
         prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain projects > "$_aout"
-        [ "$?" -ne 124 ] || _atimeout=1
+        case "$?" in 0) ;; 124) _atimeout=1 ;; *) _afailed=1 ;; esac
         _subs=$(sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p" "$_aout")
         # A project path outside those characters cannot be passed on here;
         # its module would be missing from the set, so none is made.
@@ -2107,7 +2311,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
         for _s in $_subs ""; do
             [ -z "$_aodd" ] || break
             prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon ${GRADLE_OFFLINE_ARG:+"$GRADLE_OFFLINE_ARG"} -q --console=plain "${_s}:dependencies" > "$_aout"
-            [ "$?" -ne 124 ] || _atimeout=1
+            case "$?" in 0) ;; 124) _atimeout=1 ;; *) _afailed=1 ;; esac
             _dep=$(cat "$_aout")
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
@@ -2150,6 +2354,14 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
                 log "android: no release runtime configuration found; using full graph"
             elif [ -n "$_atimeout" ]; then
                 log "android: the release classpath step timed out; using full graph"
+            elif [ -n "$_afailed" ] && android_build_in_tree; then
+                # An Android app whose Gradle build failed: what cdxgen reads
+                # from the configurations that still resolve is the build and
+                # test tooling (the Unified Test Platform, ddmlib, androidx
+                # test), not what the app ships, so none of it is kept.
+                ANDROID_RELEASE_UNRESOLVED=1
+                prep_hint android-release-classpath-unresolved
+                echo "[build-prep] android: [WARN] Gradle failed before it resolved the app's release runtime classpath (the error is above), so the app's dependencies are not known. The SBOM does not list the components of the build's other configurations, which are build and test tooling. Fix the Gradle error and scan again." >&2
             else
                 log "android: no release runtime configuration found; reading the java-gradle runtime classpath"
                 gradle_runtime_classpath
@@ -3938,11 +4150,24 @@ const list = labels.split(' ').filter(Boolean);
 for (const label of list) {
   props.push({ name: 'bomlens:pipeline-step-failed', value: label });
 }
+// The cause each failed step reported, and the hint codes for causes with a
+// fix of their own (PREP_CAUSES, PREP_HINTS), for a step on the list only.
+const clean = (t, n) => String(t).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, n);
+for (const line of (process.env.BOMLENS_PREP_CAUSES || '').split('\n')) {
+  const i = line.indexOf(': ');
+  if (i > 0 && list.includes(line.slice(0, i)) && line.slice(i + 2).trim()) {
+    props.push({ name: 'bomlens:pipeline-step-cause', value: clean(line, 400) });
+  }
+}
+for (const hint of (process.env.BOMLENS_PREP_HINTS || '').split(' ').filter(Boolean)) {
+  if (/^[a-z0-9-]{1,60}$/.test(hint)) props.push({ name: 'bomlens:resolution-hint', value: hint });
+}
 bom.metadata.properties = props;
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 process.stderr.write('[build-prep] recorded ' + list.length + ' failed preprocessing step(s) on the SBOM: ' + list.join(', ') + '\n');
 PREPFAIL_JS
-    node "$_pf" "$OUT" "$PREP_FAILED" || log "prep-failed: recording skipped (non-fatal)"
+    BOMLENS_PREP_CAUSES="$PREP_CAUSES" BOMLENS_PREP_HINTS="$PREP_HINTS" \
+        node "$_pf" "$OUT" "$PREP_FAILED" || log "prep-failed: recording skipped (non-fatal)"
     rm -f "$_pf"
 fi
 
@@ -4103,16 +4328,23 @@ fi
 # above reads: cdx:gradle:GradleRootPath, internal:GradleProfileName,
 # GradleProfileName): a jar found in the tree is on no resolved classpath, so
 # the set says nothing about it.
+# An Android app whose release runtime classpath could not be read
+# (ANDROID_RELEASE_UNRESOLVED) goes through it with an empty set: every
+# component a Gradle configuration gave is dropped.
 _flt_set=""; _flt_label=""
 if [ -n "${ANDROID_RELEASE_SET:-}" ]; then
     _flt_set="$ANDROID_RELEASE_SET"; _flt_label=android
+elif [ -n "${ANDROID_RELEASE_UNRESOLVED:-}" ]; then
+    _flt_set=/dev/null; _flt_label=android-unresolved
 elif [ -n "${GRADLE_RUNTIME_SET:-}" ]; then
     _flt_set="$GRADLE_RUNTIME_SET"; _flt_label=gradle
 fi
-if [ "${rc:-1}" -eq 0 ] && [ -n "$_flt_set" ] && [ -s "$_flt_set" ] \
+if [ "${rc:-1}" -eq 0 ] && [ -n "$_flt_set" ] && { [ -s "$_flt_set" ] || [ "$_flt_label" = android-unresolved ]; } \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     if [ "$_flt_label" = android ]; then
         log "android: filtering SBOM to release runtime scope"
+    elif [ "$_flt_label" = android-unresolved ]; then
+        log "android: leaving out the components of the build's other configurations (no release runtime classpath)"
     else
         log "gradle: filtering SBOM to the runtime classpath"
     fi
@@ -4125,7 +4357,7 @@ const fromGradle = c => (c.properties || []).some(p => GRADLE_ORIGIN.has(p.name)
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 const rel = new Set(fs.readFileSync(relPath, 'utf8').split('\n').filter(Boolean));
-if (!rel.size || !Array.isArray(bom.components)) process.exit(0);
+if ((!rel.size && label !== 'android-unresolved') || !Array.isArray(bom.components)) process.exit(0);
 const gav = p => {
   const m = /^pkg:maven\/([^/]+)\/([^@?]+)@([^?]+)/.exec(p || '');
   return m ? m[1] + ':' + m[2] + ':' + decodeURIComponent(m[3]) : null;
@@ -4138,7 +4370,7 @@ const keep = c => {
   const g = gav(p);
   if (!g) return true;                            // app root (single segment)
   if (rootGroup && g.split(':')[0] === rootGroup) return true; // first-party modules
-  if (label === 'gradle' && !fromGradle(c)) return true;     // not from a Gradle resolve
+  if ((label === 'gradle' || label === 'android-unresolved') && !fromGradle(c)) return true; // not from a Gradle resolve
   return rel.has(g);
 };
 const before = bom.components.length;
@@ -4163,7 +4395,7 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] ' + (label || 'android') + ': kept ' + bom.components.length + ' of ' + before + ' components'
+process.stderr.write('[build-prep] ' + (label === 'android-unresolved' ? 'android' : (label || 'android')) + ': kept ' + bom.components.length + ' of ' + before + ' components'
   + (rescoped ? ', ' + rescoped + ' on the runtime classpath set to scope required' : '') + '\n');
 FILTER_JS
     node "$_flt" "$OUT" "$_flt_set" "$_flt_label" || log "$_flt_label: filter skipped (non-fatal)"

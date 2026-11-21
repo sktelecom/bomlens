@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>example.mm</groupId><artifactId>parent</artifactId><version>1.0.0</version></parent>
+  <artifactId>web</artifactId>
+  <dependencies>
+    <dependency><groupId>example.mm</groupId><artifactId>core</artifactId><version>1.0.0</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-web</artifactId><version>5.3.20</version></dependency>
+  </dependencies>
+</project>

@@ -14,8 +14,14 @@
 #   - stage1_fail_reason reads "Gradle build daemon disappeared" as oom.
 #   - build-prep.sh leaves --no-configuration-cache out of a build with
 #     Isolated Projects, and runs again without it on Gradle's refusal.
+#   - an Android app whose Gradle build fails before the release runtime
+#     classpath (no android.useAndroidX): Gradle's own error is logged and
+#     kept as the step's cause, the build tooling of the other configurations
+#     is left out of the SBOM, and the completeness result is unreliable with
+#     a fix that names the property.
 #
-# Fixtures: tests/fixtures/journey/android-catalog, android-old-wrapper.
+# Fixtures: tests/fixtures/journey/android-catalog, android-old-wrapper,
+# tests/fixtures/gradle-failure/androidx-missing.stderr.txt.
 set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -170,6 +176,100 @@ $report" ) 2>&1
         "$(wc -l < "$WORK/calls" | tr -d ' ')|$(grep -c -- '--no-configuration-cache' "$WORK/calls" | tr -d ' ')" "2|1"
     check "the second run succeeded: the step is not left failed" "$(printf '%s\n' "$o" | sed -n 's/^FAILED://p')" ""
     case "$o" in *"running again without --no-configuration-cache"*) pass "the log says why it ran again" ;; *) fail "no log line for the second run" "$o" ;; esac
+fi
+
+echo "== build-prep.sh: an Android build that fails before the release classpath =="
+afns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p;
+    /^prep_cause() {/,/^}/p; /^prep_hint() {/,/^}/p; /^gradle_what_went_wrong() {/,/^}/p; /^gradle_error_cause() {/,/^}/p' "$PREP")
+GFIX="$ROOT_DIR/tests/fixtures/gradle-failure/androidx-missing.stderr.txt"
+if [ -z "$block" ] || [ -z "$afns" ] || [ ! -f "$GFIX" ]; then
+    fail "could not extract the Gradle block of build-prep.sh or find $GFIX"
+else
+    cat > "$WORK/gradlew-android" <<'STUB'
+#!/bin/sh
+# A stand-in Gradle for an app without android.useAndroidX: the project list
+# works, the app's dependencies report fails with AGP's error.
+case " $* " in *" --version "*) exit 0 ;; esac
+echo "$*" >> "$STUB_CALLS"
+case " $* " in
+    *" projects "*) printf "Root project 'a'\n+--- Project ':app'\n"; exit 0 ;;
+    *" :app:dependencies "*) cat "$STUB_ERR" >&2; exit 1 ;;
+    *" :dependencies "*) exit 0 ;;
+esac
+exit 0
+STUB
+    chmod +x "$WORK/gradlew-android"
+    areport='echo "FAILED:$PREP_FAILED"
+echo "UNRESOLVED:$ANDROID_RELEASE_UNRESOLVED"
+echo "HINTS:$PREP_HINTS"
+printf "CAUSES:%s\n" "$PREP_CAUSES"'
+    run_android() {  # <app build.gradle text>
+        local p="$WORK/aproj"
+        rm -rf "$p"; mkdir -p "$p/app"; : > "$p/build.gradle"; cp "$WORK/gradlew-android" "$p/gradlew"
+        printf '%s\n' "$1" > "$p/app/build.gradle"
+        : > "$WORK/calls"
+        ( cd "$p" && env -u GRADLE_USER_HOME -u GRADLE_INCLUDED_BUILDS -u BOMLENS_GRADLE_FULL_GRAPH -u BOMLENS_ANDROID_FULL_GRAPH \
+            ANDROID_HOME=/opt/android-sdk PATH="$bin:$PATH" HOME="$WORK/home" STUB_CALLS="$WORK/calls" STUB_ERR="$GFIX" \
+            sh -c "$prelude
+$afns
+$block
+$areport" ) 2>&1
+    }
+    o=$(run_android "plugins { id 'com.android.application' }")
+    check "the failed step is recorded" "$(printf '%s\n' "$o" | sed -n 's/^FAILED://p')" "android-release-classpath"
+    check "the build tooling is left out (ANDROID_RELEASE_UNRESOLVED)" "$(printf '%s\n' "$o" | sed -n 's/^UNRESOLVED://p')" "1"
+    check "the java-gradle runtime classpath is not read in its place" "$(grep -c bomlensRuntime "$WORK/calls" | tr -d ' ')" "0"
+    check "both hints are recorded" "$(printf '%s\n' "$o" | sed -n 's/^HINTS://p')" "android-useandroidx-missing android-release-classpath-unresolved"
+    case "$(printf '%s\n' "$o" | sed -n 's/^CAUSES://p')" in
+        "android-release-classpath: Execution failed for task ':app:dependencies'. Configuration \`:app:debugRuntimeClasspath\` contains AndroidX dependencies, but the \`android.useAndroidX\` property is not enabled"*)
+            pass "the cause is Gradle's own sentence, not the generic configuration line" ;;
+        *) fail "the cause is Gradle's own sentence" "$(printf '%s\n' "$o" | sed -n 's/^CAUSES://p')" ;;
+    esac
+    case "$o" in *"android-release-classpath: Gradle reported:"*"android.useAndroidX"*"said (last 20 lines)"*) pass "the log shows Gradle's error before the last lines" ;; *) fail "the log shows Gradle's error before the last lines" "$o" ;; esac
+    case "$o" in *"Add the line android.useAndroidX=true to gradle.properties"*) pass "the log names the missing property" ;; *) fail "the log names the missing property" "$o" ;; esac
+    o=$(run_android "plugins { alias(libs.plugins.android.application) }")
+    check "a version catalog alias counts as an Android build" "$(printf '%s\n' "$o" | sed -n 's/^UNRESOLVED://p')" "1"
+    o=$(run_android "plugins { id 'java' }")
+    check "a Java build in the SDK image still reads the java-gradle runtime classpath" \
+        "$(printf '%s\n' "$o" | sed -n 's/^UNRESOLVED://p')|$(grep -c bomlensRuntime "$WORK/calls" | tr -d ' ')" "|1"
+fi
+
+echo "== the filter with no release classpath, and what is recorded =="
+sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/filter.js"
+sed -n "/<<'PREPFAIL_JS'/,/^PREPFAIL_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/prepfail.js"
+if ! command -v node >/dev/null 2>&1; then
+    echo "  SKIP: node is not installed"
+elif [ ! -s "$WORK/filter.js" ] || [ ! -s "$WORK/prepfail.js" ]; then
+    fail "could not extract FILTER_JS or PREPFAIL_JS from build-prep.sh"
+else
+    cat > "$WORK/abom.json" <<'EOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"a","purl":"pkg:maven/com.example/a@1.0"},"properties":[]},
+ "components":[
+  {"name":"ddmlib","purl":"pkg:maven/com.android.tools.ddms/ddmlib@31.5.2?type=jar","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+  {"name":"core","purl":"pkg:maven/androidx.test/core@1.5.0?type=aar","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+  {"name":"lib","purl":"pkg:maven/com.example/lib@1.0","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+  {"name":"vendored","purl":"pkg:maven/org.x/vendored@2.0?type=jar"}],
+ "dependencies":[{"ref":"pkg:maven/com.example/a@1.0","dependsOn":["pkg:maven/com.android.tools.ddms/ddmlib@31.5.2?type=jar"]}]}
+EOF
+    node "$WORK/filter.js" "$WORK/abom.json" /dev/null android-unresolved 2>"$WORK/filter.err"
+    check "the configurations' components are dropped; the app's own module and a jar no Gradle run gave are kept" \
+        "$(jq -r '[.components[].name] | join(",")' "$WORK/abom.json")" "lib,vendored"
+    check "the dependency graph drops the removed refs" "$(jq -c '.dependencies[0].dependsOn' "$WORK/abom.json")" "[]"
+    case "$(cat "$WORK/filter.err")" in *"android: kept 2 of 4"*) pass "the filter logs what it kept" ;; *) fail "the filter logs what it kept" "$(cat "$WORK/filter.err")" ;; esac
+    BOMLENS_PREP_CAUSES="android-release-classpath: Execution failed for task ':app:dependencies'.
+not-failed: ignored" BOMLENS_PREP_HINTS="android-useandroidx-missing android-release-classpath-unresolved" \
+        node "$WORK/prepfail.js" "$WORK/abom.json" "android-release-classpath" 2>/dev/null
+    check "a cause is recorded for a failed step only" \
+        "$(jq -r '[.metadata.properties[] | select(.name == "bomlens:pipeline-step-cause") | .value] | join("|")' "$WORK/abom.json")" \
+        "android-release-classpath: Execution failed for task ':app:dependencies'."
+    check "the hints are recorded" \
+        "$(jq -r '[.metadata.properties[] | select(.name == "bomlens:resolution-hint") | .value] | join(" ")' "$WORK/abom.json")" \
+        "android-useandroidx-missing android-release-classpath-unresolved"
+    check "the hint makes the result unreliable" "$(bash "$LIB/assess-completeness.sh" "$WORK/abom.json" "$WORK/abom")" "unreliable"
+    fix=$(jq -r '.reasons[] | select(.code == "resolution-failed") | .fix.en' "$WORK/abom_completeness.json")
+    case "$fix" in "The build tool reported: Execution failed for task ':app:dependencies'. Add the line android.useAndroidX=true to gradle.properties"*) pass "the fix quotes Gradle and names the property first" ;; *) fail "the fix quotes Gradle and names the property first" "$fix" ;; esac
+    msg=$(jq -r '.reasons[] | select(.code == "resolution-failed") | .message.en' "$WORK/abom_completeness.json")
+    case "$msg" in *"build and test tooling"*"were left out"*) pass "the message says the tooling was left out" ;; *) fail "the message says the tooling was left out" "$msg" ;; esac
 fi
 
 echo

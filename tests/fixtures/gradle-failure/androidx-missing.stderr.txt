@@ -1,0 +1,36 @@
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:dependencies'.
+> Could not resolve all dependencies for configuration ':app:debugAndroidTestRuntimeClasspath'.
+   > Configuration `:app:debugRuntimeClasspath` contains AndroidX dependencies, but the `android.useAndroidX` property is not enabled, which may cause runtime issues.
+     Set `android.useAndroidX=true` in the `gradle.properties` file and retry.
+     The following AndroidX dependencies are detected:
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.activity:activity:1.6.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.appcompat:appcompat-resources:1.6.1 -> androidx.annotation:annotation:1.3.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.appcompat:appcompat-resources:1.6.1 -> androidx.collection:collection:1.1.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.appcompat:appcompat-resources:1.6.1 -> androidx.core:core:1.9.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.fragment:fragment:1.3.6 -> androidx.annotation:annotation-experimental:1.3.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.appcompat:appcompat-resources:1.6.1 -> androidx.core:core:1.9.0 -> androidx.concurrent:concurrent-futures:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.cursoradapter:cursoradapter:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.drawerlayout:drawerlayout:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.drawerlayout:drawerlayout:1.0.0 -> androidx.customview:customview:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.emoji2:emoji2:1.2.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.emoji2:emoji2:1.2.0 -> androidx.lifecycle:lifecycle-process:2.4.1
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.emoji2:emoji2:1.2.0 -> androidx.startup:startup-runtime:1.1.1
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.emoji2:emoji2-views-helper:1.2.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.fragment:fragment:1.3.6
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.fragment:fragment:1.3.6 -> androidx.viewpager:viewpager:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.fragment:fragment:1.3.6 -> androidx.loader:loader:1.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.fragment:fragment:1.3.6 -> androidx.loader:loader:1.0.0 -> androidx.lifecycle:lifecycle-livedata:2.0.0
+     :app:debugRuntimeClasspath -> androidx.appcompat:appcompat:1.6.1 -> androidx.resourceinspection:resourceinspection-annotation:1.0.1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 26s

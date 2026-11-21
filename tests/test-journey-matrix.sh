@@ -158,6 +158,9 @@ matrix_inputs() {
     with_props '[{"name":"bomlens:manifest-not-read","value":"vcpkg.json: curl, fmt"}]' | add native-manifest-not-read partial
     with_props '[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen"}]' | add tool-degraded partial
     with_props '[{"name":"bomlens:pipeline-step-failed","value":"gradle-dependencies"}]' | add step-failed partial
+    # A failed step with the cause the build tool reported and a hint.
+    with_props '[{"name":"bomlens:pipeline-step-failed","value":"maven-dependency-tree"},{"name":"bomlens:pipeline-step-cause","value":"maven-dependency-tree: Non-resolvable parent POM example.mm:parent:1.0.0 (../pom.xml is outside the scanned folder)"},{"name":"bomlens:resolution-hint","value":"maven-parent-outside-scan"}]' | add step-cause-hint partial
+    empty_props '[{"name":"bomlens:sbom-empty-with-manifests","value":"app/build.gradle"},{"name":"bomlens:pipeline-step-failed","value":"android-release-classpath"},{"name":"bomlens:pipeline-step-cause","value":"android-release-classpath: Execution failed for task '"'"':app:dependencies'"'"'. Configuration `:app:debugRuntimeClasspath` contains AndroidX dependencies, but the `android.useAndroidX` property is not enabled, which may cause runtime issues."},{"name":"bomlens:resolution-hint","value":"android-useandroidx-missing"},{"name":"bomlens:resolution-hint","value":"android-release-classpath-unresolved"}]' | add android-unresolved unreliable
 }
 
 run_reports() { # <dir> <id>
