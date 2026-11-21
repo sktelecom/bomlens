@@ -941,6 +941,23 @@ unset DOCKER_STUB_SUMMARY_RESULT
   && pass "closing summary warns on 0% license coverage, a reduced analysis and failed steps" \
   || { fail "closing summary missed a warning" "rc=$RC"; show; }
 
+# A skipped registry licence lookup is reported as [INFO], so it is not listed
+# among the failed steps; the other steps still are.
+d="$(new_proj sumlicfetch)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t5\nlicensed\t5\nlicensePercent\t100\npurlPercent\t100\nfailedSteps\tlicense-fetch, pip-install\n'
+scan_in "$d" --project LicFetch --version 5.3.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "[WARN] Steps that failed: pip-install (details" && ! in_out "license-fetch"; } \
+  && pass "license-fetch is left out of the failed-steps warning, other steps stay" \
+  || { fail "license-fetch was listed as a failed step" "rc=$RC"; show; }
+d="$(new_proj sumlicfetch2)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t5\nlicensed\t5\nlicensePercent\t100\npurlPercent\t100\nfailedSteps\tlicense-fetch\n'
+scan_in "$d" --project LicFetch2 --version 5.3.1 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && ! in_out "Steps that failed"; } \
+  && pass "a run whose only failed step is license-fetch prints no failed-steps warning" \
+  || { fail "a skipped licence lookup alone produced a failed-steps warning" "rc=$RC"; show; }
+
 d="$(new_proj sumtiny)"; printf '{"name":"a"}' > "$d/package.json"
 export DOCKER_STUB_SUMMARY_RESULT='components\t200\nlicensed\t1\nlicensePercent\t0\npurlPercent\t100\n'
 scan_in "$d" --project Tiny --version 5.15.0 --generate-only
