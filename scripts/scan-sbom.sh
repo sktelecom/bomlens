@@ -3988,6 +3988,15 @@ GRADLE_USER_CACHE_EOF
             else
                 echo "[INFO] ${_s1_where}"
             fi
+            # A Node.js project with no lock file whose npm registry did not
+            # answer (npm-registry:tls-trust or npm-registry:network) gets the
+            # advice a failed stage 1 gets for the same cause.
+            case ", $_s1_steps, " in
+                *", npm-registry:tls-trust, "*)
+                    registry_failure_advice tls-trust "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1 ;;
+                *", npm-registry:network, "*)
+                    registry_failure_advice network "$(scan_input_kind "$OUTPUT_HOST_DIR/.scanmeta.json")" 2>&1 ;;
+            esac
         else
             rm -f "$STAGE1_LOG"
         fi

@@ -251,9 +251,11 @@ extra_ca_mount() {
 
 # What a TLS client prints when it does not trust the certificate it was
 # shown: Go (x509), Java (PKIX), Python (CERTIFICATE_VERIFY_FAILED), Node.js
-# and OpenSSL (UNABLE_TO_GET_ISSUER_CERT_LOCALLY, UNABLE_TO_VERIFY_LEAF_SIGNATURE,
-# unable to get local issuer certificate, SELF_SIGNED_CERT_IN_CHAIN).
-TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path building failed|CERTIFICATE_VERIFY_FAILED|UNABLE_TO_GET_ISSUER_CERT_LOCALLY|UNABLE_TO_VERIFY_LEAF_SIGNATURE|unable to get local issuer certificate|SELF_SIGNED_CERT_IN_CHAIN|self[- ]signed certificate in certificate chain'
+# and OpenSSL (UNABLE_TO_GET_ISSUER_CERT_LOCALLY, UNABLE_TO_GET_ISSUER_CERT,
+# UNABLE_TO_VERIFY_LEAF_SIGNATURE, unable to get local issuer certificate,
+# SELF_SIGNED_CERT_IN_CHAIN, DEPTH_ZERO_SELF_SIGNED_CERT, CERT_UNTRUSTED,
+# self-signed certificate).
+TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path building failed|CERTIFICATE_VERIFY_FAILED|UNABLE_TO_GET_ISSUER_CERT|UNABLE_TO_VERIFY_LEAF_SIGNATURE|unable to get local issuer certificate|SELF_SIGNED_CERT_IN_CHAIN|DEPTH_ZERO_SELF_SIGNED_CERT|CERT_UNTRUSTED|self[- ]signed certificate'
 
 # What a package manager prints when the registry refused the login (HTTP 401
 # or 403): npm (code E401, a bare E403), pnpm (ERR_PNPM_FETCH_401), Yarn
@@ -643,7 +645,7 @@ stage1_fail_reason() {
         # different one.
         if grep -qE -- "$TLS_TRUST_ERROR_RE" "$log"; then echo tls-trust; return; fi
         if grep -qE -- "$REGISTRY_AUTH_ERROR_RE" "$log"; then echo registry-auth; return; fi
-        if grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$log"; then
+        if grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|npm registry [^ ]+ did not answer" "$log"; then
             echo network; return
         fi
     fi

@@ -11428,6 +11428,15 @@ done
     && pass "a refused login is registry-auth, ahead of the timeout that follows it" || fail "registry-auth order" ""
 [ "$(_rf_reason 'getaddrinfo ENOTFOUND registry.npmjs.org')" = network ] \
     && pass "a name that does not resolve stays network" || fail "network changed" ""
+for _rf in 'npm error code DEPTH_ZERO_SELF_SIGNED_CERT' \
+    'npm error request to https://npm.example.invalid/x failed, reason: self-signed certificate' \
+    'Error: unable to verify the first certificate UNABLE_TO_GET_ISSUER_CERT'; do
+    [ "$(_rf_reason "$_rf")" = tls-trust ] && pass "tls-trust: $(printf '%b' "$_rf" | cut -c1-60)" || fail "not tls-trust ($(_rf_reason "$_rf"))" "$_rf"
+done
+for _rf in 'npm error code ECONNREFUSED' 'getaddrinfo EAI_AGAIN registry.npmjs.org' \
+    "[build-prep] node: no lock file, and the npm registry registry.npmjs.org did not answer (it did not answer within 6s); cdxgen's npm install runs offline instead of waiting for it"; do
+    [ "$(_rf_reason "$_rf")" = network ] && pass "network: $(printf '%b' "$_rf" | cut -c1-60)" || fail "not network ($(_rf_reason "$_rf"))" "$_rf"
+done
 [ "$(_rf_reason 'added lodash@4.17.401\nDownloading foo-403.tar.gz (E4010 bytes)\nchecksum 401403e4013\nbuild 401 of 403 done')" = cdxgen-crash ] \
     && pass "a version or file name holding 401/403 is not registry-auth" || fail "an ordinary line matched" ""
 [ "$(bash -c '. "$1"; printf "npm error code E401\n" > "$2"; stage1_fail_reason true "$2" 1' _ "$DETECT" "$WORK/rf.log")" = oom ] \

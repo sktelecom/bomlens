@@ -176,6 +176,10 @@ E
 bash "$LIB/assess-completeness.sh" "$WORK/c.json" "$WORK/c" >/dev/null 2>&1
 check "resolution-failed names the dependency left out" \
     "$(jq -r '[.. | objects | select(.code? == "resolution-failed") | .detail] | first // ""' "$WORK/c_completeness.json")" "npm-excluded:private-lib"
+jq '.metadata.properties = [{"name":"bomlens:pipeline-step-failed","value":"npm-registry:tls-trust"}]' "$WORK/c.json" > "$WORK/c2.json"
+bash "$LIB/assess-completeness.sh" "$WORK/c2.json" "$WORK/c2" >/dev/null 2>&1
+check "resolution-failed names an npm registry that did not answer, with the cause" \
+    "$(jq -r '[.. | objects | select(.code? == "resolution-failed") | .detail] | first // ""' "$WORK/c2_completeness.json")" "npm-registry:tls-trust"
 
 echo "== Gradle version catalog: table order, two files, ranges, comments =="
 mkdir -p "$WORK/cat/gradle"
