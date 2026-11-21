@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1` keeps development dependencies in every ecosystem: it now also turns off the npm production filter (as `BOMLENS_NODE_FULL_GRAPH=1` does) and the Composer `require-dev` filter (as `BOMLENS_PHP_FULL_GRAPH=1` does). The empty-SBOM hint for an npm project with only development dependencies names it. By default development dependencies are still left out.
 - Log masking covers npm `_auth`, a password that holds an `@` in a URL, and `<password>`, `<passphrase>`, `<token>` and `<secret>` elements, and also applies to the web UI scan log and to the temporary cdxgen log a failed scan leaves. The SBOM carries no user or password from a URL (component URLs, `repository_url` in a package URL).
 - The source snapshot (`<Project>_<Version>_source.json`, the file viewer's content) masks credentials in every captured text file with the log masking rules, and in registry and service configuration files (`.npmrc`, `.yarnrc`, `.yarnrc.yml`, `pip.conf`, `pip.ini`, `.pypirc`, `settings.xml`, `gradle.properties`, `.netrc`, `.docker/config.json`, `nuget.config`, `.env` files) also the value of a key named as a credential, a `.netrc` password, a Docker `auth` and a NuGet password. A file with a masked value carries `"masked": true`, and `totals.maskedFiles` counts them.
 - `.gitattributes` names the jq, Python, JavaScript, TypeScript, YAML, TOML, text, HTML and CSS files and `Dockerfile` as LF text explicitly, beside the catch-all rule.

@@ -6,6 +6,8 @@
 # test-ecosystem-resolution.sh: No-Docker checks for how npm, Ruby, PHP and .NET
 # sources are read.
 #
+#   - BOMLENS_INCLUDE_DEV_DEPENDENCIES and BOMLENS_NODE_FULL_GRAPH leave the
+#     npm production set unresolved.
 #   - the npm helper names the one dependency npm could not fetch (git URL,
 #     404, no matching version) and removes only that one from package.json.
 #   - the Gemfile reader reads `group :x, optional: true`, and the dev filter
@@ -106,6 +108,23 @@ rm -rf "$WORK/n2"; cp -R "$FIX/npm-git-dep" "$WORK/n2"; : > "$WORK/n2/yarn.lock"
 out=$(run_npm_block "$WORK/n2")
 check "a yarn.lock project is left alone: no lock file placed" "$([ -f "$WORK/n2/package-lock.json" ] && echo placed || echo none)" none
 check "...and nothing is recorded as excluded" "$(echo "$out" | grep '^FAILED=')" "FAILED=[npm-production-set]"
+
+echo "== npm: the switches that keep development dependencies =="
+# BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (every ecosystem) and BOMLENS_NODE_FULL_GRAPH=1
+# (Node.js only) both leave the production set unresolved, so the production
+# filter is not applied; by default it is resolved.
+mkdir -p "$WORK/n3"; printf '{"name":"x","version":"1.0.0","dependencies":{"express":"4"},"devDependencies":{"jest":"29"}}\n' > "$WORK/n3/package.json"
+out=$(run_npm_block "$WORK/n3"); rm -f "$WORK/n3/package-lock.json"
+check "by default the production set is resolved" "$(echo "$out" | grep '^SET=')" "SET=express lodash "
+out=$(BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 run_npm_block "$WORK/n3"); rm -f "$WORK/n3/package-lock.json"
+check "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1: no production set, so the filter is not applied" "$(echo "$out" | grep '^SET=')" "SET="
+check "...and the log names the switch" "$(echo "$out" | grep -c 'development dependencies kept (BOMLENS_INCLUDE_DEV_DEPENDENCIES)')" 1
+out=$(BOMLENS_INCLUDE_DEV_DEPENDENCIES=true run_npm_block "$WORK/n3"); rm -f "$WORK/n3/package-lock.json"
+check "BOMLENS_INCLUDE_DEV_DEPENDENCIES=true counts as set" "$(echo "$out" | grep '^SET=')" "SET="
+out=$(BOMLENS_NODE_FULL_GRAPH=1 run_npm_block "$WORK/n3"); rm -f "$WORK/n3/package-lock.json"
+check "BOMLENS_NODE_FULL_GRAPH=1 still leaves the production set unresolved" "$(echo "$out" | grep '^SET=')" "SET="
+out=$(BOMLENS_INCLUDE_DEV_DEPENDENCIES=0 run_npm_block "$WORK/n3"); rm -f "$WORK/n3/package-lock.json"
+check "BOMLENS_INCLUDE_DEV_DEPENDENCIES=0 keeps the default" "$(echo "$out" | grep '^SET=')" "SET=express lodash "
 
 echo "== Ruby: optional group =="
 extract GEMDEV_JS "$WORK/gemdev.js"

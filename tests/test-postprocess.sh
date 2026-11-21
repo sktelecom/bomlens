@@ -6118,7 +6118,7 @@ else
     OUTPUT_FILE="$WORK/devonly.json"
     NRH_LOG5="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
     if printf '%s' "$NRH_LOG5" | grep -q "no runtime dependencies" \
-        && printf '%s' "$NRH_LOG5" | grep -q "BOMLENS_NODE_FULL_GRAPH=1"; then
+        && printf '%s' "$NRH_LOG5" | grep -q "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1"; then
         pass "an empty npm production set says only development dependencies were left out"
     else
         fail "the development-only note is missing" "$NRH_LOG5"
@@ -6372,7 +6372,7 @@ else
     echo "  SKIP: node unavailable, skipping php scope-filter test"
 fi
 
-echo "== php-scope: BOMLENS_PHP_FULL_GRAPH opts out, composer.json gates the trigger =="
+echo "== php-scope: BOMLENS_PHP_FULL_GRAPH and BOMLENS_INCLUDE_DEV_DEPENDENCIES opt out, composer.json gates the trigger =="
 # Guards the shell-side trigger in build-prep.sh (not the JS filter above):
 # PHP_SCOPE_FILTER is only set when composer.json exists and the opt-out is
 # not on. Extract the real trigger block (no logic duplication) and drive it
@@ -6380,23 +6380,30 @@ echo "== php-scope: BOMLENS_PHP_FULL_GRAPH opts out, composer.json gates the tri
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 _opt_fn=$(sed -n '/^opted_out() /p' "$PREP")
 _trigger=$(sed -n '/^# PHP\/Composer scope over-scan/,/^fi$/p' "$PREP")
+_log_fn='log() { :; }'
 if [ -z "$_trigger" ]; then
     fail "could not extract the PHP_SCOPE_FILTER trigger block from build-prep.sh"
 else
     _t_on=$(mkdir -p "$WORK/php-trigger-on" && cd "$WORK/php-trigger-on" && touch composer.json \
-        && bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+        && bash -c "$_opt_fn; $_log_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"" 2>/dev/null)
     [ "$_t_on" = "1" ] \
         && pass "composer.json present, BOMLENS_PHP_FULL_GRAPH unset: filter turns on" \
         || fail "filter did not turn on for a plain composer.json project" "got [$_t_on]"
 
     _t_off=$(mkdir -p "$WORK/php-trigger-off" && cd "$WORK/php-trigger-off" && touch composer.json \
-        && BOMLENS_PHP_FULL_GRAPH=1 bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+        && BOMLENS_PHP_FULL_GRAPH=1 bash -c "$_opt_fn; $_log_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"" 2>/dev/null)
     [ -z "$_t_off" ] \
         && pass "BOMLENS_PHP_FULL_GRAPH=1: filter opts out (full require+require-dev graph kept)" \
         || fail "BOMLENS_PHP_FULL_GRAPH=1 did not opt out" "got [$_t_off]"
 
+    _t_dev=$(mkdir -p "$WORK/php-trigger-dev" && cd "$WORK/php-trigger-dev" && touch composer.json \
+        && BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 bash -c "$_opt_fn; $_log_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"" 2>/dev/null)
+    [ -z "$_t_dev" ] \
+        && pass "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1: filter opts out (require-dev kept)" \
+        || fail "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 did not opt out of the PHP scope filter" "got [$_t_dev]"
+
     _t_nocomposer=$(mkdir -p "$WORK/php-trigger-none" && cd "$WORK/php-trigger-none" \
-        && bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+        && bash -c "$_opt_fn; $_log_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"" 2>/dev/null)
     [ -z "$_t_nocomposer" ] \
         && pass "no composer.json: filter never turns on" \
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
@@ -9503,6 +9510,11 @@ php_case php-full BOMLENS_PHP_FULL_GRAPH=1
 jq -e 'has("require-dev")' "$CA2_ROOT/composer-seen.json" >/dev/null 2>&1 \
     && pass "BOMLENS_PHP_FULL_GRAPH=1 resolves the full manifest, require-dev included" \
     || fail "the full-graph opt-out still resolved a stripped manifest"
+mkdir -p "$CA2_ROOT/php-dev/src"; printf '%s\n' "$MANIFEST" > "$CA2_ROOT/php-dev/src/composer.json"
+php_case php-dev BOMLENS_INCLUDE_DEV_DEPENDENCIES=1
+jq -e 'has("require-dev")' "$CA2_ROOT/composer-seen.json" >/dev/null 2>&1 \
+    && pass "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 resolves the full manifest, require-dev included" \
+    || fail "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 still resolved a stripped manifest"
 
 mkdir -p "$CA2_ROOT/php-bad/src"; printf '{ not json\n' > "$CA2_ROOT/php-bad/src/composer.json"
 php_case php-bad X=1
