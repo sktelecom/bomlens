@@ -39,7 +39,10 @@
 #                                                 manifest is a vcpkg, Conan or CMake FetchContent one)
 #   bomlens:sbom-empty-all-excluded              (only-excluded-dependencies: every declared
 #                                                 dependency was left out as development-only
-#                                                 or not deployed, so none is listed)
+#                                                 or not deployed, so none is listed; a value
+#                                                 "<package.json> devDependencies: <names>"
+#                                                 is a manifest that declares nothing else,
+#                                                 and gets the fix fixEnDevOnly)
 #   bomlens:sbom-tool-degraded                    (tool-degraded)
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
 #                                                 (resolution-failed), with
@@ -167,7 +170,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --arg vuln_env "${BOMLEN
   | ([
       (if ($comps | length) == 0 and ($empty == null) and ($allexcl == null) and ($model_root | not)
          then {code: (if $supplied then "no-components-supplied" else "no-components" end), detail: ""} else empty end),
-      (if $allexcl != null and $empty == null then {code: "only-excluded-dependencies", detail: ($allexcl | clean(200))} else empty end),
+      (if $allexcl != null and $empty == null then {code: "only-excluded-dependencies", detail: ($allexcl | clean(200)), devOnly: ($allexcl | test(" devDependencies: "))} else empty end),
       (if $empty != null then {code: (if $cpp_only then "unsupported-build-system" else "empty-with-manifests" end), detail: ($empty | clean(200))} else empty end),
       (if $degraded != null then {code: "tool-degraded", detail: ($degraded | clean(100))} else empty end),
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", ")), causes: $causes, hints: [$hints[] | $R.resolutionHints[.]]} else empty end),
@@ -192,7 +195,9 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --arg vuln_env "${BOMLEN
              detail: $r.detail,
              message: {en: ([($d.en | sub("\\{detail\\}"; $r.detail)), ($rh[] | .en), (if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end)] | join(" ")),
                        ko: ([($d.ko | sub("\\{detail\\}"; ($r.detailKo // $r.detail))), ($rh[] | .ko), (if $cause != "" then "\($R.labels.cause.ko) \($cause)" else empty end)] | join(" "))},
-             fix: (if $r.code == "lockfile-missing" and ($lockcmds | length) > 0 and $d.fixEnCommands != null
+             fix: (if ($r.devOnly // false) and $d.fixEnDevOnly != null
+                   then {en: $d.fixEnDevOnly, ko: $d.fixKoDevOnly}
+                   elif $r.code == "lockfile-missing" and ($lockcmds | length) > 0 and $d.fixEnCommands != null
                    then {en: ($d.fixEnCommands | sub("\\{commands\\}"; $lockcmds | join(", "))),
                          ko: ($d.fixKoCommands | sub("\\{commands\\}"; $lockcmds | join(", ")))}
                    else {en: ([(if $cause != "" then "\($R.labels.cause.en) \($cause)" else empty end), (if ($rh | length) > 0 then ($rh[] | .fixEn) else $d.fixEn end)] | join(" ")),

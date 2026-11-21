@@ -161,6 +161,9 @@ matrix_inputs() {
     empty_props '[{"name":"bomlens:sbom-supplied","value":"true"}]' | add supplier-empty unreliable
     empty_props '[{"name":"bomlens:sbom-empty-with-manifests","value":"pom.xml"}]' | add manifests-unresolved unreliable
     empty_props '[{"name":"bomlens:sbom-empty-all-excluded","value":"pyproject.toml, uv.lock"}]' | add all-excluded partial
+    # A package.json with only devDependencies and no lock file: the exclusion
+    # is the reason (not no-components), and the grade stays partial.
+    empty_props '[{"name":"bomlens:sbom-empty-all-excluded","value":"package.json devDependencies: eslint, jest"},{"name":"bomlens:lockfile-missing","value":"package.json: no package-lock.json"}]' | add node-dev-only partial only-excluded-dependencies
     empty_props '[{"name":"bomlens:sbom-empty-with-manifests","value":"vcpkg.json"}]' | add native-manifest unreliable
     with_props '[{"name":"bomlens:lockfile-missing","value":"package-lock.json"}]' | add lockfile-missing partial
     with_props '[{"name":"bomlens:lockfile-missing","value":"go.mod: no go.sum; Cargo.toml: no Cargo.lock"}]' | add lockfile-missing-go-cargo partial

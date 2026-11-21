@@ -163,6 +163,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 > 주의: SBOM은 production 의존성 집합으로 걸러지므로 devDependencies는 덜어내고 실제 배포되는 구성을 반영합니다. dev와 production을 합친 전체 그래프를 그대로 두려면 `BOMLENS_NODE_FULL_GRAPH=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
 
+> 참고: 그래서 `devDependencies`만 선언하고 `dependencies`, `optionalDependencies`, `peerDependencies`가 없는 `package.json`은 컴포넌트 없이 끝납니다. 스캔은 이 결과를 사유 `only-excluded-dependencies`와 함께 부분 결과로 보고합니다. 사유에는 파일과 그 개발 의존성(`package.json devDependencies: eslint, jest`)이 적히고, 해결 방법은 폴더를 잘못 고른 것이 아니며 목록에 넣으려면 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`로 다시 스캔하라고 안내합니다. `no-components`로 보고하지 않습니다. `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`이나 `BOMLENS_NODE_FULL_GRAPH=1`을 설정했는데도 컴포넌트가 없으면, 이 파일은 스캔이 해석하지 못한 의존성을 선언한 것으로 봅니다(`empty-with-manifests`).
+
 > 주의: npm 워크스페이스 멤버가 `package-lock.json`에 등록돼 있으면, 그 멤버의 디렉터리가 제외 대상 트리 아래에 있어도 위의 파일 단위 제외로는 빠지지 않습니다. cdxgen이 `package-lock.json`을 직접 읽기 때문입니다. 이런 멤버 자신의 컴포넌트는 빠지고, 그 멤버만 필요로 하는 의존성도 함께 빠집니다. 다만 유지되는 멤버가 그 의존성을 필요로 하면 남습니다. `BOMLENS_INCLUDE_NON_SHIPPED=1`(위 파일 단위 제외와 같은 스위치)로 이렇게 빠지는 것을 모두 그대로 둘 수 있습니다. 제외한 멤버와 그 때문에 빠진 컴포넌트는 SBOM에 각각 `bomlens:excluded-members`, `bomlens:excluded-components`로 기록됩니다. yarn 워크스페이스 멤버는 아직 같은 방식으로 잡히지 않습니다.
 
 > 주의: production 필터와 별도로, cdxgen이 개발 패키지(npm, pnpm, yarn, bun)로 표시한 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. production 필터가 읽지 않는 pnpm 워크스페이스도 여기에 해당합니다. 운영 의존성도 쓰는 패키지는 남습니다. `BOMLENS_NODE_FULL_GRAPH=1`이나 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`이면 이 컴포넌트들도 그대로 둡니다.

@@ -72,7 +72,9 @@
       "en": "Every dependency the source declares ({detail}) was left out of the SBOM because it is only for development or tests, or is not part of the deployed product, so the SBOM lists no component. If the product really has no runtime dependencies, this result is correct.",
       "ko": "소스에 선언된 의존성({detail})이 모두 개발용·테스트용이거나 배포 대상이 아니라서 SBOM에서 제외되어 컴포넌트가 없습니다. 제품에 런타임 의존성이 실제로 없다면 이 결과가 맞습니다.",
       "fixEn": "To list the excluded ones, scan again with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (development dependencies) or BOMLENS_MAVEN_FULL_GRAPH=1 (Maven). The names left out are in the SBOM property bomlens:excluded-components.",
-      "fixKo": "제외된 의존성을 목록에 넣으려면 BOMLENS_INCLUDE_DEV_DEPENDENCIES=1(개발 의존성) 또는 BOMLENS_MAVEN_FULL_GRAPH=1(Maven)로 다시 스캔하세요. 제외된 이름은 SBOM의 bomlens:excluded-components 속성에 있습니다."
+      "fixKo": "제외된 의존성을 목록에 넣으려면 BOMLENS_INCLUDE_DEV_DEPENDENCIES=1(개발 의존성) 또는 BOMLENS_MAVEN_FULL_GRAPH=1(Maven)로 다시 스캔하세요. 제외된 이름은 SBOM의 bomlens:excluded-components 속성에 있습니다.",
+      "fixEnDevOnly": "A source scan leaves development dependencies out by default, so this does not mean the wrong folder was scanned. To list them, scan again with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1. If the product needs one of them at run time, move it to dependencies in package.json.",
+      "fixKoDevOnly": "소스 스캔은 기본으로 개발 의존성을 제외하므로 폴더를 잘못 고른 것이 아닙니다. 목록에 넣으려면 BOMLENS_INCLUDE_DEV_DEPENDENCIES=1로 다시 스캔하세요. 제품이 실행할 때 필요한 패키지가 있다면 package.json의 dependencies로 옮기세요."
     },
     "no-components": {
       "grade": "partial",

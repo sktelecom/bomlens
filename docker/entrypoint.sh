@@ -1962,7 +1962,28 @@ fi
 if [ "$SOURCE_SCAN" = "true" ] && [ -d "${SOURCE_ROOT:-/src}" ] \
    && [ "$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 1)" = "0" ]; then
     _empty_manifests="$(source_manifests "${SOURCE_ROOT:-/src}" 5)"
-    if [ -n "$_empty_manifests" ]; then
+    # A package.json that declares only devDependencies is not counted above:
+    # a source scan leaves development dependencies out by default, so the
+    # empty SBOM is that exclusion and is said as such (not as a folder with
+    # nothing to scan). Asked to keep them (BOMLENS_INCLUDE_DEV_DEPENDENCIES
+    # or BOMLENS_NODE_FULL_GRAPH), the file declares dependencies the scan
+    # did not resolve.
+    _empty_devonly=""
+    if [ -z "$_empty_manifests" ]; then
+        _empty_devonly="$(source_dev_only_manifests "${SOURCE_ROOT:-/src}" 5)"
+        if [ -n "$_empty_devonly" ]; then
+            case "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}:${BOMLENS_NODE_FULL_GRAPH:-}" in
+                1:*|true:*|*:1|*:true)
+                    _empty_manifests="$(printf '%s\n' "$_empty_devonly" | tr ';' '\n' | sed -n 's/^ *\(.*\) devDependencies: .*/\1/p' | paste -sd, - | sed 's/,/, /g')"
+                    _empty_devonly="" ;;
+            esac
+        fi
+    fi
+    if [ -n "$_empty_devonly" ]; then
+        echo "[WARN] the source declares only development dependencies ($_empty_devonly), which a source scan leaves out by default, so the SBOM has no components. List them with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1." >&2
+        mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-all-excluded" "$_empty_devonly"
+        er_record generate degraded no_components "every declared dependency is a development dependency, left out by default; $_empty_devonly" "" "" "{\"components\":0}"
+    elif [ -n "$_empty_manifests" ]; then
         # Components build-prep left out on purpose (development-only, or modules
         # that are not deployed): the dependencies were resolved, then dropped.
         _empty_excluded="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:excluded-components") | .value | strings | select(length > 0)] | first // ""' "$OUTPUT_FILE" 2>/dev/null)"

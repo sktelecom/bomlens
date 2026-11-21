@@ -4473,7 +4473,12 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
         *)
             if [ "$sum_components" -eq 0 ]; then
                 printf '  %-12s %s\n' "Components:" "0 identified"
-                log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above."
+                case ",${sum_complete_reasons}," in
+                    *,only-excluded-dependencies,*)
+                        log_warn "No software was listed: every dependency the project declares is for development only or is not deployed, and a source scan leaves those out (see Completeness below)." ;;
+                    *)
+                        log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above." ;;
+                esac
             else
                 sum_detail=""
                 case "$sum_purl_pct" in ''|-|*[!0-9]*) ;; *) sum_detail="purl on ${sum_purl_pct}%" ;; esac
