@@ -105,7 +105,11 @@ goto :check_share_step
 
 :android_missing
 call :say M_N_ANDROID
-echo   docker build --build-arg ANDROID_API=34 -t %ANDROID_IMAGE_PREFIX%34:latest https://github.com/sktelecom/bomlens.git#main:docker/android
+REM Run from a clone or bundle that carries the image's Dockerfile: name that
+REM folder, as scan-sbom.sh does, rather than the copy on GitHub.
+set "ANDROID_CTX=https://github.com/sktelecom/bomlens.git#main:docker/android"
+if exist "%~dp0..\docker\android\Dockerfile" for %%I in ("%~dp0..\docker\android") do set "ANDROID_CTX="%%~fI""
+echo   docker build --build-arg ANDROID_API=34 -t %ANDROID_IMAGE_PREFIX%34:latest %ANDROID_CTX%
 
 REM 3c) Shared folder: a folder Docker does not share is mounted as an empty one,
 REM and a scan of it would run for minutes and find nothing. Needs the scanner
@@ -173,13 +177,22 @@ REM set /a never sees a number past 32 bits. Each image ID is counted once.
 set "IMG_SEEN= "
 set /a IMG_TOTAL=0
 set "IMG_ANY="
-for /f "tokens=1,2" %%a in ('docker image ls --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]" /C:" %DOCKER_IMAGE%$"') do call :img_line %%a %%b
+for /f "tokens=1,2" %%a in ('docker image ls --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2^>nul ^| findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]" /C:" %DOCKER_IMAGE%"') do call :img_line %%a %%b
 if not defined IMG_ANY goto :disk_free_step
 call :say M_O_TOTAL
 echo   %IMG_TOTAL% MB
 goto :disk_free_step
 
 :img_line
+REM The scanner image is matched above by the start of its name: findstr /R reads
+REM $ as the place before a CR, and docker ends its lines with LF alone, so an
+REM anchored name never matched. Only the exact name is kept here, besides the
+REM BomLens, cdxgen and Android SDK names.
+set "IMG_REF=%~2"
+if /I "%IMG_REF%"=="%DOCKER_IMAGE%" goto :img_count
+echo " %IMG_REF%" | findstr /R /C:" ghcr.io/cdxgen/" /C:" ghcr.io/sktelecom/bomlens" /C:" ghcr.io/sktelecom/sbom-" /C:" %ANDROID_IMAGE_PREFIX%[0-9]" >nul 2>&1
+if errorlevel 1 goto :eof
+:img_count
 echo %IMG_SEEN% | findstr /C:" %~1 " >nul 2>&1
 if not errorlevel 1 goto :eof
 set "IMG_SEEN=%IMG_SEEN%%~1 "

@@ -206,6 +206,10 @@ case "${1:-}" in
       *":/probe:ro"*)
         pdir=""; prev=""
         for a in "$@"; do case "$prev" in -v) pdir="${a%:/probe:ro}" ;; esac; prev="$a"; done
+        # DOCKER_STUB_MSYS=1: Git Bash, which rewrites "<folder>:/probe:ro"
+        # into a Windows path list unless MSYS_NO_PATHCONV is set: the
+        # container then sees an empty folder.
+        [ "${DOCKER_STUB_MSYS:-0}" != 1 ] || [ "${MSYS_NO_PATHCONV:-}" = 1 ] || exit 0
         if [ -n "${DOCKER_STUB_UNSHARED:-}" ]; then
           u="$(cd "$DOCKER_STUB_UNSHARED" 2>/dev/null && pwd -P)"; p="$(cd "$pdir" 2>/dev/null && pwd -P)"
           case "$p" in "$u"|"$u"/*) exit 0 ;; esac
@@ -2459,12 +2463,17 @@ if [ -f "$CHECK_SH" ]; then
   cs_run 6198534144 SBOM_LANG=ko
   grep -q "안드로이드(Gradle) 스캔에 쓰는 SDK 이미지가 아직 없습니다" "$CS_OUT" \
     && pass "check-setup.sh: the Android note is in Korean too" || { fail "check-setup.sh android Korean"; cat "$CS_OUT"; }
-  # The container must be able to see the folder that is scanned.
+  # The container must be able to see the folder that is scanned. The folder
+  # is shown in Windows form under Git Bash (C:\Users\...).
+  cs_shown() {
+    local p; p="$(cd "$1" && pwd)"
+    if is_windows_bash; then cygpath -w -l -- "$p" 2>/dev/null || cygpath -w -- "$p"; else printf '%s' "$p"; fi
+  }
   CS_VIS="$WORK/cs-visible"; mkdir -p "$CS_VIS"; : > "$CS_VIS/pom.xml"
   CS_HID="$WORK/cs-hidden"; mkdir -p "$CS_HID"; : > "$CS_HID/pom.xml"
   CS_OUT="$WORK/check-setup.out"
   env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_VIS" > "$CS_OUT" 2>&1
-  grep -q "The scanner container can see this folder: $(cd "$CS_VIS" && pwd)" "$CS_OUT" \
+  grep -qF "The scanner container can see this folder: $(cs_shown "$CS_VIS")" "$CS_OUT" \
     && pass "check-setup.sh: a shared folder is reported as visible" || { fail "check-setup.sh visible folder"; cat "$CS_OUT"; }
   env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=ko DOCKER_STUB_UNSHARED="$CS_HID" DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_HID" > "$CS_OUT" 2>&1
   CS_RC=$?
@@ -2474,10 +2483,72 @@ if [ -f "$CHECK_SH" ]; then
   # A relative folder argument is turned into a path first: docker would read
   # it as a named volume and report an empty folder.
   ( cd "$WORK" && env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" cs-visible ) > "$CS_OUT" 2>&1
-  grep -q "The scanner container can see this folder: $(cd "$CS_VIS" && pwd)" "$CS_OUT" \
+  grep -qF "The scanner container can see this folder: $(cs_shown "$CS_VIS")" "$CS_OUT" \
     && pass "check-setup.sh: a relative folder argument is passed to docker as an absolute path" \
     || { fail "check-setup.sh relative folder"; cat "$CS_OUT"; }
+  # Git Bash: a stand-in uname and cygpath (-m keeps the path so the stub can
+  # read it, -w marks it as the Windows form). The probe reaches docker
+  # unconverted, and the folder is shown in the Windows form.
+  CS_MSYS="$WORK/cs-msys-bin"; mkdir -p "$CS_MSYS"
+  printf '#!/bin/sh\necho MINGW64_NT-10.0-19045\n' > "$CS_MSYS/uname"
+  cat > "$CS_MSYS/cygpath" <<'CYG'
+#!/bin/sh
+form="$1"; shift
+[ "$1" = -l ] && shift
+[ "$1" = -- ] && shift
+case "$form" in -w) printf 'WIN:%s' "$1" ;; *) printf '%s' "$1" ;; esac
+CYG
+  chmod +x "$CS_MSYS/uname" "$CS_MSYS/cygpath"
+  env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MSYS=1 PATH="$CS_MSYS:$PATH" DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_VIS" > "$CS_OUT" 2>&1
+  grep -q "The scanner container can see this folder: WIN:$(cd "$CS_VIS" && pwd)" "$CS_OUT" \
+    && pass "check-setup.sh under Git Bash: the folder probe reaches docker unconverted and the folder is shown in Windows form" \
+    || { fail "check-setup.sh Git Bash folder probe"; cat "$CS_OUT"; }
+  # Run from this clone, which has docker/android/Dockerfile: the build
+  # command names that folder; a copy of the script without it names GitHub.
+  cs_run 6198534144 SBOM_LANG=en
+  grep -qF "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34:latest \"$(host_form "$REPO/docker/android")\"" "$CS_OUT" \
+    && pass "check-setup.sh: run from a clone, the Android build command names the local docker/android folder" \
+    || { fail "check-setup.sh local Android build folder"; cat "$CS_OUT"; }
+  mkdir -p "$WORK/cs-bundle/scripts"; cp "$CHECK_SH" "$WORK/cs-bundle/scripts/check-setup.sh"
+  env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$WORK/cs-bundle/scripts/check-setup.sh" > "$CS_OUT" 2>&1
+  grep -qF "https://github.com/sktelecom/bomlens.git#main:docker/android" "$CS_OUT" \
+    && pass "check-setup.sh: without a local docker/android folder the command names the copy on GitHub" \
+    || { fail "check-setup.sh GitHub Android build folder"; cat "$CS_OUT"; }
 fi
+# check-setup.bat (static: no cmd.exe here). The scanner image's own name is
+# matched without findstr's $ (it needs a CR, and docker ends lines with LF),
+# then kept only when exact; the Android command names the local folder.
+if [ -f "$CHECK_BAT" ]; then
+  _csb=$(tr -d '\r' < "$CHECK_BAT")
+  { printf '%s\n' "$_csb" | grep -qF '/C:" %DOCKER_IMAGE%"'"'"') do call :img_line' \
+    && ! printf '%s\n' "$_csb" | grep -qF '%DOCKER_IMAGE%$' \
+    && printf '%s\n' "$_csb" | grep -qF 'if /I "%IMG_REF%"=="%DOCKER_IMAGE%" goto :img_count'; } \
+    && pass "check-setup.bat lists the scanner image in the size list by its exact name, without an end-of-line anchor" \
+    || fail "check-setup.bat scanner image size filter"
+  printf '%s\n' "$_csb" | grep -qF 'if exist "%~dp0..\docker\android\Dockerfile" for %%I in ("%~dp0..\docker\android") do set "ANDROID_CTX="%%~fI""' \
+    && pass "check-setup.bat names the local docker/android folder when it is there" \
+    || fail "check-setup.bat local Android build folder"
+fi
+# shownpath in scan-sbom.sh (Git Bash branch): the long form of a short (8.3)
+# name when cygpath has -l, the plain Windows form when it does not.
+_sp_def=$(grep -m1 '^        shownpath() { cygpath -w -l' "$SCAN")
+if [ -n "$_sp_def" ]; then
+  _sp_long=$( eval "cygpath() { case \"\$2\" in -l) echo 'C:\\Users\\sktelecom user\\AppData' ;; *) echo 'C:\\Users\\SKTELE~1\\AppData' ;; esac; }; $_sp_def"; shownpath /c/Users/SKTELE~1/AppData )
+  _sp_old=$( eval "cygpath() { case \"\$2\" in -l) return 1 ;; *) echo 'C:\\Users\\SKTELE~1\\AppData' ;; esac; }; $_sp_def"; shownpath /c/Users/SKTELE~1/AppData )
+  _sp_none=$( eval "cygpath() { return 1; }; $_sp_def"; shownpath /c/x )
+  { [ "$_sp_long" = 'C:\Users\sktelecom user\AppData' ] && [ "$_sp_old" = 'C:\Users\SKTELE~1\AppData' ] && [ "$_sp_none" = /c/x ]; } \
+    && pass "scan-sbom.sh shownpath gives the long Windows form, falling back to the plain form and to the path itself" \
+    || fail "scan-sbom.sh shownpath long form" "long=$_sp_long old=$_sp_old none=$_sp_none"
+else
+  fail "scan-sbom.sh shownpath long form" "no Git Bash shownpath definition with -l found"
+fi
+# The lock error and the closing summary print the result folder through
+# shownpath (C:\... on Windows), not the Git Bash form.
+{ grep -qF 'already running into this folder: $(shownpath "$OUTPUT_HOST_DIR")' "$SCAN" \
+  && grep -qF 'remove the leftover lock and run again: $(shownpath "$SCAN_LOCK_DIR")' "$SCAN" \
+  && grep -qF 'echo "  Output dir: $(shownpath "$OUTPUT_HOST_DIR")"' "$SCAN"; } \
+  && pass "scan-sbom.sh prints the result folder and its lock through shownpath" \
+  || fail "scan-sbom.sh result folder paths through shownpath"
 
 # --------------------------------------------------------
 echo ""
