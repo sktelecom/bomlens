@@ -56,7 +56,7 @@ test("a scan running in another tab is shown on the new-scan screen", async ({ p
   );
   await page.goto("/#/new");
   const banner = page.getByTestId("running-scans");
-  await expect(banner).toContainText("A scan is running in another tab");
+  await expect(banner).toContainText("A scan is running");
   await expect(banner).toContainText("acme 1.0");
 });
 

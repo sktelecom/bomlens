@@ -67,7 +67,8 @@ export function ScanRunning({
   onNewScan?: () => void;
   /** Re-run the same scan; only provided when the params are safe to replay. */
   onRetry?: () => void;
-  /** Stop a running scan (closes the stream; the backend ends the process). */
+  /** Stop a running scan (asks the server to stop it by id, then closes the
+   *  stream). Works the same in a tab that joined the scan. */
   onCancel?: () => void;
   /** Whether this run requested deep CVE matching. When false its marker never
    *  appears in the log, so the step is dropped rather than left pending. */

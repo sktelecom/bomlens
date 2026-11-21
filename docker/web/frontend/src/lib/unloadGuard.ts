@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * A scan is tied to the page that started it: closing the tab ends it and what
- * it found is not kept. The browser's own "leave this page?" prompt is the
- * warning, raised only while a scan runs.
+ * A scan is tied to the tabs following it: once none has for the server's
+ * grace (a reload joins it again well within it), it ends and what it found is
+ * not kept. The browser's own "leave this page?" prompt is the warning, raised
+ * only while a scan runs.
  *
  * Automated tests navigate away from a running scan on purpose and would be
  * stopped by the prompt, so it can be switched off: at build time with

@@ -8,7 +8,9 @@
  *
  *   GET /results?id=<run>      → ResultFile[] (scoped to one run folder)
  *   GET /file?id=<run>&name=<n> → raw file (download / inline view)
- *   GET /scan-stream?…         → SSE: `log` (string line) + `done` (DoneEvent)
+ *   GET /scan-stream?…         → SSE: `started` (ScanStarted), `log` (string line) + `done` (DoneEvent)
+ *   GET /scan-attach?id=<run>  → SSE: the same events for a scan another request started
+ *   POST /scan-cancel?id=<run> → {cancelling}: stop a running scan, from any tab
  *   GET /advisory?id=<id>              → AdvisoryResult (one CVE/GHSA/… lookup)
  *   GET /package-advisories?ecosystem=&name=&version= → PackageAdvisoriesResult
  *
@@ -840,6 +842,9 @@ export interface DoneEvent {
    *  timestamped runs are `{prefix}_{YYYYMMDD-HHMMSS}` and so differ from the
    *  filename prefix. Absent on older payloads. */
   id?: string;
+  /** The scan was stopped before it finished: a tab cancelled it, or no tab
+   *  followed it long enough. Absent on older payloads. */
+  cancelled?: boolean;
   results: ResultFile[];
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
@@ -1087,6 +1092,41 @@ export interface ScanHandlers {
   onError: (message?: string, key?: string | null, extra?: ScanErrorExtra) => void;
   /** Optional determinate progress (e.g. the deep CVE NVD check). */
   onProgress?: (p: ScanProgress) => void;
+  /** The scan's run id and name, first on the stream. */
+  onStarted?: (info: ScanStarted) => void;
+}
+
+/** The first event of a scan stream (`started`): which run it is. */
+export interface ScanStarted {
+  id: string;
+  project: string;
+  version: string;
+  /** Epoch seconds. */
+  startedAt: number;
+  /** True on GET /scan-attach, false on the stream that started the scan. */
+  attached: boolean;
+  /** Early log lines the server no longer holds, so a joining tab cannot see
+   *  them. 0 when the log is whole. */
+  droppedLines: number;
+  /** The scan asked for deep CVE matching (its step is shown only then). */
+  deepCve: boolean;
+}
+
+/** Read a `started` payload; null when it does not name a run. */
+export function parseScanStarted(raw: unknown): ScanStarted | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== "string" || !r.id) return null;
+  return {
+    id: r.id,
+    project: typeof r.project === "string" ? r.project : "",
+    version: typeof r.version === "string" ? r.version : "",
+    startedAt: typeof r.startedAt === "number" ? r.startedAt : 0,
+    attached: r.attached === true,
+    droppedLines:
+      typeof r.droppedLines === "number" && r.droppedLines > 0 ? Math.floor(r.droppedLines) : 0,
+    deepCve: r.deepCve === true,
+  };
 }
 
 /** A per-feature image: whether it is already on this machine, and how many
@@ -1875,8 +1915,8 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
-/** A scan running on the server now (GET /running-scans). Read-only: the
- *  progress stream belongs to the tab that started it. */
+/** A scan running on the server now (GET /running-scans). Any tab can follow
+ *  one with `attachScan`. */
 export interface RunningScan {
   id: string;
   project: string;
@@ -2142,7 +2182,67 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
   });
 
   const es = new EventSource(`/scan-stream?${qs.toString()}`);
+  wireScanStream(es, handlers);
+  return es;
+}
+
+/**
+ * Follow a scan that another tab (or this one, before a reload) started: the
+ * log so far, then the live events, to the same handlers `startScan` takes.
+ * Closing the returned stream leaves the scan running. `onMissing` is called
+ * instead of `onError` when the stream ends before it named the scan, which
+ * is what the server's 404 for a scan no longer running looks like here.
+ */
+export function attachScan(
+  id: string,
+  handlers: ScanHandlers & { onMissing?: () => void },
+): EventSource {
+  const es = new EventSource(`/scan-attach?id=${encodeURIComponent(id)}`);
+  let named = false;
+  wireScanStream(es, {
+    ...handlers,
+    onStarted: (info) => {
+      named = true;
+      handlers.onStarted?.(info);
+    },
+    onError: (message, key, extra) => {
+      if (!named && !message && handlers.onMissing) {
+        handlers.onMissing();
+        return;
+      }
+      handlers.onError(message, key, extra);
+    },
+  });
+  return es;
+}
+
+/** Stop a running scan, from any tab. True when this request is the one that
+ *  stopped it; false when it was already stopping, has ended, or the request
+ *  failed. */
+export async function cancelScan(id: string): Promise<boolean> {
+  if (IS_STATIC_DEMO) return false;
+  try {
+    const res = await fetch(`/scan-cancel?id=${encodeURIComponent(id)}`, { method: "POST" });
+    if (!res.ok) return false;
+    const j = (await res.json()) as { cancelling?: unknown };
+    return j.cancelling === true;
+  } catch {
+    return false;
+  }
+}
+
+/** The event handling `startScan` and `attachScan` share. */
+function wireScanStream(es: EventSource, handlers: ScanHandlers): void {
   let finished = false;
+
+  es.addEventListener("started", (e) => {
+    try {
+      const info = parseScanStarted(JSON.parse((e as MessageEvent).data));
+      if (info) handlers.onStarted?.(info);
+    } catch {
+      /* ignore a malformed started event */
+    }
+  });
 
   es.addEventListener("log", (e) => {
     const data = (e as MessageEvent).data;
@@ -2206,8 +2306,6 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     }
     es.close();
   };
-
-  return es;
 }
 
 // ---------------------------------------------------------------------------

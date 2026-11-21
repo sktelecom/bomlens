@@ -3,7 +3,20 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildHash, homeHash, lookupHash, newHash, parseHash, parseQuery, scanHash } from "./route";
+import { buildHash, homeHash, lookupHash, newHash, parseHash, parseQuery, runningHash, scanHash } from "./route";
+
+describe("the running-scan route", () => {
+  it("round-trips a run id, encoded", () => {
+    expect(runningHash("my app_1.0")).toBe("#/running/my%20app_1.0");
+    expect(parseHash(runningHash("my app_1.0"))).toEqual({ kind: "running", id: "my app_1.0" });
+    expect(parseHash("#running/demo_1.0")).toEqual({ kind: "running", id: "demo_1.0" });
+  });
+
+  it("falls back to Recent without an id", () => {
+    expect(parseHash("#/running")).toEqual({ kind: "recent" });
+    expect(parseHash("#/running/")).toEqual({ kind: "recent" });
+  });
+});
 
 describe("parseHash", () => {
   it("treats empty / bare slash as Recent (home)", () => {

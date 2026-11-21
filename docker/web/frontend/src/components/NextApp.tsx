@@ -26,6 +26,8 @@ import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
   ANDROID_SDK_IMAGE_MISSING,
+  attachScan,
+  cancelScan,
   errorCodeOf,
   deleteScan,
   downloadAllUrl,
@@ -38,6 +40,7 @@ import {
   type DoneEvent,
   type RecentScan,
   type ScanConfig,
+  type ScanHandlers,
   type ScanParams,
   type Severity,
 } from "@/lib/api";
@@ -58,9 +61,11 @@ import {
   lookupHash,
   newHash,
   parseHash,
+  runningHash,
   scanHash,
   type RouteQuery,
 } from "@/lib/route";
+import { attachedLogStart, scanEndOf } from "@/lib/runningScans";
 import { formatNumber } from "@/lib/format";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 import { type ProjectName, projectText, scanProjectName } from "@/lib/scanTitle";
@@ -171,6 +176,9 @@ export function NextApp() {
   // The project a live scan was started for: it has no id (and so no entry in
   // the scan list) until it finishes.
   const [liveProject, setLiveProject] = useState<ProjectName>();
+  // Whether the live scan asked for deep CVE matching, so its step is shown.
+  // From the form for a scan started here, from the server for one joined.
+  const [runDeepCve, setRunDeepCve] = useState(false);
   // The id of a past scan being fetched, so a deep link shows a loading state
   // rather than the home screen until the scan arrives.
   const [opening, setOpening] = useState<string | null>(null);
@@ -222,7 +230,8 @@ export function NextApp() {
   // The scan id currently held in `result` — so the hash router can tell a
   // section change (no reload) from opening a different scan (reload).
   const loadedIdRef = useRef<string | null>(null);
-  // The id of an in-flight live scan, so its `done` can set the URL.
+  // The id of an in-flight live scan (from the stream's `started` event), so
+  // Cancel can name it and its `done` can set the URL.
   const runningIdRef = useRef<string | null>(null);
   // The params of the last started scan, so a failed run can be retried — but
   // only when they carry no single-use upload token or stashed credential.
@@ -283,7 +292,8 @@ export function NextApp() {
     void refreshRecent();
   }, []);
 
-  // Closing the tab or window ends a running scan and keeps nothing of it, so
+  // Closing the tab or window ends a running scan and keeps nothing of it,
+  // unless a tab joins it again within the server's grace (a reload does), so
   // the browser asks first. Only while a scan runs.
   useEffect(() => {
     if (status !== "running" || !unloadGuardEnabled()) return;
@@ -409,6 +419,10 @@ export function NextApp() {
       setOpening(null);
       setSectionQuery(parsed.query ?? {});
       if (loadedIdRef.current !== null || status !== "idle") resetToHome();
+      return;
+    }
+    if (parsed.kind === "running") {
+      attachRef.current(parsed.id);
       return;
     }
     setSectionQuery(parsed.query ?? {});
@@ -566,45 +580,108 @@ export function NextApp() {
       name: params.project,
       version: params.version || undefined,
     });
-    streamRef.current = startScan(params, {
-      onLog: (line) => setLogs((prev) => [...prev, line]),
-      onDone: (done) => {
+    setRunDeepCve(Boolean(params.deepCve));
+    streamRef.current = startScan(params, scanHandlers());
+  };
+
+  // What the live stream's events do, the same for a scan started here and one
+  // joined from the address (`#/running/<id>`) or the running-scans notice.
+  const scanHandlers = (): ScanHandlers => ({
+    onStarted: (info) => {
+      runningIdRef.current = info.id;
+      if (info.attached) {
+        setLiveProject({ name: info.project, version: info.version || undefined });
+        setRunDeepCve(info.deepCve);
+        const lead = attachedLogStart(info, (count) => t("run.attachTrimmed", { count }));
+        if (lead.length) setLogs(lead);
+      }
+      // The address names the running scan, so a reload joins it again.
+      const target = runningHash(info.id);
+      if (window.location.hash !== target) window.history.replaceState(null, "", target);
+    },
+    onLog: (line) => setLogs((prev) => [...prev, line]),
+    onDone: (done) => {
+      streamRef.current = null;
+      // Cancelled from another tab: nothing was kept, so there is no result
+      // to land on. This tab's own Cancel closes the stream before this.
+      if (scanEndOf(done) === "cancelled") {
+        toast(t("run.cancelledElsewhere"));
+        resetToHome();
+        setHomeView("new");
+        window.history.replaceState(null, "", newHash());
+        return;
+      }
+      // The scan was not started; the dialog already has the answer.
+      const doneCode = errorCodeOf(done);
+      if (doneCode === ANDROID_SDK_IMAGE_MISSING) return;
+      const hiddenKey = failureKeyForCode(doneCode);
+      if (hiddenKey) setScanErrorKey((k) => k ?? hiddenKey);
+      setResult(done);
+      setStatus(done.ok ? "done" : "error");
+      void refreshRecent(); // the finished scan is now in history
+      // Point the URL at the finished scan so it has a shareable/reopenable
+      // address. Prefer the server-provided id (exact artifact prefix).
+      const id = done.id;
+      if (id) {
+        loadedIdRef.current = id;
+        runningIdRef.current = null;
+        window.history.replaceState(null, "", scanHash(id));
+      }
+    },
+    onError: (message, key, extra) => {
+      const need = androidSdkNeed(extra);
+      if (!message && androidNeedRef.current) return;
+      if (need) {
+        androidNeedRef.current = true;
+        setLogs((prev) => [...prev, `✖ ${message ?? ""}`]);
+        setAndroidNeed(need);
+        return;
+      }
+      if (message) {
+        setLogs((prev) => [...prev, `✖ ${message}`]);
+        setScanError(message);
+        setScanErrorKey(key ?? failureKeyForCode(errorCodeOf(extra)) ?? null);
+      }
+      setStatus((s) => (s === "running" ? "error" : s));
+    },
+  });
+
+  // Follow a scan already running on the server: one this tab started before
+  // a reload, or one another tab started. The log so far arrives first. A
+  // scan that is no longer running opens as a past scan instead (its result,
+  // or the not-found notice when it was cancelled).
+  const attachTo = (id: string) => {
+    if (runningIdRef.current === id && streamRef.current) return;
+    closeStream();
+    loadedIdRef.current = null;
+    runningIdRef.current = id;
+    // Nothing here to retry with: the settings belong to the tab that started it.
+    lastParamsRef.current = null;
+    setOpening(null);
+    setStatus("running");
+    setLogs([]);
+    setScanError(null);
+    setScanErrorKey(null);
+    setAndroidNeed(null);
+    androidNeedRef.current = false;
+    setResult(null);
+    setActiveSection("overview");
+    setLiveProject(undefined);
+    setRunDeepCve(false);
+    streamRef.current = attachScan(id, {
+      ...scanHandlers(),
+      onMissing: () => {
         streamRef.current = null;
-        // The scan was not started; the dialog already has the answer.
-        const doneCode = errorCodeOf(done);
-        if (doneCode === ANDROID_SDK_IMAGE_MISSING) return;
-        const hiddenKey = failureKeyForCode(doneCode);
-        if (hiddenKey) setScanErrorKey((k) => k ?? hiddenKey);
-        setResult(done);
-        setStatus(done.ok ? "done" : "error");
-        void refreshRecent(); // the finished scan is now in history
-        // Point the URL at the finished scan so it has a shareable/reopenable
-        // address. Prefer the server-provided id (exact artifact prefix).
-        const id = done.id;
-        if (id) {
-          loadedIdRef.current = id;
-          runningIdRef.current = null;
-          window.history.replaceState(null, "", scanHash(id));
-        }
-      },
-      onError: (message, key, extra) => {
-        const need = androidSdkNeed(extra);
-        if (!message && androidNeedRef.current) return;
-        if (need) {
-          androidNeedRef.current = true;
-          setLogs((prev) => [...prev, `✖ ${message ?? ""}`]);
-          setAndroidNeed(need);
-          return;
-        }
-        if (message) {
-          setLogs((prev) => [...prev, `✖ ${message}`]);
-          setScanError(message);
-          setScanErrorKey(key ?? failureKeyForCode(errorCodeOf(extra)) ?? null);
-        }
-        setStatus((s) => (s === "running" ? "error" : s));
+        runningIdRef.current = null;
+        setStatus("idle");
+        window.history.replaceState(null, "", scanHash(id));
+        showScan(id, "overview");
       },
     });
   };
+  // The router is memoised; it reaches the latest attachTo through this.
+  const attachRef = useRef(attachTo);
+  attachRef.current = attachTo;
 
   // "Re-scan": park the finished scan's config and open the New scan form so the
   // user can adjust toggles and run it again (not an immediate re-run). The form
@@ -886,14 +963,19 @@ export function NextApp() {
           errorKey={scanErrorKey}
           newScanHref={newHash()}
           onNewScan={goToNewScan}
-          deepCveEnabled={retryParams?.deepCve}
+          deepCveEnabled={runDeepCve}
           onRetry={
             canRetry && retryParams ? () => run(retryParams) : undefined
           }
           onCancel={() => {
-            closeStream(); // backend ends the process when the stream drops
+            // Stopped by id, so a cancel from a joined tab works the same as
+            // from the one that started it; the server stops it once.
+            const id = runningIdRef.current;
+            if (id) void cancelScan(id);
+            closeStream();
             resetToHome();
             setHomeView("new");
+            if (window.location.hash !== newHash()) window.history.replaceState(null, "", newHash());
           }}
         />
         {androidNeed && (

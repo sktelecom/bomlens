@@ -17,12 +17,13 @@ import {
   PencilIcon,
   type Icon,
 } from "@primer/octicons-react";
-import { Banner, CounterLabel, FormControl, TextInput, VisuallyHidden } from "@primer/react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Banner, CounterLabel, FormControl, Link, TextInput, VisuallyHidden } from "@primer/react";
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ScreenHeader } from "@/components/primer";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
+import { runningHash } from "@/lib/route";
 import { runningLabel, useRunningScans } from "@/lib/runningScans";
 import { useScanForm } from "@/lib/useScanForm";
 
@@ -144,7 +145,8 @@ export function NewScan({
 }: Props) {
   const { t } = useTranslation();
   const state = useScanForm({ running, capabilities, onRun, initialConfig });
-  // A scan another tab started cannot be joined from here, but it can be seen.
+  // Scans running now, this tab's own included once it left the progress
+  // screen: each name opens its progress, which any tab can follow.
   const runningScans = useRunningScans(!running);
 
   // The form reads `initialConfig` once (lazy state init). Tell the parent to
@@ -266,7 +268,17 @@ export function NewScan({
             title={t("newscan.runningTitle", { count: runningScans.length })}
             description={
               <>
-                <span>{runningScans.map(runningLabel).join(", ")}. </span>
+                <span>
+                  {runningScans.map((r, i) => (
+                    <Fragment key={r.id}>
+                      {i > 0 && ", "}
+                      <Link href={runningHash(r.id)} inline data-testid="running-scan-link">
+                        {runningLabel(r)}
+                      </Link>
+                    </Fragment>
+                  ))}
+                  .{" "}
+                </span>
                 <span>{t("newscan.runningBody")}</span>
               </>
             }
