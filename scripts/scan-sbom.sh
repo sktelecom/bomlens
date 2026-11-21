@@ -1618,6 +1618,48 @@ OUTPUT_BASE_CREATED=0
 if [ ! -d "$OUTPUT_BASE" ]; then OUTPUT_BASE_CREATED=1; fi
 mkdir -p "$OUTPUT_HOST_DIR" || { log_error "cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
+
+# One scan at a time per result: a second scan with the same --project and
+# --version into the same folder would remove and overwrite the first one's
+# files while it runs, and both would fail. mkdir is atomic, so of two scans
+# started together only one gets the lock. A lock whose scan is gone (killed
+# outright, so no trap ran) is taken over.
+SCAN_LOCK_DIR="$OUTPUT_HOST_DIR/.bomlens-scan-${RUN_NAME}.lock"
+SCAN_LOCK_HELD=0
+release_scan_lock() {
+    if [ "${SCAN_LOCK_HELD:-0}" = "1" ]; then
+        rm -rf -- "$SCAN_LOCK_DIR" 2>/dev/null || true
+        SCAN_LOCK_HELD=0
+    fi
+}
+take_scan_lock() {
+    local other=""
+    if mkdir "$SCAN_LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$SCAN_LOCK_DIR/pid" 2>/dev/null || true
+        SCAN_LOCK_HELD=1
+        return 0
+    fi
+    other="$(cat "$SCAN_LOCK_DIR/pid" 2>/dev/null || true)"
+    case "$other" in ''|*[!0-9]*) other="" ;; esac
+    if [ -n "$other" ] && ! kill -0 "$other" 2>/dev/null; then
+        rm -rf -- "$SCAN_LOCK_DIR" 2>/dev/null || true
+        if mkdir "$SCAN_LOCK_DIR" 2>/dev/null; then
+            echo "$$" > "$SCAN_LOCK_DIR/pid" 2>/dev/null || true
+            SCAN_LOCK_HELD=1
+            return 0
+        fi
+    fi
+    return 1
+}
+if ! take_scan_lock; then
+    log_error "Another scan of ${PROJECT_NAME} ${PROJECT_VERSION} is already running into this folder: $OUTPUT_HOST_DIR"
+    echo "        Wait for it to finish, or give this scan another --version, another folder with -o <folder>, or --timestamp to keep both." >&2
+    echo "        If no scan is running, remove the leftover lock and run again: $SCAN_LOCK_DIR" >&2
+    echo "        같은 이름(${PROJECT_NAME} ${PROJECT_VERSION})의 스캔이 이 폴더에서 이미 진행 중입니다. 끝난 뒤 다시 실행하거나, --version, -o <폴더>, --timestamp 중 하나로 결과 위치를 나눠 주세요." >&2
+    exit 1
+fi
+# Until the full cleanup below is in place, an exit still frees the lock.
+trap release_scan_lock EXIT
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 # No API key and no upload server named (API_URL, --trusca): there is nothing to
 # upload to, and the upload would fail on the missing key after the scan. Skip it.
@@ -1787,6 +1829,7 @@ cleanup() {
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
+    release_scan_lock
     # A run that ended in failure leaves no result folder holding nothing but
     # its own .scanmeta.json: an empty folder reads as a scan that produced
     # something. Only a per-run folder (not the flat layout, not the folder the
