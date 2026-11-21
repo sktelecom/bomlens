@@ -319,6 +319,21 @@ JS
     check "an environment with nothing declared: today's path" "$(printf '%s\n' "$out" | grep -E '^(PIP-STEP|USED=)')" \
         "$(printf 'PIP-STEP\nUSED= REASON= DIR=.venv FAILED= APPLIED= SITE=')"
     case "$out" in *"is not used: no declared dependency could be read"*) pass "and says why" ;; *) fail "and says why" "$out" ;; esac
+    for lk in poetry.lock uv.lock pdm.lock Pipfile.lock; do
+        G3="$WORK/gate-lock-$lk"; make_linux "$G3"; sed -i.bak '/--index-url/d' "$G3/requirements.txt"; rm -f "$G3/requirements.txt.bak"
+        case "$lk" in
+            Pipfile.lock) printf '{"_meta": {}, "default": {"idna": {"version": "==3.7"}}, "develop": {}}\n' > "$G3/$lk" ;;
+            *) printf '[[package]]\nname = "idna"\nversion = "3.7"\n\n[metadata]\nlock-version = "2.0"\n' > "$G3/$lk" ;;
+        esac
+        out="$(gate "$G3" "pip-install" PIP_INDEX_URL="http://127.0.0.1:$CLOSED_PORT/simple/")"
+        check "a committed $lk: the environment is not read, the lock path stays" "$(printf '%s\n' "$out" | grep -E '^(PIP-STEP|USED=)')" \
+            "$(printf 'PIP-STEP\nUSED= REASON= DIR= FAILED=pip-install APPLIED= SITE=')"
+        check "a committed $lk: one log line says so" "$(printf '%s\n' "$out" | grep -c "python: $lk is the authority; the installed environment .venv/ is not read")" "1"
+    done
+    : > "$WORK/gate-lock-poetry.lock/poetry.lock"
+    out="$(gate "$WORK/gate-lock-poetry.lock" "" PIP_INDEX_URL="http://127.0.0.1:$CLOSED_PORT/simple/")"
+    check "an empty poetry.lock is not a complete lock: the environment is read" "$(printf '%s\n' "$out" | grep -E '^USED=' | cut -d' ' -f1,2)" \
+        "USED=1 REASON=index-unreachable"
     out="$(gate "$WORK/none" "" PIP_INDEX_URL="http://127.0.0.1:$CLOSED_PORT/simple/")"
     check "no environment: today's path, no probe" "$(printf '%s\n' "$out" | grep -vE '^\[build-prep\]' | head -n 2 | tr '\n' '|')" \
         "PIP-STEP|USED= REASON= DIR= FAILED= APPLIED= SITE=|"

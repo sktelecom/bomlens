@@ -2436,11 +2436,35 @@ python_venv_use() {
     return 0
 }
 
+# The complete Python lock file at the scan root (poetry.lock, uv.lock,
+# pdm.lock or Pipfile.lock), printed when there is one. A TOML lock counts when
+# it holds a [[package]] or [metadata] table, Pipfile.lock when it holds a
+# "default" section; an empty or cut-off file does not.
+python_lock_complete() {
+    for _plc in poetry.lock uv.lock pdm.lock; do
+        [ -s "$_plc" ] || continue
+        if grep -qE '^\[\[package\]\]|^\[metadata\]' "$_plc" 2>/dev/null; then
+            echo "$_plc"; return 0
+        fi
+    done
+    if [ -s Pipfile.lock ] && grep -q '"default"[[:space:]]*:' Pipfile.lock 2>/dev/null; then
+        echo Pipfile.lock; return 0
+    fi
+    return 1
+}
+
 # Before pip install: find the environment and, when there is one, probe the
-# package index; one that does not answer means the environment is read.
+# package index; one that does not answer means the environment is read. A
+# complete lock file at the scan root is read instead of the environment, which
+# may hold other versions than the lock.
 python_venv_before_pip() {
     python_venv_find
     [ -n "$PY_VENV_DIR" ] || return 0
+    if _pvb_lock="$(python_lock_complete)"; then
+        log "python: $_pvb_lock is the authority; the installed environment $PY_VENV_DIR/ is not read"
+        PY_VENV_DIR=""; PY_VENV_SITE=""
+        return 0
+    fi
     if ! registry_probe "$(python_index_url)"; then
         python_venv_use index-unreachable "the package index $REGISTRY_PROBE_HOST did not answer, $REGISTRY_PROBE_WHY"
     fi
