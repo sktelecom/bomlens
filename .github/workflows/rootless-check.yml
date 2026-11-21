@@ -115,6 +115,13 @@ jobs:
             bash scripts/scan-sbom.sh --project rootless --version 1.0 \
               --target "$src" --generate-only --output-dir "$out" || rc=$?
           echo "scan exit code: $rc"
+          # A failed stage keeps its log in /tmp; show it.
+          for f in /tmp/tmp.*; do
+            [ -f "$f" ] || continue
+            echo "::group::kept log $f"
+            tail -120 "$f"
+            echo "::endgroup::"
+          done
           echo "SCAN_RC=$rc" >> "$GITHUB_ENV"
 
       - name: Check ownership and deletion
@@ -141,6 +148,8 @@ jobs:
           [ -e "$OUT_DIR" ] && left="$(find "$OUT_DIR" | wc -l | tr -d ' ')"
           if [ "$foreign" -gt 0 ] || [ "$rm_rc" -ne 0 ]; then
             verdict=REPRODUCED
+          elif [ "$SCAN_RC" -ne 0 ]; then
+            verdict="INCONCLUSIVE (scan failed)"
           else
             verdict="NOT REPRODUCED"
           fi
