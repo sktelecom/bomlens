@@ -77,6 +77,46 @@ test("a launch folder that is the results folder is not the default or a name", 
   await expect(page.locator("#project")).toHaveValue("");
 });
 
+// The Windows launcher with a folder to scan: the list holds only that folder.
+const ONE_ROOT_CAPS = {
+  firmware: false,
+  scanoss: false,
+  docker: true,
+  hostDir: "C:\\Users\\dev\\sbom-output",
+  outputHostDir: "C:\\Users\\dev\\sbom-output",
+  launchIsOutput: true,
+  scanRoots: [{ path: "/scan-targets/mounted", hostPath: "C:\\Users\\dev\\r2" }],
+};
+
+async function runFolderScan(page: Page, sub: string) {
+  await stub(page, ONE_ROOT_CAPS);
+  await page.goto("/#/new");
+  await page.locator("#project").waitFor();
+  // Leaving the folder input and coming back starts it over.
+  await page.getByTestId("source-current-dir").click();
+  await page.getByTestId("source-rootfs-dir").click();
+  await expect(page.locator("#scanRoot option")).toHaveCount(1);
+  await expect(page.locator("#scanRoot")).toHaveValue("/scan-targets/mounted");
+  await page.fill("#target", sub);
+  await page.fill("#project", "r2");
+  await page.fill("#version", "1.0");
+  const scanReq = page.waitForRequest((req) => req.url().includes("/scan-stream"));
+  await page.getByRole("button", { name: /Run scan/i }).click();
+  return new URL((await scanReq).url()).searchParams;
+}
+
+test("a single added folder on screen is the folder the scan is sent", async ({ page }) => {
+  const params = await runFolderScan(page, "rust");
+  expect(params.get("source")).toBe("scan-target-src");
+  expect(params.get("target")).toBe("/scan-targets/mounted/rust");
+});
+
+test("\".\" under an added folder scans that folder", async ({ page }) => {
+  const params = await runFolderScan(page, ".");
+  expect(params.get("source")).toBe("scan-target-src");
+  expect(params.get("target")).toBe("/scan-targets/mounted");
+});
+
 test("the advanced note for OS root filesystems is folded away", async ({ page }) => {
   await stub(page, APP_CAPS);
   await page.goto("/#/new");

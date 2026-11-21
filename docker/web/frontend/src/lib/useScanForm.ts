@@ -45,7 +45,7 @@ import {
   pickVersion,
   suggestIdentity,
 } from "@/lib/scanDefaults";
-import { chooseInitialRoot, rememberScanRoot } from "@/lib/scanTargetMemory";
+import { chooseInitialRoot, effectiveScanRoot, rememberScanRoot } from "@/lib/scanTargetMemory";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -82,7 +82,8 @@ export const TEXT_INPUT: Partial<
  *  through (a path relative to /src). */
 export function composeRootfsTarget(scanRoot: string, target: string): string {
   if (!scanRoot) return target.trim();
-  const sub = target.trim().replace(/^\/+/, "");
+  // "." (or "./") names the added folder itself.
+  const sub = target.trim().replace(/^(?:\/|\.\/)+/, "").replace(/^\.$/, "");
   return sub ? `${scanRoot}/${sub}` : scanRoot;
 }
 
@@ -297,7 +298,12 @@ export function useScanForm({
   // With a mounted scan root selected, `target` becomes an optional subpath
   // inside it (empty = scan the whole mount); the submitted target is the
   // absolute container path the server allow-lists.
-  const activeScanRoot = source === "rootfs-dir" ? scanRoot : "";
+  // The location on screen: the select shows its first entry when the stored
+  // choice is not one it offers, so the same fallback is what is sent.
+  const shownScanRoot = effectiveScanRoot(
+    scanRoot, scanRoots, capabilities.launchIsOutput !== true,
+  );
+  const activeScanRoot = source === "rootfs-dir" ? shownScanRoot : "";
   const activeScanRootHost =
     scanRoots.find((r) => r.path === activeScanRoot)?.hostPath ?? "";
   // A picked scan-target folder can be scanned deep (cdxgen build → transitive
@@ -505,6 +511,8 @@ export function useScanForm({
   // known, and never over something the user already picked.
   const rootsKey = scanRoots.map((r) => r.path).join("|");
   const appliedDefaultRef = useRef("");
+  // The added folder chosen on load, which a return to the folder input starts on.
+  const initialRootRef = useRef("");
   useEffect(() => {
     if (userChoseRef.current || !launchIsOutput) return;
     // Once per set of folders: the choice records what it has seen, so a
@@ -512,7 +520,8 @@ export function useScanForm({
     if (appliedDefaultRef.current === rootsKey) return;
     appliedDefaultRef.current = rootsKey;
     setSource("rootfs-dir");
-    setScanRootRaw(chooseInitialRoot(scanRoots));
+    initialRootRef.current = chooseInitialRoot(scanRoots);
+    setScanRootRaw(initialRootRef.current);
     // scanRoots is read through rootsKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchIsOutput, rootsKey]);
@@ -563,7 +572,9 @@ export function useScanForm({
     setSource(s);
     setFileRaw(null);
     setTargetRaw("");
-    setScanRootRaw("");
+    // The launch folder when the list offers it, else the added folder chosen
+    // on load (effectiveScanRoot takes the first one when none was).
+    setScanRootRaw(launchIsOutput ? initialRootRef.current : "");
     setGitToken("");
     setGitRefRaw("");
     setUsage("");
@@ -767,7 +778,7 @@ export function useScanForm({
     version, setVersion,
     source, changeSource,
     target, setTarget,
-    scanRoot, setScanRoot, scanRoots,
+    scanRoot: shownScanRoot, setScanRoot, scanRoots,
     deepSource, setDeepSource, showDeepSource,
     gitToken, setGitToken,
     gitRef, setGitRef,

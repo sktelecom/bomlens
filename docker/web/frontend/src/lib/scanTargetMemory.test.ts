@@ -3,7 +3,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { chooseInitialRoot, type MemoryStore, rememberScanRoot } from "./scanTargetMemory";
+import {
+  chooseInitialRoot,
+  effectiveScanRoot,
+  type MemoryStore,
+  rememberScanRoot,
+} from "./scanTargetMemory";
 
 function memory(initial: Record<string, string> = {}): MemoryStore & { data: Record<string, string> } {
   const data = { ...initial };
@@ -66,5 +71,32 @@ describe("chooseInitialRoot", () => {
 
   it("treats damaged storage as empty", () => {
     expect(chooseInitialRoot([A, B], memory({ "bomlens.knownScanRoots": "{not json" }))).toBe(A.path);
+  });
+});
+
+describe("effectiveScanRoot", () => {
+  it("is the launch folder when nothing is added", () => {
+    expect(effectiveScanRoot("", [], true)).toBe("");
+    expect(effectiveScanRoot("", [], false)).toBe("");
+  });
+
+  it("keeps the launch folder when the list offers it", () => {
+    expect(effectiveScanRoot("", [A, B], true)).toBe("");
+  });
+
+  it("takes the first added folder when the launch folder is not offered", () => {
+    // The list shows a single added folder: that one is shown and sent.
+    expect(effectiveScanRoot("", [A], false)).toBe(A.path);
+    expect(effectiveScanRoot("", [A, B], false)).toBe(A.path);
+  });
+
+  it("keeps a chosen folder the list offers", () => {
+    expect(effectiveScanRoot(B.path, [A, B], false)).toBe(B.path);
+    expect(effectiveScanRoot(B.path, [A, B], true)).toBe(B.path);
+  });
+
+  it("falls back to the first entry when the chosen folder went away", () => {
+    expect(effectiveScanRoot(B.path, [A], false)).toBe(A.path);
+    expect(effectiveScanRoot(B.path, [A], true)).toBe("");
   });
 });
