@@ -14,7 +14,7 @@ description: Gradle로 빌드하는 안드로이드 앱을 스캔합니다. 준�
 
 ## 어떻게 스캔하나요?
 
-데스크톱 앱이나 웹 UI에서는 프로젝트 폴더를 추가하고 스캔을 실행합니다. SDK 이미지가 없으면 이유를 설명하고 구글 약관 링크를 보여 주는 대화상자가 뜨며, 동의하면 이미지를 한 번 빌드합니다. 이후 새 스캔 화면에서 스캔을 다시 시작하세요. `scan-sbom.sh --ui`로 연 웹 UI처럼 이미지를 직접 빌드할 수 없는 경우에는 그대로 실행할 수 있는 `docker build` 명령을 대신 보여 줍니다. 저장소를 복제해 쓰고 있으면 그 복제본의 `docker/android` 폴더에서 빌드하고, 그렇지 않으면 GitHub에서 사용 중인 릴리스의 태그로 빌드 파일을 읽습니다. 릴리스 버전을 알 수 없으면 `main` 브랜치를 읽습니다.
+데스크톱 앱이나 웹 UI에서는 프로젝트 폴더를 추가하고 스캔을 실행합니다. SDK 이미지가 없으면 이유를 설명하고 구글 약관 링크를 보여 주는 대화상자가 뜹니다. 데스크톱 앱과 Windows 실행 파일 `sbom-ui.bat`에서는 동의하면 대화상자가 이미지를 한 번 빌드합니다. `scan-sbom.sh --ui`나 `docker run`으로 띄운 웹 UI는 이미지를 직접 빌드할 수 없어서, 대화상자가 직접 실행할 `docker build` 명령을 보여 줍니다. 저장소를 복제해 쓰고 있으면 그 복제본의 `docker/android` 폴더에서 빌드하고, 그렇지 않으면 GitHub에서 사용 중인 릴리스의 태그로 빌드 파일을 읽습니다. 릴리스 버전을 알 수 없으면 `main` 브랜치를 읽습니다. 이미지가 생기면 새 스캔 화면에서 스캔을 다시 시작하세요.
 
 명령줄에서는 SDK 이미지가 없으면 스캔이 시작되기 전에 멈추고, API 레벨이 채워진 `docker build` 명령을 출력합니다. 그 명령을 한 번 실행하고(이것이 [구글 SDK 약관](https://developer.android.com/studio/terms)에 동의하는 것입니다) 스캔을 다시 실행하세요.
 
@@ -31,5 +31,15 @@ description: Gradle로 빌드하는 안드로이드 앱을 스캔합니다. 준�
 ## 결과에는 무엇이 담기나요?
 
 SBOM에는 release 런타임 클래스패스가 해석한 라이브러리가 담기므로, 테스트에만 쓰는 라이브러리는 없습니다. Gradle 빌드를 아예 실행하지 못하면 BomLens는 버전 카탈로그가 선언한 라이브러리로 대신합니다. 이는 빌드가 실제로 쓰는 것이 아니라 선언일 뿐이어서 결과 등급이 partial이 됩니다. 완전성 등급은 `{Project}_{Version}_completeness.json`과 개요 화면에서 볼 수 있고, partial이면 이유가 함께 적힙니다.
+
+## Gradle 빌드가 실패하면 어떻게 되나요?
+
+Gradle이 release 런타임 클래스패스를 읽기 전에 멈추면 앱의 의존성을 알 수 없습니다. 이때 SBOM은 빌드의 다른 구성이 해석한 라이브러리를 넣지 않습니다. 그 라이브러리는 앱에 포함되는 것이 아니라 빌드 도구와 테스트 도구(Unified Test Platform, `ddmlib`, AndroidX 테스트 라이브러리)이기 때문입니다. 결과 등급은 unreliable이고, 사유에는 Gradle이 보고한 오류가 그대로 인용됩니다. 스캔 로그에도 Gradle의 `What went wrong` 내용이 마지막 몇 줄보다 먼저 나옵니다.
+
+흔한 원인은 `android.useAndroidX=true`가 없는 프로젝트입니다. Android Studio는 새 프로젝트를 만들 때 이 줄을 `gradle.properties`에 적어 두므로, 이 파일 없이 복사한 프로젝트는 `contains AndroidX dependencies, but the android.useAndroidX property is not enabled` 오류로 실패합니다. 프로젝트 최상위 폴더의 `gradle.properties`에 이 줄을 추가한 뒤 다시 스캔하세요.
+
+```properties
+android.useAndroidX=true
+```
 
 감지 규칙과 Java 이미지는 [지원 생태계](../reference/ecosystems.ko.md#android)를 보세요.

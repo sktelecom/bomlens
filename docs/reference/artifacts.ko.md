@@ -143,3 +143,5 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 적합성 검사 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
 
 전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다. `bomlens:pipeline-step-failed`의 `license-fetch`는 패키지 저장소가 응답하지 않아 이번 스캔에서 저장소 라이선스 조회를 껐다는 뜻이며, SBOM에는 lock 파일과 패키지 매니페스트에 든 라이선스만 들어 있습니다. 빠지는 의존성은 없고 완전성 판정도 바뀌지 않습니다. CLI는 이를 `[INFO]` 한 줄로 알리고, 웹 UI는 불완전한 데이터가 아니라 안내 메모로 보여 줍니다.
+
+실패한 단계에는 빌드 도구가 보고한 내용이 `bomlens:pipeline-step-cause`(`<단계>: <문장>`, 예를 들어 Gradle의 `What went wrong` 내용 첫 줄)로 붙고, 해결 방법이 따로 있는 원인은 `bomlens:resolution-hint`로 붙을 수 있습니다. 원인 코드는 `maven-parent-outside-scan`(부모 POM이 있는 폴더 없이 스캔한 Maven 모듈), `android-useandroidx-missing`(`android.useAndroidX=true`가 없는 안드로이드 빌드), `android-release-classpath-unresolved`(안드로이드 빌드가 release 런타임 클래스패스를 읽기 전에 실패해 다른 구성의 빌드 도구를 제외함)입니다. 완전성 결과는 그 원인을 인용하고 일반 안내 대신 해당 원인의 해결 방법을 보여 주며, `android-release-classpath-unresolved`가 있으면 등급이 unreliable이 됩니다.

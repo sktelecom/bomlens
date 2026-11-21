@@ -20,6 +20,12 @@ The first Java scan downloads a Java image of about 3.8 to 5.6 GB (see [Disk use
 
 By default such a folder is read as a Gradle project. To read it with Maven, use `--build-tool maven` (or `BOMLENS_BUILD_TOOL=maven`). In the web UI and the desktop app, a folder with both files shows a Build tool choice on the New scan form. The scan log names the tool it used, and the SBOM records it in `bomlens:build-tool-choice`. The two tools can resolve different sets of dependencies, so compare the component counts before you pick one.
 
+## How do I scan a multi-module build?
+
+Scan the top-level folder, the one whose `pom.xml` is the parent POM and lists the `<modules>`. A module that depends on another module of the same build (`web` on `core`, say) is read from the build itself, so the scan needs no repository that holds `core`. The scan does not build the modules, so the log notes that it did not fetch the jars of those modules, and the result is still graded complete.
+
+A module folder scanned on its own lacks its parent POM, which sits one folder up (Maven's default `<relativePath>` is `../pom.xml`). Unless a repository holds that parent, Maven cannot read the module, and the SBOM lists only the dependencies written in the module's `pom.xml`. The log says `pom.xml names the parent POM ... outside the scanned folder`, and the completeness result is partial with the fix: scan the top-level folder.
+
 ## Does my private repository work?
 
 Yes, if the credentials are in your Maven settings. BomLens passes these files into the scan read-only, only the ones that exist, and never logs their contents:
