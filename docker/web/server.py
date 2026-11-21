@@ -1503,7 +1503,60 @@ def copy_scan_target_tree(src, dest):
         return [n for n in names if n in _DEEP_COPY_SKIP]
     shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
                     ignore_dangling_symlinks=True, dirs_exist_ok=True)
+    copy_python_env_metadata(real_src, dest)
     return dest
+
+
+def _venv_site_dirs(venv):
+    """The site-packages folders of an installed Python environment, in the
+    layouts read-python-venv.py reads: lib/pythonX.Y and lib64/pythonX.Y
+    (Linux, macOS, also pypyX.Y) and Lib/site-packages (Windows). A link is
+    not followed."""
+    out = []
+    for lib in ("lib", "lib64"):
+        base = os.path.join(venv, lib)
+        if os.path.islink(base) or not os.path.isdir(base):
+            continue
+        for e in sorted(os.listdir(base)):
+            if re.fullmatch(r"(python|pypy)\d+\.\d+t?", e):
+                out.append(os.path.join(base, e, "site-packages"))
+    out.append(os.path.join(venv, "Lib", "site-packages"))
+    return [p for p in out
+            if not os.path.islink(p) and not os.path.islink(os.path.dirname(p)) and os.path.isdir(p)]
+
+
+def copy_python_env_metadata(src, dest):
+    """Copy what the scan reads from an installed Python environment at the
+    top of src (a folder in _DEEP_COPY_SKIP holding a pyvenv.cfg, such as
+    .venv/ or venv/) into dest: pyvenv.cfg and the package metadata folders
+    (*.dist-info, *.egg-info) of its site-packages, nothing else. The copy
+    skips the environment for its size, but build-prep.sh reads it when the
+    package index cannot be used, and leaves it out of cdxgen's input by its
+    pyvenv.cfg, so the scan of a picked folder gives what the CLI gives for
+    the same folder. Returns the environment folders copied."""
+    copied = []
+    for name in sorted(_DEEP_COPY_SKIP):
+        venv = os.path.join(src, name)
+        cfg = os.path.join(venv, "pyvenv.cfg")
+        if os.path.islink(venv) or not os.path.isdir(venv) or os.path.islink(cfg) or not os.path.isfile(cfg):
+            continue
+        out = os.path.join(dest, name)
+        os.makedirs(out, exist_ok=True)
+        shutil.copy2(cfg, os.path.join(out, "pyvenv.cfg"))
+        for site in _venv_site_dirs(venv):
+            site_out = os.path.join(out, os.path.relpath(site, venv))
+            os.makedirs(site_out, exist_ok=True)
+            for e in sorted(os.listdir(site)):
+                p = os.path.join(site, e)
+                if not e.endswith((".dist-info", ".egg-info")) or os.path.islink(p):
+                    continue
+                if os.path.isdir(p):
+                    shutil.copytree(p, os.path.join(site_out, e), symlinks=True,
+                                    ignore_dangling_symlinks=True, dirs_exist_ok=True)
+                elif os.path.isfile(p):
+                    shutil.copy2(p, os.path.join(site_out, e))
+        copied.append(name)
+    return copied
 
 
 def parse_scan_exclude(raw):
