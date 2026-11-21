@@ -1009,6 +1009,13 @@ case "$SCAN_MODE" in
         # Reading a large tree to choose the scan path can take a while; say so
         # first, so the log is not silent until the next step.
         echo "[INFO] Detecting the project type in $SRC_ROOT"
+        # The same iOS/Swift note scan-sbom.sh prints for its own source scans
+        # (a CLI run reaches this container in POSTPROCESS mode, so it is not
+        # printed twice). Keep the two in step.
+        if [ "$(detect_lang "$SRC_ROOT")" = "swift" ]; then
+            echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
+            echo "[WARN]   Dependencies that come from the Apple platform (UIKit, Foundation) or from Xcode project settings are not resolved here: this scan runs in a Linux container. They are missing from the result, not zero." >&2
+        fi
         _static_why=""
         case "${DETECTION:-auto}" in
             static) _static_why="requested" ;;
