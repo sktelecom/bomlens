@@ -1018,30 +1018,40 @@ windows_path_too_long() {
 
 docker_check() {
     command -v docker &>/dev/null || { log_error "Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
-    if ! docker info >/dev/null 2>&1; then
+    # One `docker info` both checks the engine and says whether it is rootless
+    # (handback_ids). Podman's own CLI has no SecurityOptions field, so a failed
+    # template is followed by a plain check before the engine counts as down.
+    local _sec _sec_rc=0
+    _sec="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)" || _sec_rc=$?
+    if [ "$_sec_rc" -ne 0 ] && ! docker info >/dev/null 2>&1; then
         # Windows (Git Bash): a working folder of 260 characters or more makes
         # docker.exe fail before it reaches the engine, with the same outcome as
         # an engine that is not running. Tell the two apart.
         windows_path_too_long "$(pwd)" "the working folder" && exit 1
         log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1
     fi
-    handback_ids
+    handback_ids "$_sec_rc" "$_sec"
 }
 
 # HANDBACK_UID/HANDBACK_GID: the owner the (root) containers give their files
 # back to, sent as HOST_UID/HOST_GID. Under a rootless engine (Docker or Podman)
 # the container's root is this user already, and a chown to our own uid from in
 # there would give the files to a subordinate uid, so 0:0 is sent instead.
-# Asked once; when the engine cannot say, the calling user's ids are kept.
+# Set once from docker_check's SecurityOptions answer (args: its exit code and
+# output); when the engine cannot say, the calling user's ids are kept.
+# HANDBACK_UID/HANDBACK_GID already set: an internal override, used by the
+# rootless check workflow to send the ids a CLI without this check would. They
+# reach `eval docker run` strings, so only digits are taken; anything else is
+# replaced.
 handback_ids() {
-    [ -z "${HANDBACK_UID:-}" ] || return 0
+    if [[ "${HANDBACK_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HANDBACK_GID:-}" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
     HANDBACK_UID="$(id -u)"; HANDBACK_GID="$(id -g)"
     [ "$HANDBACK_UID" != 0 ] || return 0
-    local _sec
-    if _sec="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)"; then
-        case "$_sec" in *name=rootless*) HANDBACK_UID=0; HANDBACK_GID=0 ;; esac
+    if [ "${1:-1}" -eq 0 ]; then
+        case "${2:-}" in *name=rootless*) HANDBACK_UID=0; HANDBACK_GID=0 ;; esac
     elif [ "$(docker info --format '{{.Host.Security.Rootless}}' 2>/dev/null || true)" = true ]; then
-        # Podman's own CLI has no SecurityOptions field.
         HANDBACK_UID=0; HANDBACK_GID=0
     fi
     return 0
