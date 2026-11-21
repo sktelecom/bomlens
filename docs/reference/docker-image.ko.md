@@ -236,6 +236,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_LICENSE_PROBE_TIMEOUT` | - | `6` | `FETCH_LICENSE`가 켜진 소스 스캔: cdxgen 실행 전에 발견한 생태계의 패키지 저장소마다 요청 한 번에 응답을 기다리는 시간(초). 응답하지 않는 저장소가 있으면 그 스캔의 라이선스 조회를 끄고 SBOM에 `bomlens:pipeline-step-failed` `license-fetch`로 기록함. 이때 라이선스는 lock 파일과 패키지 메타데이터에서 가져오며, 빠진 의존성은 없고 완전성 판정에도 반영하지 않음(CLI는 `[INFO]` 한 줄, 웹 UI는 안내 메모로 알림) |
 | `BOMLENS_LICENSE_FETCH_TIMEOUT` | - | `1800` | `FETCH_LICENSE`가 켜진 소스 스캔: cdxgen 실행이 걸릴 수 있는 최대 시간(초). 넘으면 멈추고 라이선스 조회를 끈 채 다시 실행함(`license-fetch`로 기록). `0`이면 제한하지 않음 |
 | `BOMLENS_CANCEL_GRACE` | — | `30` | 스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 `--ui`에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다 |
+| `BOMLENS_REATTACH_GRACE` | - | `30` | 웹 UI: 어느 브라우저 탭에도 열려 있지 않은 스캔을 취소하기 전까지 계속 실행하는 시간(초, 0~600). 그동안 새로 고친 탭이나 다른 탭에서 다시 열 수 있음. 컨테이너 안의 웹 UI 서버가 읽음 |
 | `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | 소스 스캔: `1`로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트, `.github/workflows`의 GitHub Actions 워크플로, `gradle/wrapper`의 Gradle 래퍼를 포함 |
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
