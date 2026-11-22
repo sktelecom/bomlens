@@ -10,6 +10,8 @@ An SBOM is a point-in-time snapshot of dependencies, so it must be regenerated w
 
 To reduce load, split depth by trigger: on PRs generate the SBOM quickly (`--generate-only --no-report`); on `main` and releases generate everything (`--all --generate-only`) and apply the gate.
 
+The examples download the command-line archive of the release named in `BOMLENS_VERSION`, so every run uses the same scripts and the scanner image of that release, which the scan pulls on its first run. Raise the value when you move to a newer [release](https://github.com/sktelecom/bomlens/releases).
+
 ## GitHub Actions
 
 ```yaml
@@ -22,6 +24,9 @@ on:
   release:
     types: [published]
 
+env:
+  BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
+
 jobs:
   # PR: lightweight SBOM only (no report)
   sbom-pr:
@@ -29,8 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM (lightweight)
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \
@@ -48,8 +55,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM + reports
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \
@@ -85,11 +94,13 @@ generate-sbom:
   image: docker:latest
   services:
     - docker:dind
+  variables:
+    BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
   before_script:
-    - apk add --no-cache git
-    - git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
+    - apk add --no-cache bash curl
+    - mkdir -p /tmp/bomlens
+    - curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
   script:
-    - docker pull ghcr.io/sktelecom/bomlens:latest
     - /tmp/bomlens/scripts/scan-sbom.sh
         --project "$CI_PROJECT_NAME"
         --version "$CI_COMMIT_SHA"
@@ -117,6 +128,9 @@ on:
   push:
     tags: ['v*']
 
+env:
+  BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
+
 jobs:
   sbom:
     runs-on: ubuntu-latest
@@ -124,8 +138,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: make   # writes the files sbom-declared.cdx.json names, e.g. out/bin/media-daemon
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \

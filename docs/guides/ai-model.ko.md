@@ -27,7 +27,7 @@ AI 모델의 "구성요소 명세"는 모델 카드입니다. 식별자, 아키�
 필요한 것은 두 가지입니다.
 
 - **Docker 엔진이 설치되어 실행 중일 것.** 없다면 [첫 스캔](../start/first-scan.ko.md)의 요구 사항을 먼저 보세요.
-- **실행 방법 하나.** 데스크톱 앱을 쓰면 명령어가 필요 없고, 명령줄로 쓰려면 [첫 스캔](../start/first-scan.ko.md)에서 저장소를 내려받습니다. AI 모델 스캔에는 OWASP AIBOM Generator가 들어 있는 별도 이미지가 필요합니다. opt-in이고 네트워크(HuggingFace)에 접근하므로 기본 이미지와 분리했습니다.
+- **실행 방법 하나.** 데스크톱 앱을 쓰면 명령어가 필요 없고, 명령줄로 쓰려면 [첫 스캔](../start/first-scan.ko.md)에서 명령줄 압축 파일을 내려받습니다. AI 모델 스캔에는 OWASP AIBOM Generator가 들어 있는 별도 이미지가 필요합니다. opt-in이고 네트워크(HuggingFace)에 접근하므로 기본 이미지와 분리했습니다.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens-aibom:latest

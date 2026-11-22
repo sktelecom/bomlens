@@ -55,7 +55,7 @@ If you prefer a script over the desktop app, this path works too.
   First run: downloading the scanner image (about 1.4 GB).
   The first scan of a project also fetches a language image (about 3 to 16 GB).
   Image:
-  ghcr.io/sktelecom/bomlens:latest
+  ghcr.io/sktelecom/bomlens:<release version>
 ===========================================
 ===========================================
   BomLens web UI

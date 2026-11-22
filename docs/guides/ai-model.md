@@ -27,7 +27,7 @@ The full tool flow is in [Pipeline by input type](../concepts/pipeline-by-input.
 You need two things.
 
 - **A Docker engine, installed and running.** If you have none, start with the requirements in [First scan](../start/first-scan.md).
-- **A way to run BomLens.** The desktop app needs no commands; for the command line, [First scan](../start/first-scan.md) covers cloning the repository. AI model scans need a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships separately from the base image.
+- **A way to run BomLens.** The desktop app needs no commands; for the command line, [First scan](../start/first-scan.md) covers downloading the command-line archive. AI model scans need a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships separately from the base image.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens-aibom:latest

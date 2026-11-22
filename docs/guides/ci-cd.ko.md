@@ -10,6 +10,8 @@ SBOM은 의존성의 특정 시점 스냅샷이므로, 의존성이 바뀔 때�
 
 부하를 줄이려면 트리거에 따라 깊이를 나눕니다. PR에서는 SBOM만 빠르게 생성하고(`--generate-only --no-report`), `main`과 릴리스에서는 보안 보고서까지 전체 생성한 뒤(`--all --generate-only`) 게이트를 적용합니다.
 
+아래 예시는 `BOMLENS_VERSION`에 적은 릴리스의 명령줄 압축 파일을 받으므로, 실행할 때마다 같은 스크립트와 그 릴리스의 스캐너 이미지를 씁니다. 이미지는 첫 스캔이 받습니다. 새 [릴리스](https://github.com/sktelecom/bomlens/releases)로 옮길 때 이 값을 올립니다.
+
 ## GitHub Actions
 
 ```yaml
@@ -22,6 +24,9 @@ on:
   release:
     types: [published]
 
+env:
+  BOMLENS_VERSION: v1.15.2   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
+
 jobs:
   # PR: SBOM만 가볍게 생성 (보고서 생략)
   sbom-pr:
@@ -29,8 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM (lightweight)
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \
@@ -48,8 +55,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM + reports
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \
@@ -84,11 +93,13 @@ generate-sbom:
   image: docker:latest
   services:
     - docker:dind
+  variables:
+    BOMLENS_VERSION: v1.15.2   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
   before_script:
-    - apk add --no-cache git
-    - git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
+    - apk add --no-cache bash curl
+    - mkdir -p /tmp/bomlens
+    - curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
   script:
-    - docker pull ghcr.io/sktelecom/bomlens:latest
     - /tmp/bomlens/scripts/scan-sbom.sh
         --project "$CI_PROJECT_NAME"
         --version "$CI_COMMIT_SHA"
@@ -116,6 +127,9 @@ on:
   push:
     tags: ['v*']
 
+env:
+  BOMLENS_VERSION: v1.15.2   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
+
 jobs:
   sbom:
     runs-on: ubuntu-latest
@@ -123,8 +137,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: make   # sbom-declared.cdx.json이 가리키는 파일(예: out/bin/media-daemon)을 만든다
-      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
-      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Install BomLens
+        run: |
+          mkdir -p /tmp/bomlens
+          curl -fsSL "https://github.com/sktelecom/bomlens/releases/download/$BOMLENS_VERSION/bomlens-cli.tar.gz" | tar -xz -C /tmp/bomlens
       - name: Generate SBOM
         run: |
           /tmp/bomlens/scripts/scan-sbom.sh \

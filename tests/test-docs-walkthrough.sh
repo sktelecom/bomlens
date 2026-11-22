@@ -214,6 +214,16 @@ while IFS= read -r entry; do
     fi
     pass "$page: $(printf '%s\n' "$script" | grep -c .) runnable command line(s) extracted"
 
+    # The install step (download and extract the release archive, or a clone)
+    # stays outside the runnable blocks. The archive has the checkout's layout
+    # (scripts/, docker/lib/, examples/nodejs/), so a 'root' page runs its
+    # commands against this checkout as if it were the extracted folder; a
+    # runnable download would test the published release, not this change.
+    if printf '%s\n' "$script" | grep -qE 'releases/(latest/)?download/|git clone[^|]*sktelecom/bomlens'; then
+        fail "$page: a runnable block downloads BomLens; keep the install step outside <!-- runnable --> blocks"
+        continue
+    fi
+
     if [ "$kind" = "published" ]; then
         if [ "$have_published" != 1 ]; then
             skip "$page: execution ($PUBLISHED_IMG not present — CI tags the built image as it; nightly pulls the real one)"
