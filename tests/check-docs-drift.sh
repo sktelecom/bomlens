@@ -315,6 +315,11 @@ if [ -z "$(git tag -l 'v*' | head -1)" ]; then
 fi
 RELEASE_TAGS="$(git tag -l 'v*' 2>/dev/null | sort -V)"
 NEWEST_TAG="$(printf '%s\n' "$RELEASE_TAGS" | tail -1)"
+# The release a prepare-release change is for: the desktop app's version, when
+# CHANGELOG.md already has its section. Its tag is made after that change is
+# merged, so a pin to it is not a drift yet.
+PREPARED_VERSION="$(sed -n 's/^  "version": "\([0-9.]*\)",$/\1/p' electron/package.json | head -1)"
+grep -qF "## [v$PREPARED_VERSION]" CHANGELOG.md 2>/dev/null || PREPARED_VERSION=""
 if [ -z "$RELEASE_TAGS" ]; then
     echo "  WARN[pin]: no release tags available (shallow clone, offline) — pinned-tag check skipped"
     WARN=$((WARN + 1))
@@ -322,7 +327,11 @@ else
     while IFS= read -r pin; do
         [ -z "$pin" ] && continue
         ver="${pin##*:}"
-        if ! printf '%s\n' "$RELEASE_TAGS" | grep -qxF "v$ver"; then
+        if [ -n "$PREPARED_VERSION" ] && [ "$ver" = "$PREPARED_VERSION" ] \
+           && ! printf '%s\n' "$RELEASE_TAGS" | grep -qxF "v$ver"; then
+            echo "  WARN[pin]: docs pin '$pin', the release being prepared (v$ver is not tagged yet)"
+            WARN=$((WARN + 1))
+        elif ! printf '%s\n' "$RELEASE_TAGS" | grep -qxF "v$ver"; then
             echo "  DRIFT[pin]: docs pin '$pin', but release v$ver was never tagged"
             FAIL=$((FAIL + 1))
         elif [ "v$ver" != "$NEWEST_TAG" ]; then
