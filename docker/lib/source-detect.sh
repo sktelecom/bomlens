@@ -799,10 +799,43 @@ static_drop_project_package() {
     fi
 }
 
+# static_lift_lock_file_nodes <sbom>: Trivy puts one node per lock file between
+# the root and the packages (root -> lock file -> direct dependencies). The lock
+# file components come out of the list, so their dependency entries would point
+# at nothing. Each ref that is neither a component nor the root is replaced by
+# what it depends on (followed through further such refs, without repeats), and
+# its own entry goes. With several lock files, the direct dependencies of each
+# become the root's. Components are never removed.
+static_lift_lock_file_nodes() {
+    local sbom="$1" tmp="$1.lift.tmp"
+    jq -e '(.dependencies | type) == "array"' "$sbom" >/dev/null 2>&1 || return 0
+    if jq '
+        (.metadata.component["bom-ref"] // "") as $root
+        | (reduce (((.components // [])[]? | .["bom-ref"] // empty), (if $root != "" then $root else empty end)) as $r
+             ({}; .[$r] = true)) as $known
+        | (reduce .dependencies[] as $d ({};
+             .[$d.ref // ""] = ((.[$d.ref // ""] // []) + ($d.dependsOn // [])))) as $down
+        | def lift($seen):
+            .[] | select(type == "string") | . as $r
+            | if $known[$r] then $r
+              elif any($seen[]; . == $r) then empty
+              else ($down[$r] // []) | lift($seen + [$r]) end;
+          .dependencies |= [ .[] | select($known[.ref // ""])
+            | .ref as $self
+            | if (.dependsOn | type) == "array"
+              then .dependsOn = ([ .dependsOn | lift([]) ] | unique | map(select(. != $self)))
+              else . end ]' "$sbom" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$sbom"
+    else
+        rm -f "$tmp"; return 1
+    fi
+}
+
 # generate_sbom_static <root> <out>: the SBOM of a source tree read from its lock
 # file, with no build. `trivy fs` reads the lock files (the license scanner is
 # the one that needs no vulnerability database), the lock files themselves come
-# out of the list (Trivy lists each as a component without a purl), the project's
+# out of the list (Trivy lists each as a component without a purl) and the root
+# depends on their direct dependencies (static_lift_lock_file_nodes), the project's
 # own package comes out for yarn.lock and uv.lock (static_drop_project_package), and a
 # Trivy's 1.7 document is lowered to 1.6 when the pipeline emits 1.6. Returns 1
 # when anything fails, so the caller can fall back to a build.
@@ -818,6 +851,7 @@ generate_sbom_static() {
         rm -f "$tmp" "$out"; return 1
     fi
     rm -f "$tmp"
+    static_lift_lock_file_nodes "$out" || { rm -f "$out"; return 1; }
     static_drop_project_package "$root" "$out" || { rm -f "$out"; return 1; }
     # Trivy writes 1.7. The pipeline's later step raises a 1.6 document to 1.7 when
     # asked, and lowering 1.7 to 1.6 is what cdx-copy-as-1.6.sh does (syft's own
