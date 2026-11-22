@@ -5635,6 +5635,10 @@
     "epss": null,
     "kev": false
   },
+  "CVE-2026-134703": {
+    "epss": null,
+    "kev": false
+  },
   "CVE-2026-127039": {
     "epss": null,
     "kev": false

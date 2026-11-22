@@ -2,7 +2,7 @@
   "project": "RaspberryPiOsLite",
   "format": "CycloneDX",
   "result": "fail",
-  "generatedAt": "2026-11-22T09:50:34Z",
+  "generatedAt": "2026-11-22T16:34:18Z",
   "profile": "default",
   "untraceableComponents": 1904,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-11-22T09:41:43Z",
+      "detail": "2026-11-22T16:18:55Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-11-22T09:41:43Z"
+      "detail_ko": "2026-11-22T16:18:55Z"
     },
     {
       "id": "tools",
@@ -1436,7 +1436,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-22T09:41:43Z",
+            "detail": "2026-11-22T16:18:55Z",
             "refs": [
               "Section 5.2.1"
             ]

@@ -39,7 +39,7 @@ from bomlens_runner import Images, RunnerPolicy, Volume, run_source_scan
 from bomlens_runner.kubernetes import KubeApi, KubernetesBackend, KubernetesOptions
 
 policy = RunnerPolicy(
-    images=Images.parse("ghcr.io/sktelecom/bomlens:1.15.2@sha256:de67f3deb3bc868bce52ba18406d7724f817b198e7e50c502c4b5a8794d3b9b7"),
+    images=Images.parse("ghcr.io/sktelecom/bomlens:1.15.3@sha256:9a857b20f348c6b1ceae554c6566165c35cf24a71b12fb488b8a0e39aac7cf89"),
     workspace=Volume("pvc-workspace", Path("/workspace")),   # the claim, and where this process sees it
     trivy_db=Volume("pvc-trivy", Path("/trivy")),
     uid=1000, gid=1000,
