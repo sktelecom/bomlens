@@ -105,6 +105,14 @@ def _text(done: subprocess.CompletedProcess) -> str:
     return (done.stdout or b"").decode("utf-8", "replace").strip()
 
 
+def _daemon_message(done: subprocess.CompletedProcess) -> str:
+    """The daemon's own message from a failed command: its last line of
+    standard error, without control characters, at most 300 characters."""
+    lines = (done.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+    text = re.sub(r"[\x00-\x1f\x7f]", " ", lines[-1]).strip() if lines else ""
+    return f" ({text[:300]})" if text else ""
+
+
 def _err(done: subprocess.CompletedProcess) -> str:
     return (done.stderr or b"").decode("utf-8", "replace").lower()
 
@@ -264,12 +272,14 @@ class DockerBackend:
             done = self._create(argv, env, spec.image)
             cid = _text(done).splitlines()[-1] if done.returncode == 0 and _text(done) else ""
             if not cid:
-                outcome.start_error = "Docker: the container could not be created"
+                outcome.start_error = "Docker: the container could not be created" + _daemon_message(done)
                 return outcome
             if not self._config_matches(cid, spec):
                 raise EngineError("the daemon did not record the mounts and settings the runner asked for")
-            if self.cli.run(["start", cid], 120).returncode != 0:
-                outcome.start_error = "Docker: the container did not start (does the workspace volume exist?)"
+            started = self.cli.run(["start", cid], 120)
+            if started.returncode != 0:
+                outcome.start_error = ("Docker: the container did not start (does the workspace volume exist?)"
+                                       + _daemon_message(started))
                 return outcome
             outcome.started = True
             self._follow(spec, cid, on_line, cancelled, outcome)

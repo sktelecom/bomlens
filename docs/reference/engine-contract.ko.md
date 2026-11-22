@@ -66,7 +66,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 
 `budget_exhausted`는 아직 어느 단계도 내지 않습니다. 이후 릴리스에서 기록할 작업량 제한 사유로 예약해 둔 값입니다.
 
-각 단계에는 `stage`(이 컨테이너가 시작되기 전에 언어 이미지가 만든 SBOM이면 1, 나머지는 2), `started_at`, `ended_at`, 500자 이하의 선택 항목 `detail`이 있고, 일부 단계에는 `counts`가 있습니다(`generate`는 `components`를 기록하고, 생성기가 보았지만 이름을 알 수 없어 뺀 패키지가 있으면 `unresolved`를 기록하며 `detail`에 그 사실을 적음). `POSTPROCESS` 모드에서는 `generate`에 `input_fingerprint`, `reused`, `reuse_unsafe`가 있고, 실행 계획 뒤에는 `plan_mismatch`도 있습니다([입력 지문](#입력-지문) 참고).
+각 단계에는 `stage`(이 컨테이너가 시작되기 전에 언어 이미지가 만든 SBOM이면 1, 나머지는 2), `started_at`, `ended_at`, 500자 이하의 선택 항목 `detail`이 있고, 일부 단계에는 `counts`가 있습니다(`generate`는 `components`를 기록하고, 생성기가 보았지만 이름을 알 수 없어 뺀 패키지가 있으면 `unresolved`를 기록하며 `detail`에 그 사실을 적음). `generate`를 포함한 모든 단계의 `started_at`과 `ended_at`은 manifest를 쓰는 컨테이너, 곧 2단계 컨테이너가 기록한 시각입니다. 소스 스캔에서 이 시각에는 1단계 컨테이너(언어 이미지)의 실행 시간이 들어 있지 않으므로 1단계에 걸린 시간은 manifest에 없고, 실행기가 결과의 `stages.stage1`(`started_at`, `ended_at`)로 알려 줍니다. `POSTPROCESS` 모드에서는 `generate`에 `input_fingerprint`, `reused`, `reuse_unsafe`가 있고, 실행 계획 뒤에는 `plan_mismatch`도 있습니다([입력 지문](#입력-지문) 참고).
 
 <!-- steps:begin -->
 | 단계 | 하는 일 |
