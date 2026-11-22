@@ -389,14 +389,21 @@ done
     && pass "--license: a licenseref- prefix is read in any letter case; a value with nothing to keep is pointed to LicenseRef-<your-name>" \
     || fail "licence prefixes and suggestions" "$(lic_entry "licenseref-acme") / $(lic_entry "!!!")"
 
-# The CLI bundles (release.yml: bomlens-cli-linux.tar.gz, bomlens-cli-windows.zip)
-# carry only the host-side files scan-sbom.sh uses. The --license check before
-# a scan needs license-entry.sh and the id list; laid out as the Linux bundle
-# is, the helper reads MIT as an id, and scan-sbom.sh only runs the check when
-# both files are there (an older bundle leaves it to the container).
-REL="$ROOT_DIR/.github/workflows/release.yml"
+# The CLI bundles (scripts/build-cli-bundles.sh: bomlens-cli-linux.tar.gz,
+# bomlens-cli-windows.zip) carry only the host-side files scan-sbom.sh uses.
+# The --license check before a scan needs license-entry.sh and the id list;
+# laid out as the Linux bundle is, the helper reads MIT as an id, and
+# scan-sbom.sh only runs the check when both files are there (an older bundle
+# leaves it to the container).
+BUNDLER="$ROOT_DIR/scripts/build-cli-bundles.sh"
 cli_bundle_files() {  # <archive name>: the docker/lib files of that bundle
-    awk -v a="$1" 'index($0, "release-assets/" a) { on = 1 } on { print } on && !/\\$/ { exit }' "$REL" | grep -o 'docker/lib/[A-Za-z0-9._-]*' | sort -u
+    (
+        eval "$(grep -E '^(LICENSE_FILES|LIB_FILES|LINUX_FILES|WINDOWS_FILES)=' "$BUNDLER")"
+        case "$1" in
+            bomlens-cli-linux.tar.gz) printf '%s\n' $LINUX_FILES ;;
+            bomlens-cli-windows.zip) printf '%s\n' $WINDOWS_FILES ;;
+        esac
+    ) | grep -x 'docker/lib/[A-Za-z0-9._-]*' | sort -u
 }
 bundle_ok=true
 for a in bomlens-cli-linux.tar.gz bomlens-cli-windows.zip; do

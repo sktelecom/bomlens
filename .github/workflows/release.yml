@@ -135,9 +135,10 @@ jobs:
             Download `BomLens-Setup.exe` (Windows) or `BomLens-Setup.dmg` (macOS) from the assets below. Unsigned for now; if Windows SmartScreen warns, choose "More info", then "Run anyway".
 
             #### Scripts (CLI)
-            Download `bomlens-cli-linux.tar.gz` (Linux/macOS) or `bomlens-cli-windows.zip` (Windows) from the assets below and extract it — the archive carries `scan-sbom.sh` together with the host-side files it needs (a single raw download of `scan-sbom.sh` will not run on its own).
+            Download `bomlens-cli.tar.gz` (Linux/macOS, the same file as `bomlens-cli-linux.tar.gz`) or `bomlens-cli-windows.zip` (Windows) from the assets below and extract it. The archive carries `scan-sbom.sh` together with the host-side files it needs (a single raw download of `scan-sbom.sh` will not run on its own).
             ```bash
-            tar -xzf bomlens-cli-linux.tar.gz
+            tar -xzf bomlens-cli.tar.gz
+            ./scripts/check-setup.sh
             ./scripts/scan-sbom.sh --help
             ```
             
@@ -177,53 +178,24 @@ jobs:
         run: |
           mkdir -p release-assets
           
-          # Scripts. The CLI bundles must carry the host-side lib files
-          # scan-sbom.sh needs: source-detect.sh and cdx-version.sh are both
-          # sourced unconditionally on the host (both under set -e), and
-          # build-prep.sh is mounted into the container for source scans. Paths
-          # are preserved so the scan-sbom(.bat) -> scan-sbom.sh ->
-          # REPO_DIR/docker/lib resolution works after extraction. Omitting
-          # either sourced file makes even `scan-sbom.sh --help` exit 1 before
-          # any scan. license-entry.sh and the SPDX id list it reads
-          # (cdx-spdx-ids.json) check --license before a scan starts; the
-          # check is skipped without them, and the container then checks it.
-          # Every bundle carries the same three license documents. Apache-2.0
-          # section 4 asks a redistributor for a copy of the License and the
-          # NOTICE contents, and whoever downloads a bundle becomes one;
-          # THIRD_PARTY_LICENSES.md travels with them because it is where the
-          # NOTICE points for the bundled tools and the GPL source offer.
+          # The CLI bundles (bomlens-cli-linux.tar.gz, the same file as
+          # bomlens-cli.tar.gz, and bomlens-cli-windows.zip). The script copies
+          # the files to a staging folder and writes the release version into
+          # the copies there: check-setup's version, and the default image tag
+          # of scan-sbom.sh and sbom-ui.bat. The checkout is not changed.
+          VERSION="${{ needs.create-release.outputs.version }}"
+          bash scripts/build-cli-bundles.sh build "$VERSION" release-assets
+
+          # The three license documents every bundle carries (see
+          # scripts/build-cli-bundles.sh for why).
           LICENSE_FILES="LICENSE NOTICE THIRD_PARTY_LICENSES.md"
 
-          # docker/android/Dockerfile is the build recipe for the Android SDK
-          # image that Android source scans need. It carries no SDK files: the
-          # SDK is downloaded from Google by the user's own machine at build time.
-
-          # check-setup compares the image it finds with the version of the
-          # bundle it ships in; write that version in before packing.
-          BUNDLE_VERSION="${{ needs.create-release.outputs.version }}"
-          sed -i "s/@BOMLENS_VERSION@/${BUNDLE_VERSION#v}/" scripts/check-setup.sh scripts/check-setup.bat
+          # check-setup in the complete package compares the image it finds
+          # with the version it ships in; write that version in before packing.
+          sed -i "s/@BOMLENS_VERSION@/${VERSION#v}/" scripts/check-setup.sh scripts/check-setup.bat
 
           cp scripts/scan-sbom.sh release-assets/
           chmod +x release-assets/scan-sbom.sh
-          # shellcheck disable=SC2086  # word splitting is how the file list expands
-          tar -czf release-assets/bomlens-cli-linux.tar.gz \
-            scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
-            docker/lib/read-python-venv.py docker/android/Dockerfile $LICENSE_FILES
-
-          # Windows runtime bundle: both launchers, the orchestration script,
-          # and the host-side lib files above. sbom-ui.bat is self-contained
-          # (double-click web UI). check-setup.bat must ship too: the launchers'
-          # own error messages tell users to double-click it, and the settings
-          # example is how a non-CLI user reaches UI_PORT / SBOM_IMAGE_TAR (env
-          # vars die on a double-click).
-          # shellcheck disable=SC2086
-          zip -r release-assets/bomlens-cli-windows.zip \
-            scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
-            scripts/check-setup.bat scripts/bomlens.settings.example.txt \
-            docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py \
-            docker/lib/read-python-venv.py docker/android/Dockerfile $LICENSE_FILES
 
           # Examples
           # shellcheck disable=SC2086
@@ -277,6 +249,7 @@ jobs:
           # release gate appends the installer lines later and signs the result.
           ( cd release-assets && sha256sum \
             bomlens-cli-linux.tar.gz \
+            bomlens-cli.tar.gz \
             bomlens-cli-windows.zip \
             "bomlens-examples-${VERSION}.tar.gz" \
             "bomlens-${VERSION}.tar.gz" \
@@ -284,34 +257,14 @@ jobs:
             > SHA256SUMS.txt )
 
       - name: Verify the CLI bundles are self-sufficient
-        # The CLI zip/tar must carry every host-side file scan-sbom.sh sources
-        # or the extracted bundle dies before any scan (source-detect.sh was
-        # missing once and no test caught it — it is not in the container).
-        # Extract each into a clean dir and prove `scan-sbom.sh --help` runs.
-        run: |
-          set -e
-          for pkg in \
-            "tar:release-assets/bomlens-cli-linux.tar.gz" \
-            "zip:release-assets/bomlens-cli-windows.zip"; do
-            kind="${pkg%%:*}"; file="${pkg#*:}"
-            dir="$(mktemp -d)"
-            case "$kind" in
-              tar) tar -xzf "$file" -C "$dir" ;;
-              zip) unzip -q "$file" -d "$dir" ;;
-            esac
-            if ! bash "$dir/scripts/scan-sbom.sh" --help >/dev/null 2>"$dir/err"; then
-              echo "FAIL: $file — extracted scan-sbom.sh --help exited non-zero:"; cat "$dir/err"; exit 1
-            fi
-            # The extracted bundle must also state its own terms. Checking the
-            # unpacked tree (not the tar/zip argument list) is what catches a
-            # file that was named but never actually packed.
-            for name in LICENSE NOTICE THIRD_PARTY_LICENSES.md; do
-              if [ ! -s "$dir/$name" ]; then
-                echo "FAIL: $file — extracted bundle has no $name"; exit 1
-              fi
-            done
-            echo "OK: $file is self-sufficient and carries its license files"
-          done
+        # Unpacks each CLI bundle into a clean folder and checks that
+        # scan-sbom.sh --help runs, the license files and the paths the README's
+        # first commands use (scripts/check-setup.sh, examples/nodejs) are
+        # there, the zip has its README.txt, and every default image tag in
+        # the unpacked scripts is this release's version.
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
+        run: bash scripts/build-cli-bundles.sh verify "$VERSION" release-assets
 
       - name: Upload release assets
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -325,6 +278,7 @@ jobs:
           draft: true
           files: |
             release-assets/bomlens-cli-linux.tar.gz
+            release-assets/bomlens-cli.tar.gz
             release-assets/bomlens-cli-windows.zip
             release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz
             release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz
@@ -560,7 +514,7 @@ jobs:
           echo "## 🎉 Release ${{ needs.create-release.outputs.version }} Complete!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Downloads" >> $GITHUB_STEP_SUMMARY
-          echo "- [Linux/macOS Script](https://github.com/${{ env.PUBLISH_REPO }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-cli-linux.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Linux/macOS Script](https://github.com/${{ env.PUBLISH_REPO }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-cli.tar.gz)" >> $GITHUB_STEP_SUMMARY
           echo "- [Windows Script](https://github.com/${{ env.PUBLISH_REPO }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-cli-windows.zip)" >> $GITHUB_STEP_SUMMARY
           echo "- [Examples](https://github.com/${{ env.PUBLISH_REPO }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
