@@ -1300,7 +1300,9 @@ preflight_scan_paths() {
     done <<EOF_PREFLIGHT
 $(ls -A "$in_dir" 2>/dev/null)
 EOF_PREFLIGHT
-    seen="$("${DOCKER_ENV[@]}" docker run --rm --entrypoint sh \
+    # -u 0:0, as stage 1 runs: the cdxgen all-in-one image's own user cannot
+    # read a folder of mode 0700 that the scan itself reads as root.
+    seen="$("${DOCKER_ENV[@]}" docker run --rm -u 0:0 --entrypoint sh \
         -v "$(hostpath "$in_dir")":/probe-in:ro \
         -v "$(hostpath "$out_dir")":/probe-out:ro \
         -e "BOMLENS_PROBE_ENTRY=$entry" \
