@@ -1863,6 +1863,9 @@ container_line_is_detail() {
         "[INFO] source-file-tree: "*|"[INFO] source-snapshot: "*|"[INFO] SBOM ready: "*) return 0 ;;
         "[INFO] Looking up licences in the package registries"*|"[INFO] Generate-only mode. Done.") return 0 ;;
         "[INFO] cleaned "*" stale artifact(s) from a previous scan"*) return 0 ;;
+        # A source scan's post-processing run numbers its own steps; the stages
+        # printed here are the ones the reader follows (HIDE_CONTAINER_STAGES).
+        "["[0-9]"/"[0-9]"] "*) [ "${HIDE_CONTAINER_STAGES:-0}" = 1 ] && return 0 ;;
         "["[a-z]*"] "*)
             # A step's own lowercase tag ([cpe], [notice], [validate], ...).
             _tag="${2#\[}"; _tag="${_tag%%\]*}"
@@ -4458,6 +4461,7 @@ EOF
     _pp_rc=0
     # Quiet, the step lines are hidden: a line a minute says it is still going.
     if container_output_quiet; then start_progress_ticker "post-processing"; fi
+    HIDE_CONTAINER_STAGES=1
     # shellcheck disable=SC2046
     eval run_container_logged "\"$SCAN_LOG_TMP\"" "$DOCKER_MSYS"docker run --rm \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
@@ -4465,6 +4469,7 @@ EOF
         --add-host=host.docker.internal:host-gateway \
         -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(model_sbom_run)$(gate_run) \
         "\"$PP_IMAGE\"" || _pp_rc=$?
+    HIDE_CONTAINER_STAGES=0
     stop_progress_ticker
     keep_scan_log "$SCAN_LOG_TMP" "$_pp_rc"
     if [ "$_pp_rc" -ne 0 ]; then
@@ -4656,6 +4661,11 @@ if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
     exit 1
 fi
 
+# Where the summary's warnings send the reader for details: the lines above,
+# or, when a quiet run hid them, the scan log that has them.
+LOG_REF="the log above"
+if container_output_quiet && [ -f "${SCAN_LOG_FILE:-}" ]; then LOG_REF="${SCAN_LOG_FILE##*/}"; fi
+
 # The summary must describe what is ON DISK, not what was requested: an older
 # scanner image, or a step that degraded, leaves a requested artifact
 # unproduced, and a summary driven by the request flags would announce a file
@@ -4730,7 +4740,7 @@ if [ "$UPLOAD_VAR" = "false" ]; then
         echo "  The scan finished, but these artifacts are not in the output folder." >&2
         echo "  If the scanner image predates the feature, refresh it:" >&2
         echo "    docker pull ${RUN_IMAGE}" >&2
-        echo "  Otherwise the step degraded — check the log above for its warning." >&2
+        echo "  Otherwise the step degraded; check ${LOG_REF} for its warning." >&2
     fi
 fi
 } > "$SUMMARY_BUF" 2> "$SUMMARY_ERR"
@@ -4776,7 +4786,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                     *,only-excluded-dependencies,*)
                         log_warn "No software was listed: every dependency the project declares is for development only or is not deployed, and a source scan leaves those out (see Completeness below)." ;;
                     *)
-                        log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above." ;;
+                        log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read ${LOG_REF}." ;;
                 esac
             else
                 sum_detail=""
@@ -4787,7 +4797,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 esac
                 printf '  %-12s %s\n' "Components:" "${sum_components} identified${sum_detail:+ ($sum_detail)}"
                 if [ -n "$sum_basis" ]; then printf '  %-12s %s\n' "" "counted: ${sum_basis}"; fi
-                [ "${sum_licensed:-0}" != "0" ] || log_warn "No component declares a license, so license checks have nothing to work with. Read the log above."
+                [ "${sum_licensed:-0}" != "0" ] || log_warn "No component declares a license, so license checks have nothing to work with. Read ${LOG_REF}."
             fi
             # Under --analyze these describe the submitted document's history, not
             # this run, so they are not reported.
@@ -4807,11 +4817,11 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 if [ -n "$sum_empty_manifests" ] && [ "${sum_components:-}" = "0" ]; then
                     case ",${sum_complete_reasons}," in
                         *,lockfile-corrupt,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. A lock file is damaged: re-create it with the package manager and scan again." ;;
-                        *,resolution-failed,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see the log above)." ;;
-                        *) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed." ;;
+                        *,resolution-failed,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see ${LOG_REF})." ;;
+                        *) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check ${LOG_REF} for why resolution failed." ;;
                     esac
                 fi
-                [ -z "$sum_failed" ] || log_warn "Steps that failed: ${sum_failed} (details in the log above)"
+                [ -z "$sum_failed" ] || log_warn "Steps that failed: ${sum_failed} (details in ${LOG_REF})"
             fi
             ;;
     esac

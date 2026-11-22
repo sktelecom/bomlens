@@ -38,6 +38,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_vendored.cdx.json` | 소스 스캔에서 `--identify-vendored`, opt-in SCANOSS 이미지 필요 | 소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS) |
 | `{Project}_{Version}_security_trivy.json` | 보안보고서를 생성할 때, 다른 엔진(grype, cve-bin-tool, Yocto)이 결과를 더한 경우 | `_security.json`으로 병합하기 전에 따로 남긴 Trivy 자체 결과 |
 | `{Project}_{Version}_cdxgen.log` | CLI 소스 스캔에서 의존성 준비 단계가 실패한 경우(SBOM의 `bomlens:pipeline-step-failed`에 기록됨) | 원인을 찾을 수 있도록 남긴 1단계 로그(준비 단계와 cdxgen 출력). 진단용 파일이므로 배포하지 않습니다. URL에 든 자격 증명(`scheme://user:pass@`는 `scheme://***@`로 바뀜)과 Authorization, 토큰, 비밀번호, 시크릿, API 키 값은 가리지만 내부 호스트 이름은 그대로 남습니다. 같은 프로젝트와 버전을 다시 스캔하기 전에 지웁니다 |
+| `{Project}_{Version}_scan.log` | 모든 CLI 스캔 | 스캔 컨테이너가 출력한 모든 줄. `--verbose`나 `VERBOSE=true` 없이 터미널에서 실행하면 숨겨지는 처리 줄도 들어 있습니다. 자격 증명은 cdxgen 로그와 같은 방식으로 가립니다. 진단용 파일이므로 배포하지 않습니다. 같은 프로젝트와 버전을 다시 스캔하기 전에 지웁니다 |
 | `bomlens-events.jsonl` | `BOMLENS_EVENTS=file` | 진행 이벤트, 한 줄에 JSON 객체 하나. [엔진 계약](engine-contract.ko.md#진행-이벤트) 참고 |
 | `bomlens-result.json` | 항상 | 실행 결과 매니페스트. 실행이 어떻게 끝났는지, 단계별 결과, 출력 파일별 역할을 담습니다. [엔진 계약](engine-contract.ko.md) 참고 |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |

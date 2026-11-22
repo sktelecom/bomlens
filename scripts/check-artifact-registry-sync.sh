@@ -104,7 +104,7 @@ _govulncheck_stage1.json :: no :: yes :: skip
 _govulncheck_stage1.err :: no  :: yes :: skip
 _govulncheck_stage1.rc  :: no  :: yes :: skip
 _cdxgen.log             :: no  :: yes :: _cdxgen\.log
-_scan.log               :: no  :: yes :: skip
+_scan.log               :: no  :: yes :: _scan\.log
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's

@@ -545,7 +545,7 @@ run_q() {
     ( cd "$WORK/cwd" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never "$@" >"$WORK/out" 2>"$WORK/err" )
     RC=$?
 }
-QARGS="--project q --version 1 --target alpine:3.20 --generate-only"
+QARGS="--project q --version 1 --target alpine:3.20 --generate-only --notice"
 rm -rf "$WORK/q1"
 # shellcheck disable=SC2086
 _BOMLENS_FORCE_TTY=1 VERBOSE=false run_q bash "$SCRIPT" $QARGS -o "$WORK/q1"
@@ -565,6 +565,12 @@ if grep -q '^\[cpe\] set a cpe' "$WORK/q1/q_1/q_1_scan.log" 2>/dev/null && grep 
     pass "every container line is kept in <prefix>_scan.log and the summary names it"
 else
     fail "scan log" "$(ls "$WORK/q1/q_1" 2>&1)"
+fi
+# The notice is requested and not produced: the summary's pointer to the details.
+if grep -q 'check q_1_scan.log for its warning' "$WORK/err"; then
+    pass "on a terminal the summary points to the scan log for details"
+else
+    fail "quiet log pointer" "$(grep -i 'degraded' "$WORK/err")"
 fi
 rm -rf "$WORK/q2"
 # shellcheck disable=SC2086
@@ -586,6 +592,22 @@ if grep -q '^\[cpe\] set a cpe' "$WORK/out" && grep -q '^\[WARN\] a warning' "$W
 else
     fail "output to a file" "out=$(head -c 300 "$WORK/out") err=$(head -c 300 "$WORK/err")"
 fi
+if grep -q 'check the log above for its warning' "$WORK/err"; then pass "output to a file keeps 'the log above'"; else fail "log pointer in a file" "$(grep -i 'degraded' "$WORK/err")"; fi
+# A source scan's post-processing container numbers its own steps; on a
+# terminal only the CLI's stages are shown then, and a single-container scan's
+# own stages stay.
+(
+    eval "$(extract_fn "$SCRIPT" container_line_names_problem)"
+    eval "$(extract_fn "$SCRIPT" container_line_is_detail)"
+    # shellcheck disable=SC2034  # read by the lifted container_line_is_detail
+    HIDE_CONTAINER_STAGES=1
+    container_line_is_detail out "[1/2] static: source dir /src (lock file, no build)" || exit 1
+    # shellcheck disable=SC2034
+    HIDE_CONTAINER_STAGES=0
+    container_line_is_detail out "[1/2] syft: Docker image alpine:3.20" && exit 1
+    exit 0
+) && pass "the post-processing container's own [N/M] lines are hidden, a single-container scan's are not" \
+  || fail "container stage lines"
 # --ui started from a BomLens clone says the folder it would scan is BomLens itself.
 mkdir -p "$WORK/repo/scripts" "$WORK/repo/docker/web"
 : > "$WORK/repo/scripts/scan-sbom.sh"; : > "$WORK/repo/docker/web/server.py"
