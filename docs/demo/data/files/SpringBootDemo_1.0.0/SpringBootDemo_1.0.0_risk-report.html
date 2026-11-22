@@ -370,7 +370,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 <header class="topbar"><span class="brand"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect width="48" height="48" rx="11" fill="#1d4ed8"/><g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="12"/><line x1="27.23" y1="19.28" x2="33.19" y2="31.71"/><line x1="29.7" y1="24.44" x2="21.92" y2="35.82"/><line x1="26.47" y1="29.16" x2="12.72" y2="28.1"/><line x1="20.77" y1="28.72" x2="14.81" y2="16.29"/><line x1="18.3" y1="23.56" x2="26.08" y2="12.18"/><line x1="21.53" y1="18.84" x2="35.28" y2="19.9"/></g></svg>BomLens</span><span class="sep" aria-hidden="true">/</span><span class="proj">SpringBootDemo <span class="ver">1.0.0</span></span></header>
 <div class="page-head">
 <h1>Open-source risk report</h1>
-<p class="desc"><span>SpringBootDemo <span class="ver">1.0.0</span></span><span>Application</span><span><time datetime="2026-11-15T13:42:47Z">2026-11-15 13:42 UTC</time></span><span>64 components</span></p>
+<p class="desc"><span>SpringBootDemo <span class="ver">1.0.0</span></span><span>Application</span><span><time datetime="2026-11-22T02:22:39Z">2026-11-22 02:22 UTC</time></span><span>64 components</span></p>
 </div>
 <h2>1. Vulnerability analysis and remediation deadlines</h2>
 <div class="box"><div class="box-head"><p class="box-title">Recommended remediation deadlines</p></div>
@@ -379,6 +379,7 @@ details.fix .meta{font-size:var(--font-size-label);}
  <div><dt><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High</span></dt><dd>within 30 days</dd></div>
 </dl>
 <p class="legend">We recommend preparing a remediation plan or risk justification.</p></div>
+<p class="legend">A finding is a match between a component's name and version and a vulnerability database; whether this product uses the vulnerable code is not checked, so some findings may not apply. A source scan also leaves out test, example and sample folders by default.</p>
 <div class="box"><div class="box-head"><span class="box-title" id="box-1">Findings</span><span class="counter">96</span><span class="end">
 <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">9</span></span>
 <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">37</span></span>
@@ -486,40 +487,37 @@ details.fix .meta{font-size:var(--font-size-label);}
 </tbody></table></div></div>
 <h2>2. License summary</h2>
 <p>Distinct licenses identified: <b>10</b> (see the NOTICE artifact for details).</p>
+<p class="legend">Licenses are what each package declares. A declaration can be missing or wrong, and this is not a legal determination.</p>
 <h3>License classification (copyleft strength)</h3>
 <p>Each component is also recorded in the SBOM with a <code>bomlens:licenseClass</code> property. An unrecognized license is left uncategorized rather than assumed permissive.</p>
 <div class="summary">
 <span class="lbl lbl-cat-network zero">Network copyleft <span class="count">0</span></span>
-<span class="lbl lbl-cat-strong">Strong copyleft <span class="count">2</span></span>
-<span class="lbl lbl-cat-weak">Weak copyleft <span class="count">7</span></span>
+<span class="lbl lbl-cat-strong zero">Strong copyleft <span class="count">0</span></span>
+<span class="lbl lbl-cat-weak">Weak copyleft <span class="count">9</span></span>
 <span class="lbl lbl-cat-permissive"><span class="mk" aria-hidden="true">&#9675;</span>Permissive <span class="count">55</span></span>
 <span class="lbl zero"><span class="mk" aria-hidden="true">&#8211;</span>Uncategorized <span class="count">0</span></span>
 </div>
-<div class="box"><div class="box-head"><p class="box-title">Components that create copyleft exposure (network/strong, up to 10)</p><span class="counter">2</span></div>
-<ul class="rows mono">
-<li>jakarta.annotation-api@2.1.1 (strong-copyleft)</li>
-<li>jakarta.transaction-api@2.0.1 (strong-copyleft)</li>
-</ul></div>
 <h3>Outbound-license conflicts</h3>
 <p>Dependencies checked against the declared outbound license. Advisory only — it surfaces combinations that need a person to look, and makes no legal determination.</p>
 <div class="box lc"><div class="box-head"><p class="box-title">Conflicts with the outbound license (Apache-2.0)</p><span class="counter">8</span><span class="end">
 <span class="lbl lbl-danger zero">Incompatible <span class="count">0</span></span>
-<span class="lbl lbl-attention">Conditional <span class="count">6</span></span>
-<span class="lbl">Unknown <span class="count">2</span></span>
+<span class="lbl lbl-attention">Conditional <span class="count">8</span></span>
+<span class="lbl zero">Unknown <span class="count">0</span></span>
 </span></div>
 <ul class="rows mono">
 <li>logback-classic@1.4.11 <span class="lbl lbl-attention">Conditional</span></li>
 <li>logback-core@1.4.11 <span class="lbl lbl-attention">Conditional</span></li>
 <li>h2@2.2.224 <span class="lbl lbl-attention">Conditional</span></li>
+<li>jakarta.annotation-api@2.1.1 <span class="lbl lbl-attention">Conditional</span></li>
+<li>jakarta.transaction-api@2.0.1 <span class="lbl lbl-attention">Conditional</span></li>
 <li>aspectjweaver@1.9.20.1 <span class="lbl lbl-attention">Conditional</span></li>
 <li>hibernate-commons-annotations@6.0.6.Final <span class="lbl lbl-attention">Conditional</span></li>
 <li>hibernate-core@6.3.1.Final <span class="lbl lbl-attention">Conditional</span></li>
-<li>jakarta.annotation-api@2.1.1 <span class="lbl">Unknown</span></li>
-<li>jakarta.transaction-api@2.0.1 <span class="lbl">Unknown</span></li>
 </ul></div>
 <h2>3. Next steps</h2>
 <ol>
  <li>Prepare a <b>remediation plan or risk justification</b> within the recommended deadlines above.</li>
+ <li>Raise or replace the direct dependencies that bring in the most findings: <code>spring-boot-starter-web 3.2.0</code> (76 finding(s)), <code>jackson-databind 2.16.0</code> (15 finding(s)), <code>spring-boot-starter-data-jpa 3.2.0</code> (2 finding(s)).</li>
  <li>Keep and distribute the notice (NOTICE) together with the SBOM.</li>
 </ol>
 </body></html>

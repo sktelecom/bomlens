@@ -4,7 +4,7 @@
     "version": "1.4.0"
   },
   "engine": {
-    "version": "1.15.0",
+    "version": "1.15.1",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-11-15T13:43:25Z",
-    "ended_at": "2026-11-15T13:43:32Z",
+    "started_at": "2026-11-22T02:23:22Z",
+    "ended_at": "2026-11-22T02:23:29Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:28Z",
-      "ended_at": "2026-11-15T13:43:30Z",
+      "started_at": "2026-11-22T02:23:25Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "stage": 2
     },
     {
@@ -35,8 +35,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:25Z",
-      "ended_at": "2026-11-15T13:43:30Z",
+      "started_at": "2026-11-22T02:23:22Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "counts": {
         "components": 2
       },
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:30Z",
-      "ended_at": "2026-11-15T13:43:30Z",
+      "started_at": "2026-11-22T02:23:27Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:30Z",
-      "ended_at": "2026-11-15T13:43:30Z",
+      "started_at": "2026-11-22T02:23:27Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:30Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:27Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:27Z",
+      "ended_at": "2026-11-22T02:23:27Z",
       "stage": 2
     },
     {
@@ -83,17 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
-      "stage": 2
-    },
-    {
-      "id": "generate-notice",
-      "status": "ok",
-      "reason": null,
-      "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:27Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     },
     {
@@ -101,8 +92,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     },
     {
@@ -110,8 +101,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     },
     {
@@ -119,8 +110,17 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:31Z",
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:31Z",
-      "ended_at": "2026-11-15T13:43:32Z",
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-15T13:43:32Z",
-      "ended_at": "2026-11-15T13:43:32Z",
+      "started_at": "2026-11-22T02:23:28Z",
+      "ended_at": "2026-11-22T02:23:28Z",
       "stage": 2
     }
   ],
@@ -155,38 +155,44 @@
     {
       "role": "sbom.cyclonedx",
       "path": "BertBaseUncased_1.0_bom.json",
-      "sha256": "133a99bb06970efd5aef996932132559c8ad5be80838034a16f8c75c3610c226",
-      "bytes": 28375
+      "sha256": "d41d8a51051af8ab472089829df116f96d2721694b9d35b447ae8689331ffa37",
+      "bytes": 28535
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_completeness.json",
+      "sha256": "7221362873a2e476130f7fb6ff2f58b8c2e17a0227ab97bb3a699b5fa8615fa1",
+      "bytes": 181
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.txt",
-      "sha256": "deda43c86269eb567d738d2aa625b98622360cbd54851eccd353bcf56c023d58",
+      "sha256": "c378b9a398e023cd1894c2736235def255316ec948cc8b5d47b5c7b60871ba2d",
       "bytes": 682
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.html",
-      "sha256": "56c0120111ee56bc28a4a464fbcec3e18d91e1937caa054b75e1b7abec97e99a",
+      "sha256": "d337420f56403a57c7d02e2a09beb3729cf6cb92047df5542cbc7f26b8db997e",
       "bytes": 19821
     },
     {
       "role": "conformance",
       "path": "BertBaseUncased_1.0_conformance.json",
-      "sha256": "b23453117d12500f9365ecc7d80b2b73596a5d59d470ce2a5661b8f39854cc50",
-      "bytes": 100904
+      "sha256": "9b11b749578891db654b8dee19d6cccd2bd9c5181f4ef33d82baac0337704d93",
+      "bytes": 100840
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.md",
-      "sha256": "b8a68ac75e947af8ec073101975f59068a2e511005b9a7d4aeea61791fa5b51b",
-      "bytes": 19405
+      "sha256": "b7f6716eb6bb91af196a51dc1105083278e0f52a3beea58db0c4b41cbdee3ab5",
+      "bytes": 19192
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.html",
-      "sha256": "c3ad830b4551923b9b247e0da9b36603455eee2e719a228ddbff7948f6f09b3a",
-      "bytes": 70186
+      "sha256": "8d935df75de3588bce1eca6eb34ec7d5c709ece90a8652c2d7b899076dc85599",
+      "bytes": 69457
     },
     {
       "role": "other",
@@ -197,25 +203,25 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.md",
-      "sha256": "32ec6bb826e3475ad9f7480272fd7e502174b21f0bed9191d38395cf0e7b10ca",
-      "bytes": 1876
+      "sha256": "db4b2a222e69d5a9c596d585c3f08385273cd7e125291beabd2ecae4602b9635",
+      "bytes": 1996
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.html",
-      "sha256": "5dc0196e231a7ad0122060b0aeff539d78ec3ad165c6542495518c48eed2266f",
-      "bytes": 22468
+      "sha256": "4e957fab2d452776db3c038d4272dfd6f136e164940ce6f571cf1bd86914fd43",
+      "bytes": 22609
     },
     {
       "role": "sbom.spdx3",
       "path": "BertBaseUncased_1.0_bom.spdx3.json",
-      "sha256": "b726f3b62adb630ca54e746f9f663e6fc9f5031ff283450aa0500259219caef0",
+      "sha256": "74113c071c9cf11618d746b318f4fde6bebe42dc8723e7083e3ca2ed7fb68c64",
       "bytes": 18878
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_spdx3-check.json",
-      "sha256": "0ee9eb825eda14209e593c64de94049026a3e5f90dc5747f6d037d5b9d09f926",
+      "sha256": "e33899284f0daaad63ba861444779dd0f841a5fdbfc6fa679a4ac632cf3d0123",
       "bytes": 13097
     },
     {
@@ -233,14 +239,14 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.json",
-      "sha256": "7b825831218aa1dff5dd34ff4fa835c47cf65f778ab9f92c071b05c04bc19c03",
-      "bytes": 28797
+      "sha256": "4de3a9eab539e9f9f86f3211ac8334c9887e2c8a1b5f3f55c32bb5cf8e1019e6",
+      "bytes": 28693
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.md",
-      "sha256": "b3168d71a8914d8c501a02c5d112bd666ca168b1462b642be716505c7214cdae",
-      "bytes": 3973
+      "sha256": "1a50509b55e68dc0d7142f7bd5963df83a81a80dc9511a8e5530832985b76be3",
+      "bytes": 4009
     }
   ]
 }

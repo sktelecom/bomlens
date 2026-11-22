@@ -21,8 +21,8 @@
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, November 15, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-11-15T13:43:02Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, November 22, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-11-22T02:22:55Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -2265,7 +2265,7 @@
       ],
       "licenses": [
         {
-          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
+          "expression": "GPL-2.0-or-later WITH Classpath-exception-2.0"
         }
       ],
       "name": "jakarta.annotation-api",
@@ -2276,15 +2276,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "strong-copyleft"
+          "value": "weak-copyleft"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "conditional"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The dependency's license was not recognised."
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
           "name": "bomlens:supplierSource",
@@ -2610,7 +2610,7 @@
       ],
       "licenses": [
         {
-          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
+          "expression": "GPL-2.0-or-later WITH Classpath-exception-2.0"
         }
       ],
       "name": "jakarta.transaction-api",
@@ -2621,15 +2621,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "strong-copyleft"
+          "value": "weak-copyleft"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "conditional"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The dependency's license was not recognised."
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
           "name": "bomlens:supplierSource",
@@ -5196,7 +5196,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5350,7 +5350,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5504,7 +5504,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5658,7 +5658,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5812,7 +5812,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5967,7 +5967,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6121,7 +6121,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6276,7 +6276,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6430,7 +6430,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6585,7 +6585,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6740,7 +6740,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6896,7 +6896,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7051,7 +7051,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7457,7 +7457,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7611,7 +7611,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7765,7 +7765,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7919,7 +7919,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8073,7 +8073,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8227,7 +8227,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8381,7 +8381,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8536,7 +8536,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8690,7 +8690,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8844,7 +8844,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8998,7 +8998,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -9152,7 +9152,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-11-15"
+          "value": "endoflife.date@2026-11-22"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -9678,6 +9678,11 @@
     }
   ],
   "metadata": {
+    "authors": [
+      {
+        "name": "BomLens 1.15.1"
+      }
+    ],
     "component": {
       "bom-ref": "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar",
       "group": "com.example",
@@ -9719,14 +9724,18 @@
       },
       {
         "name": "bomlens:excluded-paths",
-        "value": "**/test/**, **/tests/**, **/spec/**, **/fixtures/**, **/testdata/**, **/__tests__/**, **/e2e/**, **/example/**, **/examples/**, **/sample/**, **/samples/**, **/bench/**, **/benches/**, **/benchmark/**, **/benchmarks/**, **/demo/**, **/demos/**, **/playground/**, **/.github/workflows/**, **/gradle/wrapper/**"
+        "value": "**/test/**, **/tests/**, **/spec/**, **/fixtures/**, **/testdata/**, **/__tests__/**, **/e2e/**, **/example/**, **/examples/**, **/sample/**, **/samples/**, **/bench/**, **/benches/**, **/benchmark/**, **/benchmarks/**, **/demo/**, **/demos/**, **/playground/**, **/.github/workflows/**, **/gradle/wrapper/**, **/vendor/**/package-lock.json"
       },
       {
         "name": "bomlens:undeclared-fields",
         "value": "unknown-to-author"
+      },
+      {
+        "name": "bomlens:sbom-author-source",
+        "value": "tool"
       }
     ],
-    "timestamp": "2026-11-15T13:43:02Z",
+    "timestamp": "2026-11-22T02:22:55Z",
     "tools": {
       "components": [
         {
@@ -9747,12 +9756,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.15.0"
+          "version": "1.15.1"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:bdd6046b-f733-44fb-afff-9a443815184a",
+  "serialNumber": "urn:uuid:1aeb21a1-6d17-4227-a308-0a3ab762680f",
   "services": [],
   "specVersion": "1.6",
   "version": 1,

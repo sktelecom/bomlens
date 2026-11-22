@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a1df72-3887-77e0-a918-7b5811c65919",
-  "CreatedAt": "2026-11-15T13:42:47.175518181Z",
+  "ReportID": "01a20110-0a5a-792e-9f3f-e98c242bfa0b",
+  "CreatedAt": "2026-11-22T02:22:38.170603961Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -255,12 +255,12 @@
           "Name": "jakarta.annotation:jakarta.annotation-api",
           "Identifier": {
             "PURL": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
-            "UID": "9746916e774a325e",
+            "UID": "1af586e57dd0bdc3",
             "BOMRef": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar"
           },
           "Version": "2.1.1",
           "Licenses": [
-            "GPL-2.0-or-later OR Classpath-exception-2.0"
+            "GPL-2.0-or-later WITH Classpath-exception-2.0"
           ],
           "Digest": "md5:5dac2f68e8288d0add4dc92cb161711d"
         },
@@ -298,12 +298,12 @@
           "Name": "jakarta.transaction:jakarta.transaction-api",
           "Identifier": {
             "PURL": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
-            "UID": "a191b6f51b64eb20",
+            "UID": "dfba76b7d95508b2",
             "BOMRef": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar"
           },
           "Version": "2.0.1",
           "Licenses": [
-            "GPL-2.0-or-later OR Classpath-exception-2.0"
+            "GPL-2.0-or-later WITH Classpath-exception-2.0"
           ],
           "Digest": "md5:5315974a3935e342b40849478e1c9966"
         },
@@ -1078,7 +1078,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2023-6378"
           ],
           "PublishedDate": "2023-11-29T12:15:07.543Z",
-          "LastModifiedDate": "2026-06-17T06:50:38.65Z"
+          "LastModifiedDate": "2026-06-17T06:50:38.65Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2023-6378",
@@ -1146,7 +1154,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2023-6378"
           ],
           "PublishedDate": "2023-11-29T12:15:07.543Z",
-          "LastModifiedDate": "2026-06-17T06:50:38.65Z"
+          "LastModifiedDate": "2026-06-17T06:50:38.65Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-12798",
@@ -1201,7 +1217,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-12798"
           ],
           "PublishedDate": "2024-12-19T16:15:07.557Z",
-          "LastModifiedDate": "2026-06-17T07:00:31.077Z"
+          "LastModifiedDate": "2026-06-17T07:00:31.077Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-11226",
@@ -1260,7 +1284,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-11226"
           ],
           "PublishedDate": "2025-10-01T08:15:31.25Z",
-          "LastModifiedDate": "2026-10-09T09:10:00.213Z"
+          "LastModifiedDate": "2026-10-09T09:10:00.213Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-12801",
@@ -1315,7 +1347,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-12801"
           ],
           "PublishedDate": "2024-12-19T17:15:08.93Z",
-          "LastModifiedDate": "2026-06-17T07:00:31.467Z"
+          "LastModifiedDate": "2026-06-17T07:00:31.467Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-10532",
@@ -1363,7 +1403,15 @@
             "https://nvd.nist.gov/vuln/detail/CVE-2026-10532"
           ],
           "PublishedDate": "2026-06-01T13:16:30.34Z",
-          "LastModifiedDate": "2026-07-22T07:10:00.107Z"
+          "LastModifiedDate": "2026-07-22T07:10:00.107Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-1225",
@@ -1420,7 +1468,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-1225"
           ],
           "PublishedDate": "2026-01-22T10:16:07.693Z",
-          "LastModifiedDate": "2026-06-17T10:15:21.373Z"
+          "LastModifiedDate": "2026-06-17T10:15:21.373Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-9828",
@@ -1467,7 +1523,15 @@
             "https://nvd.nist.gov/vuln/detail/CVE-2026-9828"
           ],
           "PublishedDate": "2026-05-28T14:16:27.43Z",
-          "LastModifiedDate": "2026-10-26T11:10:00.157Z"
+          "LastModifiedDate": "2026-10-26T11:10:00.157Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-68494",
@@ -1515,7 +1579,6 @@
           },
           "References": [
             "https://access.redhat.com/security/cve/CVE-2026-68494",
-            "https://advisory.echohq.com/cve/CVE-2026-68494",
             "https://github.com/FasterXML/jackson-core",
             "https://github.com/FasterXML/jackson-core/commit/050b429804dce2a7e08f0be1b0b4c3d040fdb9cd",
             "https://github.com/FasterXML/jackson-core/commit/4cdd529749da396cc7edf6d4a2aad41d47902641",
@@ -1528,7 +1591,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-68494"
           ],
           "PublishedDate": "2026-08-04T15:16:41.443Z",
-          "LastModifiedDate": "2026-10-23T23:10:00.157Z"
+          "LastModifiedDate": "2026-10-23T23:10:00.157Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-89425",
@@ -1561,12 +1632,12 @@
             "CWE-770"
           ],
           "VendorSeverity": {
-            "alma": 2,
+            "alma": 3,
             "amazon": 3,
             "ghsa": 3,
             "oracle-oval": 3,
             "redhat": 3,
-            "rocky": 2,
+            "rocky": 3,
             "ubuntu": 2
           },
           "CVSS": {
@@ -1580,18 +1651,22 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:86706",
+            "https://access.redhat.com/errata/RHSA-2026:98493",
+            "https://access.redhat.com/errata/RHSA-2026:98606",
             "https://access.redhat.com/security/cve/CVE-2026-89425",
             "https://advisory.echohq.com/cve/CVE-2026-89425",
+            "https://bugzilla.redhat.com/2519756",
+            "https://bugzilla.redhat.com/2519775",
             "https://bugzilla.redhat.com/2538720",
             "https://bugzilla.redhat.com/2539084",
+            "https://bugzilla.redhat.com/2539085",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2538720",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2539084",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-89407",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-89425",
-            "https://errata.almalinux.org/9/ALSA-2026-86706.html",
-            "https://errata.rockylinux.org/RLSA-2026:86706",
+            "https://errata.almalinux.org/10/ALSA-2026-98606.html",
+            "https://errata.rockylinux.org/RLSA-2026:98493",
             "https://github.com/FasterXML/jackson-core",
             "https://github.com/FasterXML/jackson-core/commit/211cf2c5d91abbec38067f37efc1363cd4e88ee3",
             "https://github.com/FasterXML/jackson-core/pull/1698",
@@ -1599,12 +1674,20 @@
             "https://github.com/FasterXML/jackson-core/releases/tag/jackson-core-3.2.3",
             "https://github.com/FasterXML/jackson-core/security/advisories/GHSA-7hhh-6rmp-j9qf",
             "https://linux.oracle.com/cve/CVE-2026-89425.html",
-            "https://linux.oracle.com/errata/ELSA-2026-90909.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98493.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-89425",
             "https://www.cve.org/CVERecord?id=CVE-2026-89425"
           ],
           "PublishedDate": "2026-09-23T03:17:04.357Z",
-          "LastModifiedDate": "2026-09-24T20:43:32.537Z"
+          "LastModifiedDate": "2026-09-24T20:43:32.537Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-18401",
@@ -1662,7 +1745,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-18401"
           ],
           "PublishedDate": "2026-08-04T15:16:29.9Z",
-          "LastModifiedDate": "2026-10-23T23:10:00.157Z"
+          "LastModifiedDate": "2026-10-23T23:10:00.157Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-54512",
@@ -1715,6 +1806,7 @@
           },
           "References": [
             "https://access.redhat.com/errata/RHSA-2026:40895",
+            "https://access.redhat.com/errata/RHSA-2026:43400",
             "https://access.redhat.com/security/cve/CVE-2026-54512",
             "https://advisory.echohq.com/cve/CVE-2026-54512",
             "https://bugzilla.redhat.com/2492010",
@@ -1724,7 +1816,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
-            "https://errata.almalinux.org/9/ALSA-2026-40895.html",
+            "https://errata.almalinux.org/10/ALSA-2026-43400.html",
             "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/434d6c511de7fdd9872f29157aafb6162d12d8d5",
@@ -1737,7 +1829,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54512"
           ],
           "PublishedDate": "2026-06-23T21:17:02.203Z",
-          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-54513",
@@ -1812,7 +1912,6 @@
             "https://access.redhat.com/errata/RHSA-2026:66488",
             "https://access.redhat.com/errata/RHSA-2026:66545",
             "https://access.redhat.com/security/cve/CVE-2026-54513",
-            "https://advisory.echohq.com/cve/CVE-2026-54513",
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492010",
@@ -1820,7 +1919,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
-            "https://errata.almalinux.org/9/ALSA-2026-40895.html",
+            "https://errata.almalinux.org/10/ALSA-2026-43400.html",
             "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/01d1692c8d0ed03e51a0e3c4f8a9e6908e4931e5",
@@ -1839,7 +1938,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-68497",
@@ -1891,6 +1998,7 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:77648",
             "https://access.redhat.com/errata/RHSA-2026:80504",
             "https://access.redhat.com/security/cve/CVE-2026-68497",
             "https://advisory.echohq.com/cve/CVE-2026-68497",
@@ -1898,7 +2006,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2531964",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68497",
-            "https://errata.almalinux.org/9/ALSA-2026-80504.html",
+            "https://errata.almalinux.org/10/ALSA-2026-77648.html",
             "https://errata.rockylinux.org/RLSA-2026:80504",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/a99b7e74c8928f43f6975773a8c862c8316178bd",
@@ -1915,7 +2023,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-68497"
           ],
           "PublishedDate": "2026-09-11T16:17:39.61Z",
-          "LastModifiedDate": "2026-09-18T19:34:36.657Z"
+          "LastModifiedDate": "2026-09-18T19:34:36.657Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-91776",
@@ -1979,7 +2095,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-91776"
           ],
           "PublishedDate": "2026-09-23T03:17:04.62Z",
-          "LastModifiedDate": "2026-09-24T20:43:32.537Z"
+          "LastModifiedDate": "2026-09-24T20:43:32.537Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-91777",
@@ -2030,15 +2154,20 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:85231",
+            "https://access.redhat.com/errata/RHSA-2026:98492",
+            "https://access.redhat.com/errata/RHSA-2026:98606",
             "https://access.redhat.com/security/cve/CVE-2026-91777",
             "https://advisory.echohq.com/cve/CVE-2026-91777",
+            "https://bugzilla.redhat.com/2519756",
+            "https://bugzilla.redhat.com/2519775",
+            "https://bugzilla.redhat.com/2538720",
+            "https://bugzilla.redhat.com/2539084",
             "https://bugzilla.redhat.com/2539085",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2539085",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-91777",
-            "https://errata.almalinux.org/9/ALSA-2026-85231.html",
-            "https://errata.rockylinux.org/RLSA-2026:85231",
+            "https://errata.almalinux.org/10/ALSA-2026-98606.html",
+            "https://errata.rockylinux.org/RLSA-2026:98492",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/37ad9b81712cbb9fb62c2d2c1813593252a24b67",
             "https://github.com/FasterXML/jackson-databind/issues/6204",
@@ -2050,12 +2179,20 @@
             "https://github.com/FasterXML/jackson-databind/releases/tag/jackson-databind-3.2.3",
             "https://github.com/FasterXML/jackson-databind/security/advisories/GHSA-cxp5-3px4-pw24",
             "https://linux.oracle.com/cve/CVE-2026-91777.html",
-            "https://linux.oracle.com/errata/ELSA-2026-90909.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98492.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-91777",
             "https://www.cve.org/CVERecord?id=CVE-2026-91777"
           ],
           "PublishedDate": "2026-09-23T03:17:04.783Z",
-          "LastModifiedDate": "2026-09-24T20:43:32.537Z"
+          "LastModifiedDate": "2026-09-24T20:43:32.537Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-19032",
@@ -2120,7 +2257,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-19032"
           ],
           "PublishedDate": "2026-09-01T04:18:00.433Z",
-          "LastModifiedDate": "2026-09-08T19:29:32.2Z"
+          "LastModifiedDate": "2026-09-08T19:29:32.2Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -2168,7 +2313,6 @@
           },
           "References": [
             "https://access.redhat.com/security/cve/CVE-2026-54514",
-            "https://advisory.echohq.com/cve/CVE-2026-54514",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/1f5a1037b1e9e05920e755cb35f198bcd46667e4",
             "https://github.com/FasterXML/jackson-databind/pull/5951",
@@ -2177,7 +2321,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54514"
           ],
           "PublishedDate": "2026-06-23T21:17:02.467Z",
-          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-54515",
@@ -2211,7 +2363,8 @@
           "VendorSeverity": {
             "amazon": 3,
             "ghsa": 2,
-            "redhat": 2
+            "redhat": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "ghsa": {
@@ -2228,14 +2381,24 @@
             "https://advisory.echohq.com/cve/CVE-2026-54515",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/0e1b0b211f7a53baa62ba2f4c9bd006c7bf4d5fa",
+            "https://github.com/FasterXML/jackson-databind/commit/0e1b0b211f7a53baa62ba2f4c9bd006c7bf4d5fa%20%28jackson-databind-3.1.4%29",
             "https://github.com/FasterXML/jackson-databind/issues/5962",
             "https://github.com/FasterXML/jackson-databind/issues/5964",
+            "https://github.com/FasterXML/jackson-databind/pull/5964",
             "https://github.com/FasterXML/jackson-databind/security/advisories/GHSA-5jmj-h7xm-6q6v",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-54515",
             "https://www.cve.org/CVERecord?id=CVE-2026-54515"
           ],
           "PublishedDate": "2026-06-23T21:17:02.597Z",
-          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-59888",
@@ -2293,7 +2456,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-59888"
           ],
           "PublishedDate": "2026-07-14T17:17:15.137Z",
-          "LastModifiedDate": "2026-10-24T21:10:00.13Z"
+          "LastModifiedDate": "2026-10-24T21:10:00.13Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-59889",
@@ -2327,7 +2498,8 @@
           "VendorSeverity": {
             "amazon": 2,
             "ghsa": 2,
-            "redhat": 2
+            "redhat": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "ghsa": {
@@ -2351,7 +2523,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-59889"
           ],
           "PublishedDate": "2026-07-14T21:17:06.16Z",
-          "LastModifiedDate": "2026-10-24T21:10:00.13Z"
+          "LastModifiedDate": "2026-10-24T21:10:00.13Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-77310",
@@ -2385,7 +2565,8 @@
           "VendorSeverity": {
             "amazon": 2,
             "ghsa": 2,
-            "redhat": 2
+            "redhat": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "ghsa": {
@@ -2402,6 +2583,7 @@
             "https://advisory.echohq.com/cve/CVE-2026-77310",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/2fc7bd9057dd051d7dea0e5fcad89822d0fa5ebd",
+            "https://github.com/FasterXML/jackson-databind/commit/2fc7bd9057dd051d7dea0e5fcad89822d0fa5ebd%20%28jackson-databind-2.18.9%29",
             "https://github.com/FasterXML/jackson-databind/pull/6058",
             "https://github.com/FasterXML/jackson-databind/releases/tag/jackson-databind-2.18.9",
             "https://github.com/FasterXML/jackson-databind/releases/tag/jackson-databind-2.21.5",
@@ -2413,7 +2595,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-77310"
           ],
           "PublishedDate": "2026-08-24T20:17:20.977Z",
-          "LastModifiedDate": "2026-10-12T21:10:00.227Z"
+          "LastModifiedDate": "2026-10-12T21:10:00.227Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-83557",
@@ -2478,7 +2668,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-83557"
           ],
           "PublishedDate": "2026-09-01T15:17:37.987Z",
-          "LastModifiedDate": "2026-09-08T19:29:32.2Z"
+          "LastModifiedDate": "2026-09-08T19:29:32.2Z",
+          "introducedBy": [
+            {
+              "name": "jackson-databind",
+              "version": "2.16.0",
+              "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-48924",
@@ -2544,7 +2742,15 @@
             "https://www.openwall.com/lists/oss-security/2025/07/11/1"
           ],
           "PublishedDate": "2025-07-11T15:15:24.347Z",
-          "LastModifiedDate": "2026-06-17T09:30:29.473Z"
+          "LastModifiedDate": "2026-06-17T09:30:29.473Z",
+          "introducedBy": [
+            {
+              "name": "commons-lang3",
+              "version": "3.14.0",
+              "purl": "pkg:maven/org.apache.commons/commons-lang3@3.14.0?type=jar",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-49844",
@@ -2598,6 +2804,7 @@
           },
           "References": [
             "https://access.redhat.com/security/cve/CVE-2026-49844",
+            "https://advisory.echohq.com/cve/CVE-2026-49844",
             "https://github.com/apache/logging-log4j2",
             "https://github.com/apache/logging-log4j2/commit/19edb23e162d6c728a8c2221a240037d389ed300",
             "https://github.com/apache/logging-log4j2/commit/feadf8eb0b4acb6ddfa4c0ab2bbc6d88b8e12d82",
@@ -2611,7 +2818,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-49844"
           ],
           "PublishedDate": "2026-07-10T22:16:42.54Z",
-          "LastModifiedDate": "2026-10-25T15:10:00.147Z"
+          "LastModifiedDate": "2026-10-25T15:10:00.147Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-24813",
@@ -2712,7 +2927,15 @@
             "https://www.vicarius.io/vsociety/posts/cve-2025-24813-tomcat-mitigation-vulnerability"
           ],
           "PublishedDate": "2025-03-10T17:15:35.067Z",
-          "LastModifiedDate": "2026-06-17T08:59:39.593Z"
+          "LastModifiedDate": "2026-06-17T08:59:39.593Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41293",
@@ -2770,6 +2993,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/13",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:99174",
             "https://access.redhat.com/security/cve/CVE-2026-41293",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
@@ -2812,7 +3036,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-99174.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/19f17a257797e8d139b33ff9c88d362a273be148",
@@ -2836,7 +3060,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41293"
           ],
           "PublishedDate": "2026-05-12T16:16:17.553Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-43512",
@@ -2894,6 +3126,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/8",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:99174",
             "https://access.redhat.com/security/cve/CVE-2026-43512",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
@@ -2936,7 +3169,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-99174.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat/commit/3d4d3fae07a6cd9c2eb193c5491001740ec64448",
             "https://github.com/apache/tomcat/commit/6565a6cb6499e56fe2f34457cec99f9d1c4f39e9",
@@ -2953,7 +3186,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-43512"
           ],
           "PublishedDate": "2026-05-12T16:16:17.99Z",
-          "LastModifiedDate": "2026-10-26T00:10:00.15Z"
+          "LastModifiedDate": "2026-10-26T00:10:00.15Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-43515",
@@ -3011,6 +3252,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/11",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:99174",
             "https://access.redhat.com/security/cve/CVE-2026-43515",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
@@ -3053,7 +3295,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-99174.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/276087d9c7abbcecc6c4fb4e4b08cf64780c6e36",
@@ -3073,7 +3315,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-43515"
           ],
           "PublishedDate": "2026-05-12T16:16:18.553Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-55276",
@@ -3129,6 +3379,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/06/29/23",
+            "https://access.redhat.com/errata/RHSA-2026:68651",
             "https://access.redhat.com/errata/RHSA-2026:68660",
             "https://access.redhat.com/security/cve/CVE-2026-55276",
             "https://bugzilla.redhat.com/2457025",
@@ -3172,7 +3423,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-68651.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/17daf80a738d66a8e6cad05c5e32c2db81500ce1%20%2810.1.56%29",
@@ -3192,7 +3443,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-55276"
           ],
           "PublishedDate": "2026-06-29T21:16:45.38Z",
-          "LastModifiedDate": "2026-10-25T21:10:00.77Z"
+          "LastModifiedDate": "2026-10-25T21:10:00.77Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-65182",
@@ -3249,11 +3508,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/08/26/1",
-            "https://access.redhat.com/errata/RHSA-2026:93469",
+            "https://access.redhat.com/errata/RHSA-2026:92862",
+            "https://access.redhat.com/errata/RHSA-2026:98523",
             "https://access.redhat.com/security/cve/CVE-2026-65182",
             "https://bugzilla.redhat.com/2524151",
             "https://bugzilla.redhat.com/2524154",
-            "https://bugzilla.redhat.com/2524155",
             "https://bugzilla.redhat.com/2524160",
             "https://bugzilla.redhat.com/2524161",
             "https://bugzilla.redhat.com/2524162",
@@ -3273,13 +3532,13 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68525",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68569",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68763",
-            "https://errata.almalinux.org/9/ALSA-2026-93469.html",
-            "https://errata.rockylinux.org/RLSA-2026:93469",
+            "https://errata.almalinux.org/10/ALSA-2026-92862.html",
+            "https://errata.rockylinux.org/RLSA-2026:98523",
             "https://github.com/apache/tomcat/commit/8bafd79a3b54684e80e9cb1bafd4746aede7d3f5",
             "https://github.com/apache/tomcat/commit/b2c56ec8f20c66773a1a813034ffcdb60841f1cf",
             "https://github.com/apache/tomcat/commit/b79752d2a8578d94743e2a95c50af297f780c0df",
             "https://linux.oracle.com/cve/CVE-2026-65182.html",
-            "https://linux.oracle.com/errata/ELSA-2026-93469.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/joosxvzc9b49ttj8lj0jw9mqt0ml767m",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-65182",
             "https://tomcat.apache.org/security-10.html",
@@ -3288,7 +3547,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-65182"
           ],
           "PublishedDate": "2026-08-25T22:17:04.9Z",
-          "LastModifiedDate": "2026-08-27T15:27:26.04Z"
+          "LastModifiedDate": "2026-08-27T15:27:26.04Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-65905",
@@ -3345,11 +3612,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/08/26/4",
-            "https://access.redhat.com/errata/RHSA-2026:93469",
+            "https://access.redhat.com/errata/RHSA-2026:92862",
+            "https://access.redhat.com/errata/RHSA-2026:98523",
             "https://access.redhat.com/security/cve/CVE-2026-65905",
             "https://bugzilla.redhat.com/2524151",
             "https://bugzilla.redhat.com/2524154",
-            "https://bugzilla.redhat.com/2524155",
             "https://bugzilla.redhat.com/2524160",
             "https://bugzilla.redhat.com/2524161",
             "https://bugzilla.redhat.com/2524162",
@@ -3369,20 +3636,28 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68525",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68569",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68763",
-            "https://errata.almalinux.org/9/ALSA-2026-93469.html",
-            "https://errata.rockylinux.org/RLSA-2026:93469",
+            "https://errata.almalinux.org/10/ALSA-2026-92862.html",
+            "https://errata.rockylinux.org/RLSA-2026:98523",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1c1a583ba57092206f77c375f45da12c99fb141d%20%2810.1.58%29",
             "https://github.com/apache/tomcat/commit/a31181af45e494b6035575519f6d1d33875f050d%20%289.0.121%29",
             "https://github.com/apache/tomcat/commit/c5f94ad1726e8399b77eb3fd69c811c1103894d6%20%2811.0.25%29",
             "https://linux.oracle.com/cve/CVE-2026-65905.html",
-            "https://linux.oracle.com/errata/ELSA-2026-93469.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/9v114xlpgbzrrbzz5vf9f6r2q4wnxwwj",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-65905",
             "https://www.cve.org/CVERecord?id=CVE-2026-65905"
           ],
           "PublishedDate": "2026-08-25T22:17:05.303Z",
-          "LastModifiedDate": "2026-08-27T15:17:49.277Z"
+          "LastModifiedDate": "2026-08-27T15:17:49.277Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-68525",
@@ -3438,11 +3713,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/08/26/7",
-            "https://access.redhat.com/errata/RHSA-2026:93469",
+            "https://access.redhat.com/errata/RHSA-2026:92862",
+            "https://access.redhat.com/errata/RHSA-2026:98523",
             "https://access.redhat.com/security/cve/CVE-2026-68525",
             "https://bugzilla.redhat.com/2524151",
             "https://bugzilla.redhat.com/2524154",
-            "https://bugzilla.redhat.com/2524155",
             "https://bugzilla.redhat.com/2524160",
             "https://bugzilla.redhat.com/2524161",
             "https://bugzilla.redhat.com/2524162",
@@ -3462,14 +3737,14 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68525",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68569",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-68763",
-            "https://errata.almalinux.org/9/ALSA-2026-93469.html",
-            "https://errata.rockylinux.org/RLSA-2026:93469",
+            "https://errata.almalinux.org/10/ALSA-2026-92862.html",
+            "https://errata.rockylinux.org/RLSA-2026:98523",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/10d048e16034ddf12055e0cede0da05b15c823b8",
             "https://github.com/apache/tomcat/commit/32f0c38526b4e655ff0c17cd97afedefc624fe43",
             "https://github.com/apache/tomcat/commit/58123aa468a20e2a079b7e0c68a4009e2475c098",
             "https://linux.oracle.com/cve/CVE-2026-68525.html",
-            "https://linux.oracle.com/errata/ELSA-2026-93469.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/x1y2lfsgzxwzc456f8954vbvgn03zhd7",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-68525",
             "https://tomcat.apache.org/security-10.html",
@@ -3478,7 +3753,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-68525"
           ],
           "PublishedDate": "2026-08-25T22:17:05.7Z",
-          "LastModifiedDate": "2026-08-27T15:15:02.453Z"
+          "LastModifiedDate": "2026-08-27T15:15:02.453Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-34750",
@@ -3564,7 +3847,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-34750"
           ],
           "PublishedDate": "2024-07-03T20:15:04.083Z",
-          "LastModifiedDate": "2026-06-17T07:34:00.13Z"
+          "LastModifiedDate": "2026-06-17T07:34:00.13Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38286",
@@ -3645,7 +3936,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-38286"
           ],
           "PublishedDate": "2024-11-07T08:15:13.007Z",
-          "LastModifiedDate": "2026-06-17T07:39:52.307Z"
+          "LastModifiedDate": "2026-06-17T07:39:52.307Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-50379",
@@ -3677,7 +3976,7 @@
             "CWE-367"
           ],
           "VendorSeverity": {
-            "alma": 2,
+            "alma": 3,
             "amazon": 3,
             "bitnami": 4,
             "ghsa": 3,
@@ -3706,16 +4005,17 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2024/12/17/4",
             "http://www.openwall.com/lists/oss-security/2024/12/18/2",
+            "https://access.redhat.com/errata/RHSA-2025:11332",
             "https://access.redhat.com/errata/RHSA-2025:3645",
             "https://access.redhat.com/security/cve/CVE-2024-50379",
-            "https://bugzilla.redhat.com/2332817",
-            "https://bugzilla.redhat.com/2351129",
+            "https://bugzilla.redhat.com/2333521",
+            "https://bugzilla.redhat.com/2362783",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332817",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2351129",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50379",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-24813",
-            "https://errata.almalinux.org/9/ALSA-2025-3645.html",
+            "https://errata.almalinux.org/10/ALSA-2025-11332.html",
             "https://errata.rockylinux.org/RLSA-2025:3645",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/05ddeeaa54df1e2dc427d0164bedd6b79f78d81f",
@@ -3742,7 +4042,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-50379"
           ],
           "PublishedDate": "2024-12-17T13:15:18.81Z",
-          "LastModifiedDate": "2026-11-03T22:17:26.637Z"
+          "LastModifiedDate": "2026-11-03T22:17:26.637Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-56337",
@@ -3799,6 +4107,7 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2025:11332",
             "https://access.redhat.com/errata/RHSA-2025:11335",
             "https://access.redhat.com/security/cve/CVE-2024-56337",
             "https://bugzilla.redhat.com/2333521",
@@ -3808,7 +4117,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
-            "https://errata.almalinux.org/9/ALSA-2025-11335.html",
+            "https://errata.almalinux.org/10/ALSA-2025-11332.html",
             "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://linux.oracle.com/cve/CVE-2024-56337.html",
@@ -3825,7 +4134,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-56337"
           ],
           "PublishedDate": "2024-12-20T16:15:24.26Z",
-          "LastModifiedDate": "2026-06-17T08:12:04.293Z"
+          "LastModifiedDate": "2026-06-17T08:12:04.293Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-48988",
@@ -3858,7 +4175,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -3885,6 +4202,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/06/16/1",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-48988",
             "https://bugzilla.redhat.com/2373015",
@@ -3909,7 +4227,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2b0ab14fb55d4edc896e5f1817f2ab76f714ae5e",
@@ -3929,7 +4247,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-48988"
           ],
           "PublishedDate": "2025-06-16T15:15:24.563Z",
-          "LastModifiedDate": "2026-06-17T09:30:37.383Z"
+          "LastModifiedDate": "2026-06-17T09:30:37.383Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-48989",
@@ -3986,6 +4312,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/08/13/2",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-48989",
             "https://bugzilla.redhat.com/2373015",
@@ -4011,7 +4338,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/73c04a10395774bda71a0b37802cf983662ce255",
@@ -4033,7 +4360,15 @@
             "https://www.kb.cert.org/vuls/id/767506"
           ],
           "PublishedDate": "2025-08-13T13:15:34.153Z",
-          "LastModifiedDate": "2026-06-17T09:30:37.53Z"
+          "LastModifiedDate": "2026-06-17T09:30:37.53Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-52520",
@@ -4091,6 +4426,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/07/10/12",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-52520",
             "https://bugzilla.redhat.com/2373015",
@@ -4115,7 +4451,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/927d66fbc294cb65242102b817a45fd80834e040",
@@ -4132,7 +4468,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-52520"
           ],
           "PublishedDate": "2025-07-10T19:15:25.57Z",
-          "LastModifiedDate": "2026-06-17T09:36:37.37Z"
+          "LastModifiedDate": "2026-06-17T09:36:37.37Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-53506",
@@ -4190,6 +4534,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/07/10/13",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-53506",
             "https://bugzilla.redhat.com/2373015",
@@ -4214,7 +4559,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2aa6261276ebe50b99276953591e3a2be7898bdb",
@@ -4231,7 +4576,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-53506"
           ],
           "PublishedDate": "2025-07-10T20:15:26.97Z",
-          "LastModifiedDate": "2026-06-17T09:38:20.783Z"
+          "LastModifiedDate": "2026-06-17T09:38:20.783Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-55752",
@@ -4291,6 +4644,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/10/27/4",
             "https://access.redhat.com/errata/RHSA-2025:23049",
+            "https://access.redhat.com/errata/RHSA-2025:23052",
             "https://access.redhat.com/security/cve/CVE-2025-55752",
             "https://bugzilla.redhat.com/2362782",
             "https://bugzilla.redhat.com/2406591",
@@ -4300,7 +4654,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
-            "https://errata.almalinux.org/9/ALSA-2025-23049.html",
+            "https://errata.almalinux.org/10/ALSA-2025-23052.html",
             "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/130d36d8492ef9e4eb22952c17c92423cb35fd06",
@@ -4321,7 +4675,15 @@
             "https://www.vicarius.io/vsociety/posts/cve-2025-55752-mitigate-apache-tomcat-vulnerability"
           ],
           "PublishedDate": "2025-10-27T18:15:42.283Z",
-          "LastModifiedDate": "2026-10-08T11:10:00.25Z"
+          "LastModifiedDate": "2026-10-08T11:10:00.25Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-24734",
@@ -4392,11 +4754,12 @@
             "https://access.redhat.com/errata/RHSA-2026:6569",
             "https://access.redhat.com/errata/RHSA-2026:8334",
             "https://access.redhat.com/security/cve/CVE-2026-24734",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2440426",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:26323",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat-native/commit/69a977dd427ad2a6da0f10aca3872386ee27f681",
@@ -4409,7 +4772,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-24734"
           ],
           "PublishedDate": "2026-02-17T19:21:56.953Z",
-          "LastModifiedDate": "2026-07-15T14:17:21.53Z"
+          "LastModifiedDate": "2026-07-15T14:17:21.53Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-24880",
@@ -4465,10 +4836,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/04/09/20",
-            "https://access.redhat.com/errata/RHSA-2026:26323",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2026-24880",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -4528,7 +4900,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1b586d6aa8ae65726da5fa8799427b5d4718478a",
@@ -4546,7 +4918,15 @@
             "https://www.herodevs.com/vulnerability-directory/cve-2026-24880"
           ],
           "PublishedDate": "2026-04-09T20:16:24.06Z",
-          "LastModifiedDate": "2026-10-26T21:10:00.17Z"
+          "LastModifiedDate": "2026-10-26T21:10:00.17Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-34483",
@@ -4602,10 +4982,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/04/09/26",
-            "https://access.redhat.com/errata/RHSA-2026:26323",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2026-34483",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -4665,7 +5046,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://lists.apache.org/thread/j1w7304yonlr8vo1tkb5nfs7od1y228b",
@@ -4673,7 +5054,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-34483"
           ],
           "PublishedDate": "2026-04-09T20:16:24.937Z",
-          "LastModifiedDate": "2026-10-26T21:10:00.17Z"
+          "LastModifiedDate": "2026-10-26T21:10:00.17Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-34487",
@@ -4729,10 +5118,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/04/09/28",
-            "https://access.redhat.com/errata/RHSA-2026:26323",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2026-34487",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -4792,7 +5182,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/301bc6efbf72feb14dacfdfa3f50372182736150",
@@ -4806,7 +5196,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-34487"
           ],
           "PublishedDate": "2026-04-09T20:16:25.203Z",
-          "LastModifiedDate": "2026-10-26T21:10:00.17Z"
+          "LastModifiedDate": "2026-10-26T21:10:00.17Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41284",
@@ -4863,15 +5261,13 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/12",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:69259",
             "https://access.redhat.com/security/cve/CVE-2026-41284",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
             "https://bugzilla.redhat.com/2476513",
             "https://bugzilla.redhat.com/2476516",
             "https://bugzilla.redhat.com/2476519",
-            "https://bugzilla.redhat.com/2476520",
-            "https://bugzilla.redhat.com/2499917",
-            "https://bugzilla.redhat.com/2499931",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457025",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2476511",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2476512",
@@ -4905,7 +5301,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-69259.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/17dacd9aa48628da2eba37a9ab743c0b6c71685c",
@@ -4921,7 +5317,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41284"
           ],
           "PublishedDate": "2026-05-12T16:16:15.933Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-42498",
@@ -4979,6 +5383,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/14",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:99174",
             "https://access.redhat.com/security/cve/CVE-2026-42498",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
@@ -5021,7 +5426,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-99174.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/169d725788ea6aec217ecac70fe4161c837ba423",
@@ -5039,7 +5444,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-42498"
           ],
           "PublishedDate": "2026-05-12T16:16:17.8Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-43513",
@@ -5097,6 +5510,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/9",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:99174",
             "https://access.redhat.com/security/cve/CVE-2026-43513",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
@@ -5139,7 +5553,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-99174.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/4a90d3fa93988c447cd5bb7482f76ff70d7f15c2",
@@ -5157,7 +5571,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-43513"
           ],
           "PublishedDate": "2026-05-12T16:16:18.177Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-53404",
@@ -5213,6 +5635,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/06/29/21",
+            "https://access.redhat.com/errata/RHSA-2026:68651",
             "https://access.redhat.com/errata/RHSA-2026:68660",
             "https://access.redhat.com/security/cve/CVE-2026-53404",
             "https://bugzilla.redhat.com/2457025",
@@ -5256,7 +5679,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-68651.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/b647cb584cea8bf95e64f5d2526c59ab8fca3225",
@@ -5274,7 +5697,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-53404"
           ],
           "PublishedDate": "2026-06-29T21:16:44.527Z",
-          "LastModifiedDate": "2026-10-25T21:10:00.77Z"
+          "LastModifiedDate": "2026-10-25T21:10:00.77Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-55957",
@@ -5415,7 +5846,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-55957"
           ],
           "PublishedDate": "2026-06-29T21:16:45.7Z",
-          "LastModifiedDate": "2026-10-25T21:10:00.77Z"
+          "LastModifiedDate": "2026-10-25T21:10:00.77Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-24549",
@@ -5507,7 +5946,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-24549"
           ],
           "PublishedDate": "2024-03-13T16:15:29.373Z",
-          "LastModifiedDate": "2026-06-17T07:14:35.11Z"
+          "LastModifiedDate": "2026-06-17T07:14:35.11Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-31650",
@@ -5570,6 +6017,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/04/28/2",
+            "https://access.redhat.com/errata/RHSA-2025:11332",
             "https://access.redhat.com/errata/RHSA-2025:11335",
             "https://access.redhat.com/security/cve/CVE-2025-31650",
             "https://bugzilla.redhat.com/2333521",
@@ -5579,7 +6027,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
-            "https://errata.almalinux.org/9/ALSA-2025-11335.html",
+            "https://errata.almalinux.org/10/ALSA-2025-11332.html",
             "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1eef1dc459c45f1e421d8bd25ef340fc1cc34edc",
@@ -5603,7 +6051,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-31650"
           ],
           "PublishedDate": "2025-04-28T20:15:20.653Z",
-          "LastModifiedDate": "2026-06-17T09:10:43.967Z"
+          "LastModifiedDate": "2026-06-17T09:10:43.967Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-49124",
@@ -5662,7 +6118,15 @@
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.106"
           ],
           "PublishedDate": "2025-06-16T15:15:24.707Z",
-          "LastModifiedDate": "2026-06-17T09:30:47.16Z"
+          "LastModifiedDate": "2026-06-17T09:30:47.16Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-49125",
@@ -5720,6 +6184,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/06/16/2",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-49125",
             "https://bugzilla.redhat.com/2373015",
@@ -5744,7 +6209,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/7617b9c247bc77ed0444dd69adcd8aa48777886c",
@@ -5764,7 +6229,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-49125"
           ],
           "PublishedDate": "2025-06-16T15:15:24.85Z",
-          "LastModifiedDate": "2026-06-17T09:30:47.307Z"
+          "LastModifiedDate": "2026-06-17T09:30:47.307Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-55668",
@@ -5909,7 +6382,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-55668"
           ],
           "PublishedDate": "2025-08-13T14:15:33.33Z",
-          "LastModifiedDate": "2026-06-17T09:41:58.817Z"
+          "LastModifiedDate": "2026-06-17T09:41:58.817Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-66614",
@@ -5972,10 +6453,11 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:26323",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2025-66614",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -6035,7 +6517,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/152c14885d45f5e0a8b59bd9f93c289cfe20ce30",
@@ -6052,7 +6534,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-66614"
           ],
           "PublishedDate": "2026-02-17T19:21:55.31Z",
-          "LastModifiedDate": "2026-06-17T09:57:06.78Z"
+          "LastModifiedDate": "2026-06-17T09:57:06.78Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-25854",
@@ -6110,10 +6600,11 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/04/09/21",
-            "https://access.redhat.com/errata/RHSA-2026:26323",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2026-25854",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -6173,7 +6664,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://lists.apache.org/thread/ghct3b6o74bp2vm7q875s1zh0dqrz3h0",
@@ -6181,7 +6672,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-25854"
           ],
           "PublishedDate": "2026-04-09T20:16:24.207Z",
-          "LastModifiedDate": "2026-10-26T22:10:00.163Z"
+          "LastModifiedDate": "2026-10-26T22:10:00.163Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-55956",
@@ -6236,6 +6735,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/06/29/25",
+            "https://access.redhat.com/errata/RHSA-2026:68651",
             "https://access.redhat.com/errata/RHSA-2026:68660",
             "https://access.redhat.com/security/cve/CVE-2026-55956",
             "https://bugzilla.redhat.com/2457025",
@@ -6279,7 +6779,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-68651.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/3f6bd2ba5e53d1f340bbe5ad2d42a28b29440b7a",
@@ -6293,7 +6793,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-55956"
           ],
           "PublishedDate": "2026-06-29T21:16:45.597Z",
-          "LastModifiedDate": "2026-10-25T21:10:00.77Z"
+          "LastModifiedDate": "2026-10-25T21:10:00.77Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-31651",
@@ -6357,6 +6865,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/04/28/3",
             "https://access.redhat.com/errata/RHSA-2025:23049",
+            "https://access.redhat.com/errata/RHSA-2025:23052",
             "https://access.redhat.com/security/cve/CVE-2025-31651",
             "https://bugzilla.redhat.com/2362782",
             "https://bugzilla.redhat.com/2406591",
@@ -6365,7 +6874,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
-            "https://errata.almalinux.org/9/ALSA-2025-23049.html",
+            "https://errata.almalinux.org/10/ALSA-2025-23052.html",
             "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/066bf6b6a15a4e7e0941d4acf096841165b97098",
@@ -6384,7 +6893,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-31651"
           ],
           "PublishedDate": "2025-04-28T20:15:20.783Z",
-          "LastModifiedDate": "2026-06-17T09:10:44.123Z"
+          "LastModifiedDate": "2026-06-17T09:10:44.123Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-46701",
@@ -6538,7 +7055,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-46701"
           ],
           "PublishedDate": "2025-05-29T19:15:27.983Z",
-          "LastModifiedDate": "2026-06-17T09:26:49.803Z"
+          "LastModifiedDate": "2026-06-17T09:26:49.803Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-55754",
@@ -6685,7 +7210,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-55754"
           ],
           "PublishedDate": "2025-10-27T18:15:42.71Z",
-          "LastModifiedDate": "2026-10-08T11:10:00.25Z"
+          "LastModifiedDate": "2026-10-08T11:10:00.25Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-61795",
@@ -6718,7 +7251,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,
@@ -6744,16 +7277,12 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/10/27/6",
+            "https://access.redhat.com/errata/RHSA-2025:23050",
             "https://access.redhat.com/errata/RHSA-2026:68677",
             "https://access.redhat.com/security/cve/CVE-2025-61795",
-            "https://bugzilla.redhat.com/2476511",
-            "https://bugzilla.redhat.com/2476513",
-            "https://bugzilla.redhat.com/2476516",
-            "https://bugzilla.redhat.com/2476519",
-            "https://bugzilla.redhat.com/2476520",
-            "https://bugzilla.redhat.com/2494669",
-            "https://bugzilla.redhat.com/2499917",
-            "https://bugzilla.redhat.com/2499931",
+            "https://bugzilla.redhat.com/2362782",
+            "https://bugzilla.redhat.com/2406588",
+            "https://bugzilla.redhat.com/2406591",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2326972",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332815",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
@@ -6814,7 +7343,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55957",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/8/ALSA-2026-68677.html",
+            "https://errata.almalinux.org/10/ALSA-2025-23050.html",
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1cdf5f730ede75a0759492f179ac21ca4ff68e06",
@@ -6833,7 +7362,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-61795"
           ],
           "PublishedDate": "2025-10-27T18:15:44.2Z",
-          "LastModifiedDate": "2026-10-08T11:10:00.25Z"
+          "LastModifiedDate": "2026-10-08T11:10:00.25Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-43514",
@@ -6890,15 +7427,13 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2026/05/12/10",
             "https://access.redhat.com/errata/RHSA-2026:68660",
+            "https://access.redhat.com/errata/RHSA-2026:69259",
             "https://access.redhat.com/security/cve/CVE-2026-43514",
             "https://bugzilla.redhat.com/2457025",
             "https://bugzilla.redhat.com/2476511",
             "https://bugzilla.redhat.com/2476513",
             "https://bugzilla.redhat.com/2476516",
             "https://bugzilla.redhat.com/2476519",
-            "https://bugzilla.redhat.com/2476520",
-            "https://bugzilla.redhat.com/2499917",
-            "https://bugzilla.redhat.com/2499931",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457025",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2476511",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2476512",
@@ -6932,7 +7467,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-55956",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59083",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-59084",
-            "https://errata.almalinux.org/9/ALSA-2026-68660.html",
+            "https://errata.almalinux.org/10/ALSA-2026-69259.html",
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/933dcdbf2515972280002929e7e597dead2e9ffa",
@@ -6946,7 +7481,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-43514"
           ],
           "PublishedDate": "2026-05-12T16:16:18.37Z",
-          "LastModifiedDate": "2026-10-26T18:10:00.173Z"
+          "LastModifiedDate": "2026-10-26T18:10:00.173Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-23672",
@@ -7038,7 +7581,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-23672"
           ],
           "PublishedDate": "2024-03-13T16:15:29.287Z",
-          "LastModifiedDate": "2026-06-17T07:13:21.377Z"
+          "LastModifiedDate": "2026-06-17T07:13:21.377Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-22235",
@@ -7095,7 +7646,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-22235"
           ],
           "PublishedDate": "2025-04-28T08:15:15.273Z",
-          "LastModifiedDate": "2026-06-17T08:45:48.46Z"
+          "LastModifiedDate": "2026-06-17T08:45:48.46Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41711",
@@ -7150,7 +7709,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41711"
           ],
           "PublishedDate": "2026-06-10T00:16:51.337Z",
-          "LastModifiedDate": "2026-07-23T09:10:00.113Z"
+          "LastModifiedDate": "2026-07-23T09:10:00.113Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-data-jpa",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41721",
@@ -7204,7 +7771,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41721"
           ],
           "PublishedDate": "2026-06-10T00:16:51.917Z",
-          "LastModifiedDate": "2026-07-23T09:10:00.113Z"
+          "LastModifiedDate": "2026-07-23T09:10:00.113Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-data-jpa",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38820",
@@ -7261,7 +7836,15 @@
             "https://spring.io/security/cve-2024-38820"
           ],
           "PublishedDate": "2024-10-18T06:15:03.333Z",
-          "LastModifiedDate": "2026-06-17T07:41:06.497Z"
+          "LastModifiedDate": "2026-06-17T07:41:06.497Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-22233",
@@ -7313,7 +7896,15 @@
             "https://spring.io/security/cve-2025-22233"
           ],
           "PublishedDate": "2025-05-16T20:15:22.143Z",
-          "LastModifiedDate": "2026-06-17T08:45:47.49Z"
+          "LastModifiedDate": "2026-06-17T08:45:47.49Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-41249",
@@ -7371,7 +7962,8 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-41249"
           ],
           "PublishedDate": "2025-09-16T11:15:30.887Z",
-          "LastModifiedDate": "2026-06-17T09:22:40.307Z"
+          "LastModifiedDate": "2026-06-17T09:22:40.307Z",
+          "introducedBy": []
         },
         {
           "VulnerabilityID": "CVE-2026-41848",
@@ -7433,7 +8025,8 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41848"
           ],
           "PublishedDate": "2026-06-09T05:16:36.94Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": []
         },
         {
           "VulnerabilityID": "CVE-2026-41850",
@@ -7489,7 +8082,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41850"
           ],
           "PublishedDate": "2026-06-09T05:16:37.177Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41851",
@@ -7552,7 +8153,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41851"
           ],
           "PublishedDate": "2026-06-09T05:16:37.297Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41852",
@@ -7613,7 +8222,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41852"
           ],
           "PublishedDate": "2026-06-09T05:16:37.407Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-22243",
@@ -7672,7 +8289,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-22243"
           ],
           "PublishedDate": "2024-02-23T05:15:08.143Z",
-          "LastModifiedDate": "2026-06-17T07:11:01.04Z"
+          "LastModifiedDate": "2026-06-17T07:11:01.04Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-22259",
@@ -7732,7 +8357,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-22259"
           ],
           "PublishedDate": "2024-03-16T05:15:20.83Z",
-          "LastModifiedDate": "2026-06-17T07:11:03.053Z"
+          "LastModifiedDate": "2026-06-17T07:11:03.053Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-22262",
@@ -7791,7 +8424,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-22262"
           ],
           "PublishedDate": "2024-04-16T06:15:46.27Z",
-          "LastModifiedDate": "2026-06-17T07:11:03.473Z"
+          "LastModifiedDate": "2026-06-17T07:11:03.473Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38809",
@@ -7852,7 +8493,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-38809"
           ],
           "PublishedDate": "2024-09-27T17:15:12.393Z",
-          "LastModifiedDate": "2026-06-17T07:41:05.253Z"
+          "LastModifiedDate": "2026-06-17T07:41:05.253Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38820",
@@ -7909,7 +8558,15 @@
             "https://spring.io/security/cve-2024-38820"
           ],
           "PublishedDate": "2024-10-18T06:15:03.333Z",
-          "LastModifiedDate": "2026-06-17T07:41:06.497Z"
+          "LastModifiedDate": "2026-06-17T07:41:06.497Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-41234",
@@ -7966,7 +8623,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-41234"
           ],
           "PublishedDate": "2025-06-12T22:15:21.09Z",
-          "LastModifiedDate": "2026-06-17T09:22:38.83Z"
+          "LastModifiedDate": "2026-06-17T09:22:38.83Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-47884",
@@ -8022,7 +8687,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-47884"
           ],
           "PublishedDate": "2026-08-27T06:17:18.507Z",
-          "LastModifiedDate": "2026-09-10T14:11:26.97Z"
+          "LastModifiedDate": "2026-09-10T14:11:26.97Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38816",
@@ -8080,7 +8753,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-38816"
           ],
           "PublishedDate": "2024-09-13T06:15:11.19Z",
-          "LastModifiedDate": "2026-06-17T07:41:06.077Z"
+          "LastModifiedDate": "2026-06-17T07:41:06.077Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-38819",
@@ -8140,7 +8821,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-38819"
           ],
           "PublishedDate": "2024-12-19T18:15:10.557Z",
-          "LastModifiedDate": "2026-06-17T07:41:06.397Z"
+          "LastModifiedDate": "2026-06-17T07:41:06.397Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41842",
@@ -8196,7 +8885,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41842"
           ],
           "PublishedDate": "2026-06-09T05:16:36.203Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41845",
@@ -8259,7 +8956,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41845"
           ],
           "PublishedDate": "2026-06-09T05:16:36.557Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-41242",
@@ -8316,7 +9021,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-41242"
           ],
           "PublishedDate": "2025-08-18T09:15:28.637Z",
-          "LastModifiedDate": "2026-06-17T09:22:39.677Z"
+          "LastModifiedDate": "2026-06-17T09:22:39.677Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-22737",
@@ -8371,7 +9084,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-22737"
           ],
           "PublishedDate": "2026-03-20T00:16:15.837Z",
-          "LastModifiedDate": "2026-06-17T10:20:19.327Z"
+          "LastModifiedDate": "2026-06-17T10:20:19.327Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-22745",
@@ -8426,7 +9147,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-22745"
           ],
           "PublishedDate": "2026-04-29T12:16:18.62Z",
-          "LastModifiedDate": "2026-10-26T20:10:00.16Z"
+          "LastModifiedDate": "2026-10-26T20:10:00.16Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41841",
@@ -8482,7 +9211,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41841"
           ],
           "PublishedDate": "2026-06-09T05:16:36.087Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41843",
@@ -8539,7 +9276,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41843"
           ],
           "PublishedDate": "2026-06-09T05:16:36.32Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41844",
@@ -8602,7 +9347,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41844"
           ],
           "PublishedDate": "2026-06-09T05:16:36.44Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41846",
@@ -8665,7 +9418,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41846"
           ],
           "PublishedDate": "2026-06-09T05:16:36.693Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-41853",
@@ -8721,7 +9482,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-41853"
           ],
           "PublishedDate": "2026-06-09T05:16:37.523Z",
-          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-22735",
@@ -8776,7 +9545,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-22735"
           ],
           "PublishedDate": "2026-03-20T00:16:15.697Z",
-          "LastModifiedDate": "2026-06-17T10:20:19.22Z"
+          "LastModifiedDate": "2026-06-17T10:20:19.22Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-22741",
@@ -8832,11 +9609,23 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-22741"
           ],
           "PublishedDate": "2026-04-29T12:16:18.487Z",
-          "LastModifiedDate": "2026-10-26T20:10:00.16Z"
+          "LastModifiedDate": "2026-10-26T20:10:00.16Z",
+          "introducedBy": [
+            {
+              "name": "spring-boot-starter-web",
+              "version": "3.2.0",
+              "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+              "direct": false
+            }
+          ]
         }
       ]
     }
   ],
+  "IntroducedBy": {
+    "State": "ok",
+    "Max": 3
+  },
   "UncheckedComponents": {
     "Count": 0,
     "Components": []

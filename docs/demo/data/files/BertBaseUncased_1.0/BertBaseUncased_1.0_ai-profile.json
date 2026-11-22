@@ -1,12 +1,12 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-11-15T13:43:32Z",
+  "generatedAt": "2026-11-22T02:23:28Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
     "auto": 41,
-    "present": 31,
-    "gap": 10,
+    "present": 32,
+    "gap": 9,
     "review": 10,
     "notApplicable": 0,
     "clusters": [
@@ -37,8 +37,8 @@
       {
         "cluster": "metadata",
         "total": 10,
-        "present": 8,
-        "gap": 2,
+        "present": 9,
+        "gap": 1,
         "review": 0,
         "notApplicable": 0
       },
@@ -120,12 +120,6 @@
       }
     ],
     "gapItems": [
-      {
-        "id": "g7-meta-author",
-        "label": "SBOM author",
-        "cluster": "metadata",
-        "docUrl": ""
-      },
       {
         "id": "g7-meta-signature",
         "label": "SBOM author signature",
@@ -564,7 +558,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-15T13:43:28+00:00",
+            "detail": "2026-11-22T02:23:25+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -696,17 +690,17 @@
         "title": "US SBOM minimum elements",
         "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
         "total": 23,
-        "present": 15,
-        "gap": 4,
+        "present": 16,
+        "gap": 3,
         "review": 4,
         "failed": 0,
         "elements": [
           {
             "id": "cisa-sbom-author",
             "label": "SBOM author",
-            "status": "warn",
+            "status": "pass",
             "source": "declared",
-            "detail": "not present in the SBOM",
+            "detail": "present",
             "refs": [
               "SBOM Author"
             ]
@@ -939,6 +933,8 @@
     "total": 0,
     "behavioral": 0,
     "nonCommercial": 0,
+    "noDerivatives": 0,
+    "proprietary": 0,
     "items": []
   },
   "riskAssessment": {

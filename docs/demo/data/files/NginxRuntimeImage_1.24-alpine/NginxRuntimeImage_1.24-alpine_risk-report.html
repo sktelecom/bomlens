@@ -370,7 +370,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 <header class="topbar"><span class="brand"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect width="48" height="48" rx="11" fill="#1d4ed8"/><g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="12"/><line x1="27.23" y1="19.28" x2="33.19" y2="31.71"/><line x1="29.7" y1="24.44" x2="21.92" y2="35.82"/><line x1="26.47" y1="29.16" x2="12.72" y2="28.1"/><line x1="20.77" y1="28.72" x2="14.81" y2="16.29"/><line x1="18.3" y1="23.56" x2="26.08" y2="12.18"/><line x1="21.53" y1="18.84" x2="35.28" y2="19.9"/></g></svg>BomLens</span><span class="sep" aria-hidden="true">/</span><span class="proj">NginxRuntimeImage <span class="ver">1.24-alpine</span></span></header>
 <div class="page-head">
 <h1>Open-source risk report</h1>
-<p class="desc"><span>NginxRuntimeImage <span class="ver">1.24-alpine</span></span><span>Container image</span><span><time datetime="2026-11-15T13:43:23Z">2026-11-15 13:43 UTC</time></span><span>1,885 components</span></p>
+<p class="desc"><span>NginxRuntimeImage <span class="ver">1.24-alpine</span></span><span>Container image</span><span><time datetime="2026-11-22T02:23:19Z">2026-11-22 02:23 UTC</time></span><span>1,885 components</span></p>
 </div>
 <h2>1. Vulnerability analysis and remediation deadlines</h2>
 <div class="box"><div class="box-head"><p class="box-title">Recommended remediation deadlines</p></div>
@@ -379,6 +379,7 @@ details.fix .meta{font-size:var(--font-size-label);}
  <div><dt><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High</span></dt><dd>within 30 days</dd></div>
 </dl>
 <p class="legend">We recommend preparing a remediation plan or risk justification.</p></div>
+<p class="legend">A finding is a match between a component's name and version and a vulnerability database; whether this product uses the vulnerable code is not checked, so some findings may not apply. A source scan also leaves out test, example and sample folders by default.</p>
 <div class="box"><div class="box-head"><span class="box-title" id="box-1">Findings</span><span class="counter">66</span><span class="end">
 <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">2</span></span>
 <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">11</span></span>
@@ -456,6 +457,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 </tbody></table></div></div>
 <h2>2. License summary</h2>
 <p>Distinct licenses identified: <b>30</b> (see the NOTICE artifact for details).</p>
+<p class="legend">Licenses are what each package declares. A declaration can be missing or wrong, and this is not a legal determination.</p>
 <h3>License classification (copyleft strength)</h3>
 <p>Each component is also recorded in the SBOM with a <code>bomlens:licenseClass</code> property. An unrecognized license is left uncategorized rather than assumed permissive.</p>
 <div class="summary">
@@ -482,6 +484,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 <h2>3. Next steps</h2>
 <ol>
  <li>Prepare a <b>remediation plan or risk justification</b> within the recommended deadlines above.</li>
+ <li>Most findings are in the image's operating-system packages: update or replace the base image rather than patching packages one by one.</li>
  <li>Keep and distribute the notice (NOTICE) together with the SBOM.</li>
 </ol>
 </body></html>

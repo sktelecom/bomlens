@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "grade": "complete",
+  "gradeLabel": {
+    "en": "Complete",
+    "ko": "완전"
+  },
+  "componentCount": 60123,
+  "reasons": [],
+  "uncheckedEcosystems": []
+}
