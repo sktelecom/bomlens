@@ -421,6 +421,22 @@ for f in $(cli_bundle_files bomlens-cli-linux.tar.gz); do cp "$ROOT_DIR/$f" "$WO
     && pass "the CLI bundles carry the --license helper and its id list, MIT is an id when laid out as the Linux bundle, and the check is skipped without them" \
     || fail "CLI bundle --license files"
 
+# The release packs the CLI archives with the same script; build and verify
+# them here with a test version so a packaging change is caught before a tag.
+if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+    rm -rf "$WORK/cli-pack"
+    if packout=$(bash "$BUNDLER" build 0.0.0-ci "$WORK/cli-pack" 2>&1 && bash "$BUNDLER" verify 0.0.0-ci "$WORK/cli-pack" 2>&1); then
+        pass "the CLI archives build and verify (check-setup, examples/nodejs, README.txt, default image tag = release version)"
+    else
+        fail "CLI archive build or verify" "$packout"
+    fi
+    rm -rf "$WORK/cli-pack"
+elif [ -n "${CI:-}" ]; then
+    fail "CLI archive build or verify" "zip or unzip is not installed on this runner"
+else
+    echo "  SKIP: CLI archive build and verify (zip or unzip is not installed)"
+fi
+
 if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
     if licout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json" "$WORK/lic-explicit.json" \
                  "$WORK/lic-lower.json" "$WORK/lic-tab.json" "$WORK/lic-paren.json" "$WORK/lic-idcase.json" "$WORK/lic-docref.json" 2>&1); then
