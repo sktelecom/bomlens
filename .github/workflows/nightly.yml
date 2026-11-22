@@ -142,6 +142,25 @@ jobs:
       - name: Validate the documents
         run: SPDX3_VALIDATE="$RUNNER_TEMP/spdx3/bin/spdx3-validate" bash tests/test-spdx3-official.sh
 
+  # Pull requests run test-postprocess.sh and test-windows.sh in shards
+  # (TEST_SHARD). Run each once whole here, so a section that silently
+  # depends on an earlier one in another shard still fails within a day.
+  unsharded-suites:
+    name: Unsharded suites (post-process, no-Docker contract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Post-process unit tests (whole)
+        run: bash tests/test-postprocess.sh
+
+      - name: No-Docker orchestration tests (whole)
+        run: bash tests/test-windows.sh
+
   # External links rot on their own schedule, so they are checked here (with
   # retries and a cache) rather than on PRs — matching the split anticipated in
   # scripts/check-doc-links.sh, which covers internal links on every PR.
@@ -430,7 +449,7 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, published-user-journey, input-matrix, android-scope, doc-links, desktop, spdx3-official]
+    needs: [heavy-e2e, published-user-journey, input-matrix, android-scope, doc-links, desktop, spdx3-official, unsharded-suites]
     if: failure()
     permissions:
       contents: read
@@ -448,6 +467,7 @@ jobs:
           LINKS: ${{ needs.doc-links.result }}
           DESKTOP: ${{ needs.desktop.result }}
           SPDX3: ${{ needs.spdx3-official.result }}
+          UNSHARDED: ${{ needs.unsharded-suites.result }}
         run: |
           title="Nightly checks are failing"
           body="Nightly run failed: ${RUN_URL}
@@ -458,6 +478,7 @@ jobs:
           - External doc links: ${LINKS}
           - Desktop: ${DESKTOP}
           - SPDX 3.0.1 official validation: ${SPDX3}
+          - Unsharded post-process and contract suites: ${UNSHARDED}
           (macOS real scan is best-effort and excluded from this alarm.)"
           num=$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
                 --json number --jq '.[0].number // empty')
