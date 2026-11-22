@@ -1384,11 +1384,19 @@ if [ "$UI_MODE" = "true" ]; then
     # a CLI scan of that path would, so a scan interrupted from one side is still
     # found and cleaned up by a rescan from the other.
     UI_BASE="$(pwd -P)"
-    # Started from a clone of BomLens itself, the folder the UI scans is
-    # BomLens's own source. Said once; the UI starts all the same.
+    # Started from a clone of BomLens itself, or from the folder the release
+    # archive was extracted to (scripts/, docker/lib/ and the example, no
+    # docker/web/), the folder the UI scans is BomLens's own files. Said once;
+    # the UI starts all the same.
+    UI_SELF_EN="" UI_SELF_KO=""
     if [ -f "$UI_BASE/scripts/scan-sbom.sh" ] && [ -f "$UI_BASE/docker/web/server.py" ]; then
-        echo "[INFO] The current folder is the BomLens repository. To scan your project, run this command from the project folder, or add --mount <folder>."
-        echo "[INFO] 현재 폴더는 BomLens 저장소입니다. 프로젝트를 스캔하려면 프로젝트 폴더에서 이 명령을 실행하거나 --mount <폴더>를 추가하세요."
+        UI_SELF_EN="the BomLens repository" UI_SELF_KO="BomLens 저장소"
+    elif [ -f "$UI_BASE/scripts/scan-sbom.sh" ] && [ -f "$UI_BASE/docker/lib/source-detect.sh" ] && [ -f "$UI_BASE/examples/nodejs/package.json" ]; then
+        UI_SELF_EN="the extracted BomLens release archive" UI_SELF_KO="BomLens 릴리스 압축본을 푼 폴더"
+    fi
+    if [ -n "$UI_SELF_EN" ]; then
+        echo "[INFO] The current folder is $UI_SELF_EN. To scan your project, run this command from the project folder, or add --mount <folder>."
+        echo "[INFO] 현재 폴더는 ${UI_SELF_KO}입니다. 프로젝트를 스캔하려면 프로젝트 폴더에서 이 명령을 실행하거나 --mount <폴더>를 추가하세요."
     fi
     UI_OUT_DEFAULT="${HOME:-$UI_BASE}/sbom-output"
     UI_OUT_FRESH="false"

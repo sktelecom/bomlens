@@ -621,6 +621,24 @@ fi
 ( cd "$WORK/cwd" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never UI_PORT=18397 \
     bash "$SCRIPT" --ui -o "$WORK/uiout" >"$WORK/out" 2>"$WORK/err" )
 if ! grep -q 'BomLens repository' "$WORK/out"; then pass "--ui from another folder does not"; else fail "--ui notice elsewhere"; fi
+# The release archive has scripts/, docker/lib/ and examples/nodejs/ but no
+# docker/web/: the same notice, naming the archive.
+mkdir -p "$WORK/archive/scripts" "$WORK/archive/docker/lib" "$WORK/archive/examples/nodejs"
+: > "$WORK/archive/scripts/scan-sbom.sh"; : > "$WORK/archive/docker/lib/source-detect.sh"
+echo '{}' > "$WORK/archive/examples/nodejs/package.json"
+( cd "$WORK/archive" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never UI_PORT=18397 \
+    bash "$SCRIPT" --ui -o "$WORK/uiout" >"$WORK/out" 2>"$WORK/err" ); RC=$?
+if grep -q 'The current folder is the extracted BomLens release archive' "$WORK/out" && grep -q '현재 폴더는 BomLens 릴리스 압축본을 푼 폴더입니다' "$WORK/out" && [ "$RC" = 0 ]; then
+    pass "--ui from the extracted release archive says so in English and Korean, and starts"
+else
+    fail "--ui release archive notice" "rc=$RC $(head -c 300 "$WORK/out") $(head -c 300 "$WORK/err")"
+fi
+# A user project that merely has its own scripts/scan-sbom.sh is not BomLens.
+mkdir -p "$WORK/userproj/scripts" "$WORK/userproj/examples/nodejs"
+: > "$WORK/userproj/scripts/scan-sbom.sh"; echo '{}' > "$WORK/userproj/examples/nodejs/package.json"
+( cd "$WORK/userproj" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never UI_PORT=18397 \
+    bash "$SCRIPT" --ui -o "$WORK/uiout" >"$WORK/out" 2>"$WORK/err" )
+if ! grep -q 'The current folder is' "$WORK/out"; then pass "--ui from a project with its own scripts/scan-sbom.sh does not"; else fail "--ui notice on a user project"; fi
 
 echo ""
 echo "== summary: $PASS passed, $FAIL failed =="
