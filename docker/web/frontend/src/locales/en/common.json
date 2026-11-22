@@ -1338,7 +1338,7 @@
   },
   "g7": {
     "empty": "No conformance checks were recorded.",
-    "panelIntro": "Checks this SBOM's fields against the CycloneDX format and SBOM regulatory requirements. For reference; it makes no compliance determination.",
+    "panelIntro": "Pass and fail here are results against the format requirements of the selected conformance profile. This is not a legal compliance determination.",
     "subtitle": "G7 minimum elements for AI",
     "present": "{{present}}/{{total}} present",
     "advisory": "{{count}} advisory",

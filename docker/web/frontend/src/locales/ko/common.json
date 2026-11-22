@@ -1338,7 +1338,7 @@
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
-    "panelIntro": "이 SBOM의 항목을 CycloneDX 형식과 SBOM 관련 규제 요건에 견준 결과입니다. 참고용이며 규정 준수를 판정하지 않습니다.",
+    "panelIntro": "이 화면의 통과와 실패는 선택한 적합성 검사 기준의 형식 요건에 대한 결과입니다. 법규 준수 여부를 판정하지 않습니다.",
     "subtitle": "AI G7 최소 요소",
     "present": "{{present}}/{{total}} 충족",
     "advisory": "권고 {{count}}건",

@@ -135,6 +135,8 @@ From here the desktop app and the web UI are the same.
 
 When the scan finishes, download the notice from the results screen as per-format chips (`HTML`, `TXT`). The SBOM (`..._bom.json`) and the risk report (`..._risk-report.html`) generated alongside are available on the same screen, and you can also download everything as a single ZIP. Downloaded files are saved to the results folder as well. For what each file is and when it appears, see the [artifacts reference](../reference/artifacts.md).
 
+If you are a supplier submitting the SBOM to SK Telecom, see [Submitting an SBOM you made](../guides/supplier-sbom.md#submitting-an-sbom-you-made) before you scan.
+
 ![The results overview: items to check first and the severity distribution, with a button to download everything as a ZIP](../images/app-results.png)
 
 ## When you get stuck
