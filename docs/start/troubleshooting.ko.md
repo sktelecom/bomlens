@@ -8,10 +8,8 @@ description: 데스크톱 앱이나 더블클릭 웹 UI가 시작되지 않을 �
 
 ## 막혔을 때
 
-- **무엇이 문제인지 모르겠어요**: `scripts\check-setup.bat`을 더블클릭하면 Docker와 이미지,
-  포트 상태를 한 번에 점검해 다음에 할 일을 알려줍니다. Windows 표시 언어를 따라
-  한국어 시스템이면 한국어로, 그 밖에는 영어로 나옵니다. 아래 설정 파일에
-  `SBOM_LANG=ko`(또는 `en`)를 적으면 강제할 수 있습니다.
+- **무엇이 문제인지 모르겠어요**: 데스크톱 앱은 시작 화면에 점검 항목(Docker, 엔진, 스캐너 이미지)을 보여 주고, 실패한 항목이 있으면 할 일을 알려 줍니다.
+  zip 경로라면 압축을 푼 폴더의 `scripts\check-setup.bat`(데스크톱 앱에는 설치되지 않습니다)을 더블클릭해 Docker와 이미지, 포트 상태를 한 번에 점검하면 다음에 할 일을 알려줍니다. Windows 표시 언어를 따라 한국어 시스템이면 한국어로, 그 밖에는 영어로 나옵니다. 아래 설정 파일에 `SBOM_LANG=ko`(또는 `en`)를 적으면 강제할 수 있습니다.
 - **"Windows가 PC를 보호했습니다" 경고가 떠요**: 데스크톱 앱이 아직 미서명이라 그렇습니다.
   "추가 정보"를 누르고 "실행"을 고르면 됩니다.
 - **macOS에서 앱이 안 열려요**: "손상됨" 경고가 뜨거나, 열리기는 하는데 임시 폴더에서 도는 경우
@@ -33,7 +31,7 @@ description: 데스크톱 앱이나 더블클릭 웹 UI가 시작되지 않을 �
   `BOMLENS_SKIP_DISK_CHECK=1`을 지정해 그대로 시도하세요.
 - **사내 저장소가 로그인을 요구해요**: 사내 저장소에서 내려받는 Maven이나 Gradle 프로젝트는 본인의
   `~/.m2/settings.xml`이나 `~/.gradle/gradle.properties`에 인증 정보가 있어야 합니다. 데스크톱 앱은 이 파일을
-  읽기 전용으로 스캔에 넘기지만, 더블클릭하는 `sbom-ui.bat`은 넘기지 않습니다.
+  읽기 전용으로 스캔에 넘기지만, 더블클릭하는 `sbom-ui.bat`은 넘기지 않으므로 이런 프로젝트는 데스크톱 앱이나 `scan-sbom.bat`으로 스캔합니다.
   [자바(Maven) 프로젝트는 어떻게 스캔하나요?](../guides/java-maven.ko.md#사내-저장소도-되나요)를 보세요.
 - **사내 네트워크에서 "이미지 다운로드에 실패했습니다"가 떠요**: 이미지는 Docker 엔진이 내려받으므로
   엔진에 프록시를 설정해야 합니다. [Docker 엔진 자체의 프록시와 인증서는 어떻게 하나요?](../guides/company-network.ko.md#docker-엔진-자체의-프록시와-인증서는-어떻게-하나요)를 보세요.
@@ -107,11 +105,11 @@ rm -f ~/Library/Preferences/com.sktelecom.sbom-generator.plist
 
 Windows에서는 설정에서 앱 제거로 지우고, 남은 설정 폴더는 `%APPDATA%\sbom-generator-desktop`입니다.
 
-스캐너 이미지는 어느 운영체제든 같습니다. 받아 둔 것만 골라 지우면 됩니다.
+스캐너 이미지는 어느 운영체제든 같습니다. 목록을 본 뒤, 나온 이미지를 이름과 태그로 하나씩 지웁니다(태그 없이 이름만 주면 `:latest`만 지워집니다).
 
 ```bash
-docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
-           ghcr.io/sktelecom/bomlens-firmware ghcr.io/sktelecom/bomlens-deep-cve
+docker images 'ghcr.io/sktelecom/*'
+docker rmi ghcr.io/sktelecom/bomlens:<TAG> ghcr.io/sktelecom/bomlens-aibom:<TAG>   # 목록에 나온 REPOSITORY:TAG
 ```
 
 스캔이 내려받은 언어별 이미지(`ghcr.io/cdxgen/...`, 안드로이드는 `bomlens-android-sdk<API>`)는 스캐너 이미지보다 크고, 위 명령으로는 지워지지 않습니다. [Docker 이미지 참조](../reference/docker-image.ko.md#디스크-공간은-어떻게-비우나요)에 이름으로 한꺼번에 지우는 명령이 있고, Docker Desktop, Rancher Desktop, Colima에서 엔진 디스크를 압축하는 방법도 있습니다. 디스크를 압축하기 전에는 Docker가 공간을 Windows나 macOS에 돌려주지 않습니다.

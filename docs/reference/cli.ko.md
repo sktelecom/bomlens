@@ -86,7 +86,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 
 | 환경변수 | 기본값 | 설명 |
 |----------|--------|------|
-| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의 |
+| `SBOM_SCANNER_IMAGE` | 릴리스 압축 파일에서는 그 릴리스 태그(v1.15.2이면 `ghcr.io/sktelecom/bomlens:1.15.2`), 저장소를 체크아웃해 쓰면 `main`에서 빌드한 `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의. 압축 파일에서는 아래 행들의 `:latest` 기본값도 릴리스 태그가 됩니다 |
 | `SBOM_FIRMWARE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-firmware:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
 | `SBOM_AIBOM_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-aibom:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
 | `SBOM_DEEP_CVE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-deep-cve:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
@@ -310,7 +310,7 @@ Rancher Desktop이나 Docker Desktop을 쓴다면 앱의 설정(Preferences) 화
 ### 그 밖의 문제
 
 1. 같은 명령을 다시 실행하고 터미널 출력을 읽습니다. `[WARN]`과 `[ERROR]` 줄에 건너뛴 것과 실패한 것이 적혀 있습니다.
-2. Docker 이미지를 최신 버전으로 업데이트합니다: `docker pull ghcr.io/sktelecom/bomlens:latest`
+2. 최신 릴리스로 올립니다. 새 압축 파일을 받으면 그 스캔이 맞는 이미지를 받습니다. 저장소를 체크아웃해 쓴다면 `git pull`과 `docker pull ghcr.io/sktelecom/bomlens:latest`를 실행합니다.
 3. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml)에 실행한 명령과 터미널 출력을 첨부해 제보해 주세요. 이슈 양식에 필요한 항목이 안내되어 있습니다.
 
 모드별 사용법은 [입력 시나리오 가이드](../guides/by-input.ko.md), 산출물 종류는 [산출물 레퍼런스](artifacts.ko.md), 언어 감지는 [지원 생태계](ecosystems.ko.md), 파이프라인에서 실행하는 방법은 [CI/CD 연동](../guides/ci-cd.ko.md)을 참고하세요.

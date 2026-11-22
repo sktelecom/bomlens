@@ -129,7 +129,7 @@ done < <(printf '%s\n' "$COVERAGE")
 LENGTH_CAPS="
 README.md :: 60 :: 700
 docs/start/first-scan.md :: 170 :: 0
-docs/start/first-scan.ko.md :: 172 :: 0
+docs/start/first-scan.ko.md :: 174 :: 0
 docs/start/no-cli.md :: 100 :: 0
 docs/start/no-cli.ko.md :: 118 :: 0
 docs/start/troubleshooting.md :: 85 :: 0
@@ -140,8 +140,8 @@ docs/guides/yocto.md :: 125 :: 0
 docs/guides/yocto.ko.md :: 127 :: 0
 docs/guides/ai-model.md :: 350 :: 0
 docs/guides/ai-model.ko.md :: 350 :: 0
-docs/reference/ui.md :: 246 :: 0
-docs/reference/ui.ko.md :: 246 :: 0
+docs/reference/ui.md :: 280 :: 0
+docs/reference/ui.ko.md :: 280 :: 0
 "
 while IFS= read -r line; do
   [ -z "$line" ] && continue

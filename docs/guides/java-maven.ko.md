@@ -35,7 +35,7 @@ Maven 스캔은 컨테이너 안에서 Maven을 실행해 의존성 트리를 �
 | Maven | `.m2/settings.xml`, `.m2/settings-security.xml` |
 | Gradle | `.gradle/gradle.properties`, `.gradle/init.gradle`, `.gradle/init.gradle.kts`, `.gradle/init.d/` |
 
-CLI, `--ui`, 데스크톱 앱은 모두 이렇게 합니다. 더블클릭하는 `sbom-ui.bat`은 넘기지 않으므로, 빌드에 이 파일이 필요한 Windows 사용자는 데스크톱 앱을 쓰세요. 미러 주소와 서버 인증 정보가 든 `settings.xml`은 그대로 사용됩니다. 비밀번호를 암호화했다면 `settings-security.xml`이 같은 폴더에 있어야 합니다. Maven 스캔은 파일을 찾으면 `maven: using the mounted settings.xml`을 로그에 남깁니다.
+CLI, `--ui`, 데스크톱 앱은 모두 이렇게 합니다. 더블클릭하는 `sbom-ui.bat`은 이 파일도 Maven 로컬 저장소도 넘기지 않으므로, 빌드에 이 파일이 필요한 Windows 사용자는 데스크톱 앱이나 `scan-sbom.bat`을 쓰세요. 미러 주소와 서버 인증 정보가 든 `settings.xml`은 그대로 사용됩니다. 비밀번호를 암호화했다면 `settings-security.xml`이 같은 폴더에 있어야 합니다. Maven 스캔은 파일을 찾으면 `maven: using the mounted settings.xml`을 로그에 남깁니다.
 
 이 컴퓨터에서 빌드한 프로젝트는 스캔이 사내 저장소에 접속하지 못해도 해석됩니다. BomLens는 사용자의 Maven 로컬 저장소(`settings.xml`의 `<localRepository>`, 없으면 `~/.m2/repository`)도 읽기 전용으로 붙이고, Maven은 BomLens 자체 저장소 다음에 이 폴더를 읽되 여기에 쓰지는 않습니다. Maven이 내려받을 저장소가 응답하지 않으면 Maven을 오프라인(`-o`)으로 실행하고, 로그에 그 사실을 한 줄로 남깁니다. Maven 3.9 이상이 필요하며, 오프라인에서 프로젝트의 `mvnw`가 그보다 낮은 Maven을 실행하면 이미지의 Maven을 대신 씁니다. 저장소에 `maven-dependency-plugin`과 Maven의 플러그인 접두어 정보도 있어야 하므로, `mvn package`만 실행해 왔거나 3.9보다 낮은 Maven만 써 왔다면 먼저 Maven 3.9 이상으로 `mvn dependency:tree`를 한 번 실행하세요. 붙이지 않으려면 `BOMLENS_MAVEN_USER_REPOSITORY=false`를 설정하세요. 자세한 동작은 [지원 생태계](../reference/ecosystems.ko.md#java-maven)에 있습니다.
 
@@ -50,7 +50,7 @@ CLI, `--ui`, 데스크톱 앱은 모두 이렇게 합니다. 더블클릭하는 
 이미지는 Docker 엔진이 받으므로 프록시는 셸이 아니라 Docker Desktop이나 Rancher Desktop에서 설정합니다. 스캔 안에서는 환경의 `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`가 전달됩니다. 프록시가 HTTPS를 검사하고 사내 CA로 다시 서명한다면, 그 CA를 PEM 파일로 BomLens에 알려 주세요.
 
 ```bash
-SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-maven-project --generate-only
+SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-maven-project --generate-only
 ```
 
 이 파일은 스캔 컨테이너의 시스템 인증서 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. `PKIX path building failed`나 `certificate signed by unknown authority`로 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. 데스크톱 앱, `sbom-ui.bat`, `scan-sbom.bat`에서 지정하는 방법은 [사내 네트워크](company-network.ko.md#사내-인증서는-어떻게-신뢰하게-하나요)에 있습니다. 이미지 다운로드 자체를 위해서는 Docker Desktop이나 Rancher Desktop에서도 그 CA를 신뢰해야 합니다.

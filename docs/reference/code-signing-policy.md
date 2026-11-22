@@ -4,9 +4,9 @@ description: The code signing policy for the BomLens Windows installer, the peop
 
 # Code signing policy
 
-Free code signing provided by SignPath.io, certificate by SignPath Foundation
+The installers are not signed yet. Free code signing of the Windows installer through SignPath.io, with a certificate by SignPath Foundation, has been applied for.
 
-Releases of the Windows installer are signed under the following policy. The file that is signed is `BomLens-Setup.exe`. Each release is built from this repository by a workflow that runs on GitHub-hosted runners, and every signing request needs an approver's manual approval before the file is signed.
+Once signing is in place, releases of the Windows installer are signed under the following policy. The file to be signed is `BomLens-Setup.exe`. Each release is built from this repository by a workflow that runs on GitHub-hosted runners, and every signing request needs an approver's manual approval before the file is signed.
 
 ## Team roles
 

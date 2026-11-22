@@ -24,8 +24,7 @@ One tool, BomLens, produces both layers; only the input changes. The requirement
 > **Windows**: the commands here are for macOS/Linux. See [First scan](../start/first-scan.md) for the `scan-sbom.bat` and WSL2 equivalents.
 
 ```bash
-# Docker 20.10+ required. Pull the scanner image once.
-docker pull ghcr.io/sktelecom/bomlens:latest
+# Docker 20.10+ required. The first scan pulls the scanner image of your release.
 
 # Keep the script path in a variable, and send every layer's output to one
 # shared directory (each still lands in its own {project}_{version}/ subfolder

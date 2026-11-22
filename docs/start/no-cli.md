@@ -6,6 +6,8 @@ description: Install the desktop app and turn source code into an SBOM and an op
 
 On Windows you do not need to type any command. On macOS one Terminal command is needed until the app is signed. This page goes from installing to an SBOM and an open-source notice, with clicks in the desktop app or the browser. If something does not work, see [Troubleshooting](troubleshooting.md).
 
+If you are a supplier submitting the SBOM to SK Telecom, see [Submitting an SBOM you made](../guides/supplier-sbom.md#submitting-an-sbom-you-made) before you scan.
+
 ## What is an open-source notice
 
 A document that lists the open-source components in a product and their licenses, provided alongside the product when it ships. Many open-source licenses (MIT, Apache-2.0, BSD, and others) require the copyright notice and the full license text to be included with the product, so a notice that gathers them is needed.
@@ -17,10 +19,10 @@ BomLens analyzes the source to build a component list (an [SBOM](../concepts/wha
 All you need is a Docker engine. On Windows, for a first install, **Rancher Desktop** is recommended: it is free and fits the double-click flow well. If you already use Docker, leave it as is and move on. (A detailed comparison of the other options is in [First scan](../start/first-scan.md).) The first time, install and download take a while. Roughly:
 
 - Installing and first launch of Rancher Desktop: about 5–10 minutes
-- First download of the scanner image (about 1.4 GB on disk): a few minutes, varying by network, only the first time
-- First scan of a project, which fetches a language image (3 to 16 GB on disk, for example 2.9 GB for Node.js and 5.6 GB for Java): several more minutes, also once per language
+- First download of the scanner image: a few minutes, varying by network, only the first time
+- First scan of a project, which fetches a language image: several more minutes, also once per language
 
-So plan for about 10 GB of free disk space in the Docker engine. [Image sizes and how to free the space](../reference/docker-image.md#how-much-disk-do-the-images-take) lists every image. The command line stops with a message before a download when the space is not enough; the web UI and the desktop app warn.
+So plan for about 10 GB of free disk space in the Docker engine. The image sizes are in the [requirements of First scan](first-scan.md#requirements). The command line stops with a message before a download when the space is not enough; the web UI and the desktop app warn.
 
 Once set up, opening the app and scanning afterward takes 1–2 minutes for a project with a lock file already committed. Without one, cdxgen resolves dependencies itself before it can scan them (see the [web UI reference](../reference/ui.md#new-scan)), which took 6–7 minutes in repeated testing on a Node.js project with no `package-lock.json`.
 
@@ -95,5 +97,3 @@ In the desktop app, Choose folder has an Add folder… button that opens a folde
 ![The scan result overview: components, vulnerabilities and licenses](../images/web-ui-scan-en.png)
 
 When the scan finishes, download the notice from the results screen as per-format chips (`HTML`, `TXT`). The SBOM (`..._bom.json`) and the risk report (`..._risk-report.html`) generated alongside are available on the same screen, and you can also download everything as a single ZIP. Downloaded files are saved to the results folder as well. For what each file is and when it appears, see the [artifacts reference](../reference/artifacts.md).
-
-If you are a supplier submitting the SBOM to SK Telecom, see [Submitting an SBOM you made](../guides/supplier-sbom.md#submitting-an-sbom-you-made) before you scan.

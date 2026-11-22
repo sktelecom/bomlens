@@ -35,7 +35,7 @@ Yes, if the credentials are in your Maven settings. BomLens passes these files i
 | Maven | `.m2/settings.xml`, `.m2/settings-security.xml` |
 | Gradle | `.gradle/gradle.properties`, `.gradle/init.gradle`, `.gradle/init.gradle.kts`, `.gradle/init.d/` |
 
-The CLI, `--ui` and the desktop app all do this. The double-click `sbom-ui.bat` does not, so use the desktop app on Windows when the build needs them. A `settings.xml` that holds your mirror address and server credentials is used as it is. If your passwords are encrypted, `settings-security.xml` must be next to it. A Maven scan logs `maven: using the mounted settings.xml` when it found one.
+The CLI, `--ui` and the desktop app all do this. The double-click `sbom-ui.bat` does not pass these files or your Maven local repository, so on Windows use the desktop app or `scan-sbom.bat` when the build needs them. A `settings.xml` that holds your mirror address and server credentials is used as it is. If your passwords are encrypted, `settings-security.xml` must be next to it. A Maven scan logs `maven: using the mounted settings.xml` when it found one.
 
 A project you have built on this machine resolves even when the scan cannot reach your repository. BomLens also mounts your Maven local repository read-only (the `<localRepository>` in `settings.xml`, else `~/.m2/repository`), and Maven reads it after BomLens's own repository without writing to it. When the repository Maven would download from does not answer, Maven runs offline (`-o`) and the log says so in one line. This needs Maven 3.9 or later; offline, a project's `mvnw` that runs an older Maven is replaced by the image's Maven. It also needs `maven-dependency-plugin` and Maven's plugin prefix data in your repository: if you have only run `mvn package`, or only used a Maven older than 3.9, run `mvn dependency:tree` once with Maven 3.9 or later first. Set `BOMLENS_MAVEN_USER_REPOSITORY=false` to leave it out. The details are in [Ecosystems](../reference/ecosystems.md#java-maven).
 
@@ -50,7 +50,7 @@ Three things to check when a private dependency is still missing:
 Image downloads are made by the Docker engine, so set the proxy in Docker Desktop or Rancher Desktop, not in your shell. Inside the scan, `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` from your environment are passed on. When the proxy inspects HTTPS and re-signs it with a company CA, give BomLens that CA as a PEM file:
 
 ```bash
-SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-maven-project --generate-only
+SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-maven-project --generate-only
 ```
 
 The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails with `PKIX path building failed` or `certificate signed by unknown authority` prints a `[WARN]` line that names this option. How to set it for the desktop app, `sbom-ui.bat` and `scan-sbom.bat` is in [Company network](company-network.md#how-do-i-trust-my-company-ca). The CA also has to be trusted by Docker Desktop or Rancher Desktop for the image download itself.

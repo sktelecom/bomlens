@@ -11,14 +11,14 @@ description: 릴리스 파일과 컨테이너 이미지가 이 프로젝트가 �
 릴리스의 [`SHA256SUMS.txt`](https://github.com/sktelecom/bomlens/releases/latest/download/SHA256SUMS.txt)에 적힌 값과 비교합니다. Linux는 `sha256sum -c SHA256SUMS.txt --ignore-missing`, macOS는 `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`, PowerShell은 `(Get-FileHash <파일> -Algorithm SHA256).Hash`를 씁니다.
 이 방법은 내려받다가 손상된 파일만 찾아냅니다. 파일을 바꿔치기할 수 있는 사람은 체크섬 파일도 바꿀 수 있으므로 위조된 릴리스는 찾지 못합니다. 그 확인은 아래 cosign 절차로 합니다.
 
-아래 절차에는 `cosign` v2가 필요하고, 최신 릴리스를 확인합니다. 이전 릴리스를 확인하려면 `VERSION`에 그 태그를 넣거나(예: `VERSION=vX.Y.Z`), PowerShell에서는 주석으로 적은 `$base` 줄을 씁니다.
+아래 절차에는 `cosign` v2 이상이 필요하고(v3는 경고를 출력할 수 있으며, 결과는 `Verified OK` 줄로 판단합니다), 최신 릴리스를 확인합니다. 이전 릴리스를 확인하려면 먼저 `VERSION`에 그 태그를 넣습니다(예: `VERSION=vX.Y.Z`). 명령은 지정한 `VERSION`을 그대로 씁니다. PowerShell에서는 주석으로 적은 `$base` 줄을 씁니다.
 
 ## 릴리스 파일(설치 파일, CLI, 소스 묶음)
 
 서명 하나가 체크섬 파일을 덮고 체크섬 파일이 모든 산출물을 덮으므로, 체크섬 파일을 검증한 뒤 체크섬을 대조합니다.
 
 ```bash
-VERSION=$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)
+VERSION=${VERSION:-$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)}
 gh release download "$VERSION" --repo sktelecom/bomlens \
   --pattern 'SHA256SUMS.txt*' --pattern 'BomLens-Setup.exe'
 
@@ -65,7 +65,7 @@ if ($want -ieq $got) { "OK: BomLens-Setup.exe matches" } else { "MISMATCH" }
 이미지는 digest 단위로 서명하며, 이미지마다 자기 SBOM을 서명된 증명(attestation)으로 함께 답니다. 이미지 태그는 릴리스 태그에서 앞의 `v`를 뺀 값입니다.
 
 ```bash
-VERSION=$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)
+VERSION=${VERSION:-$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)}
 cosign verify "ghcr.io/sktelecom/bomlens:${VERSION#v}" \
   --certificate-identity-regexp '^https://github.com/sktelecom/bomlens/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com

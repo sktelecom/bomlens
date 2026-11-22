@@ -22,7 +22,7 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 On an `arm64` host, do not force `linux/amd64` (`--platform linux/amd64` or `DOCKER_DEFAULT_PLATFORM=linux/amd64`): the image then runs under emulation, where syft in the firmware image can crash. A firmware scan tries a failed syft pass once more (not one that ran out of its time limit or was killed for memory), says in the log that it runs under emulation, and records `generate` as `degraded` in `bomlens-result.json` when the second try also fails.
 
 ```bash
-docker pull ghcr.io/sktelecom/bomlens:latest
+docker pull ghcr.io/sktelecom/bomlens:1.15.2   # a release tag; :latest is built from main
 ```
 
 ## What is in the image

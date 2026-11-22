@@ -67,9 +67,9 @@ SCANOSS_API_KEY=your-key \
 ./scripts/scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendored --all --generate-only
 ```
 
-In the web UI and desktop app, you can supply only the token from the screen. If you hit the free OSSKB rate limit, turn on **File-level identification (SCANOSS)** and paste a token from scanoss.com into the field that appears below the toggle, then run again. The token is used once for that scan and is never stored or logged.
+In the web UI and desktop app, you can supply only the token from the screen. If you hit the free OSSKB rate limit, turn on **Detect copied-in open source** and paste a token from scanoss.com into the field that appears below the toggle, then run again. The token is used once for that scan and is never stored or logged.
 
-The endpoint URL (`SCANOSS_API_URL`) and the reporting threshold (`SCANOSS_MIN_FILES`) are set through CLI or container environment variables only; neither the web UI nor the desktop app exposes a field for them. In particular, the desktop app does not forward `SCANOSS_API_URL` into the container, so a commercial or self-hosted endpoint cannot be used from the desktop app today. If you need one, run from the CLI or `sbom-ui.bat` with the variable set.
+The endpoint URL (`SCANOSS_API_URL`) and the reporting threshold (`SCANOSS_MIN_FILES`) are set through CLI or container environment variables only; neither the web UI nor the desktop app exposes a field for them. In particular, the desktop app does not forward `SCANOSS_API_URL` into the container, so a commercial or self-hosted endpoint cannot be used from the desktop app today. `sbom-ui.bat` does not forward it either. If you need one, run `scan-sbom.sh` or `scan-sbom.bat` with the variable set.
 
 Version precision is approximate. A file match reports the release where that file content first appeared, so different files of the same library can resolve to slightly different versions and a copied-in library may be reported a point release off. Treat the version (and any CVEs derived from it) as a starting point for review, not a final verdict.
 

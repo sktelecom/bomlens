@@ -37,10 +37,7 @@ When it finishes, open `MyApp_1.0.0/MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0/My
 ## Prerequisites
 
 - Docker engine 20.10+ (free: WSL2 + docker-ce, or Rancher Desktop / Docker Desktop, which is paid for organizational use)
-- Pull the scanner image:
-  ```bash
-  docker pull ghcr.io/sktelecom/bomlens:latest   # the former name sbom-scanner is the same image
-  ```
+- The scanner image needs no pull by hand: the first scan pulls the one of your release.
 - Run every example from the root of the project to scan.
 
 > Output flags are best used together with `--generate-only` (save locally). Omit it to also auto-upload to an external system (a Dependency-Track server or TRUSCA); pick the target with `UPLOAD_TARGET`.
@@ -236,7 +233,7 @@ The private key is mounted read-only into the container. Additional output: `MyA
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| `trivy not installed ... skipping` | old image. Pull the latest image with `docker pull`. |
+| `trivy not installed ... skipping` | old image. Download the current release archive; its scan pulls the matching image. |
 | `--deep-license requested but scancode not in image` | run with the `bomlens-deep-license` image (the CLI does this for a source scan unless `SBOM_SCANNER_IMAGE` names an image that is not a BomLens image, a short local name with no registry path, or a version before 1.13.2), or build one with `--build-arg SBOM_DEEP_LICENSE=true`. |
 | `Docker is not running` in the UI | start the Docker engine (Rancher Desktop/Docker Desktop, etc.) and run it again. |
 | Many `NOASSERTION` in the notice | the dependencies have no license metadata. Supplement with `--deep-license` or check manually. |

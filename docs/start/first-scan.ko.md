@@ -6,11 +6,11 @@ description: BomLens 설치부터 첫 SBOM 생성까지. 명령어 없이 데스
 
 설치부터 첫 [SBOM](../concepts/what-is-sbom.ko.md)까지 단계별로 안내합니다. 가장 빠른 길은 명령어가 필요 없습니다. 앱을 받아 더블클릭하면 됩니다.
 
-BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI가 Docker를 점검하고 이미지를 대신 받아 줍니다. Docker를 직접 다루는 건 CLI를 쓸 때뿐입니다. 엔진을 새로 설치해야 한다면 아래 [요구 사항](#요구-사항)을 참고하세요.
+BomLens는 Docker 엔진 위에서 동작하며, 엔진은 직접 설치합니다(아래 [요구 사항](#요구-사항) 참고). 그다음은 데스크톱 앱과 웹 UI가 엔진이 실행 중인지 확인하고 스캐너 이미지를 대신 받아 줍니다.
 
 ## 명령어 없이 시작하기 (권장)
 
-사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(디스크에서 약 1.4GB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법은 [비개발자 빠른 시작](../start/no-cli.ko.md)에, macOS에서 열리지 않을 때의 처리는 [문제 해결](troubleshooting.ko.md)에 있습니다. 내 프로젝트 폴더는 "폴더 선택" 타일의 "폴더 추가…" 버튼으로 고릅니다. 사내 저장소나 프록시가 필요한 프로젝트는 [자바(Maven)](../guides/java-maven.ko.md)와 [사내 네트워크](../guides/company-network.ko.md)를 보세요. 설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b-zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
+사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지([크기](#요구-사항))를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법은 [비개발자 빠른 시작](../start/no-cli.ko.md)에, macOS에서 열리지 않을 때의 처리는 [문제 해결](troubleshooting.ko.md)에 있습니다. 내 프로젝트 폴더는 "폴더 선택" 타일의 "폴더 추가…" 버튼으로 고릅니다. 사내 저장소나 프록시가 필요한 프로젝트는 [자바(Maven)](../guides/java-maven.ko.md)와 [사내 네트워크](../guides/company-network.ko.md)를 보세요. 설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b-zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](../images/desktop-startup.png)
 
@@ -21,13 +21,13 @@ BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI�
 ```bash
 mkdir -p ~/bomlens && cd ~/bomlens
 curl -fsSL https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli.tar.gz | tar -xz
-./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열리고, 산출물은 ~/sbom-output 아래 하위 폴더에 저장됩니다
+cd ~/my-project && ~/bomlens/scripts/scan-sbom.sh --ui   # 스캔할 폴더에서 실행하면 http://localhost:8080 이 열립니다
 #   Windows: bomlens-cli-windows.zip 압축을 풀고 scripts\sbom-ui.bat 더블클릭
 ```
 
-`bomlens-cli.tar.gz`는 Linux, macOS, WSL용 최신 릴리스 명령줄 도구로, 스크립트와 라이선스 파일, 번들 Node.js 예제가 들어 있습니다. WSL 없이 Windows에서 쓴다면 같은 릴리스의 [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip)을 대신 받습니다. 처음 실행할 때는 화면이 뜨기까지 1~2분 걸릴 수 있습니다. 그 릴리스의 스캐너 이미지가 없으면 받고(디스크에서 약 1.4GB), 있으면 새 버전이 있는지 확인하는 동안 서버가 아직 준비되지 않아, 자동으로 열린 브라우저 탭에 연결 오류가 보일 수 있습니다. 터미널에 `BomLens Web UI listening`이 나오면 탭을 새로고침하세요.
+`bomlens-cli.tar.gz`는 Linux, macOS, WSL용 최신 릴리스 명령줄 도구로, 스크립트와 라이선스 파일, 번들 Node.js 예제가 들어 있습니다. WSL 없이 Windows에서 쓴다면 같은 릴리스의 [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip)을 대신 받습니다. 처음 실행할 때는 화면이 뜨기까지 1~2분 걸릴 수 있습니다. 그 릴리스의 스캐너 이미지가 없으면 받고, 있으면 새 버전이 있는지 확인하는 동안 서버가 아직 준비되지 않아, 자동으로 열린 브라우저 탭에 연결 오류가 보일 수 있습니다. 터미널에 `BomLens Web UI listening`이 나오면 탭을 새로고침하세요.
 
-산출물은 `~/sbom-output`에 저장되고(`--output-dir`로 바꿉니다), 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더가 생깁니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 사용 중이면 스크립트는 주소를 출력하기 전에 멈추고 쓸 수 있는 다른 포트를 알려 줍니다. 예: `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`. Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요([설정 파일](troubleshooting.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(압축을 푼 직후의 현재 폴더는 BomLens 폴더 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
+산출물은 `~/sbom-output`에 저장되고(`--output-dir`로 바꿉니다), 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더가 생깁니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 사용 중이면 스크립트는 주소를 출력하기 전에 멈추고 쓸 수 있는 다른 포트를 알려 줍니다. 예: `UI_PORT=8081 ~/bomlens/scripts/scan-sbom.sh --ui`. Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요([설정 파일](troubleshooting.ko.md#설정-파일-명령줄-불필요) 참고). "현재 폴더" 타일은 실행한 폴더를 스캔합니다. GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
 
 ![BomLens 웹 UI](../images/web-ui.png)
 
@@ -44,7 +44,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ## 첫 번째 SBOM 생성 (CLI)
 
-자동화와 CI를 위한 고급 방식입니다. 압축을 푼 폴더에서 실행합니다. 처음 실행하면 스캐너 이미지(디스크에서 약 1.4GB)와 언어별 이미지(디스크에서 3~16GB, 예를 들어 Node.js는 2.9GB, Java는 5.6GB)를 받으므로, 네트워크에 따라 몇 분에서 수십 분이 걸립니다. 스크립트는 받기 전에 이미지 크기를 출력하고, Docker 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 멈춥니다([크기와 정리](../reference/docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요)). 오래 걸리는 단계에서는 1분마다 `Still running` 줄이 출력되므로, 터미널이 조용해도 멈춘 것은 아닙니다. 아래 명령은 번들로 포함된 Node.js 예제를 스캔합니다. 자신의 폴더를 스캔하려면 `--target`을 그 경로로 바꾸고, 현재 디렉터리를 스캔하려면 `--target`을 빼면 됩니다.
+자동화와 CI를 위한 고급 방식입니다. 압축을 푼 폴더에서 실행합니다. 처음 실행하면 스캐너 이미지와 언어별 이미지([크기](#요구-사항))를 받으므로, 네트워크에 따라 몇 분에서 수십 분이 걸립니다. 스크립트는 받기 전에 이미지 크기를 출력하고, Docker 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 멈춥니다([크기와 정리](../reference/docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요)). 오래 걸리는 단계에서는 1분마다 `Still running` 줄이 출력되므로, 터미널이 조용해도 멈춘 것은 아닙니다. 아래 명령은 번들로 포함된 Node.js 예제를 스캔합니다. 자신의 폴더를 스캔하려면 `--target`을 그 경로로 바꾸고, 현재 디렉터리를 스캔하려면 `--target`을 빼면 됩니다.
 
 <!-- runnable -->
 ```bash
@@ -95,13 +95,15 @@ BomLens에 필요한 건 Docker "엔진"뿐이고, 특정 제품에 묶이지 �
 |------|-------------|
 | Docker | 20.10 이상 |
 | 메모리 | Docker 엔진에 4 GB 이상 할당 |
-| 디스크 공간 | 한 언어를 처음 스캔할 때 Docker 엔진에 여유 공간 약 10GB. .NET이나 여러 언어가 섞인 프로젝트는 20GB 이상 |
+| 디스크 공간 | 한 언어를 처음 스캔할 때 Docker 엔진에 여유 공간 약 10GB. .NET이나 여러 언어가 섞인 프로젝트는 20GB 이상. 스캐너 이미지는 디스크에서 약 1.4GB이고, 언어마다 3~16GB의 이미지가 더해집니다(예: Node.js 2.9GB, Java 5.6GB, [전체 이미지](../reference/docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요)) |
 | OS | Linux, macOS, Windows |
-| 아키텍처 | AMD64, ARM64 |
+| 아키텍처 | AMD64, ARM64. opt-in 이미지를 포함해 발행되는 모든 이미지가 두 아키텍처에서 그대로 동작합니다([목록](../reference/docker-image.ko.md)) |
 
-opt-in인 `--firmware`, `--deep-cve` 이미지를 포함해 발행되는 모든 이미지가 두 아키텍처를 지원하므로, ARM64 호스트(Apple Silicon 맥, Arm 서버)에서도 그대로 pull해 쓸 수 있습니다. 전체 목록은 [Docker 이미지 레퍼런스](../reference/docker-image.ko.md)를 참고하세요.
+메모리 기준은 호스트가 아니라 Docker 엔진(Docker Desktop, Rancher Desktop, Colima가 띄우는 가상 머신)에 해당합니다. 4 GB 미만이면 Maven이나 Gradle 빌드(Java, Android, 혼합 프로젝트)가 메모리 부족으로 멈출 수 있고, 그러면 스캔은 직접 의존성만 기록합니다. 이런 스캔은 빌드 전에 경고를 출력하지만 스캔을 막지는 않습니다. 메모리를 늘리는 방법은 다음과 같습니다.
 
-이 메모리 기준은 호스트 컴퓨터가 아니라 Docker 엔진 자체(Docker Desktop, Rancher Desktop, macOS의 Colima가 띄우는 가상 머신)에 해당합니다. Colima는 기본값이 2 GB인데, 매니페스트만 읽는 스캔에는 충분하지만 전이 의존성을 얻기 위해 실제로 빌드까지 실행해야 하는 언어(Java/Gradle, Java/Maven)에는 부족합니다. 4 GB 미만이면 이 빌드 단계가 메모리 부족으로 죽고, 스캔은 더 얕은 결과(직접 의존성만)로 대체됩니다. 엔진 메모리가 대략 4 GB 미만인 상태에서 Maven이나 Gradle 빌드를 돌리는 스캔(Java, Android, 또는 `pom.xml`이나 `build.gradle`이 있는 혼합 프로젝트)을 하면 빌드를 시작하기 전에 경고를 출력하고 바꿀 설정도 알려 줍니다(Colima는 `colima stop && colima start --memory 4`, Docker Desktop은 Settings > Resources > Memory이며, WSL 2 백엔드나 Windows의 Rancher Desktop, WSL2의 docker-ce는 `%UserProfile%\.wslconfig`에 `memory=4GB`를 적고 `wsl --shutdown`을 실행합니다). 이 경고는 참고용이며 스캔을 막지 않습니다. 그래도 의존성 그래프가 부실해 보인다면 스캔 결과의 경고 메시지에 관련 안내가 있는지 확인하세요.
+- Colima(기본 2 GB): `colima stop && colima start --memory 4`
+- Docker Desktop: Settings > Resources > Memory
+- WSL 2 백엔드(Windows의 Rancher Desktop, WSL2의 docker-ce): `%UserProfile%\.wslconfig`에 `memory=4GB`를 적고 `wsl --shutdown`
 
 이미 Docker를 쓰고 있다면(Docker Desktop, Rancher Desktop, Colima, WSL2의 docker-ce 등 무엇이든) 동작만 확인하고 넘어가세요. macOS, Linux, WSL2에서는 압축을 푼 폴더의 점검 스크립트가 Docker 설치, 엔진 실행, 스캐너 이미지, 엔진 메모리, UI 포트를 한 번에 확인하고 항목마다 할 일을 알려 줍니다. 첫 스캔 전에는 스캐너 이미지가 없다고 알리고 받을 `docker pull` 명령을 보여 주지만, 첫 스캔이 이미지를 알아서 받습니다.
 
