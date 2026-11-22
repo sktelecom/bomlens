@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.2] - 2026-11-22
+
+### Added
+
+- `scan-sbom.sh` on a terminal prints the header, its own stages, warnings, errors and the closing summary; the scan container's processing detail lines are hidden. `--verbose` or `VERBOSE=true` shows every line, and output to a pipe, a file or CI is unchanged. Every scan writes `{Project}_{Version}_scan.log` with every line the container printed (credentials masked), and the summary names it.
+- `--ui` started from the BomLens repository itself says so and suggests running from the project folder or `--mount`.
+- The conformance check screen names the conformance profile the scan ran with.
+- The CLI archives carry `scripts/check-setup.sh` and `examples/nodejs`, the Windows zip a short `README.txt`, and the Linux archive is also published as `bomlens-cli.tar.gz`. In the archives the scripts' default image tags are the release version instead of `latest`; environment overrides still win.
+- New pages: Troubleshooting (getting stuck, opening the app on macOS, the settings file, removing BomLens) and the Yocto build SBOM guide.
+
+### Changed
+
+- The conformance check screen's intro says pass and fail are results against the selected profile's format requirements, not a legal compliance determination.
+- The Node.js example has a committed `package-lock.json`, so the README's first scan reads exact versions and grades complete.
+- The README, the no-CLI quick start, the supplier SBOM guide and the AI model guide are shorter. The supplier SBOM guide starts with how to submit an SBOM you made, the no-CLI quick start maps each task to its New scan tile, and the help menu's start link and the docs page are named First scan.
+- Verify a release reads the latest release instead of a fixed version, and starts with a checksum-only check.
+
+### Fixed
+
+- Docs: `--all` already includes the SPDX copy; `bomlens.settings.txt` is read by `sbom-ui.bat` (and `check-setup.bat`), not by `scan-sbom.bat`; the desktop app takes `SBOM_EXTRA_CA_CERTS` from the environment (`setx` on Windows, `launchctl setenv` on macOS); the pass/fail conformance screen is shown for every scan, not only `--analyze`; CocoaPods licenses are looked up online for trunk pods only; Rancher Desktop must use the dockerd (moby) engine.
+- The folder hint and the docs name the current New scan tiles (Choose folder, Build artifact, AI model or dataset).
+- The conformance report's Yocto version guidance links to the Yocto guide.
+- Docs site code blocks use the shared muted background in the dark theme.
+
 ## [v1.15.1] - 2026-11-22
 
 ### Added
