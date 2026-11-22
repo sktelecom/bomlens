@@ -38,7 +38,7 @@ If the SBOM leans Java (Maven), turn on **Deep CVE matching (NVD CPE)** in the s
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-Installation is in [Getting started](../start/first-scan.md).
+Installation is in [First scan](../start/first-scan.md).
 
 ### From the CLI
 
@@ -236,4 +236,4 @@ Response tracking, exception approval, and history management are out of scope f
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [Notice and security guide](../guides/reports.md) | [What the reports mean](../concepts/reports-explained.md)
+> **Related**: [First scan](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [Notice and security guide](../guides/reports.md) | [What the reports mean](../concepts/reports-explained.md)

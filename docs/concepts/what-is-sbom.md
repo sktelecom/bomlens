@@ -29,8 +29,8 @@ Two everyday jobs depend on knowing exactly what is inside your software.
 You do not need to remember any of this to run a scan. Pick your path:
 
 - No command line: the [no-CLI quick start](../start/no-cli.md) goes from install to an open-source notice in clicks.
-- Developer setup, web UI and CLI: [Getting started](../start/first-scan.md).
+- Developer setup, web UI and CLI: [First scan](../start/first-scan.md).
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [No-CLI quick start](../start/no-cli.md) | [Artifacts](../reference/artifacts.md)
+> **Related**: [First scan](../start/first-scan.md) | [No-CLI quick start](../start/no-cli.md) | [Artifacts](../reference/artifacts.md)

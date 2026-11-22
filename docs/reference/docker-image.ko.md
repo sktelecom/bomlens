@@ -278,4 +278,4 @@ CLI 플래그와 환경 변수의 전체 대응은 [아키텍처의 플래그 �
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [아키텍처](../concepts/architecture.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [아키텍처](../concepts/architecture.ko.md)

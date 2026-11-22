@@ -28,7 +28,7 @@ cd /path/to/your-project
 /path/to/bomlens/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
 ```
 
-On Windows, use `scripts\scan-sbom.bat` (Git Bash) or run as-is under WSL2. Installation is in [Getting started](../start/first-scan.md).
+On Windows, use `scripts\scan-sbom.bat` (Git Bash) or run as-is under WSL2. Installation is in [First scan](../start/first-scan.md).
 
 When it finishes, open `MyApp_1.0.0/MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0/MyApp_1.0.0_security.html` to check the results right away — each run's files land together in that `MyApp_1.0.0/` subfolder. See below for the detailed options.
 

@@ -28,7 +28,7 @@ cd /path/to/your-project
 /path/to/bomlens/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
 ```
 
-Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그대로 실행합니다. 설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.
+Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그대로 실행합니다. 설치는 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 
 끝나면 `MyApp_1.0.0/MyApp_1.0.0_NOTICE.html`과 `MyApp_1.0.0/MyApp_1.0.0_security.html`을 브라우저로 열어 결과를 바로 확인하세요. 실행 한 번의 산출물은 `MyApp_1.0.0/` 하위 폴더에 함께 생깁니다. 더 자세한 옵션은 아래를 참고하세요.
 
