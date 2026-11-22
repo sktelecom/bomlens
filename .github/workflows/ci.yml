@@ -1307,7 +1307,7 @@ jobs:
     name: CI Summary
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 15
-    needs: [test, secrets, contract, postprocess-unit, engine-contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage, desktop-linux]
+    needs: [test, secrets, contract, postprocess-unit, engine-contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage, desktop-linux, report-contrast]
     if: always()
 
     steps:
@@ -1378,6 +1378,7 @@ jobs:
           echo "| UI Visual Regression | ${{ needs.visual.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Doc Coverage | ${{ needs.doc-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Desktop boot tests (linux) | ${{ needs.desktop-linux.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Report Contrast (axe) | ${{ needs.report-contrast.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Only fail if critical tests failed
@@ -1425,6 +1426,9 @@ jobs:
             exit 1
           elif [ "${{ needs.desktop-linux.result }}" == "failure" ]; then
             echo "❌ Desktop boot tests (linux) failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.report-contrast.result }}" == "failure" ]; then
+            echo "❌ Report contrast (axe) failed" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "✅ Critical checks passed" >> $GITHUB_STEP_SUMMARY
