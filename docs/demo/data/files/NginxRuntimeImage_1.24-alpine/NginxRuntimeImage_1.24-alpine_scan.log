@@ -1,0 +1,73 @@
+==========================================
+ BomLens (post-process)
+ Mode: IMAGE
+ Project: NginxRuntimeImage (1.24-alpine)
+==========================================
+[1/2] syft: Docker image nginx:1.24-alpine
+[1/2] image digest: sha256:77e5d4a6ad906c5d3793764085706577fa705b1dc6f244ea0241c4b5e2155385 (linux/amd64); later reads use nginx@sha256:77e5d4a6ad906c5d3793764085706577fa705b1dc6f244ea0241c4b5e2155385
+[INFO] SBOM ready: NginxRuntimeImage_1.24-alpine_bom.json
+[os-licenses] 0 Debian package(s) from Trivy, 0 with a file hash cleaned
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
+[docmeta] tool=BomLens@1.15.2, lifecycle=post-build: NginxRuntimeImage_1.24-alpine_bom.json
+[docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
+[normalize] normalized: NginxRuntimeImage_1.24-alpine_bom.json (mode=sort-only)
+[cpe] set/normalized a whitelisted cpe:2.3 on 14 component(s) for CVE matching.
+[cpe] stripped the distro revision from 48 more deb/rpm/apk cpe(s) (vendor/product left as-is).
+[cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
+[distro-supplier] filled supplier (Alpine) on 62 component(s).
+[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[validate] detected format: CycloneDX
+[validate] added the 2026 SBOM minimum-element checks
+[validate] CycloneDX -> result=pass (mandatory fails=0, warns=9, review=5, n/a=2, untraceable=0): NginxRuntimeImage_1.24-alpine_conformance.json, NginxRuntimeImage_1.24-alpine_conformance.md, NginxRuntimeImage_1.24-alpine_conformance.html
+[INFO] source-file-tree: wrote 2808 entries to NginxRuntimeImage_1.24-alpine_files.json.
+[INFO] source-snapshot: captured 481 file(s), 1832 KiB.
+[INFO] source-snapshot: 1 file(s) shown only up to 256 KiB.
+[INFO] source-snapshot: credentials masked in 3 file(s).
+[INFO] source-snapshot: 1362 binary file(s) listed without a preview.
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_files.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_source.json
+[security] running Trivy SBOM scan...
+[go-vulndb] no Go module (pkg:golang) in the SBOM; nothing to match.
+[security] enriching with EPSS + CISA KEV...
+[security] generated: NginxRuntimeImage_1.24-alpine_security.json, NginxRuntimeImage_1.24-alpine_security.md, NginxRuntimeImage_1.24-alpine_security.html (total=66, critical=2, high=11, kev=0, unchecked=0, advisories=0)
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_files.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_source.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_completeness.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.md
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.html
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security_epss.json
+[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint).
+[notice] generated: NginxRuntimeImage_1.24-alpine_NOTICE.txt, NginxRuntimeImage_1.24-alpine_NOTICE.html (30 licenses, 1885 components: 0 libraries, 62 OS packages, 1 operating system, 1822 files)
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_files.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_source.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_completeness.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.md
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.html
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security_epss.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_NOTICE.txt
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_NOTICE.html
+[risk] generated: NginxRuntimeImage_1.24-alpine_risk-report.md, NginxRuntimeImage_1.24-alpine_risk-report.html (conformance=pass, vulns total=66, crit=2, high=11, copyleft=13 strong/network + 4 weak, malicious=0)
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_files.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_source.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_completeness.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.md
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security.html
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_security_epss.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_NOTICE.txt
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_NOTICE.html
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_conformance.json
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_conformance.md
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_conformance.html
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_conformance.result
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_summary.result
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_risk-report.md
+[SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_risk-report.html
+[INFO] Generate-only mode. Done.

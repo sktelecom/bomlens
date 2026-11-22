@@ -1,0 +1,69 @@
+Unable to find image 'ghcr.io/sktelecom/bomlens:latest' locally
+latest: Pulling from sktelecom/bomlens
+Digest: sha256:de67f3deb3bc868bce52ba18406d7724f817b198e7e50c502c4b5a8794d3b9b7
+Status: Downloaded newer image for ghcr.io/sktelecom/bomlens:latest
+==========================================
+ BomLens (post-process)
+ Mode: ANALYZE
+ Project: FlaskDataService (3.2.0)
+==========================================
+[1/2] Validating supplier SBOM (conformance, original input)...
+[validate] detected format: CycloneDX
+[validate] added the 2026 SBOM minimum-element checks
+[validate] CycloneDX -> result=pass (mandatory fails=0, warns=8, review=5, n/a=5, untraceable=0): FlaskDataService_3.2.0_conformance.json, FlaskDataService_3.2.0_conformance.md, FlaskDataService_3.2.0_conformance.html
+[INFO] describe-input-sbom: input is CycloneDX 1.6 with 39 component(s).
+[1/2] Converting supplier SBOM to CycloneDX...
+[yocto-spdx] not a Yocto SPDX 3.x document; leaving it to syft.
+[convert] input is CycloneDX; copying as-is.
+[convert] CycloneDX ready: FlaskDataService_3.2.0_bom.json (components=39)
+[INFO] SBOM ready: FlaskDataService_3.2.0_bom.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
+[normalize] normalized: FlaskDataService_3.2.0_bom.json (mode=sort-only)
+[cpe] set/normalized a whitelisted cpe:2.3 on 0 component(s) for CVE matching.
+[cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
+[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[assess] no AI model or collected dataset component; skipping.
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_input.json
+[security] running Trivy SBOM scan...
+[go-vulndb] no Go module (pkg:golang) in the SBOM; nothing to match.
+[security] enriching with EPSS + CISA KEV...
+[security] generated: FlaskDataService_3.2.0_security.json, FlaskDataService_3.2.0_security.md, FlaskDataService_3.2.0_security.html (total=24, critical=1, high=8, kev=0, unchecked=0, advisories=0)
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_input.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_completeness.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.md
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.html
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security_epss.json
+[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint).
+[notice] generated: FlaskDataService_3.2.0_NOTICE.txt, FlaskDataService_3.2.0_NOTICE.html (9 licenses, 39 components)
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_input.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_completeness.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.md
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.html
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security_epss.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_NOTICE.txt
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_NOTICE.html
+[risk] generated: FlaskDataService_3.2.0_risk-report.md, FlaskDataService_3.2.0_risk-report.html (conformance=pass, vulns total=24, crit=1, high=8, copyleft=0 strong/network + 2 weak, malicious=0)
+[ai-profile] no G7 conformance checks found; skipping (not an AI SBOM).
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_input.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_completeness.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.md
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security.html
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_security_epss.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_NOTICE.txt
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_NOTICE.html
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_conformance.json
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_conformance.md
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_conformance.html
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_conformance.result
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_summary.result
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_risk-report.md
+[SUCCESS] copied: /host-output/FlaskDataService_3.2.0_risk-report.html
+[INFO] Generate-only mode. Done.

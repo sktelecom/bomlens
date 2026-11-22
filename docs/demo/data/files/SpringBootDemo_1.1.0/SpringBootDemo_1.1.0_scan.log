@@ -1,0 +1,31 @@
+==========================================
+ BomLens (post-process)
+ Mode: POSTPROCESS
+ Project: SpringBootDemo (1.1.0)
+==========================================
+[1/2] Post-processing existing SBOM: SpringBootDemo_1.1.0_bom.json
+[INFO] SBOM ready: SpringBootDemo_1.1.0_bom.json
+[license] outbound license read from the project manifest: Apache-2.0
+[stamp] metadata.component set to SpringBootDemo@1.1.0: SpringBootDemo_1.1.0_bom.json
+[stamp] outbound license declared: Apache-2.0 (drives the license-conflict check)
+[docmeta] tool=BomLens@1.15.2, lifecycle=pre-build: SpringBootDemo_1.1.0_bom.json
+[docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
+[normalize] normalized: SpringBootDemo_1.1.0_bom.json (mode=sort-only)
+[cpe] set/normalized a whitelisted cpe:2.3 on 0 component(s) for CVE matching.
+[cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
+[maven-cpe] attached NVD-matchable cpe:2.3 candidates to 71 maven component(s) for CPE-based CVE matching.
+[eol] flagged 25 end-of-life and 0 still-supported component(s), 25 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[validate] detected format: CycloneDX
+[validate] added the 2026 SBOM minimum-element checks
+[validate] CycloneDX -> result=pass (mandatory fails=0, warns=4, review=5, n/a=4, untraceable=0): SpringBootDemo_1.1.0_conformance.json, SpringBootDemo_1.1.0_conformance.md, SpringBootDemo_1.1.0_conformance.html
+[INFO] source-file-tree: wrote 1 entry to SpringBootDemo_1.1.0_files.json.
+[INFO] source-snapshot: captured 1 file(s), 3 KiB.
+[security] running Trivy SBOM scan...
+[go-vulndb] no Go module (pkg:golang) in the SBOM; nothing to match.
+[security] enriching with EPSS + CISA KEV...
+[security] generated: SpringBootDemo_1.1.0_security.json, SpringBootDemo_1.1.0_security.md, SpringBootDemo_1.1.0_security.html (total=88, critical=9, high=33, kev=1, unchecked=0, advisories=0)
+[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint).
+[notice] generated: SpringBootDemo_1.1.0_NOTICE.txt, SpringBootDemo_1.1.0_NOTICE.html (11 licenses, 71 components)
+[risk] generated: SpringBootDemo_1.1.0_risk-report.md, SpringBootDemo_1.1.0_risk-report.html (conformance=pass, vulns total=88, crit=9, high=33, copyleft=0 strong/network + 9 weak, license-conflict incompatible=0, malicious=0)
+[INFO] Generate-only mode. Done.
