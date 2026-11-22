@@ -101,7 +101,7 @@ $SBOM --project team2-app --version 1.0.0 \
 
 ```bash
 cd ~/project/c-dev
-$SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
+$SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendored --generate-only
 ```
 
 - Conan의 `conanfile.txt`나 `conan.lock`에 선언된 의존성과 CMake 파일의 패키지 이름(`find_package`)은 SBOM에 들어갑니다. vcpkg의 `vcpkg.json`과 Conan의 `conanfile.py`는 읽지 않습니다. 여기에 선언된 의존성이 어느 컴포넌트에도 없으면 결과는 부분(사유 `manifest-not-read`)이 되고, 사유에 해당 매니페스트와 의존성 이름이 나옵니다. 프로젝트 최상위 폴더의 `sbom-declared.cdx.json`에 버전과 함께 적거나([선언 구성요소](declared-components.ko.md)) `conanfile.py` 옆에 `conan.lock`을 커밋한 뒤 다시 스캔하세요.
@@ -257,7 +257,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | 빌드 산출물 | 빌드 산출물 업로드 — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM 업로드 | 기존 SBOM(JSON) 업로드, 분석(ANALYZE) 모드 |
 | 펌웨어 업로드 | `.bin` 등 업로드 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
-| Docker 이미지 | 이미지명 입력 |
+| Docker 이미지 | 이미지명 입력(비공개 레지스트리는 이 컴퓨터에서 먼저 `docker login` 실행) |
 | AI 모델 | HuggingFace 모델 id 입력 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
 | 모델 파일 | `.gguf`, `.safetensors`, `.pt` 등 업로드(최대 8GB) |
 | 공개 데이터셋 | Figshare 아이템(페이지 URL, DOI, 아이템 번호) 또는 HuggingFace 데이터셋(`datasets/<owner>/<name>`이나 `https://huggingface.co/datasets/...` 주소)을 모델 id와 같은 입력란에 입력 |

@@ -165,7 +165,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 고지문, 보안 보고서, 오픈소스 위험 보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
 | 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
 | 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
-| 안드로이드, 자바, iOS, C/C++ 프로젝트 | [안드로이드](../guides/android-gradle.ko.md), [자바(Maven)](../guides/java-maven.ko.md), [iOS](../guides/ios-swift.ko.md), [C/C++](../guides/identify-vendored.ko.md) |
+| 안드로이드, 자바, iOS, C/C++ 프로젝트 | [안드로이드](../guides/android-gradle.ko.md), [자바(Maven)](../guides/java-maven.ko.md), [iOS](../guides/ios-swift.ko.md), [C/C++, 임베디드](../guides/identify-vendored.ko.md) |
 | 프록시, 사내 인증서, 사내 저장소 | [사내 네트워크](../guides/company-network.ko.md) |
 | 이미지 크기와 디스크 정리 | [Docker 이미지 참조](../reference/docker-image.ko.md#디스크-공간은-어떻게-비우나요) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |

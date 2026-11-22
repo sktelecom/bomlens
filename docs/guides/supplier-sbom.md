@@ -34,18 +34,11 @@ The `pkg:generic` line above is the `skt-submission` conformance profile (`--con
 
 ## Running it all at once
 
-### From the web UI
+### From the desktop app or the web UI
 
-Open the web UI, choose **SBOM upload**, and upload the file you received; enter a project name and version, then run. A Yocto SPDX 2.2 build hands over an `<image>.spdx.tar.zst` rather than a document — that archive uploads here too, since it is the only SBOM such a build produces.
+Open the desktop app or the web UI (setup is in [First scan](../start/first-scan.md)), choose **SBOM upload**, and upload the file you received; enter a project name and version, then run. A Yocto SPDX 2.2 build hands over an `<image>.spdx.tar.zst` rather than a document. That archive uploads here too, since it is the only SBOM such a build produces.
 
 If the SBOM leans Java (Maven), turn on **Deep CVE matching (NVD CPE)** in the scan options. It checks older Maven libraries against NVD-only vulnerabilities that other advisory sources miss, at the cost of a longer scan. It is the same matching as the CLI's `--deep-cve`; for which scan modes offer the toggle and what the first run downloads, see [Deep CVE matching](reports.md#deep-cve-matching---deep-cve).
-
-```bash
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080
-#   Windows: double-click scripts\sbom-ui.bat
-```
-
-Installation is in [First scan](../start/first-scan.md).
 
 ### From the CLI
 

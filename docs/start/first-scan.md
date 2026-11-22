@@ -161,7 +161,7 @@ Every scan writes `{Project}_{Version}_completeness.json`, and the Overview scre
 | Notice, security & risk reports, web UI | [Reports guide](../guides/reports.md) |
 | Every option and CI/CD | [CLI reference](../reference/cli.md) |
 | Language example projects | [Ecosystems](../reference/ecosystems.md) |
-| Android, Java, iOS or C/C++ projects | [Android](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS](../guides/ios-swift.md), [C/C++](../guides/identify-vendored.md) |
+| Android, Java, iOS or C/C++ projects | [Android](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS](../guides/ios-swift.md), [C/C++ and embedded](../guides/identify-vendored.md) |
 | Proxy, company CA and internal repositories | [Company network](../guides/company-network.md) |
 | Image sizes and freeing disk | [Docker image reference](../reference/docker-image.md#how-much-disk-do-the-images-take) |
 | Internals | [Architecture](../concepts/architecture.md) |

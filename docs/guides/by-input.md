@@ -101,7 +101,7 @@ A team shared the source via a folder you copied locally (`~/project/c-dev`). Ru
 
 ```bash
 cd ~/project/c-dev
-$SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
+$SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendored --generate-only
 ```
 
 - Dependencies declared in Conan's `conanfile.txt` or `conan.lock`, and the package names in CMake files (`find_package`), appear in the SBOM. vcpkg's `vcpkg.json` and Conan's `conanfile.py` are not read: when a dependency they declare is in no component, the result is partial with the reason `manifest-not-read`, which names the manifest and the dependencies. List them with their versions in `sbom-declared.cdx.json` at the project root ([declared components](declared-components.md)), or commit a `conan.lock` beside `conanfile.py`, and scan again.
@@ -257,7 +257,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Build artifact | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
 | Firmware upload | upload a `.bin`, etc. — the tile appears automatically whenever Docker is running |
-| Docker image | enter the image name |
+| Docker image | enter the image name (for a private registry, run `docker login` on this machine first) |
 | AI model | enter a HuggingFace model id — the tile appears automatically whenever Docker is running |
 | Model file | upload a `.gguf`, `.safetensors`, `.pt`, etc. (up to 8 GB) |
 | Published dataset | enter a Figshare item (its page URL, its DOI, or the item number) or a HuggingFace dataset (`datasets/<owner>/<name>` or its `https://huggingface.co/datasets/...` address) in the same field as the model id |

@@ -34,18 +34,11 @@ BomLens는 SK텔레콤의 공급사 SBOM 제출을 위해 만든 도구이며, �
 
 ## 한 번에 실행하기
 
-### 웹 UI에서
+### 데스크톱 앱이나 웹 UI에서
 
-웹 UI를 열고 **SBOM 업로드**를 골라 받은 파일을 올린 뒤, 프로젝트 이름과 버전을 입력하고 스캔을 실행합니다. Yocto SPDX 2.2 빌드는 문서가 아니라 `<image>.spdx.tar.zst`를 건네는데, 그 빌드가 만드는 유일한 SBOM이므로 이 아카이브도 그대로 올릴 수 있습니다.
+데스크톱 앱이나 웹 UI를 열고(설치는 [첫 스캔](../start/first-scan.ko.md) 참고) **SBOM 업로드**를 골라 받은 파일을 올린 뒤, 프로젝트 이름과 버전을 입력하고 스캔을 실행합니다. Yocto SPDX 2.2 빌드는 문서가 아니라 `<image>.spdx.tar.zst`를 건네는데, 그 빌드가 만드는 유일한 SBOM이므로 이 아카이브도 그대로 올릴 수 있습니다.
 
 Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 (NVD CPE)**을 켜세요. 오래된 Maven 라이브러리를 NVD 전용 취약점까지 대조해 다른 출처가 놓치는 항목을 찾아내며, 대신 스캔이 더 오래 걸립니다. CLI의 `--deep-cve`와 같은 매칭입니다. 어느 스캔 모드에서 이 옵션이 나타나는지, 처음 실행할 때 무엇을 내려받는지는 [정밀 CVE 대조](reports.ko.md#정밀-cve-대조---deep-cve)를 참고하세요.
-
-```bash
-./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열립니다
-#   Windows: scripts\sbom-ui.bat 더블클릭
-```
-
-설치는 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 
 ### CLI에서
 
