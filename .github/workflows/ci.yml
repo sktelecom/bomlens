@@ -735,7 +735,7 @@ jobs:
 
           emit web      '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'
           emit frontend '^(docker/web/frontend/|docker/shared/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
-          emit docs     '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$)'
+          emit docs     '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$|^scripts/check-doc-ci-examples\.sh$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
           emit shell    '\.sh$'
@@ -873,6 +873,27 @@ jobs:
           echo ""
           echo "✅ Documentation check completed"
       
+      # The CI/CD guide's pipeline examples are copied into users' pipelines as
+      # they are: actionlint checks the GitHub Actions ones, and each GitLab one
+      # must parse and name stages GitLab accepts (scripts/check-doc-ci-examples.sh,
+      # which reads YAML with the runner's python3 PyYAML).
+      - name: Check the CI/CD guide examples
+        env:
+          ACTIONLINT_VERSION: 1.7.7
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64) arch=amd64 sum=023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757 ;;
+            aarch64|arm64) arch=arm64 sum=401942f9c24ed71e4fe71b76c7d638f66d8633575c4016efd2977ce7c28317d0 ;;
+            *) echo "no actionlint build for $(uname -m)"; exit 1 ;;
+          esac
+          tgz="actionlint_${ACTIONLINT_VERSION}_linux_${arch}.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$tgz"
+          echo "$sum  $RUNNER_TEMP/$tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/$tgz" -C "$RUNNER_TEMP/actionlint" actionlint
+          PATH="$RUNNER_TEMP/actionlint:$PATH" bash scripts/check-doc-ci-examples.sh
+
       # Advisory by design: this step checks EXTERNAL links, which fail for
       # reasons outside the repo (rate limits, transient outages), so it must
       # not block merges. Internal links are hard-gated separately by
