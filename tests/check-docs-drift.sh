@@ -501,7 +501,7 @@ for f in "${PATHDOCS[@]}"; do
         ln="${rec%%:*}"
         content="${rec#*:}"
         read -ra toks <<<"$content"
-        for raw in "${toks[@]}"; do
+        for raw in ${toks[@]+"${toks[@]}"}; do
             [ -z "$raw" ] && continue
             tok="${raw#./}"
             # A placeholder (`<lang>`, `{language}`) or a glob (`*.txt`)

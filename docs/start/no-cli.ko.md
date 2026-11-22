@@ -252,7 +252,7 @@ docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
 
 스캔 결과는 홈 디렉터리 아래 `sbom-output` 폴더에 있습니다. 보고서를 보관할 생각이면 지우지 마세요.
 
-더 자세한 설명과 CLI 사용법은 [첫 스캔](../start/first-scan.ko.md)와
+더 자세한 설명과 CLI 사용법은 [첫 스캔](../start/first-scan.ko.md)과
 [고지문·보안 보고서 가이드](../guides/reports.ko.md) 문서를 참고하세요.
 
 ---
