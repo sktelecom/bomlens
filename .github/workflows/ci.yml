@@ -103,17 +103,19 @@ jobs:
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 15
     needs: [changes]
-    # Skipped on a pull request that touches nothing but docs (see the
-    # changes job). Dispatch always runs it (except a reseed dispatch). Compared
-    # against 'false' rather than 'true' so a classifier failure runs the
-    # job instead of skipping it unnoticed.
+    # Skipped on a pull request that touches nothing but docs, unless one of
+    # the scripts that check docs changed (see the changes job). Dispatch
+    # always runs it (except a reseed dispatch). Compared against 'false'
+    # rather than 'true' so a classifier failure runs the job instead of
+    # skipping it unnoticed.
     if: >-
       !cancelled() &&
       !(github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.reseed_visual == 'true' ||
        github.event.inputs.reseed_guide_shots == 'true')) && (
         github.event_name != 'pull_request' ||
-        needs.changes.outputs.code != 'false')
+        needs.changes.outputs.code != 'false' ||
+        needs.changes.outputs.shell != 'false')
 
     steps:
       - name: Checkout repository
@@ -566,12 +568,6 @@ jobs:
       - name: Web UI server contract tests (upload round-trip)
         run: bash tests/test-web-ui.sh
 
-      - name: Examples / docs / test-all.sh sync check
-        run: bash tests/check-examples-sync.sh
-
-      - name: Docs / tool drift check (flags, env vars, image names, download, output dir)
-        run: bash tests/check-docs-drift.sh
-
       - name: License files shipped in the image match the repository root
         run: bash tests/check-notice-sync.sh
 
@@ -609,6 +605,7 @@ jobs:
       examples: ${{ steps.filter.outputs.examples }}
       desktop: ${{ steps.filter.outputs.desktop }}
       code: ${{ steps.filter.outputs.code }}
+      shell: ${{ steps.filter.outputs.shell }}
       reports: ${{ steps.filter.outputs.reports }}
     steps:
       - name: Checkout repository
@@ -641,21 +638,26 @@ jobs:
           emit docs     '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
+          emit shell    '\.sh$'
           emit reports  '^(docker/lib/(generate-risk-report|generate-notice|scan-security|validate-sbom|report-common)\.sh$|docker/lib/i18n/|docker/shared/|tests/(test-report-contrast\.sh|report-contrast/|fixtures/report-contrast/)|docker/web/frontend/package-lock\.json$)'
 
-          # True when at least one changed file lies outside the docs surface
-          # above. This is the negation of "docs", not another membership
-          # test, so it cannot go through emit(): that helper answers "does
-          # anything match", and this needs "does everything match". Gates
-          # lint/contract/postprocess so a docs-only PR is not queued behind
-          # ShellCheck/hadolint and the scanner/CLI-script suites, none of
-          # which can exercise anything it touched. `test` and `secrets` stay
-          # unconditional: `test` also runs the docs/tool drift checks
-          # (check-docs-drift.sh, check-examples-sync.sh) that verify docs
-          # content against the code, which is exactly what a docs-only
+          # True when at least one changed file lies outside the docs surface:
+          # the docs paths above plus the scripts that check docs (the
+          # doc-coverage job runs them on every event). This is the negation
+          # of a docs match, not another membership test, so it cannot go
+          # through emit(): that helper answers "does anything match", and
+          # this needs "does everything match". Gates contract and the
+          # post-process jobs so a docs-only PR is not queued behind the
+          # scanner/CLI-script suites, none of which can exercise anything it
+          # touched; lint also runs when a shell script changed, so a doc
+          # check script is still linted. `test`, `secrets` and doc-coverage
+          # stay unconditional: doc-coverage also runs the docs/tool drift
+          # checks (check-docs-drift.sh, check-examples-sync.sh) that verify
+          # docs content against the code, which is exactly what a docs-only
           # change must not skip, and a secrets scan should never depend on
           # which files changed.
-          if echo "$changed" | grep -qvE '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$)'; then
+          docs_surface='(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$|^scripts/check-doc-[^/]*\.sh$|^tests/check-docs-drift\.sh$|^scripts/ko-style/)'
+          if echo "$changed" | grep -qvE "$docs_surface"; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -1182,6 +1184,14 @@ jobs:
       # Deterministic internal-link gate for the getting-started pages.
       - name: Check onboarding internal links
         run: bash scripts/check-doc-links.sh
+
+      # Here rather than with the code suites: both check docs content against
+      # the code, so a docs-only change must run them too.
+      - name: Examples / docs / test-all.sh sync check
+        run: bash tests/check-examples-sync.sh
+
+      - name: Docs / tool drift check (flags, env vars, image names, download, output dir)
+        run: bash tests/check-docs-drift.sh
 
   summary:
     name: CI Summary
