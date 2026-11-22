@@ -15654,6 +15654,16 @@ SELF_OUT="$( {
     && [ "$(reach "$GS/self-npm.json")" = "pkg:npm/debug@4.3.1,pkg:npm/ms@2.1.2,pkg:npm/yarn-app@1.0.0" ] \
     && echo "PASS: a tree with no yarn.lock or uv.lock keeps every component, even one named like the project" \
     || echo "FAIL: package-lock.json tree was changed"
+  # The graph's shape after every read above: each dependencies[].ref and each
+  # dependsOn target names a component or the root, and the root has a direct
+  # dependency (tests/test-scan.sh checks the same on real scans).
+  shaped() { jq -e '([.components[]["bom-ref"]] + [.metadata.component["bom-ref"]]) as $k
+                    | .metadata.component["bom-ref"] as $r
+                    | all(.dependencies[] | (.ref, .dependsOn[]?); . as $x | $k | index([$x]) != null)
+                      and ([.dependencies[] | select(.ref == $r) | .dependsOn[]] | length > 0)' "$1" >/dev/null; }
+  shaped "$GS/self-yarn.json" && shaped "$GS/self-uv.json" && shaped "$GS/self-scoped.json" && shaped "$GS/self-npm.json" \
+    && echo "PASS: after a static read every graph ref names a component or the root, and the root has a direct dependency" \
+    || echo "FAIL: static read graph shape"
   true
 } 2>&1 )"
 while IFS= read -r line; do
