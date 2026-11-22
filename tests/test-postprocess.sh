@@ -15633,17 +15633,17 @@ echo '{"name":"yarn-app","version":"1.0.0","dependencies":{"debug":"4.3.1"}}' > 
 SELF_OUT="$( {
   . "$ROOT_DIR/docker/lib/source-detect.sh"
   export PATH="$GS/bin-self:$PATH" LIBDIR="$ROOT_DIR/docker/lib" CDX_SPEC_VERSION=1.6
-  # every package, listed once, reachable from the lock file node after the project is gone
+  # every package, listed once, reachable from the root after the project is gone
   reach() { jq -r '[.components[].purl] | sort | join(",")' "$1"; }
   generate_sbom_static "$GS/yarn" "$GS/self-yarn.json" \
     && [ "$(reach "$GS/self-yarn.json")" = "pkg:npm/debug@4.3.1,pkg:npm/ms@2.1.2" ] \
-    && [ "$(jq -r '[.dependencies[]|select(.ref=="lock")|.dependsOn[]]|join(",")' "$GS/self-yarn.json")" = "pkg:npm/debug@4.3.1" ] \
+    && [ "$(jq -r '[.dependencies[]|select(.ref=="root")|.dependsOn[]]|join(",")' "$GS/self-yarn.json")" = "pkg:npm/debug@4.3.1" ] \
     && [ "$(jq '[.dependencies[]|select(.ref=="pkg:npm/yarn-app@1.0.0")]|length' "$GS/self-yarn.json")" = "0" ] \
     && echo "PASS: a static read of yarn.lock leaves the project itself out and keeps the graph reaching every package" \
     || echo "FAIL: yarn.lock project package"
   generate_sbom_static "$GS/uv" "$GS/self-uv.json" \
     && [ "$(reach "$GS/self-uv.json")" = "pkg:pypi/idna@3.4" ] \
-    && [ "$(jq -r '[.dependencies[]|select(.ref=="lock")|.dependsOn[]]|join(",")' "$GS/self-uv.json")" = "pkg:pypi/idna@3.4" ] \
+    && [ "$(jq -r '[.dependencies[]|select(.ref=="root")|.dependsOn[]]|join(",")' "$GS/self-uv.json")" = "pkg:pypi/idna@3.4" ] \
     && echo "PASS: a static read of uv.lock leaves the project itself out, matching its name as PEP 503 does (Uv_App is uv-app)" \
     || echo "FAIL: uv.lock project package"
   generate_sbom_static "$GS/scoped" "$GS/self-scoped.json" \
@@ -15660,6 +15660,69 @@ while IFS= read -r line; do
   case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
 done <<< "$SELF_OUT"
 rm -rf "$GS"
+
+echo "== static detection: the root depends on the lock file's direct dependencies =="
+# Trivy puts a node per lock file between the root and the packages, and the
+# lock file component is taken out of the list, so the root pointed at a ref
+# that is not a component (the dependency tree showed a bare UUID and the count
+# of direct dependencies was 0). Shaped like a real package-lock.json read, plus
+# a tree with two lock files and a loop between two such nodes.
+LF="$WORK/lift"; mkdir -p "$LF"
+cat > "$LF/one.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"type":"application","name":"nodejs","bom-ref":"53dc4565-9751-4eca-904f-f6a784cbf701"}},
+ "components":[{"type":"library","name":"express","version":"4.22.3","purl":"pkg:npm/express@4.22.3","bom-ref":"pkg:npm/express@4.22.3"},
+   {"type":"library","name":"debug","version":"2.6.9","purl":"pkg:npm/debug@2.6.9","bom-ref":"pkg:npm/debug@2.6.9"},
+   {"type":"library","name":"ms","version":"2.0.0","purl":"pkg:npm/ms@2.0.0","bom-ref":"pkg:npm/ms@2.0.0"}],
+ "dependencies":[{"ref":"53dc4565-9751-4eca-904f-f6a784cbf701","dependsOn":["0d1898dc-7d86-4e22-92b1-bbba10f3b6c4"]},
+   {"ref":"0d1898dc-7d86-4e22-92b1-bbba10f3b6c4","dependsOn":["pkg:npm/express@4.22.3","pkg:npm/debug@2.6.9"]},
+   {"ref":"pkg:npm/express@4.22.3","dependsOn":["pkg:npm/debug@2.6.9"]},
+   {"ref":"pkg:npm/debug@2.6.9","dependsOn":["pkg:npm/ms@2.0.0"]},
+   {"ref":"pkg:npm/ms@2.0.0","dependsOn":[]}]}
+JSON
+cat > "$LF/two.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"type":"application","name":"repo","bom-ref":"root"}},
+ "components":[{"type":"library","name":"a","version":"1","purl":"pkg:npm/a@1","bom-ref":"pkg:npm/a@1"},
+   {"type":"library","name":"b","version":"1","purl":"pkg:pypi/b@1","bom-ref":"pkg:pypi/b@1"},
+   {"type":"library","name":"c","version":"1","purl":"pkg:pypi/c@1","bom-ref":"pkg:pypi/c@1"}],
+ "dependencies":[{"ref":"root","dependsOn":["lock-npm","lock-py"]},
+   {"ref":"lock-npm","dependsOn":["pkg:npm/a@1","loop-x"]},{"ref":"lock-py","dependsOn":["pkg:pypi/b@1"]},
+   {"ref":"loop-x","dependsOn":["loop-y","pkg:pypi/c@1"]},{"ref":"loop-y","dependsOn":["loop-x"]},
+   {"ref":"pkg:npm/a@1","dependsOn":[]},{"ref":"pkg:pypi/b@1","dependsOn":["pkg:pypi/c@1"]},{"ref":"pkg:pypi/c@1","dependsOn":[]}]}
+JSON
+cp "$LF/one.json" "$LF/one.before.json"
+LF_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  # every ref in dependencies[] names a component or the root
+  closed() { jq -e '([.components[]["bom-ref"]] + [.metadata.component["bom-ref"]]) as $k
+                    | all(.dependencies[] | (.ref, .dependsOn[]?); . as $r | $k | index([$r]) != null)' "$1" >/dev/null; }
+  rootdeps() { jq -r '.metadata.component["bom-ref"] as $r | [.dependencies[] | select(.ref == $r) | .dependsOn[]] | sort | join(",")' "$1"; }
+  static_lift_lock_file_nodes "$LF/one.json" \
+    && [ "$(rootdeps "$LF/one.json")" = "pkg:npm/debug@2.6.9,pkg:npm/express@4.22.3" ] \
+    && closed "$LF/one.json" \
+    && [ "$(jq '[.dependencies[] | select(.ref == "0d1898dc-7d86-4e22-92b1-bbba10f3b6c4")] | length' "$LF/one.json")" = "0" ] \
+    && [ "$(jq -c '.components' "$LF/one.json")" = "$(jq -c '.components' "$LF/one.before.json")" ] \
+    && [ "$(jq -r '[.dependencies[] | select(.ref == "pkg:npm/express@4.22.3") | .dependsOn[]] | join(",")' "$LF/one.json")" = "pkg:npm/debug@2.6.9" ] \
+    && echo "PASS: the root depends on the lock file's direct dependencies, the lock file node is gone and no component changes" \
+    || echo "FAIL: lock file node between the root and the packages"
+  static_lift_lock_file_nodes "$LF/two.json" \
+    && [ "$(rootdeps "$LF/two.json")" = "pkg:npm/a@1,pkg:pypi/b@1,pkg:pypi/c@1" ] \
+    && closed "$LF/two.json" \
+    && [ "$(jq '.dependencies | length' "$LF/two.json")" = "4" ] \
+    && echo "PASS: with two lock files the root depends on the direct dependencies of both, and a loop between such nodes ends" \
+    || echo "FAIL: two lock files"
+  echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "$LF/none.json"
+  static_lift_lock_file_nodes "$LF/none.json" \
+    && [ "$(jq -c . "$LF/none.json")" = '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' ] \
+    && echo "PASS: an SBOM with no dependencies is left as it is" \
+    || echo "FAIL: an SBOM with no dependencies was changed"
+  true
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$LF_OUT"
+rm -rf "$LF"
 
 echo "== completeness: an empty or partial result is said so in every report, never as 'no vulnerabilities' =="
 # The security, risk and NOTICE reports and the conformance check read one verdict
