@@ -30,6 +30,8 @@
 #     or missing its MODE's required inputs
 #   - an English page and its .ko.md mirror whose <!-- runnable --> blocks
 #     differ in their command lines (comments may translate)
+#   - a tile named in the no-CLI quick start's task table that is not a New
+#     scan tile label in that page's locale
 # Warnings (non-fatal):
 #   - an English page and its .ko.md mirror passing different scan-sbom.sh flags
 #   - a pinned-tag example that is not the newest release (stale advice)
@@ -586,6 +588,44 @@ for f in "${DOCS[@]}"; do
         done
     done < <(grep -nE 'settings\.txt|settings-file|설정-파일|[Ss]ettings file (below|described)|아래 설정 파일' "$f" 2>/dev/null)
 done
+
+# --- Check 14: tile names in the no-CLI task table ---------------------------
+# The table after `<!-- tiles -->` in the no-CLI quick start tells the reader
+# which New scan tile to pick. Its second column must be a tile label as the web
+# UI shows it: a label key from SOURCE_META in NewScan.tsx, read from the page's
+# own locale (en for .md, ko for .ko.md).
+TILE_SRC=docker/web/frontend/src/components/NewScan.tsx
+if command -v python3 >/dev/null 2>&1 && [ -f "$TILE_SRC" ]; then
+    for page in docs/start/no-cli.md docs/start/no-cli.ko.md; do
+        [ -f "$page" ] || continue
+        case "$page" in *.ko.md) loc=ko ;; *) loc=en ;; esac
+        while IFS= read -r msg; do
+            [ -n "$msg" ] || continue
+            echo "  DRIFT[tile]: $page $msg"
+            FAIL=$((FAIL + 1))
+        done < <(python3 - "$page" "$TILE_SRC" "docker/web/frontend/src/locales/$loc/common.json" <<'PY'
+import json, re, sys
+page, src, loc = sys.argv[1:4]
+keys = re.findall(r'labelKey:\s*"source\.([A-Za-z]+)"', open(src, encoding="utf-8").read())
+strings = json.load(open(loc, encoding="utf-8")).get("source", {})
+labels = {strings[k] for k in keys if k in strings}
+lines = open(page, encoding="utf-8").read().split("\n")
+if "<!-- tiles -->" not in lines:
+    print("has no <!-- tiles --> table")
+    sys.exit()
+rows = []
+for ln in lines[lines.index("<!-- tiles -->") + 1:]:
+    if not ln.startswith("|"):
+        break
+    rows.append(ln)
+for row in rows[2:]:
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    if len(cells) < 2 or cells[1] not in labels:
+        print("names tile '%s', which is not a New scan tile label in %s" % (cells[1] if len(cells) > 1 else row, loc))
+PY
+        )
+    done
+fi
 
 echo ""
 [ "$WARN" -gt 0 ] && echo "${WARN} i18n warning(s) (non-fatal)"
