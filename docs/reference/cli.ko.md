@@ -12,7 +12,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 ./scripts/scan-sbom.sh [옵션]
 ```
 
-> **Windows 사용자**: 위 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.
+> **Windows 사용자**: 위 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 >
 > - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
 > - WSL2에서는 명령을 그대로 실행합니다.

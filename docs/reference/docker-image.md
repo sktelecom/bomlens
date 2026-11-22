@@ -278,4 +278,4 @@ The procedure for building the image yourself or publishing it for multiple plat
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [CLI reference](../reference/cli.md) | [Architecture](../concepts/architecture.md)
+> **Related**: [First scan](../start/first-scan.md) | [CLI reference](../reference/cli.md) | [Architecture](../concepts/architecture.md)

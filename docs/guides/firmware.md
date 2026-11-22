@@ -185,4 +185,4 @@ The firmware image contains GPL tools (cve-bin-tool, sasquatch, and some extract
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [CLI reference](../reference/cli.md) | [Notice and security guide](../guides/reports.md)
+> **Related**: [First scan](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [CLI reference](../reference/cli.md) | [Notice and security guide](../guides/reports.md)

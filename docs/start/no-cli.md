@@ -19,7 +19,7 @@ The prefix (`...`) is the project name and version you entered. For example, if 
 
 ## What you need and how long it takes
 
-All you need is a Docker engine. On Windows, for a first install, **Rancher Desktop** is recommended — it is free and fits the double-click flow well. If you already use Docker, leave it as is and move on. (A detailed comparison of the other options is in [Getting started](../start/first-scan.md).)
+All you need is a Docker engine. On Windows, for a first install, **Rancher Desktop** is recommended: it is free and fits the double-click flow well. If you already use Docker, leave it as is and move on. (A detailed comparison of the other options is in [First scan](../start/first-scan.md).)
 
 The first time, install and download take a while. Roughly:
 
@@ -129,7 +129,7 @@ From here the desktop app and the web UI are the same.
 2. For the scan target, choose "ZIP upload" and upload the source code ZIP received from the dev team.
 3. Click run. The progress log streams in real time, and the result overview appears when it finishes.
 
-> To scan a folder already on your disk instead of a ZIP, the desktop app has an **Add folder** button. On the `sbom-ui.bat` path, set `SBOM_UI_MOUNT_DIR` to that folder before running so the web UI can reach it (the CLI equivalent is `--ui --mount <dir>`).
+> To scan a folder already on your disk instead of a ZIP, the desktop app has an **Add folder** button. On the `sbom-ui.bat` path, put `SBOM_UI_MOUNT_DIR=D:\my-project` in the [settings file](#settings-file-no-command-line-needed) before running so the web UI can reach that folder (the CLI equivalent is `--ui --mount <dir>`).
 
 ![The scan result overview — components, vulnerabilities and licenses](../images/web-ui-scan-en.png)
 
@@ -149,12 +149,12 @@ When the scan finishes, download the notice from the results screen as per-forma
 - **A message says there is not enough free disk space**: the Docker engine has less free than the image to download plus 2 GB. [Free the space](../reference/docker-image.md#how-do-i-free-the-space) by removing images you no longer need, or set `BOMLENS_SKIP_DISK_CHECK=1` to try anyway.
 - **My company's repository needs a login**: a Maven or Gradle project that downloads from a private repository needs the credentials in your own `~/.m2/settings.xml` or `~/.gradle/gradle.properties`. The desktop app passes them into the scan read-only; the double-click `sbom-ui.bat` does not. See [How do I scan a Java project that builds with Maven?](../guides/java-maven.md#does-my-private-repository-work).
 - **"Image download failed" on a company network**: this is almost always a proxy. The image is downloaded by the **Docker daemon**, not by the launcher, so proxy settings in your command prompt have no effect — set them in Docker Desktop (`Settings > Resources > Proxies`) or Rancher Desktop (`Preferences > WSL > Proxy`). If the proxy also intercepts `localhost`, add `localhost` to its bypass list, otherwise the browser shows an error even when the scan is running fine.
-- **Scans fail with `certificate signed by unknown authority` or `PKIX path building failed`**: your network's proxy inspects HTTPS and re-signs it with its own CA, which the scan containers do not trust. Get that CA bundle in PEM form from your IT team and put `SBOM_EXTRA_CA_CERTS=C:\path\to\proxy-ca.pem` in `bomlens.settings.txt` (a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`); `sbom-ui.bat` then mounts it into the scan containers. The desktop app reads the same name as an environment variable. When a scan fails this way, its log shows a `[WARN]` line naming this option. It does not cover image downloads: those are done by the Docker daemon, so the CA has to be trusted in Docker Desktop or Rancher Desktop as well.
+- **Scans fail with `certificate signed by unknown authority` or `PKIX path building failed`**: your network's proxy inspects HTTPS and re-signs it with its own CA, which the scan containers do not trust. Get that CA bundle in PEM form from your IT team and give it to BomLens as `SBOM_EXTRA_CA_CERTS`. The desktop app and `sbom-ui.bat` take it in different ways, both described in [Company network](../guides/company-network.md#how-do-i-trust-my-company-ca).
 - **No usable network at all**: the launcher can install from a file instead of downloading. Ask for `bomlens-image.tar`, put it next to the `.bat` files, and it is used automatically — no network, no command line. See "Settings file" below.
 
 ## Settings file (no command line needed)
 
-Environment variables you type in a command prompt do not apply when you double-click a `.bat`, so the launchers also read a plain text file. Copy `scripts\bomlens.settings.example.txt` to `bomlens.settings.txt` in the same folder and uncomment what you need:
+Environment variables you type in a command prompt do not apply when you double-click a `.bat`, so `sbom-ui.bat` and `check-setup.bat` also read a plain text file. `scan-sbom.bat` and the desktop app do not. Copy `scripts\bomlens.settings.example.txt` to `bomlens.settings.txt` in the same folder and uncomment what you need:
 
 ```
 SBOM_LANG=en
@@ -190,8 +190,8 @@ The language images a scan downloaded (`ghcr.io/cdxgen/...`, and `bomlens-androi
 
 Your scan results live in the `sbom-output` folder under your home directory. Leave it alone if you want to keep the reports.
 
-For more detail and command-line usage, see [Getting started](../start/first-scan.md) and the [Notice and security guide](../guides/reports.md).
+For more detail and command-line usage, see [First scan](../start/first-scan.md) and the [Notice and security guide](../guides/reports.md).
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Notice and security guide](../guides/reports.md)
+> **Related**: [First scan](../start/first-scan.md) | [Notice and security guide](../guides/reports.md)

@@ -53,6 +53,6 @@ Image downloads are made by the Docker engine, so set the proxy in Docker Deskto
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-maven-project --generate-only
 ```
 
-The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails with `PKIX path building failed` or `certificate signed by unknown authority` prints a `[WARN]` line that names this option. On Windows, the desktop app reads `SBOM_EXTRA_CA_CERTS` as an environment variable, and the batch launchers read it from `bomlens.settings.txt` ([Settings file](../start/no-cli.md#settings-file-no-command-line-needed)). The CA also has to be trusted by Docker Desktop or Rancher Desktop for the image download itself.
+The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails with `PKIX path building failed` or `certificate signed by unknown authority` prints a `[WARN]` line that names this option. How to set it for the desktop app, `sbom-ui.bat` and `scan-sbom.bat` is in [Company network](company-network.md#how-do-i-trust-my-company-ca). The CA also has to be trusted by Docker Desktop or Rancher Desktop for the image download itself.
 
 For the full Maven behavior, such as test scope, parent POM licenses and Maven 3.10, see [Ecosystems](../reference/ecosystems.md#java-maven).

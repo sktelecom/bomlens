@@ -31,7 +31,13 @@ HTTPS를 검사하는 프록시는 사내 인증기관(CA)으로 다시 서명�
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-project --generate-only
 ```
 
-이 파일은 스캔 컨테이너의 시스템 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. 신뢰할 수 없는 인증서 때문에 스캔이 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. npm은 cdxgen 로그에 `SELF_SIGNED_CERT_IN_CHAIN`으로 보고하며, 그런 저장소를 상대로 의존성 단계가 진행 없이 몇 분씩 이어지는 것도 같은 원인을 가리킵니다. Windows에서 데스크톱 앱은 `SBOM_EXTRA_CA_CERTS`를 환경 변수로 읽고, 배치 실행 파일은 `bomlens.settings.txt`에서 읽습니다([설정 파일](../start/no-cli.ko.md#설정-파일-명령줄-불필요)).
+이 파일은 스캔 컨테이너의 시스템 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. 신뢰할 수 없는 인증서 때문에 스캔이 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. npm은 cdxgen 로그에 `SELF_SIGNED_CERT_IN_CHAIN`으로 보고하며, 그런 저장소를 상대로 의존성 단계가 진행 없이 몇 분씩 이어지는 것도 같은 원인을 가리킵니다.
+
+`SBOM_EXTRA_CA_CERTS`를 지정하는 방법은 BomLens를 실행하는 방식에 따라 다릅니다.
+
+- `scan-sbom.sh`와 `scan-sbom.bat`은 위 명령처럼 환경 변수에서 읽습니다. 설정 파일은 읽지 않습니다.
+- `sbom-ui.bat`을 더블클릭해 실행하면 명령 프롬프트에서 설정한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적은 `SBOM_EXTRA_CA_CERTS=C:\경로\company-ca.pem`도 읽습니다([설정 파일](../start/no-cli.ko.md#설정-파일-명령줄-불필요)). 경로에는 `&`, `^`, `|`, `<`, `>`, `%`, `!`가 없어야 합니다. 환경 변수가 설정되어 있으면 파일보다 우선합니다.
+- 데스크톱 앱은 환경 변수에서만 읽습니다. Windows에서는 명령 프롬프트에서 `setx SBOM_EXTRA_CA_CERTS C:\경로\company-ca.pem`을 한 번 실행한 뒤 앱을 종료했다가 다시 실행합니다. macOS에서는 터미널에서 `launchctl setenv SBOM_EXTRA_CA_CERTS /경로/company-ca.pem`을 실행한 뒤 앱을 다시 실행합니다. 이 설정은 재부팅하면 사라집니다. 경로에 쉼표나 큰따옴표가 있으면 시작하지 않습니다.
 
 ## Docker 엔진 자체의 프록시와 인증서는 어떻게 하나요?
 

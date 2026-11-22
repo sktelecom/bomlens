@@ -68,6 +68,10 @@ docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.html   ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.md  ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.html ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_completeness.json :: .grade=="complete"
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_bom.spdx.json   :: .spdxVersion=="SPDX-2.3"
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_conformance.json ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_conformance.md   ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_conformance.html ::
 docs/reference/ecosystems.md :: NodeExample_1.0.0/NodeExample_1.0.0_bom.json :: .bomFormat=="CycloneDX" and .specVersion=="1.6"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_NOTICE.txt        ::

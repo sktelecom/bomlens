@@ -53,6 +53,6 @@ CLI, `--ui`, 데스크톱 앱은 모두 이렇게 합니다. 더블클릭하는 
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-maven-project --generate-only
 ```
 
-이 파일은 스캔 컨테이너의 시스템 인증서 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. `PKIX path building failed`나 `certificate signed by unknown authority`로 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. Windows에서 데스크톱 앱은 `SBOM_EXTRA_CA_CERTS`를 환경변수로 읽고, 배치 런처는 `bomlens.settings.txt`에서 읽습니다([설정 파일](../start/no-cli.ko.md#설정-파일-명령줄-불필요)). 이미지 다운로드 자체를 위해서는 Docker Desktop이나 Rancher Desktop에서도 그 CA를 신뢰해야 합니다.
+이 파일은 스캔 컨테이너의 시스템 인증서 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. `PKIX path building failed`나 `certificate signed by unknown authority`로 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. 데스크톱 앱, `sbom-ui.bat`, `scan-sbom.bat`에서 지정하는 방법은 [사내 네트워크](company-network.ko.md#사내-인증서는-어떻게-신뢰하게-하나요)에 있습니다. 이미지 다운로드 자체를 위해서는 Docker Desktop이나 Rancher Desktop에서도 그 CA를 신뢰해야 합니다.
 
 테스트 스코프, 부모 POM 라이선스, Maven 3.10 같은 Maven 동작 전반은 [지원 생태계](../reference/ecosystems.ko.md#java-maven)를 보세요.

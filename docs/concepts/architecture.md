@@ -273,4 +273,4 @@ flowchart TB
     C -. upload .-> F
 ```
 
-> Related: [Pipeline by input type](pipeline-by-input.md) | [Getting started](../start/first-scan.md) | [CLI reference](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)
+> Related: [Pipeline by input type](pipeline-by-input.md) | [First scan](../start/first-scan.md) | [CLI reference](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)

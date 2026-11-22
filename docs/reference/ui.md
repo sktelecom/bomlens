@@ -29,7 +29,7 @@ The interface has a top bar across the width, a left rail for the current scan's
 
 The first Tab stop on every screen is a "Skip to main content" link that moves focus past the top bar and rail. The global actions (New scan, Scan management) live in the top bar, and the rail repeats them as labelled links above its sections so a result screen always shows a named way back. Every navigation element — the logo, New scan, the rail sections, the past-scan links — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
 
-The **Help** menu (the question-mark icon in the top bar) links to Getting started, the documentation, the live demo, the release notes of the running version and **Report a problem**, and lists the keyboard shortcuts. Press `?` outside a text field to open the same list. On a first run with no scans yet, the Scan management screen offers a link to an example result next to the New scan button.
+The **Help** menu (the question-mark icon in the top bar) links to First scan, the documentation, the live demo, the release notes of the running version and **Report a problem**, and lists the keyboard shortcuts. Press `?` outside a text field to open the same list. On a first run with no scans yet, the Scan management screen offers a link to an example result next to the New scan button.
 
 ## New scan
 

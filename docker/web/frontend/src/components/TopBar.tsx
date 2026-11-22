@@ -336,7 +336,7 @@ function RecentMenu({
 }
 
 /**
- * Getting started, documentation, the demo, the keyboard shortcuts, what
+ * First scan, documentation, the demo, the keyboard shortcuts, what
  * changed, reporting a problem, and which version is running. On a compact top
  * bar it also carries the language choice.
  */

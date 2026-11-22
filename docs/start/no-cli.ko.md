@@ -27,7 +27,7 @@ description: 명령어 없이 소스 코드를 오픈소스 고지문으로 바�
 
 필요한 것은 Docker 엔진 하나뿐입니다. Windows에서 처음 설치한다면 무료이면서 더블클릭 흐름과
 잘 맞는 **Rancher Desktop**을 권장합니다. 이미 Docker를 쓰고 있다면 그대로 두고 넘어가세요.
-(다른 선택지의 자세한 비교는 [시작하기](../start/first-scan.ko.md) 문서에 있습니다.)
+(다른 선택지의 자세한 비교는 [첫 스캔](../start/first-scan.ko.md) 문서에 있습니다.)
 
 처음 한 번은 설치와 다운로드에 시간이 걸립니다. 대략 다음과 같습니다.
 
@@ -158,7 +158,7 @@ codesign --force --deep -s - /Applications/BomLens.app
 2. 스캔 대상에서 "ZIP 업로드"를 고르고, 개발팀에게 받은 소스 코드 ZIP 파일을 올립니다.
 3. 스캔 실행을 누릅니다. 진행 로그가 실시간으로 표시되고, 끝나면 결과 개요가 나타납니다.
 
-> ZIP 대신 디스크에 이미 있는 폴더를 스캔하려면, 데스크톱 앱에는 **폴더 추가** 버튼이 있습니다. `sbom-ui.bat` 경로에서는 실행 전에 `SBOM_UI_MOUNT_DIR`을 그 폴더로 설정하면 웹 UI가 접근할 수 있습니다(CLI로는 `--ui --mount <dir>`에 해당).
+> ZIP 대신 디스크에 이미 있는 폴더를 스캔하려면, 데스크톱 앱에는 **폴더 추가** 버튼이 있습니다. `sbom-ui.bat` 경로에서는 실행 전에 [설정 파일](#설정-파일-명령줄-불필요)에 `SBOM_UI_MOUNT_DIR=D:\my-project`처럼 그 폴더를 적으면 웹 UI가 접근할 수 있습니다(CLI로는 `--ui --mount <dir>`에 해당).
 
 ![스캔 결과 개요 — 컴포넌트, 취약점, 라이선스 요약](../images/web-ui-scan.png)
 
@@ -205,19 +205,16 @@ SBOM(`..._bom.json`)과 오픈소스 위험 보고서(`..._risk-report.html`)도
   프록시 우회 목록에 `localhost`를 추가하세요.
 - **스캔이 `certificate signed by unknown authority`나 `PKIX path building failed`로 실패해요**:
   사내 프록시가 HTTPS를 검사하면서 자체 CA로 다시 서명하는데, 스캔 컨테이너가 그 CA를 신뢰하지 않아서입니다.
-  IT 담당 부서에서 그 CA 번들을 PEM 형식으로 받아 `bomlens.settings.txt`에
-  `SBOM_EXTRA_CA_CERTS=C:\경로\proxy-ca.pem`을 넣으세요(`&`, `^`, `|`, `<`, `>`, `%`, `!`가 없는 경로).
-  그러면 `sbom-ui.bat`이 이 파일을 스캔 컨테이너에 마운트합니다. 데스크톱 앱은 같은 이름의 환경변수를 읽습니다.
-  이렇게 실패한 스캔은 로그에 이 옵션을 안내하는 `[WARN]` 줄을 남깁니다. 이미지 다운로드에는 적용되지 않습니다.
-  이미지는 Docker 데몬이 내려받으므로 Docker Desktop이나 Rancher Desktop에서도 그 CA를 신뢰하도록 설정해야 합니다.
+  IT 담당 부서에서 그 CA 번들을 PEM 형식으로 받아 `SBOM_EXTRA_CA_CERTS`로 BomLens에 알려 주세요.
+  데스크톱 앱과 `sbom-ui.bat`은 지정하는 방법이 다르며, 둘 다 [사내 네트워크](../guides/company-network.ko.md#사내-인증서는-어떻게-신뢰하게-하나요)에 있습니다.
 - **쓸 수 있는 네트워크가 아예 없어요**: 다운로드 대신 파일로 설치할 수 있습니다.
   `bomlens-image.tar`를 받아 `.bat` 파일들 옆에 두면 자동으로 사용합니다 — 네트워크도 명령줄도
   필요 없습니다. 아래 "설정 파일"을 참고하세요.
 
 ## 설정 파일 (명령줄 불필요)
 
-명령 프롬프트에서 설정한 환경변수는 `.bat`을 더블클릭할 때 적용되지 않습니다. 그래서 런처는
-텍스트 파일도 함께 읽습니다. `scripts\bomlens.settings.example.txt`를 같은 폴더에
+명령 프롬프트에서 설정한 환경변수는 `.bat`을 더블클릭할 때 적용되지 않습니다. 그래서 `sbom-ui.bat`과
+`check-setup.bat`은 텍스트 파일도 함께 읽습니다. `scan-sbom.bat`과 데스크톱 앱은 이 파일을 읽지 않습니다. `scripts\bomlens.settings.example.txt`를 같은 폴더에
 `bomlens.settings.txt`로 복사한 뒤 필요한 줄의 주석을 해제하세요.
 
 ```
@@ -255,9 +252,9 @@ docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
 
 스캔 결과는 홈 디렉터리 아래 `sbom-output` 폴더에 있습니다. 보고서를 보관할 생각이면 지우지 마세요.
 
-더 자세한 설명과 CLI 사용법은 [시작하기](../start/first-scan.ko.md)와
+더 자세한 설명과 CLI 사용법은 [첫 스캔](../start/first-scan.ko.md)과
 [고지문·보안 보고서 가이드](../guides/reports.ko.md) 문서를 참고하세요.
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)

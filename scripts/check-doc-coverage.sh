@@ -16,7 +16,8 @@
 # "expected .../..." line). This script reads it and checks that every
 # user-facing mode is (1) registered in the coverage manifest below and
 # (2) mentioned in each page that should cover it. Adding a mode to the code
-# but forgetting a page therefore fails CI.
+# but forgetting a page therefore fails CI. It also caps the length of the
+# pages a first-time reader opens (LENGTH_CAPS below).
 
 set -euo pipefail
 
@@ -122,9 +123,46 @@ while IFS= read -r line; do
   IFS="$oldIFS"
 done < <(printf '%s\n' "$COVERAGE")
 
+# 4) Length caps for the pages a first-time reader opens. A page may only grow
+#    past its cap by raising the number here, so the growth shows in review.
+#    path :: max lines :: max words (0 = no word cap)
+LENGTH_CAPS="
+README.md :: 60 :: 700
+docs/start/first-scan.md :: 170 :: 0
+docs/start/first-scan.ko.md :: 172 :: 0
+docs/start/no-cli.md :: 197 :: 0
+docs/start/no-cli.ko.md :: 260 :: 0
+docs/guides/supplier-sbom.md :: 239 :: 0
+docs/guides/supplier-sbom.ko.md :: 241 :: 0
+docs/guides/ai-model.md :: 464 :: 0
+docs/guides/ai-model.ko.md :: 464 :: 0
+docs/reference/ui.md :: 239 :: 0
+docs/reference/ui.ko.md :: 239 :: 0
+"
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  rel=$(printf '%s' "$line" | awk -F ' :: ' '{print $1}')
+  max_lines=$(printf '%s' "$line" | awk -F ' :: ' '{print $2}')
+  max_words=$(printf '%s' "$line" | awk -F ' :: ' '{print $3}')
+  f="$ROOT/$rel"
+  if [ ! -f "$f" ]; then echo "FAIL: length cap names a missing file ($rel)"; fail=1; continue; fi
+  lines=$(wc -l < "$f" | tr -d ' ')
+  if [ "$lines" -gt "$max_lines" ]; then
+    echo "FAIL: $rel has $lines lines, over its cap of $max_lines (scripts/check-doc-coverage.sh)"
+    fail=1
+  fi
+  if [ "$max_words" -gt 0 ]; then
+    words=$(wc -w < "$f" | tr -d ' ')
+    if [ "$words" -gt "$max_words" ]; then
+      echo "FAIL: $rel has $words words, over its cap of $max_words (scripts/check-doc-coverage.sh)"
+      fail=1
+    fi
+  fi
+done < <(printf '%s\n' "$LENGTH_CAPS")
+
 if [ "$fail" -ne 0 ]; then
   echo ""
-  echo "Documentation coverage check failed — a scan mode is missing from one or more pages."
+  echo "Documentation coverage check failed: a scan mode is missing from a page, or a page is over its length cap."
   exit 1
 fi
-echo "OK: every user-facing input form is documented across the key pages."
+echo "OK: every user-facing input form is documented across the key pages, and no capped page is over its length."

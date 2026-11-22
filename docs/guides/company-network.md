@@ -31,7 +31,13 @@ A proxy that inspects HTTPS re-signs it with a company CA, and the scan containe
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-project --generate-only
 ```
 
-The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way. On Windows, the desktop app reads `SBOM_EXTRA_CA_CERTS` as an environment variable, and the batch launchers read it from `bomlens.settings.txt` ([Settings file](../start/no-cli.md#settings-file-no-command-line-needed)).
+The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way.
+
+How you set `SBOM_EXTRA_CA_CERTS` depends on how you start BomLens:
+
+- `scan-sbom.sh` and `scan-sbom.bat` read it from the environment, as in the command above. They do not read a settings file.
+- When you double-click `sbom-ui.bat`, it does not see a variable typed in a command prompt, so it also reads `SBOM_EXTRA_CA_CERTS=C:\path\to\company-ca.pem` from `bomlens.settings.txt` next to the scripts ([Settings file](../start/no-cli.md#settings-file-no-command-line-needed)). Use a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`. A variable set in the environment wins over the file.
+- The desktop app reads it from the environment only. On Windows, run `setx SBOM_EXTRA_CA_CERTS C:\path\to\company-ca.pem` once in a command prompt, then quit the app and start it again. On macOS, run `launchctl setenv SBOM_EXTRA_CA_CERTS /path/to/company-ca.pem` in Terminal, then start the app again; the setting is lost on restart. A path with a comma or a double quote is refused.
 
 ## What about the Docker engine's own proxy and CA?
 

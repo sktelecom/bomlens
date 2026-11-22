@@ -81,9 +81,17 @@ export default defineConfig({
         shiki: { langAlias: { modelica: 'text' } },
         // Shell blocks get no window bar; the copy button stays.
         defaultProps: { frame: 'code' },
+        // Code blocks take the shared --muted token in both themes, as the web UI
+        // does, in place of the github-light and github-dark theme backgrounds.
         styleOverrides: {
           borderRadius: '0.5rem',
-          frames: { terminalTitlebarDotsForeground: 'transparent', terminalTitlebarDotsOpacity: '0' },
+          codeBackground: 'hsl(var(--muted))',
+          frames: {
+            editorBackground: 'hsl(var(--muted))',
+            terminalBackground: 'hsl(var(--muted))',
+            terminalTitlebarDotsForeground: 'transparent',
+            terminalTitlebarDotsOpacity: '0',
+          },
         },
       },
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },

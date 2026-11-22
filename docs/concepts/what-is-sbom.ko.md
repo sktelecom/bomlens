@@ -29,8 +29,8 @@ SBOM(Software Bill of Materials)은 소프트웨어 안에 든 구성요소의 �
 스캔을 실행하는 데 이 내용을 외울 필요는 없습니다. 맞는 길을 고르세요.
 
 - 명령어 없이: [비개발자 빠른 시작](../start/no-cli.ko.md)이 설치부터 오픈소스 고지문까지 클릭만으로 안내합니다.
-- 개발자 환경, 웹 UI와 CLI: [시작하기](../start/first-scan.ko.md).
+- 개발자 환경, 웹 UI와 CLI: [첫 스캔](../start/first-scan.ko.md).
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [비개발자 빠른 시작](../start/no-cli.ko.md) | [산출물 종류](../reference/artifacts.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [비개발자 빠른 시작](../start/no-cli.ko.md) | [산출물 종류](../reference/artifacts.ko.md)

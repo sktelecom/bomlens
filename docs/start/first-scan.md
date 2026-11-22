@@ -2,21 +2,17 @@
 description: Install BomLens and generate your first SBOM. The fastest path needs no command line — download the desktop app and double-click; or use the web UI or the CLI to produce a CycloneDX SBOM, an open-source notice, and a security report.
 ---
 
-# Getting started
+# First scan
 
-From install to your first [SBOM](../concepts/what-is-sbom.md), step by step. The fastest path needs no command line — download the app and double-click.
-
-> Just want an SBOM or a notice quickly, no commands? Start with the [no-CLI quick start](../start/no-cli.md). Building an Android, Java or iOS app? There is a short page for each: [Android (Gradle)](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS (SwiftPM and CocoaPods)](../guides/ios-swift.md).
+From install to your first [SBOM](../concepts/what-is-sbom.md), step by step. The fastest path needs no command line: download the app and double-click it.
 
 BomLens runs on a Docker engine, but the desktop app and web UI set it up and pull the image for you. You only manage Docker yourself for the CLI — see [Requirements](#requirements) below if you still need to install one.
 
 ## Start without the command line (recommended)
 
-Download the installer for your system, [Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 1.4 GB on disk), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so Edge may hold the download back and Windows SmartScreen may warn when you open it. The [no-CLI quick start](../start/no-cli.md) shows each of those steps, how to update the app, and what to do on macOS.
+Download the installer for your system, [Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 1.4 GB on disk), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so Edge may hold the download back and Windows SmartScreen may warn when you open it. The [no-CLI quick start](../start/no-cli.md) shows each of those steps, how to update the app, and what to do on macOS. Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step by step in [Path B of the no-CLI quick start](../start/no-cli.md#path-b--zip-and-double-click-batch-file-alternative).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
-
-Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step by step in [Path B of the no-CLI quick start](../start/no-cli.md#path-b--zip-and-double-click-batch-file-alternative).
 
 ## Web UI
 
@@ -51,16 +47,11 @@ Advanced, for automation and CI. Run from the cloned repo. The first run downloa
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target examples/nodejs --all --generate-only
 ```
 
-This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report named `MyApp_1.0.0_…`, all in a `MyApp_1.0.0/` subfolder of the current directory.
+This produces a CycloneDX SBOM, an open-source notice, a security report, a risk report and an SPDX copy named `MyApp_1.0.0_…`, all in a `MyApp_1.0.0/` subfolder of the current directory.
 
-```bash
-# From a GitHub URL, without cloning first
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --git "https://github.com/org/repo" --all --generate-only
-```
+To scan a GitHub repository without cloning it, use `--git "https://github.com/org/repo"` in place of `--target`. Other inputs, such as a ZIP source (`--target app.zip`), an existing SBOM (`--analyze sbom.json`), firmware (`--target dev.bin --firmware`) and a Docker image (`--target nginx:latest`), are in the [input-scenarios guide](../guides/by-input.md).
 
-Other inputs — a ZIP source (`--target app.zip`), an existing SBOM (`--analyze sbom.json`), firmware (`--target dev.bin --firmware`), a Docker image (`--target nginx:latest`) — are in the [input-scenarios guide](../guides/by-input.md).
-
-> `--generate-only` saves the outputs locally without uploading (the vulnerability scan still runs). `--all` produces the notice, the SBOM, and the risk report in one run. The full options are in the [CLI reference](../reference/cli.md#options-reference); to upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`) — the steps are in the [upload guide](../guides/upload.md).
+> `--generate-only` saves the outputs locally without uploading (the vulnerability scan still runs). `--all` adds the notice, the security report and an SPDX copy to the SBOM; the risk report is made by default. The full options are in the [CLI reference](../reference/cli.md#options-reference). To upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`); the steps are in the [upload guide](../guides/upload.md).
 
 ## Understanding the results
 
@@ -72,44 +63,11 @@ Each scan lands in a `{Project}_{Version}/` subfolder, and the files inside are 
 | `{Project}_{Version}_NOTICE.{txt,html}` | open-source notice (고지문) grouped by license |
 | `{Project}_{Version}_security.{json,md,html}` | Trivy vulnerability report |
 | `{Project}_{Version}_risk-report.{md,html}` | open-source risk report (licenses + vulnerabilities), generated by default |
+| `{Project}_{Version}_bom.spdx.json` | the SBOM as an SPDX 2.3 copy, with `--spdx` or `--all` |
+| `{Project}_{Version}_conformance.{json,md,html}` | conformance check of the SBOM against the selected profile, for reference only |
+| `{Project}_{Version}_completeness.json` | how complete the result is ([Reading the completeness grade](#reading-the-completeness-grade)) |
 
-The SBOM is [CycloneDX 1.6](https://cyclonedx.org/) JSON:
-
-```json
-{
-  "bomFormat": "CycloneDX",
-  "specVersion": "1.6",
-  "version": 1,
-  "metadata": {
-    "timestamp": "2026-01-15T10:30:00Z",
-    "component": {
-      "type": "application",
-      "name": "MyApp",
-      "version": "1.0.0"
-    }
-  },
-  "components": [
-    {
-      "type": "library",
-      "name": "express",
-      "version": "4.18.2",
-      "purl": "pkg:npm/express@4.18.2",
-      "licenses": [
-        { "license": { "id": "MIT" } }
-      ]
-    }
-  ]
-}
-```
-
-### Key fields
-
-| Field | Meaning |
-|-------|---------|
-| `metadata.component` | the scanned project (name, version) |
-| `components` | the open-source components found |
-| `components[].purl` | Package URL — the unique package identifier |
-| `components[].licenses` | license info (SPDX ID) |
+Other files appear for some inputs and options; [Artifacts](../reference/artifacts.md) lists them all. The SBOM is [CycloneDX 1.6](https://cyclonedx.org/) JSON, and [What is an SBOM](../concepts/what-is-sbom.md) explains its terms, such as the PURL that identifies each package.
 
 ### Quick checks on the SBOM
 
@@ -203,11 +161,8 @@ Every scan writes `{Project}_{Version}_completeness.json`, and the Overview scre
 | Notice, security & risk reports, web UI | [Reports guide](../guides/reports.md) |
 | Every option and CI/CD | [CLI reference](../reference/cli.md) |
 | Language example projects | [Ecosystems](../reference/ecosystems.md) |
-| Android, Java or iOS projects | [Android](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS](../guides/ios-swift.md) |
+| Android, Java, iOS or C/C++ projects | [Android](../guides/android-gradle.md), [Java (Maven)](../guides/java-maven.md), [iOS](../guides/ios-swift.md), [C/C++](../guides/identify-vendored.md) |
+| Proxy, company CA and internal repositories | [Company network](../guides/company-network.md) |
 | Image sizes and freeing disk | [Docker image reference](../reference/docker-image.md#how-much-disk-do-the-images-take) |
 | Internals | [Architecture](../concepts/architecture.md) |
 | Contributing | [Contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) |
-
----
-
-> **Related**: [CLI reference](../reference/cli.md) | [Input scenarios](../guides/by-input.md)

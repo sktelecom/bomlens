@@ -38,7 +38,7 @@ Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 
 #   Windows: scripts\sbom-ui.bat 더블클릭
 ```
 
-설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.
+설치는 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 
 ### CLI에서
 
@@ -238,4 +238,4 @@ PURL에 기대는 적합성 항목은 실패합니다. Yocto는 패키지를 PUR
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [시나리오 가이드](../guides/by-input.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [보고서 읽는 법](../concepts/reports-explained.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [시나리오 가이드](../guides/by-input.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [보고서 읽는 법](../concepts/reports-explained.ko.md)

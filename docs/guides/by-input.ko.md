@@ -23,7 +23,7 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터
 
 ## 공통 준비
 
-> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 >
 > - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
 > - WSL2에서는 명령을 그대로 실행합니다.
@@ -282,4 +282,4 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)

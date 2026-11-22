@@ -501,7 +501,7 @@ for f in "${PATHDOCS[@]}"; do
         ln="${rec%%:*}"
         content="${rec#*:}"
         read -ra toks <<<"$content"
-        for raw in "${toks[@]}"; do
+        for raw in ${toks[@]+"${toks[@]}"}; do
             [ -z "$raw" ] && continue
             tok="${raw#./}"
             # A placeholder (`<lang>`, `{language}`) or a glob (`*.txt`)
@@ -561,6 +561,30 @@ for f in "${DOCS[@]}"; do
         diff <(heading_levels "$f") <(heading_levels "$ko") | sed 's/^/      /' | head -8
         WARN=$((WARN + 1))
     fi
+done
+
+# --- Check 13: settings-file keys must be ones sbom-ui.bat reads ------------
+# sbom-ui.bat reads bomlens.settings.txt through an allow-list (:cfg_set) and
+# ignores any other name without a message. A doc line that tells the reader to
+# put `NAME=value` in the settings file must therefore name an allowed key.
+SETTINGS_KEYS="$(grep -E '^for %%w in \(' scripts/sbom-ui.bat | head -1 \
+    | sed -E 's/^for %%w in \(([^)]*)\).*/\1/')"
+if [ -z "$SETTINGS_KEYS" ]; then
+    echo "  DRIFT[settings-key]: could not read the settings allow-list from scripts/sbom-ui.bat"
+    FAIL=$((FAIL + 1))
+fi
+for f in "${DOCS[@]}"; do
+    while IFS= read -r rec; do
+        ln="${rec%%:*}"
+        line="${rec#*:}"
+        while [[ $line =~ \`([A-Z][A-Z0-9_]*)=[^\`]*\` ]]; do
+            key="${BASH_REMATCH[1]}"
+            line="${line#*"${BASH_REMATCH[0]}"}"
+            case " $SETTINGS_KEYS " in *" $key "*) continue ;; esac
+            echo "  DRIFT[settings-key]: $f:$ln puts '$key' in the settings file, which sbom-ui.bat does not read"
+            FAIL=$((FAIL + 1))
+        done
+    done < <(grep -nE 'settings\.txt|settings-file|설정-파일|[Ss]ettings file (below|described)|아래 설정 파일' "$f" 2>/dev/null)
 done
 
 echo ""

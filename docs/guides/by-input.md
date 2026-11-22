@@ -23,7 +23,7 @@ For any input form, adding `--all --generate-only` produces all four at once (th
 
 ## Common setup
 
-> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](../start/first-scan.md) for installation.
+> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [First scan](../start/first-scan.md) for installation.
 >
 > - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash).
 > - Under WSL2, run the commands as-is.
@@ -282,4 +282,4 @@ As it runs, logs stream live; when done you can view or download the notice, SBO
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [CLI reference](../reference/cli.md)
+> **Related**: [First scan](../start/first-scan.md) | [CLI reference](../reference/cli.md)

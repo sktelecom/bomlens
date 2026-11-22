@@ -2,21 +2,17 @@
 description: BomLens 설치부터 첫 SBOM 생성까지. 명령어 없이 데스크톱 앱을 더블클릭하는 가장 빠른 길부터 웹 UI와 CLI까지, CycloneDX SBOM과 오픈소스 고지문, 보안 보고서를 만드는 단계별 가이드입니다.
 ---
 
-# 시작하기
+# 첫 스캔
 
 설치부터 첫 [SBOM](../concepts/what-is-sbom.ko.md)까지 단계별로 안내합니다. 가장 빠른 길은 명령어가 필요 없습니다. 앱을 받아 더블클릭하면 됩니다.
-
-> 명령어 없이 SBOM이나 고지문만 빨리 만들고 싶다면 [비개발자 빠른 시작](../start/no-cli.ko.md)부터 보세요. 안드로이드, 자바, iOS 앱을 만든다면 프로젝트별 안내가 있습니다. [안드로이드(Gradle)](../guides/android-gradle.ko.md), [자바(Maven)](../guides/java-maven.ko.md), [iOS(SwiftPM과 CocoaPods)](../guides/ios-swift.ko.md)입니다.
 
 BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI가 Docker를 점검하고 이미지를 대신 받아 줍니다. Docker를 직접 다루는 건 CLI를 쓸 때뿐입니다. 엔진을 새로 설치해야 한다면 아래 [요구 사항](#요구-사항)을 참고하세요.
 
 ## 명령어 없이 시작하기 (권장)
 
-사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(디스크에서 약 1.4GB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법, macOS에서 열리지 않을 때의 처리는 [비개발자 빠른 시작](../start/no-cli.ko.md)에 있습니다.
+사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(디스크에서 약 1.4GB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법, macOS에서 열리지 않을 때의 처리는 [비개발자 빠른 시작](../start/no-cli.ko.md)에 있습니다. 설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b--zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](../images/desktop-startup.png)
-
-설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b--zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
 
 ## 웹 UI
 
@@ -55,14 +51,11 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target examples/nodejs --all --generate-only
 ```
 
-```bash
-# GitHub URL에서 클론 없이 바로
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --git "https://github.com/org/repo" --all --generate-only
-```
+현재 디렉터리의 `MyApp_1.0.0/` 하위 폴더에 CycloneDX SBOM, 오픈소스 고지문, 보안 보고서, 위험 보고서, SPDX 사본이 `MyApp_1.0.0_…` 이름으로 생깁니다.
 
-ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
+GitHub 저장소를 클론 없이 스캔하려면 `--target` 대신 `--git "https://github.com/org/repo"`를 씁니다. ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
 
-> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 오픈소스 위험 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
+> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 SBOM에 고지문, 보안 보고서, SPDX 사본을 더해 만듭니다. 오픈소스 위험 보고서는 기본으로 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
 
 ## 결과 파일 이해하기
 
@@ -74,44 +67,11 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스별로 묶은 오픈소스 고지문 |
 | `{Project}_{Version}_security.{json,md,html}` | Trivy 취약점 보고서 |
 | `{Project}_{Version}_risk-report.{md,html}` | 오픈소스 위험 보고서(기본 생성) |
+| `{Project}_{Version}_bom.spdx.json` | SBOM의 SPDX 2.3 사본(`--spdx`나 `--all`을 쓸 때) |
+| `{Project}_{Version}_conformance.{json,md,html}` | 선택한 프로필 기준의 SBOM 적합성 검사 결과(참고용) |
+| `{Project}_{Version}_completeness.json` | 결과의 완전성([완전성 등급은 어떻게 읽나요?](#완전성-등급은-어떻게-읽나요)) |
 
-SBOM은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON입니다.
-
-```json
-{
-  "bomFormat": "CycloneDX",
-  "specVersion": "1.6",
-  "version": 1,
-  "metadata": {
-    "timestamp": "2026-01-15T10:30:00Z",
-    "component": {
-      "type": "application",
-      "name": "MyApp",
-      "version": "1.0.0"
-    }
-  },
-  "components": [
-    {
-      "type": "library",
-      "name": "express",
-      "version": "4.18.2",
-      "purl": "pkg:npm/express@4.18.2",
-      "licenses": [
-        { "license": { "id": "MIT" } }
-      ]
-    }
-  ]
-}
-```
-
-### 주요 필드 설명
-
-| 필드 | 설명 |
-|------|------|
-| `metadata.component` | 분석 대상 프로젝트 정보 (이름, 버전) |
-| `components` | 발견된 오픈소스 컴포넌트 목록 |
-| `components[].purl` | Package URL — 패키지의 고유 식별자 |
-| `components[].licenses` | 라이선스 정보 (SPDX ID) |
+입력과 옵션에 따라 생기는 다른 파일은 [산출물 레퍼런스](../reference/artifacts.ko.md)에 모두 있습니다. SBOM은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON이고, 각 패키지를 식별하는 PURL 같은 용어는 [SBOM이란](../concepts/what-is-sbom.ko.md)에서 설명합니다.
 
 ### SBOM 내용 빠르게 확인하기
 
@@ -205,11 +165,8 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 고지문, 보안 보고서, 오픈소스 위험 보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
 | 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
 | 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
-| 안드로이드, 자바, iOS 프로젝트 | [안드로이드](../guides/android-gradle.ko.md), [자바(Maven)](../guides/java-maven.ko.md), [iOS](../guides/ios-swift.ko.md) |
+| 안드로이드, 자바, iOS, C/C++ 프로젝트 | [안드로이드](../guides/android-gradle.ko.md), [자바(Maven)](../guides/java-maven.ko.md), [iOS](../guides/ios-swift.ko.md), [C/C++](../guides/identify-vendored.ko.md) |
+| 프록시, 사내 인증서, 사내 저장소 | [사내 네트워크](../guides/company-network.ko.md) |
 | 이미지 크기와 디스크 정리 | [Docker 이미지 참조](../reference/docker-image.ko.md#디스크-공간은-어떻게-비우나요) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |
 | 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.ko.md) |
-
----
-
-> **관련 문서**: [CLI 레퍼런스](../reference/cli.ko.md) | [지원 생태계](../reference/ecosystems.ko.md) | [시나리오 가이드](../guides/by-input.ko.md)

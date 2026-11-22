@@ -175,4 +175,4 @@ Trivy는 컴포넌트를 패키지 PURL로 대조하며, 다른 스캔과 마찬
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [시나리오 가이드](../guides/by-input.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)
+> **관련 문서**: [첫 스캔](../start/first-scan.ko.md) | [시나리오 가이드](../guides/by-input.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)

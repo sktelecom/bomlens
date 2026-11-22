@@ -12,7 +12,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 ./scripts/scan-sbom.sh [options]
 ```
 
-> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](../start/first-scan.md) for installation.
+> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [First scan](../start/first-scan.md) for installation.
 >
 > - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash).
 > - Under WSL2, run the commands as-is.
