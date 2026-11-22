@@ -1422,7 +1422,8 @@ EOF
             # A version-banner text file is NOT detected (cve-bin-tool needs an actual
             # binary), so build the rootfs inside the firmware image from one of its
             # own binaries (curl), then squash it. curl has known CVEs in the index.
-            if docker run --rm -v "$wc":/wc --entrypoint sh "$FW_IMG" -c '
+            # As this user, so the fixture files can be removed afterwards.
+            if docker run --rm -u "$(id -u):$(id -g)" -v "$wc":/wc --entrypoint sh "$FW_IMG" -c '
                     mkdir -p /wc/rootfs/bin /wc/rootfs/etc
                     cp /usr/bin/curl /wc/rootfs/bin/curl
                     echo NAME=Fixture > /wc/rootfs/etc/os-release
