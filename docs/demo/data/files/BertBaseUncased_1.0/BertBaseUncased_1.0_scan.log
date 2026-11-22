@@ -11,7 +11,7 @@ Generating AIBOM for google-bert/bert-base-uncased...
   - Generating AIBOM model data...
 
 📄 HTML Report:
-   /tmp/tmp.wOSnXQxyQ0/aibom.html
+   /tmp/tmp.621HOANWrx/aibom.html
 
 📝 Model Description:
    No description available
@@ -20,11 +20,11 @@ Generating AIBOM for google-bert/bert-base-uncased...
    Apache-2.0
 
 ✅ Successfully generated CycloneDX 1.6 SBOM:
-   /tmp/tmp.wOSnXQxyQ0/aibom.json
+   /tmp/tmp.621HOANWrx/aibom.json
    - Schema Validation (1.6): ✅ Valid
 
 ✅ Successfully generated CycloneDX 1.7 SBOM:
-   /tmp/tmp.wOSnXQxyQ0/aibom_1_7.json
+   /tmp/tmp.621HOANWrx/aibom_1_7.json
    - Schema Validation (1.7): ✅ Valid
 
 📊 Completeness Score: 63.4/100
@@ -47,7 +47,7 @@ Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF
 [enrich] enrichment complete.
 [INFO] SBOM ready: BertBaseUncased_1.0_bom.json
 [SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
-[docmeta] tool=BomLens@1.15.2, lifecycle=post-build: BertBaseUncased_1.0_bom.json
+[docmeta] tool=BomLens@1.15.3, lifecycle=post-build: BertBaseUncased_1.0_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [normalize] normalized: BertBaseUncased_1.0_bom.json (mode=sort-only)
 [malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).

@@ -8,10 +8,11 @@
 [firmware] rootfs candidate: 2026-06-18-raspios-trixie-arm64-lite.img.xz_extract/xz.uncompressed_extract/545259520-2977955840.extfs_extract (relative to extract root)
 [INFO] source-file-tree: wrote 20000 entries to RaspberryPiOsLite_2026-06-18_files.json.
 [WARN] source-file-tree: truncated at 20000 entries (source tree larger than the cap); the file view is partial.
-[INFO] source-snapshot: captured 730 file(s), 3205 KiB.
-[INFO] source-snapshot: 3 file(s) shown only up to 256 KiB.
+[INFO] source-snapshot: captured 1360 file(s), 8191 KiB.
+[WARN] source-snapshot: 914 file(s) left out — the snapshot hit its size limit; the file view is partial.
+[INFO] source-snapshot: 12 file(s) shown only up to 256 KiB.
 [INFO] source-snapshot: credentials masked in 5 file(s).
-[INFO] source-snapshot: 1546 binary file(s) listed without a preview.
+[INFO] source-snapshot: 2 binary file(s) listed without a preview.
 [firmware] syft: cataloging packages under rootfs...
 [firmware] cve-bin-tool: identifying binary components (signature checkers)...
 [firmware] This product uses NVD data but is not endorsed or certified by the NVD.
@@ -19,7 +20,7 @@
 [elf-presence] 5801 distinct ELF file(s) of 10801 found; 27 component(s) proved present by structure.
 [elf-presence] 1 of them fill a SONAME that names a slot rather than a project, and were read from the marker the library writes about itself: glibc
 [elf-presence] 1 of them were linked into another binary and read from its exported symbols: readline
-[elf-presence] 917 library name(s) have no mapping and were not reported: libc(1811), ld-linux-aarch64(1646), libstdc++(176), libgcc_s(175), libsystemd-shared-257(106), libm(102), libselinux(81), libpam(67), libgobject-2.0(43), libaudit(39), libgio-2.0(37), libcap(30), libblkid(30), libabsl_raw_logging_internal(30), libsystemd(28)
+[elf-presence] 918 library name(s) have no mapping and were not reported: libc(1811), ld-linux-aarch64(1646), libstdc++(176), libgcc_s(175), libsystemd-shared-257(106), libm(102), libselinux(81), libpam(67), libgobject-2.0(43), libaudit(39), libgio-2.0(37), libblkid(30), libcap(30), libabsl_raw_logging_internal(30), libsystemd(28)
 [android] 0 version file(s) read; 0 library(ies) the package declares.
 [ios] 0 framework(s) the package ships.
 [firmware] reading version strings cve-bin-tool's checkers do not match...
@@ -32,7 +33,7 @@
 [firmware] 17 of those are present with no version recovered. They cannot be matched against a vulnerability database — a clean vulnerability result does not cover them.
 [INFO] SBOM ready: RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
-[docmeta] tool=BomLens@1.15.2, lifecycle=post-build, sha256=acff736c…: RaspberryPiOsLite_2026-06-18_bom.json
+[docmeta] tool=BomLens@1.15.3, lifecycle=post-build, sha256=acff736c…: RaspberryPiOsLite_2026-06-18_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [component-versions] 1787 component(s) still have no version: 6lowpan, 6pack, 9p, 9pnet, 9pnet_fd, a8293, act_csum, act_ctinfo, act_gact, act_mirred, act_nat, act_pedit, act_police, act_simple, act_skbedit, ad5398_vcm, ad714x, ad714x_i2c, ad714x_spi, ad799x, adiantum, ads7828, ads7846, adt7410, adt7x10, adutux, adv7180, adxl34x, adxl34x_i2c, adxl34x_spi (and 1757 more)
 [component-versions]   Fill in RaspberryPiOsLite_2026-06-18_component-versions.template.csv and pass it with --component-versions to add them.
@@ -59,7 +60,7 @@
 [go-vulndb] 53 Go module(s) checked against 4783 record(s) (database of 2026-11-11T02:51:11Z): 0 new finding(s), 37 already reported by another engine -> RaspberryPiOsLite_2026-06-18_security_govulndb.json
 [security] merged 1022 new cvebintool CVE(s) (of 1022; overlap deduped) from RaspberryPiOsLite_2026-06-18_security_cvebintool.json.
 [security] enriching with EPSS + CISA KEV...
-[security] generated: RaspberryPiOsLite_2026-06-18_security.json, RaspberryPiOsLite_2026-06-18_security.md, RaspberryPiOsLite_2026-06-18_security.html (total=10529, critical=25, high=1137, kev=5, unchecked=1926, advisories=10)
+[security] generated: RaspberryPiOsLite_2026-06-18_security.json, RaspberryPiOsLite_2026-06-18_security.md, RaspberryPiOsLite_2026-06-18_security.html (total=10530, critical=25, high=1137, kev=5, unchecked=1926, advisories=10)
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_component-versions.template.csv
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_files.json
@@ -84,7 +85,7 @@
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_security_epss.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_NOTICE.txt
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_NOTICE.html
-[risk] generated: RaspberryPiOsLite_2026-06-18_risk-report.md, RaspberryPiOsLite_2026-06-18_risk-report.html (conformance=fail, vulns total=11551, crit=103, high=1621, copyleft=2276 strong/network + 33 weak, malicious=0)
+[risk] generated: RaspberryPiOsLite_2026-06-18_risk-report.md, RaspberryPiOsLite_2026-06-18_risk-report.html (conformance=fail, vulns total=11552, crit=103, high=1621, copyleft=2276 strong/network + 33 weak, malicious=0)
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_component-versions.template.csv
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_files.json
