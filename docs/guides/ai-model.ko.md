@@ -6,6 +6,10 @@ description: BomLens로 HuggingFace 모델의 AI SBOM(CycloneDX ML-BOM)을 모�
 
 HuggingFace 모델의 CycloneDX ML-BOM(머신러닝 SBOM)을 생성하고 결과를 읽는 방법입니다. 모델 id만 주면 BomLens가 모델 카드 메타데이터를 네트워크로 가져옵니다. 소스 코드도, 모델 가중치 다운로드도 필요 없습니다.
 
+- 입력: HuggingFace 모델은 `--model <owner/name>`, 공개된 데이터셋은 데이터셋 주소를 준 `--model`, 가중치 파일은 `--model-file`, 저장소나 파일이 아직 없는 모델은 `--ai-declare`를 씁니다. 데스크톱 앱과 웹 UI에서는 새 스캔의 AI 모델 또는 데이터셋, 모델 파일, 모델 정보 직접 입력 타일입니다.
+- 산출물: ML-BOM(CycloneDX 1.7)과 SPDX 3.0.1 사본, 고지문, 모델마다 사용 가능 여부를 판정한 오픈소스 위험 보고서, G7 최소 요소 적합성 검사입니다. 보안 보고서는 만들지 않습니다.
+- G7 검사와 판정은 권고입니다. 모델 문서가 무엇을 담고 있고 무엇을 사람이 채워야 하는지 보여 줄 뿐, 규제 준수 여부를 판정하지 않습니다.
+
 ## 동작 방식
 
 AI 모델의 "구성요소 명세"는 모델 카드입니다. 식별자, 아키텍처, 태스크, 라이선스, 공급자, 데이터셋, 파일 무결성 등이 담깁니다. BomLens는 [OWASP AIBOM Generator](https://github.com/GenAI-Security-Project/aibom-generator)로 HuggingFace 모델 카드를 읽어 모델과 참조 데이터셋 중심의 **CycloneDX 1.7 ML-BOM**을 만들고, **G7 최소 요소 적합성** 검사(권고)를 더합니다. 모델에는 패키지 의존성이 없으므로 보안(CVE) 보고서는 생성하지 않습니다.
@@ -29,28 +33,15 @@ AI 모델의 "구성요소 명세"는 모델 카드입니다. 식별자, 아키�
 docker pull ghcr.io/sktelecom/bomlens-aibom:latest
 ```
 
-이 이미지는 다운로드 기준 약 3.5GB로 기본 스캐너 이미지(약 250MB)보다 훨씬 큽니다. 회선에 따라 처음 받는 데 수십 분이 걸릴 수 있으니 시간을 두고 시작하세요. 한 번 받으면 다시 받지 않습니다.
-
-미리 받지 않아도 됩니다. `--model`을 쓰면 이 이미지가 기본값이라 없을 때 알아서 받고, 웹 UI와 데스크톱 앱도 첫 AI 모델 스캔에서 받으면서 진행 상황을 보여 줍니다. 다른 태그를 쓰려면 환경변수 `SBOM_AIBOM_IMAGE`로 지정합니다.
+이 이미지는 다운로드 기준 약 3.5GB로 기본 스캐너 이미지(약 250MB)보다 훨씬 큽니다. 회선에 따라 처음 받는 데 수십 분이 걸릴 수 있으니 시간을 두고 시작하세요. 한 번 받으면 다시 받지 않습니다. 미리 받지 않아도 됩니다. `--model`을 쓰면 이 이미지가 기본값이라 없을 때 알아서 받고, 웹 UI와 데스크톱 앱도 첫 AI 모델 스캔에서 받으면서 진행 상황을 보여 줍니다. 다른 태그를 쓰려면 환경변수 `SBOM_AIBOM_IMAGE`로 지정합니다.
 
 ## 실행하기
 
-### 웹 UI에서
+### 데스크톱 앱이나 웹 UI에서
 
-데스크톱 앱이나 평소 쓰던 웹 UI를 그대로 쓰면 됩니다. Docker에 접근할 수 있으면 AI 모델 타일이 활성화되고, aibom 이미지는 첫 스캔에서 별도 컨테이너로 받아 실행합니다. 처음 한 번은 이미지를 받느라 시작이 느립니다.
+데스크톱 앱이나 웹 UI를 엽니다(설치는 [첫 스캔](../start/first-scan.ko.md) 참고). Docker에 접근할 수 있으면 AI 모델 또는 데이터셋 타일이 활성화되고, aibom 이미지는 첫 스캔에서 별도 컨테이너로 받아 실행합니다. 그래서 처음 한 번은 시작이 느립니다. Docker 소켓을 쓸 수 없는 환경에서는 aibom 이미지로 UI 자체를 띄웁니다(`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui`, Windows는 `sbom-ui.bat` 더블클릭 전에 `SBOM_SCANNER_IMAGE`를 지정). 이때는 별도 컨테이너 없이 UI 안에서 바로 처리합니다.
 
-```bash
-./scripts/scan-sbom.sh --ui
-```
-
-aibom 이미지로 UI 자체를 띄우면 별도 컨테이너 없이 UI 안에서 바로 처리합니다. Docker 소켓을 쓸 수 없는 환경에서 필요합니다.
-
-```bash
-SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui
-#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_SCANNER_IMAGE를 지정
-```
-
-새 스캔의 소스 타일에서 **AI 모델**을 고르고, HuggingFace 모델 id를 `org/model` 형식으로 입력한 뒤(예: `google-bert/bert-base-uncased`, `Qwen/Qwen2.5-0.5B` — 컬렉션 이름이나 전체 URL이 아닌) 스캔을 실행합니다.
+새 스캔의 소스 타일에서 **AI 모델 또는 데이터셋**을 고르고, HuggingFace 모델 id를 `org/model` 형식으로 입력한 뒤(예: `google-bert/bert-base-uncased`, `Qwen/Qwen2.5-0.5B`. 컬렉션 이름이나 전체 URL은 안 됩니다) 스캔을 실행합니다.
 
 ### CLI에서
 
@@ -186,7 +177,7 @@ HuggingFace에 있는 데이터셋도 같은 방법으로 스캔하며, 역시 �
 
 ![빈 항목 채우기의 모델 정보 단계](../images/web-ui-ai-declaration-ko.png)
 
-출시를 준비 중인 모델에는 스캔할 저장소나 파일이 없으므로, 선언만으로 기술할 수 있습니다. `--model`이나 `--model-file` 없이 `--ai-declare <파일>`만 주거나, 웹 UI 새 스캔 화면에서 **모델 정보 직접 입력**을 고릅니다. 이 타일은 같은 내용을 질문으로 묻고 그 답으로 스캔을 시작합니다.
+출시를 준비 중인 모델에는 스캔할 저장소나 파일이 없으므로, 선언만으로 기술할 수 있습니다. `--model`이나 `--model-file` 없이 `--ai-declare <파일>`만 주거나, 웹 UI 새 스캔 화면에서 **모델 정보 직접 입력**을 고릅니다. 이 타일은 같은 내용을 질문으로 묻고 그 답으로 스캔을 시작합니다. 스캔은 기본 이미지에서 실행되며, `HF_TOKEN`이 설정되어 있으면 넘깁니다.
 
 ```bash
 ./scripts/scan-sbom.sh --project support-bot --version 1.0 \
@@ -205,43 +196,15 @@ HuggingFace에 있는 데이터셋도 같은 방법으로 스캔하며, 역시 �
 
 모델 카드는 모델을 설명합니다. G7 체크리스트는 그 모델을 둘러싼 시스템도 묻습니다. 시스템의 이름, 제작자, 버전, 데이터가 시스템 안에서 어떻게 흐르는지, 받은 데이터를 어떻게 쓰는지, 입력과 출력, 어느 분야에 쓰려는지입니다. 이 내용은 모델 카드에도 가중치 파일에도 없으므로, 그대로 두면 이 요소들은 사람이 검토할 항목으로 남습니다. 모델을 앱이나 API에 넣어 운영한다면 선언 파일에 그 서비스를 적을 수 있고, BomLens는 이를 두 문서에 모두 기록합니다. EU 인공지능법(AI Act)의 기술 문서 항목(Annex IV 1호)과 NIST AI 위험관리 프레임워크(AI RMF)의 MAP 1.1(의도한 목적과 사용 환경)도 같은 종류의 설명을 요구합니다. 여기서는 배경으로 소개할 뿐이며, 서비스를 선언했다고 해서 어느 쪽의 요구를 충족했다는 뜻은 아닙니다.
 
-선언 파일에서 서비스는 최상위 `service` 객체입니다.
-
-```json
-"service": {
-  "name": "Acme Support Assistant",
-  "packageVersion": "2.3.0",
-  "downloadLocation": "https://support.acme.example/assistant",
-  "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
-  "releaseTime": "2025-06-01T00:00:00Z",
-  "informationAboutApplication": "Answers customer support questions in the web chat.",
-  "domain": ["customer support"],
-  "autonomyType": "no",
-  "inputModality": ["text"],
-  "outputModality": ["text"],
-  "dataFlows": [
-    {"flow": "inbound", "classification": "personal data",
-     "description": "Customer questions typed in the chat window.",
-     "source": ["https://support.acme.example/chat"]}
-  ],
-  "standardCompliance": ["ISO/IEC 42001:2023"],
-  "disclosureUrl": "https://support.acme.example/ai-disclosure"
-}
-```
-
-앞의 다섯 키는 SPDX가 서비스에 요구하는 필수 항목이며, 모두 적을 때까지 문서는 초안으로 남습니다. 나머지는 선택입니다. `autonomyType`은 AI의 결정에 사람이 관여하는지를 답합니다. `no`는 사람이 관여한다는 뜻이고, `yes`는 완전히 자동으로 동작한다는 뜻이며, `noAssertion`은 모른다는 뜻입니다. 키와 허용 값 전체는 [산출물 레퍼런스](../reference/artifacts.ko.md#선언한-ai-서비스)에 있습니다. 웹 UI에서는 빈 항목 채우기와 모델 정보 직접 입력에 있는 선택 단계인 서비스 단계가 같은 내용을 묻습니다.
+선언 파일에서 서비스는 최상위 `service` 객체입니다. 그중 다섯 키(`name`, `packageVersion`, `downloadLocation`, `suppliedBy`, `releaseTime`)는 SPDX가 요구하는 필수 항목이며, 모두 적을 때까지 문서는 초안으로 남습니다. 나머지는 선택입니다. `autonomyType`은 AI의 결정에 사람이 관여하는지를 답합니다. `no`는 사람이 관여한다는 뜻이고, `yes`는 완전히 자동으로 동작한다는 뜻이며, `noAssertion`은 모른다는 뜻입니다. 서비스가 API로 호출하는 모델(외부에서 제공하는 번역 API나 임베딩 API 등)은 `service.externalModels[]`에 적습니다. 이 모델은 식별 정보만 기록하며, 위험 판정 대상이 아니고 G7 검사에서 모델로 세지도 않습니다. 웹 UI에서는 빈 항목 채우기와 모델 정보 직접 입력에 있는 선택 단계인 서비스 단계가 같은 내용을 묻습니다.
 
 ![빈 항목 채우기의 서비스 단계와 서비스 필수 항목 다섯 개](../images/web-ui-ai-service-ko.png)
 
-SPDX 3.0.1 문서는 서비스를 용도가 `application`인 `ai_AIPackage`로 쓰고, 실행할 때 모델에 의존하는 관계로 잇습니다. 문서의 루트는 계속 모델입니다. 스캔은 서비스를 CycloneDX SBOM에도 기록합니다. 선언한 데이터셋 원천을 읽은 다음, 위험 판정과 G7 검사보다 먼저 도는 단계입니다. 서비스는 `services[]`에, 그 데이터 흐름은 `data[]`에, 모델과의 의존 관계는 `dependencies[]`에, 적은 표준은 `declarations.claims[]`에 들어갑니다. 모두 `bomlens:origin=declared-input`으로 표시하고, 표준 항목의 근거(reasoning)에는 발행자 선언이며 BomLens가 확인하지 않았다고 적습니다.
+서비스는 SPDX 3.0.1 문서와 CycloneDX SBOM에 모두 기록됩니다. CycloneDX에서는 서비스가 `services[]`에, 모델과의 의존 관계가 `dependencies[]`에, 적은 표준이 `declarations.claims[]`에 들어가며, 모두 `bomlens:origin=declared-input`으로 표시합니다. 선언 예시와 키 전체, 각 값의 기록 위치는 [산출물 레퍼런스](../reference/artifacts.ko.md#선언한-ai-서비스)에 있습니다.
 
 서비스를 선언하면 G7 시스템 속성 요소가 그 값을 읽습니다. SBOM의 루트가 시스템 이름, 제작자, 버전을 주지 않을 때의 이 세 요소, 그리고 시스템 데이터 흐름, 시스템 데이터 사용(데이터 흐름의 설명), 시스템 입출력 속성, 적용 대상 분야입니다. 이렇게 채워진 요소는 "있음 (발행자 선언, BomLens가 확인하지 않음)"으로 나오고, 웹 UI는 "발행자 선언" 배지를 붙입니다. BomLens는 적은 내용을 기록할 뿐, 서비스가 실제로 그렇게 동작하는지는 확인하지 않습니다. 다른 도구가 만든 SBOM도 서비스에 CycloneDX `data`(serviceData) 항목이 있으면 인정합니다. 흐름 방향이 있으면 데이터 흐름을, 설명이 있으면 데이터 사용을 충족하고, 이때는 일반 충족으로 나옵니다. `standardCompliance`에 보안 표준을 적어도 보안 준수 요소는 충족되지 않으며 검토 항목으로 남습니다.
 
 CycloneDX SBOM은 스캔할 때만 바뀝니다. 스캔 뒤 웹 UI에서 저장한 서비스는 SPDX 문서에는 바로 들어가지만, CycloneDX SBOM과 G7 검사에는 다음 스캔에서 반영됩니다. 그때까지 SPDX 검사 결과는 `service.state`를 `pendingScan`으로 알리고, 모델·데이터셋 화면의 띠에 다시 스캔 버튼이 나옵니다. `--ai-declare`로 넘긴 선언은 같은 실행에서 반영됩니다.
-
-### 외부 AI 모델
-
-서비스는 직접 실행하지 않는 모델을 호출하기도 합니다. 외부에서 제공하는 번역 API나 임베딩 API가 그런 예입니다. 이런 모델은 `service.externalModels[]`에 적습니다. 항목마다 `key`와 `name`은 반드시 적고, `suppliedBy`, `packageVersion`, `endpoint`는 선택입니다. 기록하는 것은 식별 정보뿐입니다. SPDX 문서에는 용도가 `model`인 `software_Package`로, CycloneDX에는 선언한 서비스가 의존하는 별도 서비스로 `services[]`에 들어갑니다. BomLens는 이 모델에 관해 아무것도 읽어 오지 않습니다. 위험 판정 대상도 아니고, G7 검사에서 모델로 세지도 않습니다.
 
 ### 규제 제출용 정보
 
@@ -252,11 +215,7 @@ CycloneDX SBOM은 스캔할 때만 바뀝니다. 스캔 뒤 웹 UI에서 저장�
 
 조문은 이 필드가 왜 있는지 알리려고 적었습니다. BomLens는 수치를 기준값과 비교하거나 규정이 모델에 적용되는지 판단하지 않으며, 이 값을 채웠다고 해서 어느 규정을 준수하게 되는 것도 아닙니다.
 
-`model` 항목에는 `inputModality`와 `outputModality`(`text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other`)도 적을 수 있습니다. 다섯 값 모두 SPDX 문서와 CycloneDX SBOM의 모델 컴포넌트에 들어갑니다. 규제 값 셋은 `bomlens:regulatory:*` 속성으로, 입력과 출력 종류는 `modelCard.modelParameters`의 형식(format)으로 기록합니다. 스캔이 이미 입력이나 출력을 기록했다면 스캔한 값을 그대로 둡니다. 선언에서 채운 위치마다 `bomlens:declared` 속성이 붙습니다.
-
-### 이전 버전의 BomLens
-
-BomLens v1.13 이하는 이 키를 모릅니다. `service`나 새 모델 키가 있는 선언은 값을 말없이 버리지 않고 "unknown key(s)" 오류로 거부합니다. 이런 파일은 이 키를 지원하는 버전으로 읽거나, 해당 키를 지운 뒤 씁니다. SPDX 2.3 내보내기와 `--diff`도 서비스를 다루지 않습니다. SPDX 2.3 사본은 CycloneDX SBOM의 컴포넌트로 만들고, `--diff`는 모델과 컴포넌트를 비교하기 때문입니다.
+`model` 항목에는 `inputModality`와 `outputModality`(`text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other`)도 적을 수 있습니다. 다섯 값 모두 SPDX 문서와 CycloneDX SBOM의 모델 컴포넌트에 들어가며, 기록 위치는 [산출물 레퍼런스](../reference/artifacts.ko.md#선언한-ai-서비스)에 있습니다.
 
 ## 적합성 검사 보고서 읽는 법
 
@@ -286,14 +245,7 @@ G7 블록의 머리에는 "N / 41 충족" 같은 수치가 옵니다. 분모는 
   --model "FINAL-Bench/Aether-7B-5Attn" --generate-only
 ```
 
-2026-10-23에 스캔한 결과(모델 리비전 `da711bdb`)는 `result=pass`에 G7 요소 41개 중 30개 충족입니다. 수치는 모델 카드 내용을 따르므로 이후 리비전에서는 달라질 수 있습니다. Models 클러스터는 14개 중 12개가 통과하며, SBOM에 모델 타임스탬프와 모델 설명이 없습니다. 공개성 패널은 네 축 전부 열림으로 표시됩니다.
-
-| 축 | 값 |
-| --- | --- |
-| 가중치 | open-weight |
-| 구조 | open-architecture |
-| 학습 데이터 | open-data |
-| 학습 과정 | open-training |
+2026-10-23에 스캔한 결과(모델 리비전 `da711bdb`)는 `result=pass`에 G7 요소 41개 중 30개 충족입니다. 수치는 모델 카드 내용을 따르므로 이후 리비전에서는 달라질 수 있습니다. Models 클러스터는 14개 중 12개가 통과하며, SBOM에 모델 타임스탬프와 모델 설명이 없습니다. 공개성 패널은 네 축 전부 열림(`open-weight`, `open-architecture`, `open-data`, `open-training`)으로 표시됩니다.
 
 모델 카드가 데이터셋을 명시하므로, BomLens는 학습에 쓰인 7종(FineWeb-Edu, SmolLM 코퍼스, FineMath, open-web-math, OpenCoder 코드 코퍼스, HAERAE-HUB의 한국어 두 종)을 하나씩 조회해 각 데이터셋이 밝힌 내용을 기록합니다. 데이터셋 속성 10개 중 8개가 충족으로 나옵니다. 남는 두 개는 데이터의 통계 속성과 개인정보·저작물 포함 여부인데, 저장소를 읽어서는 알 수 없는 항목이라 보고서는 추측하지 않고 사람에게 확인을 요청합니다.
 
@@ -335,21 +287,12 @@ BomLens는 50개 요소를 51개 검사로 보여줍니다. 모델 개방성(가
 
 적합성 검사 보고서는 규제와 대응되는 검사마다 그 검사가 어느 문서화 의무와 닿는지를 연결해 줍니다. 검토자가 던지는 질문에 답하기 위한 것입니다. 어떤 검사가 미달일 때, 그 공백이 어느 규제 요구와 관련되는가? 참고 규정은 검사 표에서 해당 요구사항 행 아래에 붙고, 상세 위의 크로스워크 절이 프레임워크마다 한 행씩, 매핑된 검사 중 충족, 공백, 검토 필요가 몇 건인지 집계해 보여 줍니다.
 
-AI 여부와 관계없이 분석하는 모든 SBOM에는 두 가지 프레임워크가 매핑됩니다.
-
-- EU 사이버복원력법(CRA) — CRA 준수를 위해 작성된 독일 기술지침이자 공개된 것 중 가장 상세한 SBOM 필드 명세인 BSI TR-03183-2를 통해 연결합니다(CRA 본문은 데이터 필드를 지정하지 않습니다). TR-03183-2는 국가 지침이며, 구속력 있는 문구를 담을 유럽 조화 표준은 아직 초안 단계입니다.
-- 미국 SBOM 최소 요소 — 2026년판 최소 요소의 데이터 필드 17개와 운영 원칙 6개. CISA와 NSA, FBI가 15개 해외 기관과 함께 발표했고 2021년 NTIA 문서를 대체합니다. 이후 연방 차원의 SBOM 수집 의무는 기관별 위험 기반 판단으로 축소되었지만, 개별 기관이 요구하는 실무 기준으로는 여전히 유효합니다.
-
-위 크로스워크는 SBOM 데이터 필드만 다룹니다. 이 필드가 속한 CRA 준비 절차 전체(거버넌스, 취약점 대응, 기술문서, 보안 업데이트)는 커뮤니티가 관리하는 [OpenChain CRA Compliance Requirements & Checklist](https://github.com/OpenChain-Project/CRA-Compliance)를 참고하세요.
-
-AI SBOM에는 G7 요소에 대응하는 두 가지 프레임워크가 더해집니다.
+AI 여부와 관계없이 분석하는 모든 SBOM은 EU 사이버복원력법(CRA, BSI TR-03183-2를 통해)과 미국 SBOM 최소 요소(2026년판)에 매핑됩니다. 두 프레임워크와 매핑 파일은 [산출물 레퍼런스](../reference/artifacts.ko.md#규제-크로스워크)에 설명했습니다. AI SBOM에는 G7 요소에 대응하는 두 가지 프레임워크가 더해집니다.
 
 - EU 인공지능법(AI Act) — Annex IV 기술문서 항목(Regulation (EU) 2024/1689, Article 11(1)).
 - AI 기본법(한국) — 투명성(제31조), 안전성과 위험관리(제32조), 고영향 인공지능(제33·34조), 영향평가(제35조) 조항. 이 법은 기본법 성격이라 매핑이 EU 쪽보다 성깁니다.
 
 크로스워크는 준수 판정이 아니라 준비를 돕는 자료입니다([한계](#한계) 참고). 각 매핑에는 그 연결의 해석 근거를 함께 담아 사람이 판단할 수 있게 했고, 크로스워크가 검사 상태나 전체 판정을 바꾸지는 않습니다. 검사가 이미 낸 결과를 규제별로 다시 묶을 뿐입니다.
-
-매핑은 검사 id를 키로 삼아 `docker/lib/regulation-crosswalk.json`에 있습니다. AI 검사는 G7 요소 id, 기본 형식 검사는 일반 CycloneDX 검사 id를 씁니다. 의도적으로 보수적으로 잡아, 근거가 분명한 검사만 매핑합니다. 현재 검사 id 74개가 네 프레임워크에 걸쳐 84건으로 연결되어 있습니다. 검사 하나가 여러 프레임워크에 연결될 수 있어 두 수치가 다릅니다. 검사 이름이 바뀌어도 크로스워크가 조용히 어긋나지 않도록, 매핑된 모든 id를 레지스트리와 대조하는 테스트를 둡니다.
 
 ## AI 준수 개요
 
@@ -387,67 +330,11 @@ AI 준수 개요에는 모델별 사용 가능성 판정도 담깁니다. 개발
 
 ## 소스 스캔의 AI 사용 기록
 
-소스 스캔은 스캔한 코드가 쓰는 AI도 기록합니다. `--model`과는 별개의 기능입니다. 모델 카드를 읽지 않고, 코드가 호출하는 대상과 프로젝트가 AI 도구를 쓰도록 설정된 내용을 목록으로 남깁니다. 기본으로 실행됩니다.
-
-| 항목 | 기록 위치 | 예 |
-| --- | --- | --- |
-| 코드가 참조하는 모델 | `components[]`, 유형 `machine-learning-model` | `pkg:generic/openai/gpt-4o`인 `gpt-4o`, `pkg:huggingface/...`인 `meta-llama/Llama-3.1-8B-Instruct` |
-| 코드가 호출하는 AI 서비스 | `services[]`, 호출에 쓰는 모델은 `dependencies[]` | OpenAI API |
-| 설정 파일에 있는 MCP 서버 | `services[]` | `.vscode/mcp.json`이나 `.cursor/mcp.json`의 서버 |
-| MCP 설정 파일 | `components[]`, 유형 `file` | `.vscode/mcp.json` |
-| 에이전트 지침 파일 | `components[]`, 유형 `file`, SHA-256 포함 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
-
-각 항목에는 `bomlens:ai:usage`(`model`, `ai-service`, `mcp-server`, `mcp-config`, `instruction-file`)와 `bomlens:ai:scope`가 붙습니다. `bomlens:ai:scope`는 코드가 호출하는 것이면 `runtime`, 편집기와 에이전트 설정이면 `development`입니다.
-
-검토해야 할 MCP 서버에는 `bomlens:ai:reviewReason`이 하나 이상 붙습니다.
-
-- `broad-filesystem-access`: 파일 시스템 루트나 홈 폴더를 넘겨받습니다.
-- `unpinned-package`: 버전 없이 `npx`나 `uvx`로 실행되어, 새 릴리스가 검토 없이 실행됩니다.
-- `unencrypted-transport`: 다른 호스트에 평문 `http`로 접속합니다.
-
-MCP 서버에 넘기는 환경 변수 값과 헤더(토큰 등), 프롬프트 문구는 복사하지 않습니다. 접속 주소에서는 사용자 정보, 쿼리, 프래그먼트를 지웁니다.
-
-이 항목들은 목록으로만 보여 주고 측정하지 않습니다. 적합성 검사와 NOTICE에서 빠지고, 모델 위험 판정도 허브에서 조회한 모델(아래)이 아니면 빠지며, 코드가 호출만 하는 모델에는 G7 검사를 적용하지 않습니다. 이 스캔에는 그 모델의 카드가 없기 때문입니다. 모델 자체를 점검하려면 `--model`로 스캔합니다.
-
-탐지는 cdxgen의 `ai`, `mcp` 분석을 쓰며, 이 분석은 텍스트를 맞춰 보는 방식입니다. BomLens는 모델 식별자 형태이고 시험 코드나 문서가 아닌 코드에 나온 모델만 남기고, AI 서비스는 그런 모델이 연결된 경우에만 남깁니다. 그래도 프로젝트가 자료 구조에 나열한 모델은 놓칠 수 있고, 모델 식별자처럼 생긴 문자열이 기록될 수 있습니다. 이 단계를 끄려면 `BOMLENS_NO_AI_USAGE=1`을 설정합니다.
-
-### Hugging Face에서 모델 조회
-
-코드가 참조하는 모델은 이름과 purl만 목록에 올라옵니다. `--resolve-models`(또는 새 스캔 화면의 옵션)를 켜면 스캔이 각 `pkg:huggingface/...` 모델을 Hugging Face 허브에 조회해 그 항목에 요약을 덧붙입니다.
-
-- 모델 카드가 밝힌 라이선스. 적힌 그대로(`llama3.1`)이며 SPDX 식별자로 추측하지 않고, 그 라이선스에 대한 모델 위험 판정도 함께 보여 줍니다. 이 판정은 기반 모델의 라이선스도 읽습니다.
-- 가중치 파일 형식, 그중 pickle 파일의 수(불러올 때 코드를 실행할 수 있음), 허브가 해시를 가진 파일마다의 SHA-256. 이 값들은 기록만 하고 판정에는 읽지 않습니다.
-- 저장소의 접근 제한(gated) 여부(허브는 토큰 없이도 접근 제한 저장소를 설명함), 허브의 현재 리비전과 그 시각(코드가 실제로 불러오는 리비전과 같다고 볼 수는 없음).
-- 카드가 밝힌 기반 모델 계보와 각 기반 모델의 라이선스.
-
-허브가 오류로 답한 모델은 HTTP 상태와 함께 `unreadable`로 표시합니다. 비공개 저장소이거나 없는 저장소이며, 허브는 둘 다 같은 방식(401)으로 답합니다. 읽을 수 있는 비공개 모델이면 `HF_TOKEN`을 설정합니다. 허브가 답하지 않았거나 429나 5xx로 답했거나 시간이 모자란 모델은 `unreachable` 또는 `not-attempted`로 표시하고, 이 단계를 실패로 기록합니다(SBOM은 그대로 기록됩니다). 추측해서 채우는 값은 없습니다. 조회하는 모델은 `MODEL_RESOLVE_MAX`(20)개까지이고, 기반 모델 조회를 포함한 전체 조회 시간은 `MODEL_RESOLVE_BUDGET`(240초)까지입니다. 나머지는 `not-attempted`로 표시합니다. `gpt-4o`처럼 허브 페이지가 없는 호스팅 모델은 그대로 둡니다.
-
-이 요약은 모델 자체의 SBOM이 아닙니다. 모델 카드와 `--model`이 실행하는 검사가 필요하기 때문입니다. 전체 SBOM을 만들어 소스 SBOM에 연결하려면 모델을 스캔한 뒤 그 파일을 넘깁니다.
-
-```bash
-./scripts/scan-sbom.sh --project my-llm --version 1.0 --model "meta-llama/Llama-3.1-8B-Instruct"
-./scripts/scan-sbom.sh --project my-app --version 1.0 --target ./my-app \
-  --model-sbom my-llm_1.0/my-llm_1.0_bom.json
-```
-
-그러면 모델이 CycloneDX BOM-Link(`externalReferences` 유형 `bom`, `urn:cdx:<일련번호>/<버전>#<bom-ref>`)로 그 파일과 연결되어, 소스 SBOM을 읽는 쪽이 전체 SBOM을 찾을 수 있습니다. 링크는 문서를 일련번호로 가리키므로, 소스 SBOM을 전달할 때 모델 SBOM도 함께 전달합니다. 일련번호가 없는 파일이나 코드가 참조하지 않는 모델의 파일은 알리고 제외합니다. 요약의 라이선스와 가중치 파일은 스캔 시점에 허브에서 읽은 값이므로, 완전한 정보는 연결된 SBOM을 기준으로 봅니다.
+소스 스캔은 스캔한 코드가 쓰는 AI도 기록합니다. 코드가 참조하는 모델, 호출하는 AI 서비스와 MCP 서버, 에이전트 지침 파일입니다. `--model`과는 별개이며 기본으로 실행됩니다. `--resolve-models`는 참조한 모델을 Hugging Face에서 조회하고, `--model-sbom`은 모델 자체의 SBOM을 소스 SBOM에 연결합니다. 무엇을 어디에 기록하는지는 [산출물 레퍼런스](../reference/artifacts.ko.md#소스-스캔의-ai-사용-기록)에 있습니다.
 
 ## 다른 도구가 만든 AI BOM
 
-`--analyze`는 다른 도구가 만든 AI BOM도 읽어 같은 G7 점검과 위험 판정을 돌립니다. k8s-aibom의 CycloneDX 출력, AIsbom, Cisco AI BOM, AIBoMGen CLI 네 가지 도구의 시료로 확인했습니다. 어느 도구도 G7 항목 대부분을 채우지 않으므로 보고서에는 없음으로 나오는 항목이 많습니다. 이는 파일에 든 내용이 그렇다는 뜻이며 읽기가 잘못된 것이 아닙니다.
-
-일부 값은 G7 점검이 예전에 보지 않던 자리에 들어 있어서, 이제 그 자리에서도 읽습니다. 이렇게 채워진 항목의 상세 줄에는 `also read from`과 출처가 붙고, 결과의 `via`에도 담깁니다.
-
-| 항목 | 읽는 곳 | 도구 |
-|---|---|---|
-| 모델 식별자 | `aisbom:hf:repo_id` | AIsbom |
-| 모델 라이선스 | `aisbom:hf:license` | AIsbom |
-| 모델 버전 | `aisbom:hf:revision`, `k8s-aibom:model:revision` | AIsbom, k8s-aibom |
-| SBOM 생성 맥락 | `metadata.lifecycles`(CycloneDX 표준 필드) | k8s-aibom, AIBoMGen CLI |
-
-AIsbom은 라이선스 판정이 저절로 바뀌지 않게 하려고 허브의 라이선스를 `licenses[]`에 넣지 않습니다. BomLens는 이 값을 있는 것으로 세고, `licenses[]`가 비어 있을 때만 위험 판정에 넘깁니다. 둘 다 있으면 `licenses[]`를 씁니다. 이 값은 허브 페이지가 밝힌 내용이며 BomLens가 검증하지는 않습니다.
-
-그 밖에 이 도구들이 적은 내용은 대응하는 G7 항목이 없습니다. Cisco AI BOM은 에이전트와 MCP 서버를 `application` 구성요소로, k8s-aibom은 모델을 실행하는 워크로드를 기록합니다. 이 내용은 파일과 구성요소 목록에 그대로 남습니다.
+`--analyze`는 다른 도구가 만든 AI BOM도 읽어 같은 G7 점검과 위험 판정을 돌립니다. 확인한 도구와 그 도구들의 필드 중 무엇을 읽는지는 [산출물 레퍼런스](../reference/artifacts.ko.md#다른-도구가-만든-ai-bom)에 있습니다.
 
 ## 한계
 
@@ -459,6 +346,4 @@ AIsbom은 라이선스 판정이 저절로 바뀌지 않게 하려고 허브의 
 - 메타데이터를 네트워크로 가져오므로 오프라인 사용은 지원하지 않습니다. 비공개 모델과 게이트 모델에는 `HF_TOKEN`이 필요합니다([비공개 모델과 게이트 모델](#비공개-모델과-게이트-모델) 참고).
 - 모델 id는 `org/model` 형식이어야 합니다. 컬렉션 이름이나 전체 URL은 해석되지 않습니다.
 
----
-
-> **관련 문서**: [입력 형태별 파이프라인](../concepts/pipeline-by-input.ko.md) | [웹 UI 레퍼런스](../reference/ui.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md)
+관련 문서: [입력 형태별 파이프라인](../concepts/pipeline-by-input.ko.md), [웹 UI 레퍼런스](../reference/ui.ko.md), [CLI 레퍼런스](../reference/cli.ko.md), [산출물 레퍼런스](../reference/artifacts.ko.md).

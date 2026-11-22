@@ -6,6 +6,10 @@ description: Generate an AI SBOM (CycloneDX ML-BOM) for a HuggingFace model with
 
 How to generate a CycloneDX ML-BOM (machine-learning bill of materials) for a HuggingFace model and read the result. You give a model id; BomLens fetches the model-card metadata over the network — no source code and no model-weight download.
 
+- Inputs: `--model <owner/name>` for a HuggingFace model, `--model` with a dataset address for a published dataset, `--model-file` for a weight file, and `--ai-declare` for a model with no repository or file yet. In the desktop app and the web UI these are the New scan tiles AI model or dataset, Model file and Enter model information.
+- Outputs: an ML-BOM (CycloneDX 1.7) with an SPDX 3.0.1 copy, the notice, a risk report with a usability verdict per model, and a G7 minimum-element conformance check. There is no security report.
+- The G7 checks and the verdicts are advisory. They show what the model's documentation covers and what a person has to supply, not whether a regulation is met.
+
 ## How it works
 
 An AI model's "bill of materials" is its model card: identifier, architecture, task, license, supplier, datasets, and the integrity of its files. BomLens uses the [OWASP AIBOM Generator](https://github.com/GenAI-Security-Project/aibom-generator) to read a HuggingFace model card and build a **CycloneDX 1.7 ML-BOM** centered on the model and the datasets it references. It then adds a **G7 minimum-element conformance** check (advisory). Because a model has no package dependencies, there is no security (CVE) report.
@@ -29,28 +33,15 @@ You need two things.
 docker pull ghcr.io/sktelecom/bomlens-aibom:latest
 ```
 
-That image is about 3.5 GB to download, far larger than the base scanner image (about 250 MB). The first pull can take tens of minutes depending on your connection, so start it with time to spare. It is downloaded once.
-
-Pulling ahead of time is optional. `--model` uses this image by default and fetches it when missing, and the web UI and desktop app fetch it on the first AI-model scan while showing progress. To use a different tag, set `SBOM_AIBOM_IMAGE`.
+That image is about 3.5 GB to download, far larger than the base scanner image (about 250 MB). The first pull can take tens of minutes depending on your connection, so start it with time to spare. It is downloaded once. Pulling ahead of time is optional: `--model` uses this image by default and fetches it when missing, and the web UI and desktop app fetch it on the first AI-model scan while showing progress. To use a different tag, set `SBOM_AIBOM_IMAGE`.
 
 ## Running it
 
-### From the web UI
+### From the desktop app or the web UI
 
-Use the desktop app, or the web UI you already run. Where Docker is reachable the AI model tile is enabled, and the aibom image runs as a separate container fetched on the first scan — which makes that first run slow to start.
+Open the desktop app or the web UI (setup is in [First scan](../start/first-scan.md)). Where Docker is reachable the AI model or dataset tile is enabled, and the aibom image runs as a separate container fetched on the first scan, so that first run is slow to start. Where the Docker socket is unavailable, launch the UI from the aibom image itself (`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui`, or set `SBOM_SCANNER_IMAGE` before double-clicking `sbom-ui.bat` on Windows); it then handles the scan in-process.
 
-```bash
-./scripts/scan-sbom.sh --ui
-```
-
-Launching the UI from the aibom image itself handles the scan in-process, with no second container. This is what you need where the Docker socket is unavailable.
-
-```bash
-SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui
-#   Windows: set SBOM_SCANNER_IMAGE before double-clicking sbom-ui.bat
-```
-
-Choose **AI model** under the New scan source tiles, enter the HuggingFace model id as `org/model` (for example `google-bert/bert-base-uncased` or `Qwen/Qwen2.5-0.5B` — not a collection name or a full URL), and run.
+Choose **AI model or dataset** under the New scan source tiles, enter the HuggingFace model id as `org/model` (for example `google-bert/bert-base-uncased` or `Qwen/Qwen2.5-0.5B`, not a collection name or a full URL), and run.
 
 ### From the CLI
 
@@ -186,7 +177,7 @@ In the web UI there is no file to edit: **Models & datasets** shows the document
 
 ![Fill in empty fields: the model step of the questions](../images/web-ui-ai-declaration.png)
 
-A model being prepared for release has no repository or file to scan, so it can be described from the declaration alone: give `--ai-declare <file>` without `--model` or `--model-file`, or pick **Enter model information** on the web UI's New scan screen, which asks the same questions and starts the scan with the answers.
+A model being prepared for release has no repository or file to scan, so it can be described from the declaration alone: give `--ai-declare <file>` without `--model` or `--model-file`, or pick **Enter model information** on the web UI's New scan screen, which asks the same questions and starts the scan with the answers. It runs in the base image and passes `HF_TOKEN` when it is set.
 
 ```bash
 ./scripts/scan-sbom.sh --project support-bot --version 1.0 \
@@ -205,43 +196,15 @@ Two rules apply. A value that is not in the scan and not declared is left out ra
 
 A model card describes the model. The G7 checklist also asks about the system around it: the system's name, maker and version, how data flows through it, what it does with that data, its input and output, and the field it is meant for. None of that is in a model card or a weight file, so without help those elements stay review items. When you run the model inside an app or an API, the declaration can describe that service, and BomLens writes it into both documents. The EU AI Act's technical documentation (Annex IV, point 1) and the NIST AI Risk Management Framework (MAP 1.1, the intended purpose and context of use) ask for the same kind of description. They are named here only as context; declaring a service does not show that a system meets either.
 
-In the declaration file the service is a top-level `service` object:
-
-```json
-"service": {
-  "name": "Acme Support Assistant",
-  "packageVersion": "2.3.0",
-  "downloadLocation": "https://support.acme.example/assistant",
-  "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
-  "releaseTime": "2025-06-01T00:00:00Z",
-  "informationAboutApplication": "Answers customer support questions in the web chat.",
-  "domain": ["customer support"],
-  "autonomyType": "no",
-  "inputModality": ["text"],
-  "outputModality": ["text"],
-  "dataFlows": [
-    {"flow": "inbound", "classification": "personal data",
-     "description": "Customer questions typed in the chat window.",
-     "source": ["https://support.acme.example/chat"]}
-  ],
-  "standardCompliance": ["ISO/IEC 42001:2023"],
-  "disclosureUrl": "https://support.acme.example/ai-disclosure"
-}
-```
-
-SPDX requires the first five keys of a service, and the document stays a draft until they are given; the rest are optional. `autonomyType` answers whether a person is involved in the AI's decisions: `no` means a person is involved, `yes` that it acts fully automatically, and `noAssertion` that you do not know. Every key and allowed value is listed in [the artifacts reference](../reference/artifacts.md#the-declared-ai-service). In the web UI the same questions form the optional Service step of Fill in empty fields and of Enter model information.
+In the declaration file the service is a top-level `service` object. SPDX requires five of its keys (`name`, `packageVersion`, `downloadLocation`, `suppliedBy` and `releaseTime`), and the document stays a draft until they are given; the rest are optional. `autonomyType` answers whether a person is involved in the AI's decisions: `no` means a person is involved, `yes` that it acts fully automatically, and `noAssertion` that you do not know. Models the service calls through an API, such as a hosted translation or embedding API, go under `service.externalModels[]`. They are recorded by identity only: the risk assessment does not judge them, and the G7 checks do not count them as models. In the web UI the same questions form the optional Service step of Fill in empty fields and of Enter model information.
 
 ![Fill in empty fields: the optional Service step with the five required service fields](../images/web-ui-ai-service.png)
 
-The SPDX 3.0.1 document writes the service as an `ai_AIPackage` with the purpose `application` that depends on the model at runtime; the model stays the document's root. The scan also writes the service into the CycloneDX SBOM, in a step that runs after the declared dataset sources are read and before the risk assessment and the G7 checks. The service goes into `services[]` with its data flows as `data[]`, its dependency on the model into `dependencies[]`, and each standard it names into `declarations.claims[]`. Each of these is marked `bomlens:origin=declared-input`, and a claim's reasoning says it is the publisher's declaration, not verified by BomLens.
+The service is written into the SPDX 3.0.1 document and into the CycloneDX SBOM (`services[]`, its dependency on the model in `dependencies[]`, each named standard in `declarations.claims[]`), each part marked `bomlens:origin=declared-input`. An example declaration, every key and where each value lands are in [the artifacts reference](../reference/artifacts.md#the-declared-ai-service).
 
 With a service declared, the G7 system-level elements read from it: the system name, producer and version when the SBOM's root does not already give them, and the system data flow, data usage (the description of a data flow), input/output properties and intended application area. An element met this way reads "present (publisher's declaration, not verified by BomLens)", and the web UI gives it a "Publisher's declaration" badge. BomLens records what you state; it does not check that the service behaves that way. An SBOM from another tool counts too when its services carry CycloneDX `data` (serviceData) entries: a flow direction meets the data flow element and a description meets data usage, and both read as plainly present. A security standard named in `standardCompliance` does not meet the security compliance element, which stays a review item.
 
 The CycloneDX SBOM changes only when a scan runs. A service saved in the web UI after the scan goes into the SPDX document at once, but reaches the CycloneDX SBOM and the G7 checks only with the next scan. Until then the SPDX check reports `service.state` as `pendingScan`, and the band on Models & datasets offers a re-scan. A declaration passed with `--ai-declare` is applied in the same run.
-
-### External AI models
-
-A service often calls models it does not run itself, such as a hosted translation or embedding API. List them under `service.externalModels[]`, each with a `key` and a `name`, and optionally `suppliedBy`, `packageVersion` and `endpoint`. They are recorded by identity only: a `software_Package` with the purpose `model` in the SPDX document, and a service of its own in CycloneDX `services[]` that the declared service depends on. BomLens reads nothing about them; the risk assessment does not judge them, and the G7 checks do not count them as models.
 
 ### Values for regulatory filings
 
@@ -252,11 +215,7 @@ Rules for large general-purpose models ask for figures no model card holds. The 
 
 The articles are named so you know why the fields exist. BomLens does not compare a figure with a threshold or decide whether a rule applies to your model, and filling these fields does not make a model compliant with any of them.
 
-The model also takes `inputModality` and `outputModality` (`text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other`). All five values go into the SPDX document and onto the model component of the CycloneDX SBOM: the three regulatory values as `bomlens:regulatory:*` properties, and the input and output kinds as formats in `modelCard.modelParameters`. Where the scan already recorded inputs or outputs there, the scanned values are kept. A `bomlens:declared` property names each location filled from the declaration.
-
-### Older BomLens versions
-
-BomLens v1.13 and earlier do not know these keys. They refuse a declaration that has a `service`, or one of the new model keys, with "unknown key(s)" rather than dropping the values without a word; read such a file with a version that has them, or remove the keys. The SPDX 2.3 export and `--diff` do not carry services: the SPDX 2.3 copy is converted from the components of the CycloneDX SBOM, and `--diff` compares models and components.
+The model also takes `inputModality` and `outputModality` (`text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other`). All five values go into the SPDX document and onto the model component of the CycloneDX SBOM; [the artifacts reference](../reference/artifacts.md#the-declared-ai-service) lists the locations.
 
 ## Reading the conformance check report
 
@@ -286,14 +245,7 @@ A concrete run helps read the rest. `FINAL-Bench/Aether-7B-5Attn` is a foundatio
   --model "FINAL-Bench/Aether-7B-5Attn" --generate-only
 ```
 
-A scan on 2026-10-23 (model revision `da711bdb`) reports `result=pass` with 30 of 41 G7 elements present. The figures follow the model card, so a later revision can give different ones. In the Models cluster 12 of 14 checks pass; the SBOM has no model timestamp and no model description. The disclosure panel reads open on every axis:
-
-| Axis | Value |
-| --- | --- |
-| Weights | open-weight |
-| Architecture | open-architecture |
-| Training data | open-data |
-| Training process | open-training |
+A scan on 2026-10-23 (model revision `da711bdb`) reports `result=pass` with 30 of 41 G7 elements present. The figures follow the model card, so a later revision can give different ones. In the Models cluster 12 of 14 checks pass; the SBOM has no model timestamp and no model description. The disclosure panel reads open on every axis: `open-weight`, `open-architecture`, `open-data` and `open-training`.
 
 Because the card lists its datasets, BomLens looks up all seven the model was trained on (FineWeb-Edu, the SmolLM corpus, FineMath, open-web-math, an OpenCoder code corpus, and two Korean sets from HAERAE-HUB) and records what each one declares. Eight of the ten Dataset-properties elements come back present. The two that remain are the statistical properties of the data and whether it contains personal or copyrighted material; neither can be read from a repository, so the report asks a person rather than guessing.
 
@@ -335,21 +287,12 @@ Ten elements have no automated source, such as the intended application area or 
 
 The conformance check report links each check that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when a check comes back short, which regulatory requirement does that gap concern? The reference sits under the requirement it belongs to in the check tables, and a crosswalk section above the detail rolls the coverage up — one row per framework, counting how many mapped checks are present, a gap, or review-only.
 
-Two frameworks cover every analyzed SBOM, AI or not:
-
-- EU Cyber Resilience Act — via BSI TR-03183-2, the German technical guideline written for CRA compliance and the most detailed public SBOM field specification (the CRA itself names no data fields). TR-03183-2 is a national guideline, and the European harmonized standard that will carry the binding wording is still a draft.
-- US SBOM minimum elements — the 17 data fields and 6 practices of the 2026 minimum elements, published by CISA, the NSA and the FBI with fifteen international partners and replacing the NTIA elements of 2021. Federal SBOM collection has since been narrowed to agency-level, risk-based decisions, but the fields remain the practical baseline that individual agencies ask for.
-
-The crosswalk above covers SBOM data fields only. For the broader CRA readiness process those fields sit inside — governance, vulnerability handling, the technical file, security updates — see the community-maintained [OpenChain CRA Compliance Requirements & Checklist](https://github.com/OpenChain-Project/CRA-Compliance).
-
-For an AI SBOM, two more frameworks map onto the G7 elements:
+Every analyzed SBOM, AI or not, is mapped to the EU Cyber Resilience Act (through BSI TR-03183-2) and to the US SBOM minimum elements (2026); [the artifacts reference](../reference/artifacts.md#regulatory-crosswalk) describes both and the mapping file. For an AI SBOM, two more frameworks map onto the G7 elements:
 
 - EU AI Act — the technical-documentation sections of Annex IV (Regulation (EU) 2024/1689, Article 11(1)).
 - AI Framework Act (Korea) — the Act's articles on transparency (제31조), safety and risk management (제32조), high-impact AI (제33·34조), and impact assessment (제35조). The Act sets framework-level duties, so these links are coarser than the EU ones.
 
 The crosswalk is a preparation aid, not a compliance verdict (see [Limits](#limits)). Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups findings the checks already produced.
-
-The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by check id — the G7 element ids for the AI checks and the plain CycloneDX check ids for the base format checks. It is deliberately conservative: only checks with a defensible correspondence are mapped. Today that is 74 check ids with 84 links across the four frameworks, since one check can point at more than one framework. A test validates every mapped id against the registry so the crosswalk cannot drift silently when a check is renamed.
 
 ## AI compliance profile
 
@@ -387,67 +330,11 @@ The verdicts are guidance, not legal advice, and every report that prints them s
 
 ## AI usage in a source scan
 
-A source scan also records the AI the scanned code uses. This is separate from `--model`: it reads no model card, and lists what the code calls and how the project is set up to work with AI tools. It runs by default.
-
-| What | Where it goes | Example |
-| --- | --- | --- |
-| A model the code references | `components[]`, type `machine-learning-model` | `gpt-4o` as `pkg:generic/openai/gpt-4o`, `meta-llama/Llama-3.1-8B-Instruct` as `pkg:huggingface/...` |
-| An AI service the code calls | `services[]`, with the models it is called with in `dependencies[]` | OpenAI API |
-| An MCP server in a configuration file | `services[]` | a server from `.vscode/mcp.json` or `.cursor/mcp.json` |
-| The MCP configuration file | `components[]`, type `file` | `.vscode/mcp.json` |
-| An agent instruction file | `components[]`, type `file`, with its SHA-256 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
-
-Each item carries `bomlens:ai:usage` (`model`, `ai-service`, `mcp-server`, `mcp-config` or `instruction-file`) and `bomlens:ai:scope`: `runtime` for what the code calls, `development` for editor and agent configuration.
-
-An MCP server that needs a look gets one or more `bomlens:ai:reviewReason` values:
-
-- `broad-filesystem-access`: it is given the filesystem root or the home folder.
-- `unpinned-package`: it runs with `npx` or `uvx` and no version, so a new release runs without review.
-- `unencrypted-transport`: it is reached over plain `http` on another host.
-
-Some things are never copied: the environment values and headers an MCP server is given (tokens, for example) and prompt texts. An endpoint keeps no user info, query or fragment.
-
-These items are listed, not measured. The conformance check and the NOTICE leave them out, and so does the model risk assessment unless the model was looked up on the hub (below), and a model the code only calls gets no G7 checks, because it has no card here to check. To check a model itself, scan it with `--model`.
-
-The findings come from cdxgen's `ai` and `mcp` analyses, which match text. BomLens keeps a model only when its id looks like one and it appears in code that is neither a test nor documentation, and keeps an AI service only when such a model is left under it. A model a project lists in a data structure can still be missed, and a string shaped like a model id can still be reported. Set `BOMLENS_NO_AI_USAGE=1` to turn the step off.
-
-### Looking the models up on Hugging Face
-
-A model the code references is listed by name and purl only. With `--resolve-models` (or the option on the new-scan form), the scan asks the Hugging Face hub about each `pkg:huggingface/...` model and adds a summary to its entry:
-
-- the licence the model card declares, as written (`llama3.1`, not a guess at an SPDX id), and the model risk assessment's verdict on it, which also reads the base models' licences,
-- the weight file formats, how many are pickle files (they can run code when loaded), and each weight file's SHA-256 where the hub holds one. These are recorded, not judged: the verdict does not read them,
-- whether the repository is gated (the hub describes a gated repository without a token), and the hub's current revision and its time (not necessarily what the code loads),
-- the chain of base models the card names, with each one's licence.
-
-A model the hub answers an error for is marked `unreadable` with the HTTP status. That is a private repository or one that does not exist, which the hub answers the same way (401); set `HF_TOKEN` for a private one you can read. A model the hub did not answer for, answered 429 or a 5xx status for, or ran out of time for is marked `unreachable` or `not-attempted`, and the step is recorded as failed (the SBOM is still written). Nothing is filled in by guessing. `MODEL_RESOLVE_MAX` (20) bounds the models looked up and `MODEL_RESOLVE_BUDGET` (240) the seconds all lookups, base models included, may take; the rest are marked `not-attempted`. A hosted model with no hub page, such as `gpt-4o`, is left as it was.
-
-The summary is not the model's own SBOM, which needs the model card and the checks `--model` runs. To get it and tie it to the source SBOM, scan the model and pass the file:
-
-```bash
-./scripts/scan-sbom.sh --project my-llm --version 1.0 --model "meta-llama/Llama-3.1-8B-Instruct"
-./scripts/scan-sbom.sh --project my-app --version 1.0 --target ./my-app \
-  --model-sbom my-llm_1.0/my-llm_1.0_bom.json
-```
-
-The model is then linked to the file with a CycloneDX BOM-Link (`externalReferences` of type `bom`, `urn:cdx:<serial number>/<version>#<bom-ref>`), so a reader of the source SBOM can find the full one. The link points at the document by its serial number, so keep the model SBOM with the source SBOM when you pass them on. A file with no serial number, or one that matches no model the code references, is reported and left out. The summary's licence and weight files are read from the hub at scan time; the linked SBOM is the one to rely on for a complete picture.
+A source scan also records the AI the scanned code uses: the models it references, the AI services and MCP servers it calls, and agent instruction files. This is separate from `--model` and runs by default. `--resolve-models` looks the referenced models up on Hugging Face, and `--model-sbom` links a model's own SBOM to the source SBOM. What is recorded and where is in [the artifacts reference](../reference/artifacts.md#ai-usage-in-a-source-scan).
 
 ## AI BOMs from other tools
 
-`--analyze` reads an AI BOM that another tool wrote and runs the same G7 check and risk assessment on it. Samples of four tools were checked: the k8s-aibom CycloneDX output, AIsbom, Cisco AI BOM and AIBoMGen CLI. None of them fills most of the G7 elements, so the report shows many of them as missing. That is the content of the file, not a fault of the reading.
-
-A few values sit where the G7 check did not look before, and are read now. The detail line of such an element says `also read from` and names the source, and the result carries it in `via`.
-
-| Element | Read from | Tool |
-|---|---|---|
-| Model identifier | `aisbom:hf:repo_id` | AIsbom |
-| Model licence | `aisbom:hf:license` | AIsbom |
-| Model version | `aisbom:hf:revision`, `k8s-aibom:model:revision` | AIsbom, k8s-aibom |
-| SBOM generation context | `metadata.lifecycles` (a CycloneDX field) | k8s-aibom, AIBoMGen CLI |
-
-AIsbom leaves the hub's licence out of `licenses[]` on purpose, so that a licence verdict does not change on its own. BomLens counts it as present and passes it to the risk assessment only while `licenses[]` is empty; `licenses[]` wins when both exist. The value is what the hub page declares, and BomLens does not check it.
-
-The rest of what these tools write has no G7 element to land on: Cisco AI BOM lists agents and MCP servers as `application` components, and k8s-aibom records the workload that runs the model. They stay in the file and in the component list.
+`--analyze` reads an AI BOM that another tool wrote and runs the same G7 check and risk assessment on it. Which tools were checked and which of their fields are read is in [the artifacts reference](../reference/artifacts.md#ai-boms-from-other-tools).
 
 ## Limits
 
@@ -459,6 +346,4 @@ The rest of what these tools write has no G7 element to land on: Cisco AI BOM li
 - It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).
 - The model id must be `org/model`. A collection name or a full URL will not resolve.
 
----
-
-> **Related**: [Pipeline by input type](../concepts/pipeline-by-input.md) | [Web UI reference](../reference/ui.md) | [CLI reference](../reference/cli.md)
+Related pages: [Pipeline by input type](../concepts/pipeline-by-input.md), [Web UI reference](../reference/ui.md), [CLI reference](../reference/cli.md), [Artifacts reference](../reference/artifacts.md).

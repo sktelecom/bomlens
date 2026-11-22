@@ -32,6 +32,8 @@
 #     differ in their command lines (comments may translate)
 #   - a tile named in the no-CLI quick start's task table that is not a New
 #     scan tile label in that page's locale
+#   - a fixed release version (vX.Y.Z, bomlens:X.Y.Z) in docs/start/ or the
+#     release verification page
 # Warnings (non-fatal):
 #   - an English page and its .ko.md mirror passing different scan-sbom.sh flags
 #   - a pinned-tag example that is not the newest release (stale advice)
@@ -626,6 +628,25 @@ PY
         )
     done
 fi
+
+# --- Check 15: no fixed release version in the start and verify pages -------
+# These pages are read right after a download, so a fixed release (v1.2.3 or
+# bomlens:1.2.3) goes stale with the next release. They take the newest release
+# instead (gh release view, releases/latest/download). VERSION_ALLOW lists the
+# literal strings that may stay; it is empty today.
+VERSION_ALLOW=""
+for f in docs/start/*.md docs/guides/verify-release.md docs/guides/verify-release.ko.md; do
+    [ -f "$f" ] || continue
+    while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        lit="${hit#*:}"
+        if [ -n "$VERSION_ALLOW" ] && printf '%s\n' $VERSION_ALLOW | grep -qxF -- "$lit"; then
+            continue
+        fi
+        echo "  DRIFT[release-version]: $f:${hit%%:*} names the fixed release '$lit'; use the newest release instead"
+        FAIL=$((FAIL + 1))
+    done < <(grep -noE '\bv[0-9]+\.[0-9]+\.[0-9]+\b|bomlens[a-z-]*:[0-9]+\.[0-9]+\.[0-9]+' "$f" 2>/dev/null)
+done
 
 echo ""
 [ "$WARN" -gt 0 ] && echo "${WARN} i18n warning(s) (non-fatal)"

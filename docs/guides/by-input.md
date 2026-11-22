@@ -101,7 +101,7 @@ A team shared the source via a folder you copied locally (`~/project/c-dev`). Ru
 
 ```bash
 cd ~/project/c-dev
-$SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
+$SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendored --generate-only
 ```
 
 - Dependencies declared in Conan's `conanfile.txt` or `conan.lock`, and the package names in CMake files (`find_package`), appear in the SBOM. vcpkg's `vcpkg.json` and Conan's `conanfile.py` are not read: when a dependency they declare is in no component, the result is partial with the reason `manifest-not-read`, which names the manifest and the dependencies. List them with their versions in `sbom-declared.cdx.json` at the project root ([declared components](declared-components.md)), or commit a `conan.lock` beside `conanfile.py`, and scan again.
@@ -177,59 +177,9 @@ $SBOM --project bert-base --version 1.0.0 \
 - Needs the opt-in aibom image (`ghcr.io/sktelecom/bomlens-aibom:latest`), pulled automatically. Set a different tag via `SBOM_AIBOM_IMAGE`.
 - `--model` is mutually exclusive with `--target`/`--analyze`/`--git`/`--merge`.
 - Produces a CycloneDX 1.7 **ML-BOM** (not 1.6), the notice, and the risk report, plus a G7 minimum-element conformance check. There is **no security report** — a model has no package CVEs.
-- For the model card, datasets, and G7 details, see the [AI model guide](ai-model.md).
+- The other AI inputs are run from the [AI model guide](ai-model.md): a published dataset on Figshare or HuggingFace ([Scanning a published dataset](ai-model.md#scanning-a-published-dataset)), a model file such as `.gguf` ([Scanning a model file](ai-model.md#scanning-a-model-file)), and a model with no repository or file yet, described with `--ai-declare` ([The SPDX 3.0.1 AI document](ai-model.md#the-spdx-301-ai-document)). The guide also explains the model card, dataset and G7 results.
 
 **Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, G7 conformance
-
-### When it is a published dataset, not a model
-
-Research data is published where the paper put it, which for a great deal of science is a repository like Figshare rather than a model hub. Hand `--model` the item instead:
-
-```bash
-$SBOM --project cell-imaging-data --version 1.0.0 \
-  --model "https://figshare.com/articles/dataset/Title/33412285" \
-  --usage product --generate-only
-```
-
-The page URL, the DOI, or the item number all work, and no account or opt-in image is needed.
-
-A dataset on HuggingFace goes the same way. Give it as `datasets/<owner>/<name>`, as its `https://huggingface.co/datasets/<owner>/<name>` address, or as `hf:<owner>/<name>`. A bare `owner/name` is read as a model id, because the hub uses the same form for both:
-
-```bash
-$SBOM --project tulu --version 1.0 \
-  --model datasets/allenai/tulu-3-sft-mixture --generate-only
-```
-
-For version selection, the licence-to-SPDX mapping, how a private or embargoed item is handled, and how a HuggingFace dataset's sources are traced, see [Scanning a published dataset](ai-model.md#scanning-a-published-dataset) in the AI model guide.
-
-**Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, conformance check
-
-### When the model has no repository or file yet
-
-A model being prepared for release has no HuggingFace repository and no file to read. Give its publisher's declaration alone, without `--model`, `--model-file` or `--target`:
-
-```bash
-./scripts/scan-sbom.sh --project support-bot --version 1.0 \
-  --ai-declare support-bot-declaration.json --generate-only
-```
-
-The declaration names the base models (`model.baseModels[].ref`) and the HuggingFace datasets (`datasets[].ref`, as `huggingface:<owner>/<name>`), which are read from the hub by id as in a model scan. Data the hub does not hold goes under `datasets[].local`. The scan runs in the base image and passes `HF_TOKEN` when it is set. In the web UI, the **Enter model information** tile in the AI model group asks the same questions step by step and uses the answers as the declaration. See [The SPDX 3.0.1 AI document](ai-model.md#the-spdx-301-ai-document) in the AI model guide.
-
-**Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, G7 conformance, SPDX 3.0.1 AI document
-
-### When you have the model file, not the model id
-
-A supplier ships weights rather than a Hub link, or the model is internal and was never published. Point at the file itself:
-
-```bash
-$SBOM --project internal-llm --version 1.0.0 \
-  --model-file ./models/internal-llm-q4.gguf \
-  --generate-only
-```
-
-Reads the file's own header; no network, no HuggingFace account, and no opt-in image. For the recognized formats, what each one contributes to the SBOM, and the pickle/Keras code-execution check, see [Scanning a model file](ai-model.md#scanning-a-model-file) in the AI model guide.
-
-Deliverables are the same as Scenario 7's, minus what the model card would have supplied.
 
 ## Reading the four deliverables
 
@@ -257,7 +207,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Build artifact | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
 | Firmware upload | upload a `.bin`, etc. — the tile appears automatically whenever Docker is running |
-| Docker image | enter the image name |
+| Docker image | enter the image name (for a private registry, run `docker login` on this machine first) |
 | AI model | enter a HuggingFace model id — the tile appears automatically whenever Docker is running |
 | Model file | upload a `.gguf`, `.safetensors`, `.pt`, etc. (up to 8 GB) |
 | Published dataset | enter a Figshare item (its page URL, its DOI, or the item number) or a HuggingFace dataset (`datasets/<owner>/<name>` or its `https://huggingface.co/datasets/...` address) in the same field as the model id |

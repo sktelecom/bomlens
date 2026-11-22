@@ -53,6 +53,30 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 AI 선언(`--ai-declare`, 또는 웹 UI에서 저장한 선언)에는 최상위 `service` 객체로 모델을 실행하는 서비스를 적을 수 있고, 스캔으로 읽을 수 없는 모델 값 몇 가지도 적을 수 있습니다. `service`는 문서가 데이터셋이 아니라 모델을 기술할 때만 받으며, 값이 하나도 없는 `service`는 선언하지 않은 것으로 봅니다. 이 값들이 무엇을 위한 것인지는 [AI 모델 가이드](../guides/ai-model.ko.md#모델을-실행하는-서비스)에서 설명합니다.
 
+`service` 객체는 다음과 같은 모양입니다.
+
+```json
+"service": {
+  "name": "Acme Support Assistant",
+  "packageVersion": "2.3.0",
+  "downloadLocation": "https://support.acme.example/assistant",
+  "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
+  "releaseTime": "2025-06-01T00:00:00Z",
+  "informationAboutApplication": "Answers customer support questions in the web chat.",
+  "domain": ["customer support"],
+  "autonomyType": "no",
+  "inputModality": ["text"],
+  "outputModality": ["text"],
+  "dataFlows": [
+    {"flow": "inbound", "classification": "personal data",
+     "description": "Customer questions typed in the chat window.",
+     "source": ["https://support.acme.example/chat"]}
+  ],
+  "standardCompliance": ["ISO/IEC 42001:2023"],
+  "disclosureUrl": "https://support.acme.example/ai-disclosure"
+}
+```
+
 | 키 | 값 |
 |----|----|
 | `name` | 서비스 이름. 필수 |
@@ -93,6 +117,53 @@ SPDX 3.0.1 문서에서 서비스는 `software_primaryPurpose`가 `application`�
 이렇게 기록한 서비스에는 모두 `bomlens:origin=declared-input`과 `bomlens:service:kind`(`application` 또는 `external-model`)가 붙고, 서비스 본체에는 `bomlens:service:declarationDigest`도 붙습니다. 모델 컴포넌트에는 선언에서 채운 위치마다 `bomlens:declared` 속성이 붙습니다. 값은 속성 이름이나 `modelCard` 경로이며, 이 단계가 `modelCard`나 `modelCard.modelParameters`를 새로 만들었다면 그 경로도 적습니다. 스캔이 이미 입력이나 출력을 기록했다면 그 값을 그대로 두고 `bomlens:declared:observedKept` 속성에 그 위치를 적습니다. `bomlens:model:declarationDigest`는 모델 값이 어느 선언에서 왔는지 기록합니다. 선언한 형식을 담으려고 새로 만든 `modelCard.modelParameters`는 G7 검사에서 모델 카드로 세지 않습니다. 이 단계는 같은 SBOM에 여러 번 돌려도 됩니다. 이전 실행이 쓴 내용을 먼저 지우므로, 서비스가 없는 선언을 적용하면 예전 서비스가 지워집니다. SPDX 변환기가 거부한 선언은 아예 적용하지 않습니다.
 
 G7 시스템 속성 요소는 선언한 서비스를 읽고, 이렇게 충족된 요소는 "있음 (발행자 선언, BomLens가 확인하지 않음)"으로 나옵니다. SPDX 2.3 내보내기와 `--diff`는 서비스를 다루지 않습니다. BomLens v1.13 이하는 `service`나 새 모델 키가 있는 선언을 "unknown key(s)" 오류로 거부합니다.
+
+## 소스 스캔의 AI 사용 기록
+
+소스 스캔은 스캔한 코드가 쓰는 AI도 기록합니다. `--model`과는 별개의 기능입니다. 모델 카드를 읽지 않고, 코드가 호출하는 대상과 프로젝트가 AI 도구를 쓰도록 설정된 내용을 목록으로 남깁니다. 기본으로 실행됩니다.
+
+| 항목 | 기록 위치 | 예 |
+| --- | --- | --- |
+| 코드가 참조하는 모델 | `components[]`, 유형 `machine-learning-model` | `pkg:generic/openai/gpt-4o`인 `gpt-4o`, `pkg:huggingface/...`인 `meta-llama/Llama-3.1-8B-Instruct` |
+| 코드가 호출하는 AI 서비스 | `services[]`, 호출에 쓰는 모델은 `dependencies[]` | OpenAI API |
+| 설정 파일에 있는 MCP 서버 | `services[]` | `.vscode/mcp.json`이나 `.cursor/mcp.json`의 서버 |
+| MCP 설정 파일 | `components[]`, 유형 `file` | `.vscode/mcp.json` |
+| 에이전트 지침 파일 | `components[]`, 유형 `file`, SHA-256 포함 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
+
+각 항목에는 `bomlens:ai:usage`(`model`, `ai-service`, `mcp-server`, `mcp-config`, `instruction-file`)와 `bomlens:ai:scope`가 붙습니다. `bomlens:ai:scope`는 코드가 호출하는 것이면 `runtime`, 편집기와 에이전트 설정이면 `development`입니다.
+
+검토해야 할 MCP 서버에는 `bomlens:ai:reviewReason`이 하나 이상 붙습니다.
+
+- `broad-filesystem-access`: 파일 시스템 루트나 홈 폴더를 넘겨받습니다.
+- `unpinned-package`: 버전 없이 `npx`나 `uvx`로 실행되어, 새 릴리스가 검토 없이 실행됩니다.
+- `unencrypted-transport`: 다른 호스트에 평문 `http`로 접속합니다.
+
+MCP 서버에 넘기는 환경 변수 값과 헤더(토큰 등), 프롬프트 문구는 복사하지 않습니다. 접속 주소에서는 사용자 정보, 쿼리, 프래그먼트를 지웁니다.
+
+이 항목들은 목록으로만 보여 주고 측정하지 않습니다. 적합성 검사와 NOTICE에서 빠지고, 모델 위험 판정도 허브에서 조회한 모델(아래)이 아니면 빠지며, 코드가 호출만 하는 모델에는 G7 검사를 적용하지 않습니다. 이 스캔에는 그 모델의 카드가 없기 때문입니다. 모델 자체를 점검하려면 `--model`로 스캔합니다.
+
+탐지는 cdxgen의 `ai`, `mcp` 분석을 쓰며, 이 분석은 텍스트를 맞춰 보는 방식입니다. BomLens는 모델 식별자 형태이고 시험 코드나 문서가 아닌 코드에 나온 모델만 남기고, AI 서비스는 그런 모델이 연결된 경우에만 남깁니다. 그래도 프로젝트가 자료 구조에 나열한 모델은 놓칠 수 있고, 모델 식별자처럼 생긴 문자열이 기록될 수 있습니다. 이 단계를 끄려면 `BOMLENS_NO_AI_USAGE=1`을 설정합니다.
+
+### Hugging Face에서 모델 조회
+
+코드가 참조하는 모델은 이름과 purl만 목록에 올라옵니다. `--resolve-models`(또는 새 스캔 화면의 옵션)를 켜면 스캔이 각 `pkg:huggingface/...` 모델을 Hugging Face 허브에 조회해 그 항목에 요약을 덧붙입니다.
+
+- 모델 카드가 밝힌 라이선스. 적힌 그대로(`llama3.1`)이며 SPDX 식별자로 추측하지 않고, 그 라이선스에 대한 모델 위험 판정도 함께 보여 줍니다. 이 판정은 기반 모델의 라이선스도 읽습니다.
+- 가중치 파일 형식, 그중 pickle 파일의 수(불러올 때 코드를 실행할 수 있음), 허브가 해시를 가진 파일마다의 SHA-256. 이 값들은 기록만 하고 판정에는 읽지 않습니다.
+- 저장소의 접근 제한(gated) 여부(허브는 토큰 없이도 접근 제한 저장소를 설명함), 허브의 현재 리비전과 그 시각(코드가 실제로 불러오는 리비전과 같다고 볼 수는 없음).
+- 카드가 밝힌 기반 모델 계보와 각 기반 모델의 라이선스.
+
+허브가 오류로 답한 모델은 HTTP 상태와 함께 `unreadable`로 표시합니다. 비공개 저장소이거나 없는 저장소이며, 허브는 둘 다 같은 방식(401)으로 답합니다. 읽을 수 있는 비공개 모델이면 `HF_TOKEN`을 설정합니다. 허브가 답하지 않았거나 429나 5xx로 답했거나 시간이 모자란 모델은 `unreachable` 또는 `not-attempted`로 표시하고, 이 단계를 실패로 기록합니다(SBOM은 그대로 기록됩니다). 추측해서 채우는 값은 없습니다. 조회하는 모델은 `MODEL_RESOLVE_MAX`(20)개까지이고, 기반 모델 조회를 포함한 전체 조회 시간은 `MODEL_RESOLVE_BUDGET`(240초)까지입니다. 나머지는 `not-attempted`로 표시합니다. `gpt-4o`처럼 허브 페이지가 없는 호스팅 모델은 그대로 둡니다.
+
+이 요약은 모델 자체의 SBOM이 아닙니다. 모델 카드와 `--model`이 실행하는 검사가 필요하기 때문입니다. 전체 SBOM을 만들어 소스 SBOM에 연결하려면 모델을 스캔한 뒤 그 파일을 넘깁니다.
+
+```bash
+./scripts/scan-sbom.sh --project my-llm --version 1.0 --model "meta-llama/Llama-3.1-8B-Instruct"
+./scripts/scan-sbom.sh --project my-app --version 1.0 --target ./my-app \
+  --model-sbom my-llm_1.0/my-llm_1.0_bom.json
+```
+
+그러면 모델이 CycloneDX BOM-Link(`externalReferences` 유형 `bom`, `urn:cdx:<일련번호>/<버전>#<bom-ref>`)로 그 파일과 연결되어, 소스 SBOM을 읽는 쪽이 전체 SBOM을 찾을 수 있습니다. 링크는 문서를 일련번호로 가리키므로, 소스 SBOM을 전달할 때 모델 SBOM도 함께 전달합니다. 일련번호가 없는 파일이나 코드가 참조하지 않는 모델의 파일은 알리고 제외합니다. 요약의 라이선스와 가중치 파일은 스캔 시점에 허브에서 읽은 값이므로, 완전한 정보는 연결된 SBOM을 기준으로 봅니다.
 
 ## SBOM 구조
 
@@ -163,4 +234,34 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 - 권장 행. 라이선스와 hash 포함률 외에 SHA-512 체크섬 포함률, 컴포넌트 작성 주체, 컴포넌트 파일명, 소스·배포 URI, 전달 파일 속성(스캔으로 확인할 수 없으면 검토 필요), 파일 구성요소 식별자 포함률이 있습니다. 2026년 최소 요소 중에는 필드가 비어 있는 이유를 밝히라는 항목이 있습니다. BomLens가 생성한 SBOM은 문서 전체에 대해 그 이유를 적고, 받은 SBOM이 아무 말도 하지 않으면 이 항목을 공백으로 보고합니다.
 - `--resolve-purl`을 붙이면 권고 행이 하나 더 붙으며, 적합성 검사에서 네트워크를 쓰는 유일한 부분입니다. 식별자가 실제 있는 패키지를 가리키는지 각 패키지 저장소에 조회해, 형식은 맞지만 저장소에 없는 식별자를 잡습니다. `pkg:maven/org.drools/org.drools.drools-core-dynamic@…`(artifactId 안에 groupId가 한 번 더 들어감)이나 `pkg:maven/The%2BApache%2BSoftware%2BFoundation/poi@…`(groupId 자리에 회사 표시 이름)가 그 예입니다. 사내 저장소에만 올린 패키지도 같은 결과가 나오므로 판정을 바꾸지 않으며, 사내 네임스페이스는 `PURL_RESOLVE_IGNORE`로 제외합니다. 버전이 아니라 좌표만 확인합니다. 벤더가 다시 빌드한 버전은 정상이면서도 공개 저장소에 없기 때문입니다.
 - 검사하지 않는 것. 서버 납품에 OS 패키지가 들어 있는지, OS 패키지 purl이 실제 설치된 배포판을 가리키는지(RHEL 서버에 `pkg:deb/debian/...`이 붙어 있어도 통과합니다), 파일 기본 점검(확장자, 크기, JSON 문법)은 보지 않습니다. 이런 항목은 [점검표](https://sktelecom.github.io/guide/supply-chain/for-suppliers/checklist/)로 확인하세요.
-- 규제 참고 정보. 규제 기준선과 대응되는 행에는 그 아래에 참고 규정이 붙고, 크로스워크 절이 프레임워크별 충족 현황을 집계합니다. 대상은 BSI TR-03183-2(EU 사이버복원력법을 위한 독일 기술지침)와 미국 SBOM 최소 요소(2026년판)입니다. 크로스워크는 참고 자료이며 준수 판정을 하지 않습니다. 동작 방식은 [AI 모델 SBOM 가이드](../guides/ai-model.ko.md#규제-크로스워크)에서 설명합니다. HTML 보고서 상단 카드에는 판정과 누락 항목이 표시됩니다.
+- 규제 참고 정보. 규제 기준선과 대응되는 행에는 그 아래에 참고 규정이 붙고, 크로스워크 절이 프레임워크별 충족 현황을 집계합니다. 대상은 BSI TR-03183-2(EU 사이버복원력법을 위한 독일 기술지침)와 미국 SBOM 최소 요소(2026년판)입니다. 크로스워크는 참고 자료이며 준수 판정을 하지 않습니다. 동작 방식은 아래 [규제 크로스워크](#규제-크로스워크)에서 설명합니다. HTML 보고서 상단 카드에는 판정과 누락 항목이 표시됩니다.
+
+### 규제 크로스워크
+
+AI 여부와 관계없이 분석하는 모든 SBOM에는 두 가지 프레임워크가 매핑됩니다.
+
+- EU 사이버복원력법(CRA): CRA 준수를 위해 작성된 독일 기술지침이자 공개된 것 중 가장 상세한 SBOM 필드 명세인 BSI TR-03183-2를 통해 연결합니다(CRA 본문은 데이터 필드를 지정하지 않습니다). TR-03183-2는 국가 지침이며, 구속력 있는 문구를 담을 유럽 조화 표준은 아직 초안 단계입니다.
+- 미국 SBOM 최소 요소: 2026년판 최소 요소의 데이터 필드 17개와 운영 원칙 6개. CISA와 NSA, FBI가 15개 해외 기관과 함께 발표했고 2021년 NTIA 문서를 대체합니다. 이후 연방 차원의 SBOM 수집 의무는 기관별 위험 기반 판단으로 축소되었지만, 개별 기관이 요구하는 실무 기준으로는 여전히 유효합니다.
+
+위 크로스워크는 SBOM 데이터 필드만 다룹니다. 이 필드가 속한 CRA 준비 절차 전체(거버넌스, 취약점 대응, 기술문서, 보안 업데이트)는 커뮤니티가 관리하는 [OpenChain CRA Compliance Requirements & Checklist](https://github.com/OpenChain-Project/CRA-Compliance)를 참고하세요.
+
+AI SBOM에는 EU 인공지능법(AI Act)과 한국 AI 기본법도 G7 요소에 매핑됩니다. 대응하는 조항은 [AI 모델 SBOM 가이드](../guides/ai-model.ko.md#규제-크로스워크)에 있습니다.
+
+매핑은 검사 id를 키로 삼아 `docker/lib/regulation-crosswalk.json`에 있습니다. AI 검사는 G7 요소 id, 기본 형식 검사는 일반 CycloneDX 검사 id를 씁니다. 의도적으로 보수적으로 잡아, 근거가 분명한 검사만 매핑합니다. 현재 검사 id 74개가 네 프레임워크에 걸쳐 84건으로 연결되어 있습니다. 검사 하나가 여러 프레임워크에 연결될 수 있어 두 수치가 다릅니다. 검사 이름이 바뀌어도 크로스워크가 조용히 어긋나지 않도록, 매핑된 모든 id를 레지스트리와 대조하는 테스트를 둡니다.
+
+### 다른 도구가 만든 AI BOM
+
+`--analyze`는 다른 도구가 만든 AI BOM도 읽어 같은 G7 점검과 위험 판정을 돌립니다. k8s-aibom의 CycloneDX 출력, AIsbom, Cisco AI BOM, AIBoMGen CLI 네 가지 도구의 시료로 확인했습니다. 어느 도구도 G7 항목 대부분을 채우지 않으므로 보고서에는 없음으로 나오는 항목이 많습니다. 이는 파일에 든 내용이 그렇다는 뜻이며 읽기가 잘못된 것이 아닙니다.
+
+일부 값은 G7 점검이 예전에 보지 않던 자리에 들어 있어서, 이제 그 자리에서도 읽습니다. 이렇게 채워진 항목의 상세 줄에는 `also read from`과 출처가 붙고, 결과의 `via`에도 담깁니다.
+
+| 항목 | 읽는 곳 | 도구 |
+|---|---|---|
+| 모델 식별자 | `aisbom:hf:repo_id` | AIsbom |
+| 모델 라이선스 | `aisbom:hf:license` | AIsbom |
+| 모델 버전 | `aisbom:hf:revision`, `k8s-aibom:model:revision` | AIsbom, k8s-aibom |
+| SBOM 생성 맥락 | `metadata.lifecycles`(CycloneDX 표준 필드) | k8s-aibom, AIBoMGen CLI |
+
+AIsbom은 라이선스 판정이 저절로 바뀌지 않게 하려고 허브의 라이선스를 `licenses[]`에 넣지 않습니다. BomLens는 이 값을 있는 것으로 세고, `licenses[]`가 비어 있을 때만 위험 판정에 넘깁니다. 둘 다 있으면 `licenses[]`를 씁니다. 이 값은 허브 페이지가 밝힌 내용이며 BomLens가 검증하지는 않습니다.
+
+그 밖에 이 도구들이 적은 내용은 대응하는 G7 항목이 없습니다. Cisco AI BOM은 에이전트와 MCP 서버를 `application` 구성요소로, k8s-aibom은 모델을 실행하는 워크로드를 기록합니다. 이 내용은 파일과 구성요소 목록에 그대로 남습니다.

@@ -101,7 +101,7 @@ $SBOM --project team2-app --version 1.0.0 \
 
 ```bash
 cd ~/project/c-dev
-$SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
+$SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendored --generate-only
 ```
 
 - Conan의 `conanfile.txt`나 `conan.lock`에 선언된 의존성과 CMake 파일의 패키지 이름(`find_package`)은 SBOM에 들어갑니다. vcpkg의 `vcpkg.json`과 Conan의 `conanfile.py`는 읽지 않습니다. 여기에 선언된 의존성이 어느 컴포넌트에도 없으면 결과는 부분(사유 `manifest-not-read`)이 되고, 사유에 해당 매니페스트와 의존성 이름이 나옵니다. 프로젝트 최상위 폴더의 `sbom-declared.cdx.json`에 버전과 함께 적거나([선언 구성요소](declared-components.ko.md)) `conanfile.py` 옆에 `conan.lock`을 커밋한 뒤 다시 스캔하세요.
@@ -177,59 +177,9 @@ $SBOM --project bert-base --version 1.0.0 \
 - opt-in aibom 이미지(`ghcr.io/sktelecom/bomlens-aibom:latest`)가 필요하며 자동으로 받습니다. 다른 태그는 `SBOM_AIBOM_IMAGE`로 지정합니다.
 - `--model`은 `--target`/`--analyze`/`--git`/`--merge`와 함께 쓸 수 없습니다.
 - CycloneDX 1.7 **ML-BOM**(1.6 아님), 고지문, 오픈소스 위험 보고서와 G7 최소 요소 적합성 검사를 만듭니다. **보안 보고서는 없습니다.** 모델에는 패키지 CVE가 없습니다.
-- 모델 카드, 데이터셋, G7 세부는 [AI 모델 가이드](ai-model.ko.md)를 참고하세요.
+- 다른 AI 입력은 [AI 모델 가이드](ai-model.ko.md)에서 실행 방법을 설명합니다. Figshare나 HuggingFace에 공개된 데이터셋([공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)), `.gguf` 같은 모델 파일([모델 파일 스캔](ai-model.ko.md#모델-파일-스캔)), 저장소나 파일이 아직 없어 `--ai-declare`로 기술하는 모델([SPDX 3.0.1 AI 문서](ai-model.ko.md#spdx-301-ai-문서))입니다. 모델 카드, 데이터셋, G7 결과를 읽는 법도 이 가이드에 있습니다.
 
 **산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, G7 적합성
-
-### 모델이 아니라 공개된 데이터셋이라면
-
-연구 데이터는 논문이 올려 둔 곳에 있고, 여러 분야에서 그곳은 모델 허브가 아니라 Figshare 같은 저장소입니다. `--model`에 해당 항목을 그대로 넣습니다.
-
-```bash
-$SBOM --project cell-imaging-data --version 1.0.0 \
-  --model "https://figshare.com/articles/dataset/Title/33412285" \
-  --usage product --generate-only
-```
-
-페이지 주소, DOI, 항목 번호 모두 되고, 계정도 별도 이미지도 필요 없습니다.
-
-HuggingFace에 있는 데이터셋도 같은 방법으로 스캔합니다. `datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>` 주소, `hf:<owner>/<name>` 중 하나로 주면 됩니다. 앞에 아무것도 붙이지 않은 `owner/name`은 모델 id로 읽습니다. HuggingFace가 모델과 데이터셋에 같은 형식을 쓰기 때문입니다.
-
-```bash
-$SBOM --project tulu --version 1.0 \
-  --model datasets/allenai/tulu-3-sft-mixture --generate-only
-```
-
-버전 지정 방법, 라이선스를 SPDX로 옮기는 규칙, 비공개·엠바고 항목 처리, HuggingFace 데이터셋의 원천을 따라가는 방식은 AI 모델 가이드의 [공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)을 참고하세요.
-
-**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, 적합성 검사
-
-### 모델에 아직 저장소도 파일도 없다면
-
-출시를 준비 중인 모델에는 HuggingFace 저장소도 읽을 파일도 없습니다. 이때는 `--model`, `--model-file`, `--target` 없이 모델 공개자의 선언 파일만 줍니다.
-
-```bash
-./scripts/scan-sbom.sh --project support-bot --version 1.0 \
-  --ai-declare support-bot-declaration.json --generate-only
-```
-
-선언 파일에는 기반 모델(`model.baseModels[].ref`)과 HuggingFace 데이터셋(`datasets[].ref`, `huggingface:<owner>/<name>` 형식)을 적고, 이들은 모델 스캔과 같은 방식으로 허브에서 id로 읽어 옵니다. 허브에 없는 데이터는 `datasets[].local`에 적습니다. 스캔은 기본 이미지에서 실행되며, `HF_TOKEN`이 설정되어 있으면 함께 넘깁니다. 웹 UI에서는 AI 모델 묶음의 **모델 정보 직접 입력** 타일이 같은 내용을 단계별로 묻고, 그 답을 선언으로 씁니다. 자세한 내용은 AI 모델 가이드의 [SPDX 3.0.1 AI 문서](ai-model.ko.md#spdx-301-ai-문서)를 참고하세요.
-
-**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, G7 적합성, SPDX 3.0.1 AI 문서
-
-### 모델 id가 아니라 모델 파일을 받았다면
-
-공급사가 Hub 링크 대신 가중치 파일을 보내왔거나, 사내 모델이라 공개한 적이 없는 경우입니다. 파일을 직접 가리킵니다.
-
-```bash
-$SBOM --project internal-llm --version 1.0.0 \
-  --model-file ./models/internal-llm-q4.gguf \
-  --generate-only
-```
-
-파일의 헤더를 직접 읽으므로 네트워크도 HuggingFace 계정도 opt-in 이미지도 필요 없습니다. 인식하는 형식과 형식마다 SBOM에 담기는 내용, pickle·Keras 코드 실행 검증은 AI 모델 가이드의 [모델 파일 스캔](ai-model.ko.md#모델-파일-스캔)을 참고하세요.
-
-산출물은 시나리오 7과 같고, 모델 카드에서 오던 정보만 빠집니다.
 
 ## 산출물 4종 해석
 
@@ -257,7 +207,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | 빌드 산출물 | 빌드 산출물 업로드 — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM 업로드 | 기존 SBOM(JSON) 업로드, 분석(ANALYZE) 모드 |
 | 펌웨어 업로드 | `.bin` 등 업로드 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
-| Docker 이미지 | 이미지명 입력 |
+| Docker 이미지 | 이미지명 입력(비공개 레지스트리는 이 컴퓨터에서 먼저 `docker login` 실행) |
 | AI 모델 | HuggingFace 모델 id 입력 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
 | 모델 파일 | `.gguf`, `.safetensors`, `.pt` 등 업로드(최대 8GB) |
 | 공개 데이터셋 | Figshare 아이템(페이지 URL, DOI, 아이템 번호) 또는 HuggingFace 데이터셋(`datasets/<owner>/<name>`이나 `https://huggingface.co/datasets/...` 주소)을 모델 id와 같은 입력란에 입력 |

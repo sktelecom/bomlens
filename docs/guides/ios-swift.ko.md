@@ -10,7 +10,7 @@ BomLens는 프로젝트에 이미 있는 잠금 파일을 읽습니다. 그래�
 
 | 의존성 관리자 | 파일 | 없으면 |
 |---------------|------|--------|
-| Swift Package Manager | `Package.swift` 옆의 `Package.resolved` | 스캔이 `swift package resolve`를 실행하며, 모든 의존성에 네트워크로 접근해야 합니다 |
+| Swift Package Manager | `Package.swift` 옆의 `Package.resolved`, 또는 Xcode가 두는 `*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`(또는 `*.xcworkspace/xcshareddata/swiftpm/`) | 스캔이 `swift package resolve`를 실행하며, 모든 의존성에 네트워크로 접근해야 합니다 |
 | CocoaPods | `Podfile.lock` | `pod install`을 한 번 실행해 파일을 커밋하세요. BomLens가 직접 파싱합니다 |
 
 최상위에 매니페스트가 없어도 세 단계 아래까지 Xcode 프로젝트, `Package.swift`, `Podfile`, `Package.resolved`가 있으면(예: `App/App.xcodeproj`) Swift 프로젝트로 스캔합니다.
@@ -27,7 +27,7 @@ BomLens는 프로젝트에 이미 있는 잠금 파일을 읽습니다. 그래�
 
 ## 비공개 의존성은 어떻게 하나요?
 
-`Package.resolved`를 커밋하세요. 이 파일이 있으면 스캔이 네트워크 해석을 건너뛰고 파일에서 버전을 읽으므로, 비공개 Git 의존성을 클론하지 않아도 됩니다. 없으면 해석 단계가 `BOMLENS_PREP_TIMEOUT`초(기본 900초) 뒤에 멈춥니다. Git이 로그인을 요구하지 않도록 설정되어 있기 때문입니다. 비공개 CocoaPods 소스는 따로 할 일이 없습니다. `Podfile.lock`에 모든 Pod가 이미 적혀 있습니다.
+`Package.resolved`를 커밋하세요. 이 파일이 있으면 스캔이 네트워크 해석을 건너뛰고 파일에서 버전을 읽으므로, 비공개 Git 의존성을 클론하지 않아도 됩니다. 없으면 해석 단계가 `BOMLENS_PREP_TIMEOUT`초(기본 900초) 뒤에 멈춥니다. Git이 로그인을 요구하지 않도록 설정되어 있기 때문입니다. CocoaPods는 `Podfile.lock`에 모든 Pod와 버전이 적혀 있으므로 비공개 소스에 접근하지 않아도 버전을 읽습니다. 라이선스는 이 파일에 없어서 BomLens가 CocoaPods trunk(`cdn.cocoapods.org`)에서 온라인으로 조회하며, trunk에 등록된 Pod만 조회합니다. 따라서 비공개 spec 저장소나 git, 로컬 경로에서 가져온 Pod는 SBOM에 라이선스가 비어 있습니다. TLS를 검사하는 프록시 뒤에서는 이 조회에 사내 인증서가 필요하므로 `SBOM_EXTRA_CA_CERTS`를 지정하세요([사내 네트워크](company-network.ko.md#사내-인증서는-어떻게-신뢰하게-하나요) 참고).
 
 ## 결과에서 빠지는 것은 무엇인가요?
 

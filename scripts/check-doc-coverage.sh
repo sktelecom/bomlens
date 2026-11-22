@@ -134,10 +134,10 @@ docs/start/no-cli.md :: 100 :: 0
 docs/start/no-cli.ko.md :: 118 :: 0
 docs/start/troubleshooting.md :: 85 :: 0
 docs/start/troubleshooting.ko.md :: 119 :: 0
-docs/guides/supplier-sbom.md :: 246 :: 0
-docs/guides/supplier-sbom.ko.md :: 248 :: 0
-docs/guides/ai-model.md :: 464 :: 0
-docs/guides/ai-model.ko.md :: 464 :: 0
+docs/guides/supplier-sbom.md :: 239 :: 0
+docs/guides/supplier-sbom.ko.md :: 241 :: 0
+docs/guides/ai-model.md :: 350 :: 0
+docs/guides/ai-model.ko.md :: 350 :: 0
 docs/reference/ui.md :: 246 :: 0
 docs/reference/ui.ko.md :: 246 :: 0
 "

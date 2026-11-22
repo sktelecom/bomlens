@@ -33,34 +33,21 @@ Firmware is a single file that packs and seals an operating system and dozens of
 
 Firmware analysis needs a separate image that bundles the unpacking and binary-identification tools (unblob, cve-bin-tool, and so on). These are GPL-family tools, so they are kept out of the lightweight base image and split into an opt-in firmware image.
 
+On the CLI, pull it once:
+
 ```bash
 docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 ```
 
-This image is the default, so adding `--firmware` pulls it without any extra setting. To use a different tag, set the environment variable `SBOM_FIRMWARE_IMAGE`.
+In the desktop app and the web UI you do not run that command: the firmware input shows a **Download now** button with the download size and the layer progress.
 
-In the web UI and the desktop app you do not have to run that command: the firmware input offers a Download now button with the download size, and shows how many layers are done while it runs. Without it the image is still pulled on the first firmware scan, so the only difference is whether the wait happens before the scan or inside it.
+To use a different tag or an internal mirror registry, set `SBOM_FIRMWARE_IMAGE`. It takes effect only as a real environment variable; the settings file `bomlens.settings.txt` that a double-clicked `.bat` reads does not support this key.
 
 ## Running it
 
-Firmware analysis needs the firmware image (above), whether you use the web UI or the CLI.
+### From the desktop app or the web UI
 
-### From the web UI
-
-Launch the web UI as usual — you do not need to point it at this image yourself. As long as the Docker engine is running, the base UI image launches this firmware image as a sibling container over the Docker socket, and the firmware upload tile appears automatically.
-
-```bash
-./scripts/scan-sbom.sh --ui
-#   Windows: just double-click sbom-ui.bat
-```
-
-Set `SBOM_FIRMWARE_IMAGE` only if you want a different tag or an internal mirror registry. It takes effect only as a real environment variable — the settings file `bomlens.settings.txt` that a double-clicked `.bat` reads does not support this key.
-
-```bash
-SBOM_FIRMWARE_IMAGE=<your-mirror>:<tag> ./scripts/scan-sbom.sh --ui
-```
-
-Enter a project name and version, choose the firmware upload tile, upload the file, and run.
+Open the desktop app or the web UI (setup is in [First scan](../start/first-scan.md)). Enter a project name and version, choose the firmware upload tile, upload the file, and run.
 
 ### From the CLI
 
