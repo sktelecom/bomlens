@@ -22,7 +22,14 @@
 # Env:     VERBOSE=true   show the captured scan output for failing cases
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# TEST_SHARD=i/N runs one shard of the sections below (tests/lib/test-shard.sh).
+if [ -n "${TEST_SHARD:-}" ] && [ -z "${TEST_SHARD_CHILD:-}" ]; then
+  # shellcheck source=tests/lib/test-shard.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/lib/test-shard.sh"
+  test_shard_run "${BASH_SOURCE[0]}" '^section "' "$@"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${TEST_SHARD_SELF:-${BASH_SOURCE[0]}}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCAN="$REPO/scripts/scan-sbom.sh"
 VERBOSE="${VERBOSE:-false}"
@@ -351,6 +358,21 @@ in_log() { grep -qF -- "$1" "$LOG"; }
 
 new_proj() { local d="$WORK/proj.$N.$1"; mkdir -p "$d"; echo "$d"; }
 
+# Shared by more than one section, so a shard (TEST_SHARD) that runs only the
+# later one still has them.
+is_windows_bash() {
+    case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac
+}
+host_form() { if is_windows_bash; then cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; else printf '%s' "$1"; fi; }
+guard() { # label | expected-substring | args...
+  local label="$1" want="$2"; shift 2
+  local d; d="$(new_proj guard)"
+  scan_in "$d" "$@"
+  if [ "$RC" -ne 0 ] && in_out "$want"; then pass "$label"; else
+    fail "$label" "rc=$RC; expected '$want'"; show; fi
+}
+CDX='{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"a","version":"1"}},"components":[]}'
+
 echo "=================================================="
 echo " BomLens — Windows / no-Docker tests"
 echo " bash: $(bash --version | head -1)"
@@ -625,9 +647,6 @@ in_log ":/bomlens-state" \
 # keys off LOCALAPPDATA, everywhere else it is XDG_STATE_HOME (or
 # $HOME/.local/state) -- both end in .../bomlens/guard, but a different env
 # var, so a test cannot just set XDG_STATE_HOME and assume it took effect.
-is_windows_bash() {
-    case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac
-}
 # $1 = the POSIX dir a test wants scan-sbom.sh to use as its guard-state root.
 # Exports the right override var for this platform in the CALLING shell (no
 # $(...) here -- a subshell's export never reaches scan_in afterward) and sets
@@ -1192,13 +1211,6 @@ scan_in "$d" --project Rel --version 1 --target dev.bin --as-source --generate-o
 # --------------------------------------------------------
 section "Mutual-exclusivity & input guards"
 # --------------------------------------------------------
-guard() { # label | expected-substring | args...
-  local label="$1" want="$2"; shift 2
-  local d; d="$(new_proj guard)"
-  scan_in "$d" "$@"
-  if [ "$RC" -ne 0 ] && in_out "$want"; then pass "$label"; else
-    fail "$label" "rc=$RC; expected '$want'"; show; fi
-}
 guard "--git + --target rejected"      "mutually exclusive" --project p --version 1 --git https://github.com/x/y --target z
 guard "--git + --analyze rejected"     "mutually exclusive" --project p --version 1 --git https://github.com/x/y --analyze s.json
 guard "--analyze + --target rejected"  "mutually exclusive" --project p --version 1 --analyze s.json --target z
@@ -1461,7 +1473,6 @@ scan_in "$d" --project MVW --version 1 --model owner/repo --verify-weights --gen
 # --------------------------------------------------------
 section "Merge mode (--merge)"
 # --------------------------------------------------------
-CDX='{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"a","version":"1"}},"components":[]}'
 d="$(new_proj merge)"
 printf '%s' "$CDX" > "$d/a.json"
 printf '%s' "$CDX" > "$d/b.json"
@@ -2190,7 +2201,6 @@ cache_home="$WORK/cachehome"; fake_home="$WORK/fakehome"
 mkdir -p "$fake_home/.m2/repository" "$fake_home/.gradle/init.d"
 : > "$fake_home/.m2/settings.xml"; : > "$fake_home/.m2/settings-security.xml"
 : > "$fake_home/.gradle/gradle.properties"; : > "$fake_home/.gradle/init.gradle"; : > "$fake_home/.gradle/init.gradle.kts"
-host_form() { if is_windows_bash; then cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; else printf '%s' "$1"; fi; }
 _prev_xch="${XDG_CACHE_HOME-__unset__}"; _prev_lad="${LOCALAPPDATA-__unset__}"
 if is_windows_bash; then
     LOCALAPPDATA="$(cygpath -w "$cache_home" 2>/dev/null || printf '%s' "$cache_home")"; export LOCALAPPDATA
@@ -2591,6 +2601,7 @@ fi
   && pass "scan-sbom.sh prints the result folder and its lock through shownpath" \
   || fail "scan-sbom.sh result folder paths through shownpath"
 
+# shard: closing summary
 # --------------------------------------------------------
 echo ""
 echo "=================================================="

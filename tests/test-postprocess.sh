@@ -17,7 +17,14 @@
 # Pure jq/bash, so it runs in CI without Docker or a scanner image.
 set -u
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# TEST_SHARD=i/N runs one shard of the sections below (tests/lib/test-shard.sh).
+if [ -n "${TEST_SHARD:-}" ] && [ -z "${TEST_SHARD_CHILD:-}" ]; then
+    # shellcheck source=tests/lib/test-shard.sh
+    . "$(dirname "${BASH_SOURCE[0]}")/lib/test-shard.sh"
+    test_shard_run "${BASH_SOURCE[0]}" '^echo "== ' "$@"
+fi
+
+ROOT_DIR="$(cd "$(dirname "${TEST_SHARD_SELF:-${BASH_SOURCE[0]}}")/.." && pwd)"
 LIB="$ROOT_DIR/docker/lib"
 FIX="$ROOT_DIR/tests/fixtures"
 PASS=0
@@ -32,6 +39,18 @@ fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# Paths and the stub folder more than one section uses, set here so a shard
+# (TEST_SHARD) that runs only a later section still has them.
+LTS="$ROOT_DIR/docker/web/frontend/src/lib/licenses.ts"
+LFJ="$LIB/license-flags.jq"
+MVNCPE="$LIB/enrich-maven-cpe.py"
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
+SNAP="$ROOT_DIR/docker/lib/source-snapshot.py"
+UPP="$LIB/upstream-purl.py"
+CVP="$LIB/component-versions.py"
+FAKEBIN="$WORK/fakebin"; mkdir -p "$FAKEBIN"
 
 echo "== B-1: --byte-stable normalizes cdxgen venv name =="
 cp "$FIX/venv-leak-a.json" "$WORK/a.json"
@@ -738,6 +757,7 @@ else
     fail "generate-notice.sh did not produce source/attribution NOTICE"
 fi
 
+# shard: same unit as the section above
 echo "== B-6: NOTICE PDF — rendered when weasyprint present, skipped gracefully otherwise =="
 # generate-notice.sh must not die when the PDF renderer is absent, and must produce
 # the PDF (and report it) when weasyprint is on PATH. We force the absent case with a
@@ -933,6 +953,7 @@ diff -q "$WORK/lcs1.json" "$WORK/lcs2.json" >/dev/null 2>&1 \
     && pass "--stable output with licenseClass is byte-identical across runs" \
     || fail "licenseClass stamping broke --byte-stable determinism"
 
+# shard: same unit as the section above
 echo "== license-class drift guard: license-flags.jq and licenses.ts share one classifier =="
 # The jq classifier is a hand-written mirror of the frontend's licenses.ts. This
 # gate extracts both sides' permissive id sets, tier regex patterns (in match
@@ -972,6 +993,7 @@ else
     fail "tier results diverged" "licenses.ts: $(echo "$ts_tier" | tr '\n' ' ') / license-flags.jq: $(echo "$jq_tier" | tr '\n' ' ')"
 fi
 
+# shard: same unit as the section above
 echo "== malicious packages: PURL-keyed, version-aware, and silent without a snapshot =="
 # A tiny stand-in for the bundled OSV index. Two shapes matter: an entry with no
 # version list (every published version is malicious — the common case) and one
@@ -1076,6 +1098,7 @@ else
     fail "malicious properties duplicated on re-run" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
 fi
 
+# shard: same unit as the section above
 echo "== malicious packages: a range-limited advisory is compared against the component's own version =="
 # Real case: OSV MAL-2023-462 names no explicit versions for pkg:npm/fsevents,
 # only a SEMVER range (introduced 1.0.0, fixed 1.2.11). Before this fix, the
@@ -1152,6 +1175,7 @@ else
     fail "unparseable-range version not handled as rangeUnknown" "$(jq -c '.components[4].properties' "$WORK/mal-range.json")"
 fi
 
+# shard: same unit as the section above
 echo "== license-conflict: expression parsing and outbound-license verdicts =="
 # The conflict check needs an OUTBOUND license on metadata.component. Every
 # expression below was measured in a real BomLens SBOM, so this pins the cases
@@ -1220,6 +1244,7 @@ LCJSON
         || fail "licenseConflict stamping broke --byte-stable determinism"
 fi
 
+# shard: same unit as the section above
 echo "== os-licenses: a Debian package's several licenses all apply, never a choice =="
 # Trivy lists each license of a copyright file as its own entry. They must stay
 # separate entries (no OR expression), and the class and the conflict verdict
@@ -1288,6 +1313,7 @@ osl_under BSD-2-Clause libxxhash0 && osl_under GPL-2.0-only libxxhash0 \
     && pass "the NOTICE lists a deb package under each of its licenses" \
     || fail "NOTICE grouping of libxxhash0" "$(grep -n -E '^License: |libxxhash0' "$OSLT/n_NOTICE.txt" 2>/dev/null | head -10)"
 
+# shard: same unit as the section above
 echo "== SPDX expressions: class, nesting and conflict (the same cases licenses.test.ts checks) =="
 spdx_class() { jq -n -r --arg e "$1" 'include "license-flags"; {licenses:[{expression:$e}]} | component_license_class' -L "$LIB"; }
 spdx_dnf_of() { jq -n -c --arg e "$1" 'include "license-flags"; parse_license_expr($e)' -L "$LIB"; }
@@ -1315,6 +1341,7 @@ done
     && pass "the conflict verdict combines a nested expression: AND is the worst, OR the best" \
     || fail "nested verdicts: $(spdx_verdict '(MIT OR GPL-2.0-only) AND BSD-3-Clause') $(spdx_verdict 'GPL-3.0-only AND (MIT OR BSD-2-Clause)') $(spdx_verdict '(GPL-3.0-only AND MIT) OR Apache-2.0')"
 
+# shard: same unit as the section above
 echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
 # Same contract as the license-class guard above: the SPDX operator patterns and
 # the exception test are hand-mirrored, so extract both sides and diff them.
@@ -1338,6 +1365,7 @@ else
     fail "exception-clause pattern diverged" "license-flags.jq: $jq_exc / licenses.ts: $ts_exc"
 fi
 
+# shard: same unit as the section above
 echo "== risk-report: license classification summary drives from the SBOM =="
 # generate-risk-report.sh must add the per-class table and the copyleft driver
 # list (network/strong, up to 10) when the BOM artifact exists, and skip the
@@ -1561,6 +1589,7 @@ fi
 ssl_ver=$(jq -r '.components[] | select(.name=="openssl") | .version' "$WORK/vend.json")
 [ "$ssl_ver" = "3.0.0" ] && pass "git-tag version normalized (openssl-3.0.0 -> 3.0.0)" || fail "version='$ssl_ver', expected 3.0.0 (normalization)"
 
+# shard: same unit as the section above
 echo "== vendored: identify -> merge -> normalize completes the PURL->CVE chain =="
 # Merge the vendored components with a sparse cdxgen C/C++ SBOM, then normalize.
 bash "$LIB/merge-sbom.sh" "$WORK/merged.json" "trelay" "26.4.0" \
@@ -2640,6 +2669,7 @@ preset_src=$(jq -r '[.components[]|select(.name=="preset-cpe")]|.[0]|[(.properti
 cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json"; python3 "$MVNCPE" "$WORK/mvn-pkg2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json" >/dev/null 2>&1 && pass "F-1c9 enrichment is idempotent" || fail "second run changed the SBOM"
 
+# shard: same unit as the section above
 echo "== F-1c10: scan-nvd-cpe.py hands the alternates to grype and version-filters their matches =="
 # The alternates go to grype as syft:cpe23 properties of a temporary SBOM copy
 # (one grype run, purl kept). A match found through a package-style NVD record
@@ -3874,6 +3904,7 @@ sem_tv=$(jq -r '"\(.format)|\(.checks[]|select(.id=="purl-namespace-os")|.status
 [ "$sem_tv" = "SPDX-TagValue|fail|fail" ] && pass "SPDX Tag-Value: the namespace and version rows fail" \
     || fail "SPDX Tag-Value rows = '$sem_tv', expected 'SPDX-TagValue|fail|fail'"
 
+# shard: same unit as the section above
 echo "== conformance: suggested fixes are rule-based, offline and leave the input alone =="
 sem_sug=$(jq -c '.suggestions' "$WORK/ses_conformance.json")
 jq -e '.suggestions | map(select(.check=="purl-namespace-os" and .name=="glibc")) | .[0]
@@ -3918,6 +3949,7 @@ sem_sum_after=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
 jq -e '.suggestions | map(select(.name=="bash" or .name=="curl" or .name=="musl")) | length == 0' "$WORK/seo_conformance.json" >/dev/null \
     && pass "components that pass are not in the suggestions" || fail "a passing component appears in the suggestions"
 
+# shard: same unit as the section above
 echo "== conformance: operating-system hint, type match, declared distribution, new ids =="
 semrun() {   # $1 jq filter adding components, $2 out prefix; skt-submission, extra env via SEMENV
     jq "$1" "$FIX/good-cyclonedx.json" > "$WORK/$2.json"
@@ -3960,6 +3992,7 @@ jq -e '.checks[] | select(.id=="purl-namespace-os") | .status == "pass"' "$WORK/
     && pass "sle-micro, opensuse.leap, rhcos, poky, opencloudos, amzn and ol are accepted ids" \
     || fail "a listed distribution id was rejected" "$(jq -c '.checks[]|select(.id=="purl-namespace-os")|.detail' "$WORK/osd_conformance.json")"
 
+# shard: same unit as the section above
 echo "== conformance: the maven group field is a medium hint and never contradicts the purl name =="
 semrun '.components += [
   {"type":"library","name":"foo","version":"1","group":"org.foo","purl":"pkg:maven/org.foo:foo@1"},
@@ -3971,6 +4004,7 @@ jq -e '.suggestions | (map(select(.name=="foo" or .name=="org.bar-core")) | all(
     && pass "no candidate when the purl name has a colon or starts with the group; otherwise the group gives a medium candidate" \
     || fail "maven group rule is wrong" "$(jq -c .suggestions "$WORK/mvg_conformance.json")"
 
+# shard: same unit as the section above
 echo "== conformance: firmware, rootfs and Yocto scans defer the two value rows to warnings =="
 SEMENV="MODE=FIRMWARE" semrun '.components += [
   {"type":"library","name":"g","version":"1","purl":"pkg:rpm/examplevendor/g@1"},
@@ -3982,6 +4016,7 @@ semrun '.components += [{"type":"library","name":"g","version":"1","purl":"pkg:r
 [ "$(jq -r '.checks[]|select(.id=="purl-namespace-os")|.status' "$WORK/fwn_conformance.json")" = "fail" ] \
     && pass "a source scan keeps the row as a required failure" || fail "the row was deferred outside firmware modes"
 
+# shard: same unit as the section above
 echo "== conformance: CRLF Tag-Value and control characters =="
 sed 's/$/\r/' "$WORK/semantic-tv.spdx" > "$WORK/semantic-crlf.spdx"
 CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-crlf.spdx" "$WORK/crlf" "supplier" >/dev/null 2>&1
@@ -4947,6 +4982,7 @@ bash "$LIB/normalize-sbom.sh" "$WORK/os.json" >/dev/null 2>&1
 total_src=$(jq '[.components[].properties[]? | select(.name=="aquasecurity:trivy:SrcName")] | length' "$WORK/os.json")
 [ "$total_src" = "7" ] && pass "idempotent: second normalize adds no duplicate properties" || fail "SrcName count after 2nd run = $total_src, expected 7"
 
+# shard: same unit as the section above
 echo "== os-purl: deb/rpm/apk PURLs take the form Trivy and the purl-spec use =="
 # A container scan's identifiers must join the same packages from a Trivy scan:
 # deb epoch as a qualifier, no syft `upstream` qualifier (its content is in
@@ -5071,6 +5107,7 @@ grep -q "Scan failed" "$WORK/secfail_security.html" \
     && pass "html report says the scan failed" \
     || fail "html report still reads like a clean 0-findings result"
 
+# shard: same unit as the section above
 echo "== sec-ok: a successful Trivy run gets no ScanError marker =="
 cat > "$FAKEBIN/trivy" <<'SH'
 #!/bin/sh
@@ -5091,6 +5128,7 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+# shard: same unit as the section above
 echo "== sec-introduced-by: each finding names the direct dependency it arrives through =="
 IBDIR="$WORK/introby"; mkdir -p "$IBDIR"
 cat > "$FAKEBIN/trivy" <<'SH'
@@ -5172,6 +5210,7 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
 grep -qi "base image" "$IBDIR/notimg_security.md" \
     && fail "the base image hint is for image scans only" || pass "no base image hint outside an image scan"
 
+# shard: same unit as the section above
 echo "== build-tool role: gems in an iOS project are marked as build tooling, elsewhere left alone =="
 BTDIR="$WORK/buildtool"; mkdir -p "$BTDIR"
 jq -n '{bomFormat:"CycloneDX",specVersion:"1.5",version:1,metadata:{component:{type:"application",name:"app",version:"1"}},
@@ -5203,6 +5242,7 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false MODE=SOURCE \
 grep -q "fastlane (build tool)" "$BTDIR/sec_security.md" && grep -q "(build tool)" "$BTDIR/sec_security.html" \
     && pass "a finding in a build-tool gem is tagged in the security report" || fail "build-tool tag missing in the security report"
 
+# shard: same unit as the section above
 echo "== sec-advisory-ids: distribution advisory numbers become CVE ids or a separate advisory list =="
 # Trivy files some findings under a distribution advisory number (DLA-...,
 # SUSE-SU-...). One that names a CVE is reported under that CVE with the number
@@ -5824,6 +5864,9 @@ else
 fi
 
 echo "== sbom-size-cap: an oversized SBOM body is stamped, not truncated or rejected =="
+# mark_document_status comes from pipeline-step.sh; source it here so this
+# section does not depend on an earlier one (TEST_SHARD runs sections apart).
+. "$LIB/pipeline-step.sh"
 # Extracted verbatim from docker/entrypoint.sh (between its literal anchor
 # comments), so this test tracks the shipped logic rather than a hand-copied
 # duplicate that could silently drift from it.
@@ -6960,6 +7003,40 @@ STUB
         || fail "online with a Maven 3.8 wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
     rm -rf "$_mo_repo" "$WORK/mh-home/.m2/repository/org"
 fi
+
+# The Maven jar-fetch step records an unresolvable dependency whatever else it fetched.
+if [ -n "${_mh_block:-}" ]; then
+    cat > "$WORK/mh-bin/mvn" <<'STUB'
+#!/bin/sh
+args=""
+for a in "$@"; do
+    case "$a" in
+        -DoutputFile=*) [ -z "$MH_LIST" ] || printf '%s\n' "$MH_LIST" >> "${a#-DoutputFile=}"; a="-DoutputFile=LIST" ;;
+    esac
+    args="$args $a"
+done
+echo "${0##*/}$args" >> "$MH_CALLS"
+[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"
+[ "$MH_FAIL" = missing ] && echo "[ERROR] Could not find artifact com.example.internal:zz-internal-auth:jar:9.9.9 in central (https://repo.maven.apache.org/maven2)"
+[ "$MH_FAIL" != exit ]
+STUB
+    chmod +x "$WORK/mh-bin/mvn"
+    mkdir -p "$WORK/mh-home/.m2/repository/org/x/y/1.0"; : > "$WORK/mh-home/.m2/repository/org/x/y/1.0/y-1.0.jar"
+    _mh_one='The following files have been resolved:
+   org.x:y:jar:1.0:compile'
+    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" missing)
+    { printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
+        && ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-jars"; } \
+        && pass "completeness/maven: a dependency Maven cannot find is recorded as maven-dependency-resolve although the other jars were fetched" \
+        || fail "completeness/maven: the unresolvable dependency was not recorded" "$_mh_out"
+    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" error)
+    ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
+        && pass "completeness/maven: an unrelated Maven error is not recorded as an unresolvable dependency" \
+        || fail "completeness/maven: an unrelated error was recorded as unresolvable"
+    rm -rf "$WORK/mh-home/.m2/repository/org"
+else
+    fail "completeness/maven: the Maven block of the jar-fetch test is not available to this section"
+fi
 echo "== maven-duplicates: a pom.xml Maven 3.10 refuses gets a Maven that reads it, or is recorded =="
 # Maven 3.10 and later refuse a dependency declared twice in one POM; 3.9 only
 # warns. Drive the real Maven block of build-prep.sh with a stand-in mvn that
@@ -7333,6 +7410,7 @@ STUB
         || fail "Gradle settings around build-prep's own Gradle run" "calls=[$(cat "$_sg/gradle-calls" 2>/dev/null)] $(grep gradle "$_sg/log" | head -5)"
 fi
 
+# shard: same unit as the section above
 echo "== stage1-user-repository: the user's Maven local repository, read-only, offline only when needed =="
 # Which folder the CLI, the web UI and the plan's caller mount (source-detect.sh).
 _ur="$WORK/ur"; rm -rf "$_ur"; mkdir -p "$_ur/h1/.m2/repository" "$_ur/h2/.m2" "$_ur/h2/alt" "$_ur/h3/.m2/repository"
@@ -7514,6 +7592,7 @@ fi
     && pass "the probe file is removed" || fail "probe file left behind"
 chmod 755 "$_co_t/ro"
 
+# shard: same unit as the section above
 echo "== owner hand-back: a rootless (uid-remapped) container skips the chown =="
 _oh_t="$WORK/oh"; rm -rf "$_oh_t"; mkdir -p "$_oh_t"
 printf '         0          0 4294967295\n' > "$_oh_t/identity"
@@ -8250,6 +8329,7 @@ python3 "$LIB/upstream-purl.py" "$WORK/yocto-upp.cdx.json" >/dev/null 2>&1
     && pass "5.x: a package with no CPE gets its upstream purl through its recipe" \
     || fail "5.x libz1 purl: $(jq -c '.components[] | select(.name=="libz1") | .purl' "$WORK/yocto-upp.cdx.json" 2>/dev/null)"
 
+# shard: same unit as the section above
 echo "== yocto: SPDX 3.0 image SBOM in the 6.x shape (declared licenses, recipe VEX, purl) =="
 # Yocto 6.0 writes the declared license, a purl per package, and links
 # vulnerabilities to the recipe, which generates the installed packages; 6.1
@@ -9072,6 +9152,7 @@ BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
     && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
     || fail "the opt-out did not keep the resolved tree"
 
+# shard: same unit as the section above
 echo "== source-tree guard: a record without a snapshot never deletes the tree (#988) =="
 # A scan whose cdxgen container never started leaves owner/path/image in the
 # guard-state folder and no files.before. The next scan's restore-only run
@@ -9275,6 +9356,7 @@ if command -v jq >/dev/null 2>&1 && [ -f "$PREP_FAIL_ROOT/out/bom.json" ]; then
         || fail "the SBOM does not carry the failure" "$(jq -c '.metadata.properties' "$PREP_FAIL_ROOT/out/bom.json" 2>&1)"
 fi
 
+# shard: same unit as the section above
 echo "== prep_step: a step that outlives its budget is stopped and reported as a timeout, not waited out =="
 PREP_TO_ROOT="$WORK/prep-timeout"
 mkdir -p "$PREP_TO_ROOT/bin" "$PREP_TO_ROOT/src" "$PREP_TO_ROOT/out"
@@ -9311,6 +9393,7 @@ if command -v jq >/dev/null 2>&1 && [ -f "$PREP_TO_ROOT/out/bom.json" ]; then
         || fail "the SBOM does not carry the timeout" "$(jq -c '.metadata.properties' "$PREP_TO_ROOT/out/bom.json" 2>&1)"
 fi
 
+# shard: same unit as the section above
 echo "== prep_step: a successful step leaves no trace of failure =="
 PREP_OK_ROOT="$WORK/prep-ok"
 mkdir -p "$PREP_OK_ROOT/bin" "$PREP_OK_ROOT/src" "$PREP_OK_ROOT/out"
@@ -9342,6 +9425,7 @@ if command -v jq >/dev/null 2>&1 && [ -f "$PREP_OK_ROOT/out/bom.json" ]; then
         || fail "the successful step was not recorded as applied lock evidence" "$(jq -c '.metadata.properties' "$PREP_OK_ROOT/out/bom.json" 2>&1)"
 fi
 
+# shard: same unit as the section above
 echo "== prep_step: the same label failing more than once is recorded only once =="
 # Isolated unit test of the dedup logic in prep_step itself (real function,
 # lifted from build-prep.sh), with run_supervised_timeout stubbed to a plain
@@ -9373,6 +9457,7 @@ else
         || fail "PREP_APPLIED dedup is wrong" "got [$PREP_APPLIED]"
 fi
 
+# shard: same unit as the section above
 echo "== committed lockfiles: a lockfile already in the tree is itself positive lock evidence, without a network resolve =="
 # Ruby, Swift and PHP only resolve when NO lockfile is already committed;
 # .NET has no pre-resolve step at all. A committed lockfile is checked once,
@@ -9644,6 +9729,7 @@ else
     fail "a nested packages.lock.json was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/dotnet-monorepo/out/bom.json" 2>&1)"
 fi
 
+# shard: same unit as the section above
 echo "== cargo: a committed Cargo.lock is used as it is, not re-resolved =="
 # generate-lockfile re-resolves to the newest compatible crates, so a committed
 # lock (syn 3.0.6) came out as syn 3.0.7 in the SBOM. With a lock present,
@@ -9670,6 +9756,7 @@ jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and 
     && pass "the committed lock is recorded as lock evidence (cargo-lock-committed)" \
     || fail "no cargo-lock-committed evidence" "$(jq -c '.metadata.properties' "$CL_ROOT/out/bom.json" 2>&1)"
 
+# shard: same unit as the section above
 echo "== node-scope: build-prep writes the production set the filter reads (stub npm and cdxgen, real node) =="
 # The set writer runs inside build-prep; this drives it end to end. The stub
 # npm writes the resolved lock a real npm would; the stub cdxgen reports what a
@@ -9727,6 +9814,7 @@ else
     echo "  SKIP: node unavailable"
 fi
 
+# shard: same unit as the section above
 echo "== poetry: exact pins of a lock-less Poetry project reach cdxgen as requirements.txt =="
 PO_ROOT="$WORK/poetry-nolock"
 mkdir -p "$PO_ROOT/bin" "$PO_ROOT/src" "$PO_ROOT/out"
@@ -9830,6 +9918,7 @@ else
     echo "  SKIP: this host's python3 has no tomllib (3.11+)"
 fi
 
+# shard: same unit as the section above
 echo "== python: cdxgen's pkg:pypi/unknown@latest is dropped =="
 PU_ROOT="$WORK/pypi-unknown"; mkdir -p "$PU_ROOT/bin" "$PU_ROOT/src" "$PU_ROOT/out"
 printf '[project]\nname = "x"\nversion = "1"\n' > "$PU_ROOT/src/pyproject.toml"
@@ -9864,6 +9953,7 @@ else
     echo "  SKIP: node unavailable"
 fi
 
+# shard: same unit as the section above
 echo "== gradle: a read-only account home moves Gradle's files to HOME =="
 GU_ROOT="$WORK/gradle-home"; mkdir -p "$GU_ROOT/bin" "$GU_ROOT/src" "$GU_ROOT/out" "$GU_ROOT/acct" "$GU_ROOT/home"
 printf "plugins { id 'java' }\n" > "$GU_ROOT/src/build.gradle"
@@ -9887,6 +9977,7 @@ else
         || fail "writable account home: gradle saw $(sort -u "$GU_ROOT/seen" 2>&1 | tr '\n' ' ')"
 fi
 
+# shard: same unit as the section above
 echo "== gradle: a gradlew without the executable bit runs through sh =="
 GW_ROOT="$WORK/gradle-wrapper-noexec"; mkdir -p "$GW_ROOT/bin" "$GW_ROOT/src" "$GW_ROOT/out" "$GW_ROOT/gh"
 printf "plugins { id 'java' }\n" > "$GW_ROOT/src/build.gradle"
@@ -9916,6 +10007,7 @@ grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "
     && pass "the gradlew is left without the executable bit after the scan" \
     || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
 
+# shard: same unit as the section above
 echo "== gradle: the shell for a gradlew without the executable bit follows its first line =="
 # Stub bash and sh in PATH record who ran the wrapper, then run the real shell.
 _gs_run() {  # <name> <first line of gradlew or empty>
@@ -9966,6 +10058,7 @@ wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
     && pass "a bash shebang runs through sh when bash is not installed, and through bash when it is" \
     || fail "wrapper_shell without bash [$_ws_nobash], with bash [$_ws_withbash]"
 
+# shard: same unit as the section above
 echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
 # HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
 # cache is, unless the caller already set GRADLE_CACHE_DIR.
@@ -9992,6 +10085,7 @@ _gc_seen=$(_gc_run -u GRADLE_USER_HOME GRADLE_CACHE_DIR=/elsewhere/files-2.1)
     && pass "a GRADLE_CACHE_DIR the caller set is kept" \
     || fail "preset GRADLE_CACHE_DIR: [$_gc_seen]"
 
+# shard: same unit as the section above
 echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
 # The pre-prep_step patterns (silently discarded stderr, no time limit) must
 # not reappear alongside prep_step for the same command.
@@ -10007,6 +10101,7 @@ for pattern in \
 done
 pass "none of the old silently-discarded preprocessing invocations remain"
 
+# shard: same unit as the section above
 echo "== prep_step/run_supervised: no step's command is a shell function defined in this file =="
 # Regression: pip-install passed _pip_install_requirements (a shell function)
 # as prep_step's command. prep_step backgrounds a step through setsid, which
@@ -10029,6 +10124,7 @@ done
     && pass "no prep_step/run_supervised call passes a locally-defined function as its command" \
     || fail "a step's command is a shell function, not an external command (setsid cannot exec it)" "$BP_BAD"
 
+# shard: same unit as the section above
 echo "== prep_step: pip-install actually runs pip3, not a function setsid cannot exec =="
 # Same stub-PATH harness as the failed/success cases above, but exercising the
 # pip step specifically -- the one step this regression broke. PIP_MARKER
@@ -10523,6 +10619,7 @@ else
     echo "  SKIP: python3 venv not available"
 fi
 
+# shard: same unit as the section above
 echo "== copyright: npm packages read from node_modules =="
 if command -v node >/dev/null 2>&1; then
     sed -n "/cat > \"\$_jscpr\" <<'NODE_CPR'/,/^NODE_CPR\$/p" "$LIB/build-prep.sh" \
@@ -10651,6 +10748,7 @@ else
     echo "  SKIP: node not available"
 fi
 
+# shard: same unit as the section above
 echo "== copyright: Go modules and Cargo crates read from an index of installed directories =="
 # The shell side of build-prep.sh writes name@version -> directory (from `go list -m`
 # and `cargo metadata`); the same node script as the npm pass then reads the files.
@@ -12032,6 +12130,7 @@ else
     echo "  SKIP: node not installed; development-marker filter not exercised"
 fi
 
+# shard: same unit as the section above
 echo "== Gemfile development/test groups: gems declared only there are dropped =="
 if command -v node >/dev/null 2>&1; then
     sed -n "/<<'GEMDEV_JS'/,/^GEMDEV_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/gemdev.js"
@@ -13696,6 +13795,7 @@ python3 "$LIB/import-vex.py" "$VEXDIR/bom.json" "$VEXDIR/notvex.json" "$VEXDIR/n
 # The entrypoint.sh block that runs import-vex.py for --vex, extracted between its
 # anchor comments (as the size-cap test above does) so this tracks the shipped
 # logic. Run in a subshell with the few names it reads.
+# shard: same unit as the section above
 echo "== --vex step in entrypoint.sh: each outcome is reported, and only a usable document writes a file =="
 sed -n "/^# A supplier's CycloneDX VEX (--vex)/,/^# Risk report/p" "$ROOT_DIR/docker/entrypoint.sh" | sed '$d' > "$WORK/vex-step.sh"
 [ "$(wc -l < "$WORK/vex-step.sh")" -gt 20 ] && [ "$(wc -l < "$WORK/vex-step.sh")" -lt 80 ] \
@@ -15904,39 +16004,6 @@ bash "$LIB/assess-completeness.sh" "$CPD/unpinned.json" "$CPD/unpinned" >/dev/nu
     && pass "completeness: bomlens:source:versionPinning=unpinned is read as a missing lock file" \
     || fail "completeness: the unpinned source is not graded partial"
 
-# The Maven jar-fetch step records an unresolvable dependency whatever else it fetched.
-if [ -n "${_mh_block:-}" ]; then
-    cat > "$WORK/mh-bin/mvn" <<'STUB'
-#!/bin/sh
-args=""
-for a in "$@"; do
-    case "$a" in
-        -DoutputFile=*) [ -z "$MH_LIST" ] || printf '%s\n' "$MH_LIST" >> "${a#-DoutputFile=}"; a="-DoutputFile=LIST" ;;
-    esac
-    args="$args $a"
-done
-echo "${0##*/}$args" >> "$MH_CALLS"
-[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"
-[ "$MH_FAIL" = missing ] && echo "[ERROR] Could not find artifact com.example.internal:zz-internal-auth:jar:9.9.9 in central (https://repo.maven.apache.org/maven2)"
-[ "$MH_FAIL" != exit ]
-STUB
-    chmod +x "$WORK/mh-bin/mvn"
-    mkdir -p "$WORK/mh-home/.m2/repository/org/x/y/1.0"; : > "$WORK/mh-home/.m2/repository/org/x/y/1.0/y-1.0.jar"
-    _mh_one='The following files have been resolved:
-   org.x:y:jar:1.0:compile'
-    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" missing)
-    { printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
-        && ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-jars"; } \
-        && pass "completeness/maven: a dependency Maven cannot find is recorded as maven-dependency-resolve although the other jars were fetched" \
-        || fail "completeness/maven: the unresolvable dependency was not recorded" "$_mh_out"
-    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" error)
-    ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
-        && pass "completeness/maven: an unrelated Maven error is not recorded as an unresolvable dependency" \
-        || fail "completeness/maven: an unrelated error was recorded as unresolvable"
-    rm -rf "$WORK/mh-home/.m2/repository/org"
-else
-    fail "completeness/maven: the Maven block of the jar-fetch test is not available to this section"
-fi
 
 echo "== completeness: a vulnerability check that was asked for and did not run or failed =="
 # A Trivy run that stopped (a DNS error on the database download, say) wrote
@@ -16284,6 +16351,7 @@ grep -q '^\[proprietary\] commercial  (1 component(s)):' "$LRD/p_NOTICE.txt" 2>/
     && pass "licenseReview: the NOTICE (text and HTML) lists the proprietary licenses under license review with the class explained" \
     || fail "licenseReview: NOTICE review section" "$(grep -A3 'License review' "$LRD/p_NOTICE.txt" 2>&1 | head -8)"
 
+# shard: closing summary
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
