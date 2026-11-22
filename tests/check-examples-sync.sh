@@ -10,6 +10,8 @@
 #     present example missing from the guide, e.g. swift)
 #   - the example->manifest map in examples/test-all.sh        (catches B-5: the
 #     batch test silently skipping an example)
+# and the examples for lock-file ecosystems (nodejs, go, rust, php) must carry
+# their lock file.
 # No Docker needed.
 set -u
 
@@ -40,10 +42,24 @@ for d in "$ROOT_DIR"/examples/*/; do
     fi
 done
 
+# Examples for ecosystems that use a lock file carry it, so a first scan of
+# them reads exact versions and grades complete.
+for pair in "nodejs:package-lock.json" "go:go.sum" "rust:Cargo.lock" "php:composer.lock"; do
+    lang="${pair%%:*}"
+    lock="${pair#*:}"
+    [ -d "$ROOT_DIR/examples/$lang" ] || continue
+    if [ -f "$ROOT_DIR/examples/$lang/$lock" ]; then
+        echo "  ok:   ${lang} has ${lock}"
+    else
+        echo "  MISS: examples/${lang}/${lock} is missing"
+        MISSING=$((MISSING + 1))
+    fi
+done
+
 echo ""
 if [ "$MISSING" -eq 0 ]; then
     echo "OK: every examples/ directory is documented and tested"
 else
-    echo "FAIL: ${MISSING} sync gap(s) — update the guide and/or test-all.sh"
+    echo "FAIL: ${MISSING} sync gap(s) — update the guide or test-all.sh, or add the missing lock file"
     exit 1
 fi

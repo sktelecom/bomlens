@@ -876,8 +876,11 @@ section "Source scan E2E"
 if [ "$have_image" != 1 ]; then
     skip "source scan group (scanner image '$SCANNER_IMG' not available)"
 else
-    # 3a: nodejs --all -> 6 artifacts, valid SBOM
-    nodesrc="$EXAMPLES/nodejs"
+    # 3a: nodejs --all -> 6 artifacts, valid SBOM. The lock-less fixture, not
+    # examples/nodejs (which has a lock file and is read statically): 3a to 3a3
+    # check what the build path produces (copyright lines from the installed
+    # packages, BOMLENS_NODE_FULL_GRAPH reaching build-prep.sh).
+    nodesrc="$REPO/tests/fixtures/node-no-lock"
     if [ -d "$nodesrc" ]; then
         w="$(run_source_scan "$nodesrc" --all)"
         ok=1
@@ -1048,14 +1051,14 @@ else
 
     # 3h: the web UI's SOURCE mode without a docker.sock (its own no-cdxgen
     # path, entrypoint.sh's "else" branch) against a Node project with real
-    # declared dependencies (examples/nodejs) but no committed lockfile: syft
+    # declared dependencies (tests/fixtures/node-no-lock) but no lockfile: syft
     # has nothing to read and resolves none of them. Runs the scanner image
     # directly, not through scan-sbom.sh (which always has docker.sock), to
     # exercise this exact branch with a real image rather than a stub. The
     # scan now fails with guidance instead of reporting a near-empty SBOM as
     # a successful, complete result when the fallback resolves none of the
     # project's own dependencies.
-    ndocker="$REPO/examples/nodejs"
+    ndocker="$REPO/tests/fixtures/node-no-lock"
     if [ -d "$ndocker" ]; then
         w="$(mktemp -d "$WORK_ROOT/nodocker.XXXXXX")"
         docker run --rm -v "$ndocker":/src:ro -v "$w":/host-output -w /host-output \
@@ -1072,7 +1075,7 @@ else
         fi
         rm -rf "$w"
     else
-        skip "examples/nodejs not found"
+        skip "tests/fixtures/node-no-lock not found"
     fi
 
     # 3d': the same direct run on a tree whose lock file covers it. It is read as it

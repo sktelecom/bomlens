@@ -149,13 +149,14 @@ jobs:
           EOF
           docker build -q -t bomlens-overlay:check "$ctx"
 
-      - name: Scan examples/nodejs
+      - name: Scan a Node.js project with no lock file
         run: |
           set -uo pipefail
           src="$RUNNER_TEMP/src"
           out="$RUNNER_TEMP/out"
           rm -rf "$src" "$out"
-          cp -R examples/nodejs "$src"
+          # No lock file, so the scan takes the build path, which writes into the tree.
+          cp -R tests/fixtures/node-no-lock "$src"
           # Nested folders, so a hand-back to the wrong owner also blocks
           # deleting what is inside them.
           mkdir -p "$src/lib/util"

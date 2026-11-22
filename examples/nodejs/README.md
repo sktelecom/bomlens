@@ -7,6 +7,7 @@ This example demonstrates SBOM generation for a Node.js project using npm, an Ex
 ## Project Structure
 
 - `package.json`: npm dependencies
+- `package-lock.json`: the committed lock file, so the scan reads exact versions without a build
 - `index.js`: an Express app with a few JSON endpoints
 
 ## Dependencies
@@ -70,12 +71,6 @@ jq -r '.components[] | select(.name | contains("express")) | "\(.name)@\(.versio
 
 ## Common Issues
 
-### package-lock.json missing
-
-The scan still reads dependencies from `package.json` without a lock file, but a committed `package-lock.json` pins exact versions for a reproducible SBOM.
-
-**Solution:** run `npm install --package-lock-only` (or a full `npm install`) first.
-
 ### devDependencies missing from the SBOM
 
 This is expected: the scan is filtered to the production dependency set, so `jest`, `eslint`, `prettier`, `nodemon`, and `supertest` are dropped and the result reflects what actually ships.
@@ -89,14 +84,6 @@ npm list
 
 **Solution:** confirm `package.json` is where the scan expects it, and that its dependencies are installed or at least resolvable.
 
-### npm install fails
-
-```bash
-npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install
-```
-
 ### Generating an SBOM with cyclonedx-npm instead
 
 ```bash
@@ -106,5 +93,4 @@ npx @cyclonedx/cyclonedx-npm --output-file bom.json
 ## Next Steps
 
 - Add more npm dependencies and re-scan
-- Commit `package-lock.json` for a reproducible, fully pinned SBOM
 - Try a Yarn (`yarn.lock`) or pnpm (`pnpm-lock.yaml`) project; the same command works, just point `--project` at your own name
