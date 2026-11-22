@@ -44,4 +44,4 @@ BomLens는 사용자의 컴퓨터에서 실행됩니다. BomLens의 어떤 기�
 
 ## 설치와 제거
 
-Windows 설치 프로그램은 설치 폴더를 고르게 합니다. 저장소에는 별도로 정의한 설치 단계가 없어서 BomLens가 방화벽이나 레지스트리를 직접 바꾸지 않습니다. BomLens를 제거하려면 Windows 설정에서 앱을 제거하고, 앱이 남긴 데이터까지 지우려면 설정 폴더 `%APPDATA%\sbom-generator-desktop`을 삭제합니다. 스캐너 이미지는 직접 지우기 전까지 Docker에 남습니다. 명령은 [비개발자 빠른 시작](../start/no-cli.ko.md)의 제거 절차를 참고하세요.
+Windows 설치 프로그램은 설치 폴더를 고르게 합니다. 저장소에는 별도로 정의한 설치 단계가 없어서 BomLens가 방화벽이나 레지스트리를 직접 바꾸지 않습니다. BomLens를 제거하려면 Windows 설정에서 앱을 제거하고, 앱이 남긴 데이터까지 지우려면 설정 폴더 `%APPDATA%\sbom-generator-desktop`을 삭제합니다. 스캐너 이미지는 직접 지우기 전까지 Docker에 남습니다. 명령은 문제 해결 문서의 [지울 때](../start/troubleshooting.ko.md#지울-때)를 참고하세요.

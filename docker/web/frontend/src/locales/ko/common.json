@@ -21,7 +21,7 @@
     "label": "스캔 대상",
     "currentDir": "현재 폴더",
     "currentDirPath": "현재 폴더",
-    "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 디렉터리 / rootfs를 고르거나 그 폴더에서 BomLens를 시작하세요.",
+    "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 폴더 선택 타일을 쓰거나 그 폴더에서 BomLens를 시작하세요.",
     "rootfsDir": "폴더 선택",
     "yoctoBuildDir": "Yocto 빌드 디렉터리",
     "rootfsPlaceholder": "my-project/  (현재 폴더 아래 하위 폴더)",
