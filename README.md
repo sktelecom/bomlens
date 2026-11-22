@@ -20,8 +20,8 @@ BomLens generates an [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is
 
 | If you want to | Use |
 |---|---|
-| Scan with no commands, on Windows or macOS | The desktop app: [BomLens-Setup.exe](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [BomLens-Setup.dmg](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg). It checks Docker, pulls the image and opens the UI. It is unsigned for now; the [no-CLI quick start](docs/start/no-cli.md) shows how to open it. The signing rules and the privacy policy are in the [code signing policy](docs/reference/code-signing-policy.md). |
-| Script scans or run them in CI | The command line, below |
+| Scan with no commands, on Windows or macOS | The desktop app: [BomLens-Setup.exe](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [BomLens-Setup.dmg](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg) (one file for Apple Silicon and Intel Macs). It checks Docker, pulls the image and opens the UI. It is unsigned for now; the [no-CLI quick start](docs/start/no-cli.md) shows how to open it. The signing rules and the privacy policy are in the [code signing policy](docs/reference/code-signing-policy.md). |
+| Script scans or run them in CI | The command line, below. Linux has no desktop app, so use the web UI with `scan-sbom.sh --ui` |
 | See results before installing | The read-only [live demo](https://sktelecom.github.io/bomlens/demo/), with one finished scan of each kind |
 
 ## Quick start
