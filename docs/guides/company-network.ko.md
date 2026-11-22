@@ -21,7 +21,13 @@ lock 파일이 없는 Node.js 프로젝트는 프로젝트 `.npmrc`가 가리키
 
 ## 프록시는 어떻게 설정하나요?
 
-`scan-sbom.sh`를 실행하는 셸의 `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`(소문자 이름 포함)는 이름 그대로 스캔 컨테이너에 전달됩니다. 이 기계의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 전달하지 않습니다. 컨테이너 안에서 그 주소는 컨테이너 자신이기 때문입니다. 이때는 Docker 자체의 프록시 설정이 적용됩니다. `sbom-ui.bat`은 Windows 환경 변수에 있는 같은 세 변수를 웹 UI에 전달합니다. 더블클릭한 `.bat`은 명령 프롬프트에서 입력한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적거나(예: `HTTPS_PROXY=http://proxy.example:8080`) `setx`로 지정한 뒤 다시 더블클릭합니다. 데스크톱 앱도 자기 환경 변수에서 같은 방식으로 전달합니다(`setx`로 지정한 뒤 앱을 다시 실행).
+`scan-sbom.sh`를 실행하는 셸의 `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`(소문자 이름 포함)는 이름 그대로 스캔 컨테이너에 전달됩니다. 이 기계의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 전달하지 않습니다. 컨테이너 안에서 그 주소는 컨테이너 자신이기 때문입니다. 이때는 Docker 자체의 프록시 설정이 적용됩니다. `sbom-ui.bat`은 Windows 환경 변수에 있는 같은 세 변수를 웹 UI에 전달합니다. 더블클릭한 `.bat`은 명령 프롬프트에서 입력한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적거나(예: `HTTPS_PROXY=http://proxy.example:8080`) `setx`로 지정한 뒤 다시 더블클릭합니다. 데스크톱 앱도 자기 환경 변수에서 같은 방식으로 전달합니다. Windows에서는 `setx`로 지정한 뒤 앱을 다시 실행하고, macOS에서는 터미널에서 `launchctl setenv HTTPS_PROXY http://proxy.example:8080`을 실행한 뒤 앱을 다시 시작합니다(재부팅하면 설정이 사라집니다).
+
+PowerShell에서 `scan-sbom.bat`을 쓸 때는 같은 줄에서 변수를 먼저 지정합니다.
+
+```powershell
+$env:HTTPS_PROXY="http://proxy.example:8080"; scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-project --generate-only
+```
 
 ## 사내 인증서는 어떻게 신뢰하게 하나요?
 

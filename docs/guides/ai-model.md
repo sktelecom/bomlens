@@ -33,7 +33,7 @@ That image is about 3.5 GB to download, larger than the base scanner image ([siz
 
 ### From the desktop app or the web UI
 
-Open the desktop app or the web UI (setup is in [First scan](../start/first-scan.md)). Where Docker is reachable the AI model or dataset tile is enabled, and the aibom image runs as a separate container fetched on the first scan, so that first run is slow to start. Where the Docker socket is unavailable, launch the UI from the aibom image itself (`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui`, or set `SBOM_SCANNER_IMAGE` before double-clicking `sbom-ui.bat` on Windows); it then handles the scan in-process.
+Open the desktop app or the web UI (setup is in [First scan](../start/first-scan.md)). Where Docker is reachable the AI model or dataset tile is enabled, and the aibom image runs as a separate container fetched on the first scan, so that first run is slow to start. Where the Docker socket is unavailable, launch the UI from the aibom image itself (`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:<version> ./scripts/scan-sbom.sh --ui`, where `<version>` is your release without the leading `v`). On Windows, write that `SBOM_SCANNER_IMAGE=...` line in `bomlens.settings.txt` next to `sbom-ui.bat` ([Settings file](../start/troubleshooting.md#settings-file-no-command-line-needed)), since a double-clicked launcher does not see a variable typed in a command prompt. The UI then handles the scan in-process.
 
 Choose **AI model or dataset** under the New scan source tiles, enter the HuggingFace model id as `org/model` (for example `google-bert/bert-base-uncased` or `Qwen/Qwen2.5-0.5B`, not a collection name or a full URL), and run.
 

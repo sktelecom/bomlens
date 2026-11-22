@@ -63,12 +63,12 @@ Only projects in a closed table whose repository and tag spelling were checked a
 
 ## Supplying the versions the scan could not read
 
-A component tagged `presence-only` has no version, so neither a CVE lookup nor a purl lookup can use it. Every firmware, root filesystem and binary scan lists those components on the console and writes them to `<Project>_<Version>_component-versions.template.csv`. Write the version shipped in the product after each name and pass the file back:
+A component tagged `presence-only` has no version, so neither a CVE lookup nor a purl lookup can use it. Every firmware, root filesystem and binary scan lists those components on the console and writes them to `<Project>_<Version>_component-versions.template.csv` in the run's `<Project>_<Version>/` subfolder. Write the version shipped in the product after each name and pass the file back:
 
 ```bash
 ./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
   --target "./device.bin" --firmware \
-  --component-versions device-fw_1.0.0_component-versions.template.csv --generate-only
+  --component-versions device-fw_1.0.0/device-fw_1.0.0_component-versions.template.csv --generate-only
 ```
 
 The file is CSV with the columns `name,version,reason`; the third column is optional, so a two-column `name,version` file is read as before. Lines starting with `#` and rows with neither a version nor a reason are skipped. The template can be filled in where it is: when the file passed is that template, the scan leaves it as you wrote it and only lists what is still missing. A filled version is marked `bomlens:versionSource = supplier-declared` and gets the upstream purl above. When the scan read a version from the delivered files, that version is kept and a warning shows both, because a source tree can hold several releases of one project and the binary shows which one shipped. A name the scan did not find is added as a component marked `bomlens:identifiedBy = supplier-declared`. A file over 256 KiB, a row that is not two or three fields, a name or version with characters outside letters, digits and `. _ + ~ -`, or one name given two versions is refused with the line number: the SBOM and the other files are written without the file's versions, and the scan exits 1. A component whose version reads `UNKNOWN` (a kernel module with no version in its metadata) counts as having none, so it is in the template. A component whose name holds other characters, such as a space, is listed on the console instead of in the template.

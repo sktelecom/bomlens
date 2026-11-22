@@ -50,6 +50,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | Build artifact (`.jar`, `.deb`, …) | BINARY | `$SBOM --target app.jar --all --generate-only` | same |
 | Installer (`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | same |
 | Mobile app (`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | same |
+| Docker image | IMAGE | `$SBOM --target nginx:alpine --all --generate-only` | same; for a private registry, `docker login` and `docker pull` first ([Docker image](#docker-image)) |
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 | AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 | AI model file (GGUF, safetensors, …) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
@@ -104,7 +105,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendor
 ```
 
 - Dependencies declared in Conan's `conanfile.txt` or `conan.lock`, and the package names in CMake files (`find_package`), appear in the SBOM. vcpkg's `vcpkg.json` and Conan's `conanfile.py` are not read: when a dependency they declare is in no component, the result is partial with the reason `manifest-not-read`, which names the manifest and the dependencies. List them with their versions in `sbom-declared.cdx.json` at the project root ([declared components](declared-components.md)), or commit a `conan.lock` beside `conanfile.py`, and scan again.
-- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license` (the post-process step runs on the `ghcr.io/sktelecom/bomlens-deep-license` image, which carries ScanCode and is pulled automatically; when it cannot be pulled, the scan runs on the base image without the license scan, warns, and records the step as `skipped` (`fallback`) in the result manifest), and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow (OS rootfs, application, and static-link dependencies as separate layers), see the [server SBOM guide](server-delivery.md). In the web UI, `--deep-license` is the **License scan (ScanCode)** toggle in the Result quality group; it scans your own source files (`/src`), not the declared dependencies, and is slow, so turn it on only when you need per-file license detection.
+- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license` (the post-process step runs on the `ghcr.io/sktelecom/bomlens-deep-license` image, which carries ScanCode and is pulled automatically; when it cannot be pulled, the scan runs on the base image without the license scan, warns, and records the step as `skipped` (`fallback`) in the result manifest), and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow (OS rootfs, application, and static-link dependencies as separate layers), see the [server SBOM guide](server-delivery.md). In the web UI, `--deep-license` is the **Per-file license scan** toggle in the Result quality group; it scans your own source files (`/src`), not the declared dependencies, and is slow, so turn it on only when you need per-file license detection.
 - When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
@@ -173,12 +174,25 @@ $SBOM --project bert-base --version 1.0.0 \
   --generate-only
 ```
 
-- Needs the opt-in aibom image (`ghcr.io/sktelecom/bomlens-aibom:latest`), pulled automatically. Set a different tag via `SBOM_AIBOM_IMAGE`.
+- Needs the opt-in aibom image (`ghcr.io/sktelecom/bomlens-aibom`), pulled automatically with the same release tag as the scanner image. Set a different tag via `SBOM_AIBOM_IMAGE`.
 - `--model` is mutually exclusive with `--target`/`--analyze`/`--git`/`--merge`.
 - Produces a CycloneDX 1.7 **ML-BOM** (not 1.6), the notice, and the risk report, plus a G7 minimum-element conformance check. There is **no security report** — a model has no package CVEs.
 - The other AI inputs are run from the [AI model guide](ai-model.md): a published dataset on Figshare or HuggingFace ([Scanning a published dataset](ai-model.md#scanning-a-published-dataset)), a model file such as `.gguf` ([Scanning a model file](ai-model.md#scanning-a-model-file)), and a model with no repository or file yet, described with `--ai-declare` ([The SPDX 3.0.1 AI document](ai-model.md#the-spdx-301-ai-document)). The guide also explains the model card, dataset and G7 results.
 
 **Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, G7 conformance
+
+## Docker image
+
+A team handed you a container image. Pass its name as `--target`; a `docker save` tar works the same way.
+
+```bash
+$SBOM --project team8-image --version 1.0.0 \
+  --target nginx:alpine \
+  --all --generate-only
+```
+
+- The scanner reads the image through this machine's Docker engine. For an image in a private registry, run `docker login` and `docker pull <image>` here first: your Docker login is not passed into the scan. An image the engine does not have can be read with the `SYFT_REGISTRY_AUTH_*` variables instead ([CLI reference](../reference/cli.md#options-reference)).
+- A name that starts like a path (`./`, `/`, `~`) and does not exist stops the scan rather than being read as an image name.
 
 ## Reading the four deliverables
 

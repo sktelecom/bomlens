@@ -14,6 +14,8 @@ Maven 스캔은 컨테이너 안에서 Maven을 실행해 의존성 트리를 �
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./my-maven-project --generate-only
 ```
 
+Windows의 PowerShell이나 명령 프롬프트에서는 `scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-maven-project --generate-only`로 실행합니다.
+
 처음 자바를 스캔하면 디스크에서 약 3.8~5.6GB인 Java 이미지를 받습니다([디스크 사용량과 정리](../reference/docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요) 참고). 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 받기 전에 멈추며, `BOMLENS_SKIP_DISK_CHECK=1`을 지정하면 그대로 스캔합니다. Docker 엔진에 메모리 약 4GB를 할당하세요. 모자라면 빌드 단계가 종료되어 결과가 직접 의존성만 담긴 얕은 결과로 바뀝니다.
 
 ## pom.xml과 build.gradle이 함께 있으면 어떻게 되나요?

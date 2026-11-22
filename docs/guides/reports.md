@@ -15,7 +15,8 @@ If this is your first time, this is all you need. With the Docker engine running
 Launch the UI, then enter a project name and version, pick a scan target, run, and download the notice and security report.
 
 ```bash
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080 (port taken? UI_PORT=9090 ./scripts/scan-sbom.sh --ui)
+cd /path/to/your-project
+/path/to/bomlens/scripts/scan-sbom.sh --ui     # opens http://localhost:8080 (port taken? put UI_PORT=9090 before it)
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
@@ -38,7 +39,7 @@ When it finishes, open `MyApp_1.0.0/MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0/My
 
 - Docker engine 20.10+ (free: WSL2 + docker-ce, or Rancher Desktop / Docker Desktop, which is paid for organizational use)
 - The scanner image needs no pull by hand: the first scan pulls the one of your release.
-- Run every example from the root of the project to scan.
+- Run every example from the root of the project to scan. `$SBOM` is the path to `scan-sbom.sh`, set once as in the [input scenarios guide](by-input.md#common-setup): `SBOM=/path/to/bomlens/scripts/scan-sbom.sh`.
 
 > Output flags are best used together with `--generate-only` (save locally). Omit it to also auto-upload to an external system (a Dependency-Track server or TRUSCA); pick the target with `UPLOAD_TARGET`.
 
@@ -51,7 +52,7 @@ When it finishes, open `MyApp_1.0.0/MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0/My
 In the web UI and the desktop app the notice and the security report are generation options on the New scan screen, and the SPDX copy is exported from the results screen once the scan is done.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --all --generate-only
 ```
 
 Generated files, all together in a `MyApp_1.0.0/` subfolder next to where you ran the command (see [Where outputs go](../reference/cli.md#where-outputs-go)):
@@ -77,7 +78,7 @@ For the full list of artifact kinds, see the [artifacts reference](../reference/
 Gathers the `components[].licenses` information from the SBOM and generates a notice that groups components by license.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --notice --generate-only
 ```
 
 - `_NOTICE.txt` — standard text, good to ship with the distribution.
@@ -100,7 +101,7 @@ Components (1):
 Scans the generated SBOM with Trivy and reports known vulnerabilities (CVEs). (NVD + OSV + GHSA DB)
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --security --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --security --generate-only
 ```
 
 - `_security.json` — raw Trivy JSON. For CI or machine processing.
@@ -128,18 +129,18 @@ For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation,
 Trivy matches vulnerabilities by package identity (PURL), which covers the ecosystem advisory databases well. Some CVEs in older Java libraries, however, are recorded only in the NVD against a CPE identifier, so a PURL-based scan never reaches them. `--deep-cve` adds a second pass: BomLens derives an NVD-matchable CPE for each Maven component from its groupId (that enrichment step targets Maven), then grype matches every component's CPE, whatever ecosystem it came from, against a bundled NVD database. In practice most of the extra findings are still Maven, since that is where the enrichment adds a CPE the SBOM did not already carry.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --deep-cve --generate-only
 ```
 
 - `--deep-cve` implies `--security`. The extra findings merge into the same security report (`_security.json/.md/.html`), tagged with their `nvd:cpe` source.
-- The scan runs on the opt-in `ghcr.io/sktelecom/bomlens-deep-cve:latest` image, which bundles grype and its database; it is pulled automatically when the flag is set (override with `SBOM_DEEP_CVE_IMAGE`). It applies to the base-image modes (source, image, binary, rootfs, SBOM analysis); a firmware or AI-model scan prints a warning and runs without grype, since neither produces package purls for it to match. A source scan runs its post-processing step (where the security report is made) on the deep-cve image; when that image cannot be pulled (offline, or `SBOM_PULL=never`), the source scan goes on without the grype match, says so, and records the `deep-cve` step as skipped in `bomlens-result.json`. So it does when `SBOM_SCANNER_IMAGE` is a local build with no registry path (`bomlens:dev`), a version before 1.13.2 or not a BomLens image name, and `SBOM_DEEP_CVE_IMAGE` is not set: no deep-cve image of that build is known, so post-processing stays on the image you named. If that image has grype (built with `SBOM_DEEP_CVE=true`), the match runs there and is recorded as it came out. The deep-cve image has no scancode, so with `--deep-license` as well the licence scan runs first in the deep-license image and the post-processing step then runs on the deep-cve image: the run writes both `_scancode.json` and `_security_grype.json`. The web UI does the same when it runs from the deep-license image. A first use pulls each opt-in image once, with docker's progress shown; a pull that prints nothing for two minutes is stopped and the scan goes on without that image.
+- The scan runs on the opt-in `ghcr.io/sktelecom/bomlens-deep-cve` image, with the same release tag as the scanner image, which bundles grype and its database; it is pulled automatically when the flag is set (override with `SBOM_DEEP_CVE_IMAGE`). It applies to the base-image modes (source, image, binary, rootfs, SBOM analysis); a firmware or AI-model scan prints a warning and runs without grype, since neither produces package purls for it to match. A source scan runs its post-processing step (where the security report is made) on the deep-cve image; when that image cannot be pulled (offline, or `SBOM_PULL=never`), the source scan goes on without the grype match, says so, and records the `deep-cve` step as skipped in `bomlens-result.json`. So it does when `SBOM_SCANNER_IMAGE` is a local build with no registry path (`bomlens:dev`), a version before 1.13.2 or not a BomLens image name, and `SBOM_DEEP_CVE_IMAGE` is not set: no deep-cve image of that build is known, so post-processing stays on the image you named. If that image has grype (built with `SBOM_DEEP_CVE=true`), the match runs there and is recorded as it came out. The deep-cve image has no scancode, so with `--deep-license` as well the licence scan runs first in the deep-license image and the post-processing step then runs on the deep-cve image: the run writes both `_scancode.json` and `_security_grype.json`. The web UI does the same when it runs from the deep-license image. A first use pulls each opt-in image once, with docker's progress shown; a pull that prints nothing for two minutes is stopped and the scan goes on without that image.
 - In the web UI (and the desktop app), the same option is the **Deep CVE matching (NVD CPE)** toggle in the scan options. It is offered on every scan mode that uses the base image — source, Docker image, rootfs, build artifact, and SBOM upload — and hidden only for firmware and AI-model scans, matching the CLI. Turning it on switches the security report on too, and the deep-cve image downloads once on first use, either as a sibling container or in-process if the UI itself was launched from that image.
 - CPE matching is looser than PURL matching, because NVD version ranges can be recorded coarsely. By default the scan stays offline: such findings are kept and marked **version-unverified** in the report (a dagger with a footnote), so a reader knows which rows may be loose-version false positives. To tighten them, set `SECURITY_NVD_VERIFY=true` with an `NVD_API_KEY`: each finding is then checked against the live NVD version range and out-of-range false positives are dropped. The verification needs network access and adds minutes.
 - For an OS package (rootfs or image scan), the component's `cpe` carries the plain upstream version; the distro's own package revision (a Debian `+deb12u3`, an RPM `.el9`, an Alpine `-r0`, ...) stays only in its `purl` and `version`. A distro that has already backported a fix keeps the same upstream version in its CPE, so a `--deep-cve` match against NVD's version range can still flag that CVE even though the installed package is patched. The base security report above, which matches by PURL and OS context, already knows the distro's own advisory state and is the one to trust for an OS package's real vulnerability status; read a `--deep-cve` finding on an OS package the same way as a version-unverified one, as a lead to check rather than a final verdict.
 
 ```bash
 SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
-  ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+  $SBOM --project "MyApp" --version "1.0.0" --deep-cve --generate-only
 ```
 
 ---
@@ -149,8 +150,8 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 A vulnerability in a Go module matters only when the program uses the affected code. `--reachability` asks govulncheck, the Go project's own checker, which advisories the scanned Go program actually reaches. For a source tree it follows the call graph from the program's entry points; for a Go executable (`--target ./app`) it looks for the affected functions in the executable's symbols.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --reachability --generate-only
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --reachability --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
 ```
 
 - Each Go advisory against a component of the SBOM gets a judgement in `_reachability.cdx.json`, a CycloneDX VEX document. When the affected code is not reached, `analysis.state` is `not_affected` and `analysis.detail` says why. The `justification` is `code_not_present` when the affected package is not in the build, and `code_not_reachable` when it is there but no affected function is called (source) or linked (executable). When it is reached, the state is `exploitable` and the detail gives the call path or the symbol.
@@ -166,14 +167,14 @@ A vulnerability in a Go module matters only when the program uses the affected c
 The basic notice covers the licenses of dependencies (third-party). `--deep-license` uses scancode-toolkit to also detect license headers in the project's own source code (first-party).
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-scancode is heavy and slow (minutes to tens of minutes for a large repo), so it is not in the base image. The CLI runs a source scan's post-process step on the opt-in `ghcr.io/sktelecom/bomlens-deep-license:latest` image when the flag is set, and pulls it automatically (override with `SBOM_DEEP_LICENSE_IMAGE`). In the web UI, deep license detection is one of the Generation options and needs the UI itself to run from that image:
+scancode is heavy and slow (minutes to tens of minutes for a large repo), so it is not in the base image. The CLI runs a source scan's post-process step on the opt-in `ghcr.io/sktelecom/bomlens-deep-license` image, with the same release tag as the scanner image, when the flag is set, and pulls it automatically (override with `SBOM_DEEP_LICENSE_IMAGE`). In the web UI, deep license detection is one of the Generation options and needs the UI itself to run from that image (`<version>` is your release without the leading `v`):
 
-> ```bash
-> SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest ./scripts/scan-sbom.sh --ui
-> ```
+```bash
+SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:<version> $SBOM --ui
+```
 
 Only the project's own files are scanned: dependency folders (`node_modules`, `vendor`, virtual environments), build output and tool folders are left out, since their licences come from the package managers. A tree with more than 20,000 such files is not scanned, and scancode is stopped after 600 seconds; `DEEP_LICENSE_MAX_FILES` and `DEEP_LICENSE_TIMEOUT` change the limits ([Docker image environment variables](../reference/docker-image.md#environment-variables)). Either case is noted in the log and in the run's [result manifest](../reference/engine-contract.md).
 
@@ -186,7 +187,7 @@ Additional output: `MyApp_1.0.0_scancode.json`
 Declares the license you distribute under, so each dependency can be judged against it. A source scan cannot infer this — cdxgen leaves the root license empty for maven and gradle trees — so without the flag no verdict is produced.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
 ```
 
 The value is recorded on the SBOM's root component, and the risk report gains a conflict section. An existing root license — a supplier SBOM's own declaration — is never replaced. For how to read the verdicts see [What the reports mean](../concepts/reports-explained.md#outbound-license-conflicts).
@@ -198,7 +199,7 @@ The value is recorded on the SBOM's root component, and the risk report gains a 
 Produces a byte-identical SBOM for the same input. It removes meaningless diffs in CI (timestamps, random IDs, ordering differences) and ensures reproducibility.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --byte-stable --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --byte-stable --generate-only
 ```
 
 What it does: fixes `metadata.timestamp` to `1970-01-01T00:00:00Z`, removes the random `serialNumber`, sorts `components` by purl, and sorts keys.
@@ -210,19 +211,20 @@ What it does: fixes `metadata.timestamp` to `1970-01-01T00:00:00Z`, removes the 
 Creates a detached signature on the SBOM with cosign to establish supply-chain trust. It is offline key-based signing (`--tlog-upload=false`), so no network or OIDC is needed.
 
 ```bash
+# <version> is your BomLens release without the leading v
 # 1) Generate a key (first time only). For a passwordless key, use COSIGN_PASSWORD=""
 docker run --rm -v "$PWD":/keys -w /keys -e COSIGN_PASSWORD="" \
-  --entrypoint cosign ghcr.io/sktelecom/bomlens:latest generate-key-pair
+  --entrypoint cosign ghcr.io/sktelecom/bomlens:<version> generate-key-pair
 
 # 2) Scan while signing (COSIGN_KEY=private key path, COSIGN_PASSWORD=key password)
 COSIGN_KEY="$PWD/cosign.key" COSIGN_PASSWORD="" \
-  ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --sign --generate-only
+  $SBOM --project MyApp --version 1.0.0 --sign --generate-only
 
 # 3) Verify
 docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
-  ghcr.io/sktelecom/bomlens:latest \
-  verify-blob --key cosign.pub --signature MyApp_1.0.0_bom.json.sig \
-  --insecure-ignore-tlog MyApp_1.0.0_bom.json
+  ghcr.io/sktelecom/bomlens:<version> \
+  verify-blob --key cosign.pub --signature MyApp_1.0.0/MyApp_1.0.0_bom.json.sig \
+  --insecure-ignore-tlog MyApp_1.0.0/MyApp_1.0.0_bom.json
 ```
 
 The private key is mounted read-only into the container. Additional output: `MyApp_1.0.0_bom.json.sig`

@@ -86,7 +86,7 @@ Deleting images inside Docker does not always give the space back to the compute
 
 ## Running directly
 
-Select the analysis mode with the `MODE` environment variable. All examples below leave their outputs in the current directory and do not upload anything (`UPLOAD_ENABLED=false`).
+Select the analysis mode with the `MODE` environment variable. All examples below leave their outputs in the current directory and do not upload anything (`UPLOAD_ENABLED=false`). They name `:latest`, the image built from `main`; to run the image of your release, put its release tag in its place, as in the `docker pull` line above.
 
 ### Analyze a Docker image
 

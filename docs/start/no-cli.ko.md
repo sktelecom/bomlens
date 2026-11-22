@@ -69,7 +69,7 @@ BomLens는 소스 코드를 분석해 구성요소 목록([SBOM](../concepts/wha
 
 ```text
 ===========================================
-  처음 실행이라 스캐너 이미지를 내려받습니다 (약 1.4GB).
+  처음 실행이라 스캐너 이미지를 내려받습니다 (약 0.35GB, 디스크 사용량 1.4GB).
   프로젝트를 처음 스캔할 때 언어별 이미지(약 3~16GB)를 한 번 더 내려받습니다.
   이미지:
   ghcr.io/sktelecom/bomlens:<릴리스 버전>
@@ -104,7 +104,7 @@ Docker 설치와 실행, 스캐너 이미지, Docker 엔진 메모리, 포트 �
 | ZIP으로 받은 소스 코드 스캔 | ZIP 업로드 | [소스 ZIP](../guides/by-input.ko.md#시나리오-2--소스-zip) |
 | GitHub 저장소 스캔 | GitHub URL | [GitHub URL](../guides/by-input.ko.md#시나리오-1--github-url) |
 | 받은 SBOM 검증 | SBOM 업로드 | [공급사 SBOM 검증 가이드](../guides/supplier-sbom.ko.md) |
-| 컨테이너 이미지 스캔 | Docker 이미지 | [입력 시나리오별 처리 가이드](../guides/by-input.ko.md#한눈에-보기) |
+| 컨테이너 이미지 스캔 | Docker 이미지 | [Docker 이미지](../guides/by-input.ko.md#docker-이미지) |
 | 펌웨어 이미지 분석 | 펌웨어 업로드 | [펌웨어](../guides/firmware.ko.md) |
 | AI 모델의 SBOM 만들기 | AI 모델 또는 데이터셋 | [AI 모델 SBOM](../guides/ai-model.ko.md) |
 

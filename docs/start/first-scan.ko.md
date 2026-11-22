@@ -54,7 +54,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 현재 디렉터리의 `MyApp_1.0.0/` 하위 폴더에 CycloneDX SBOM, 오픈소스 고지문, 보안 보고서, 위험 보고서, SPDX 사본이 `MyApp_1.0.0_…` 이름으로 생깁니다.
 
-GitHub 저장소를 클론 없이 스캔하려면 `--target` 대신 `--git "https://github.com/org/repo"`를 씁니다. ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
+GitHub 저장소를 클론 없이 스캔하려면 `--target` 대신 `--git "https://github.com/org/repo"`를 씁니다. ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있고, Docker 이미지(`--target nginx:alpine`)는 그 가이드의 [Docker 이미지](../guides/by-input.ko.md#docker-이미지) 절에 있습니다.
 
 > `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 SBOM에 고지문, 보안 보고서, SPDX 사본을 더해 만듭니다. 오픈소스 위험 보고서는 기본으로 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
 
