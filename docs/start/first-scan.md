@@ -107,7 +107,7 @@ docker run --rm hello-world
 
 The check also lists the BomLens images on the machine with their sizes, their total and the engine's free disk space, and says how to free space when it is low. `BOMLENS_SKIP_DISK_CHECK=1` skips the stop before a download.
 
-If BomLens stops with `Cannot reach the Docker engine`, the `docker` command exists but the engine is not running. Start Docker Desktop or Rancher Desktop and wait for its icon to settle, or run `colima start` for Colima, then run the command again.
+If BomLens stops with `Cannot reach the Docker engine`, the `docker` command exists but the engine is not running. Start Docker Desktop or Rancher Desktop and wait for its icon to settle (in Rancher Desktop, Preferences > Container Engine must be dockerd (moby), not containerd), or run `colima start` for Colima, then run the command again.
 
 ### Installing Docker on macOS and Linux for the first time
 
