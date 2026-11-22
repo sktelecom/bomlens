@@ -25,7 +25,7 @@ on:
     types: [published]
 
 env:
-  BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
+  BOMLENS_VERSION: v1.15.3   # the BomLens release to use; raise it to take a newer one
 
 jobs:
   # PR: lightweight SBOM only (no report)
@@ -100,7 +100,7 @@ generate-sbom:
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
-    BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
+    BOMLENS_VERSION: v1.15.3   # the BomLens release to use; raise it to take a newer one
   before_script:
     - apk add --no-cache bash curl
     - mkdir -p /tmp/bomlens
@@ -134,7 +134,7 @@ on:
     tags: ['v*']
 
 env:
-  BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
+  BOMLENS_VERSION: v1.15.3   # the BomLens release to use; raise it to take a newer one
 
 jobs:
   sbom:
@@ -198,7 +198,7 @@ stages: [security]
 generate-sbom:
   stage: security
   image:
-    name: ghcr.io/sktelecom/bomlens:1.15.2   # a release tag without the leading v; raise it to take a newer one
+    name: ghcr.io/sktelecom/bomlens:1.15.3   # a release tag without the leading v; raise it to take a newer one
     entrypoint: [""]
   variables:
     MODE: SOURCE

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.3] - 2026-11-22
+
+### Added
+
+- `sbom-ui.bat` and the desktop app pass `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` to the web UI container (a loopback proxy is not passed), and `bomlens.settings.txt` accepts the three keys.
+- The CLI archives carry `docker/lib/binarykb.py` and `docker/lib/binary-kb-review.py`, the tools the firmware guide runs to build a binary knowledge base and to review its results.
+
+### Changed
+
+- The README and First scan install the command line from the release archive (`bomlens-cli.tar.gz` or `bomlens-cli-windows.zip`), which uses that release's scanner image; the CI/CD examples download the archive of a pinned `BOMLENS_VERSION`.
+- `--ui` started from the extracted release archive says so, as it does for a repository checkout.
+- The SKT submission profile label says `pkg:generic` is not allowed, and the Korean conformance verdict reads 통과/실패.
+- The desktop app's "engine not reachable" screen names Rancher Desktop's dockerd (moby) setting.
+- The settings example in the Windows archive names the release's scanner image. `sbom-ui.bat` and the setup checks give the scanner image's download size (about 0.35 GB) beside its size on disk (1.4 GB), and the `SBOM_PULL` help says only a moving tag such as `:latest` gets a newer copy.
+
+### Fixed
+
+- On the static path (a lock file read without a build), the root depends on the lock file's direct dependencies instead of the lock file's own node, so the dependency tree no longer shows an unnamed node under the project, the direct-dependency count is right and the security report names the dependency that brings a vulnerable package in.
+- Docs: guides name the release tag instead of `:latest`; `SBOM_SCANNER_IMAGE` for a double-clicked `sbom-ui.bat` goes in `bomlens.settings.txt`; the `--component-versions` example and the signature check use the run's `{Project}_{Version}/` subfolder; the reports guide runs from the project folder; the input scenarios guide has a Docker image section with the private registry steps; the proxy section has a PowerShell form and `launchctl setenv` for the macOS desktop app; UI names match the screen (Per-file license scan, Reproducible output, Choose folder, Conformance check).
+
 ## [v1.15.2] - 2026-11-22
 
 ### Added

@@ -54,7 +54,7 @@ If you prefer a script over the desktop app, this path works too.
 
 ```text
 ===========================================
-  First run: downloading the scanner image (about 1.4 GB).
+  First run: downloading the scanner image (about 0.35 GB, 1.4 GB on disk).
   The first scan of a project also fetches a language image (about 3 to 16 GB).
   Image:
   ghcr.io/sktelecom/bomlens:<release version>
@@ -88,7 +88,7 @@ From here the desktop app and the web UI are the same. Enter the project name an
 | Scan source code you received as a ZIP | ZIP upload | [Source ZIP](../guides/by-input.md#scenario-2--source-zip) |
 | Scan a repository on GitHub | GitHub URL | [GitHub URL](../guides/by-input.md#scenario-1--github-url) |
 | Check an SBOM you received | SBOM upload | [Supplier SBOM validation](../guides/supplier-sbom.md) |
-| Scan a container image | Docker image | [Input scenarios](../guides/by-input.md#at-a-glance) |
+| Scan a container image | Docker image | [Docker image](../guides/by-input.md#docker-image) |
 | Analyze a firmware image | Firmware upload | [Firmware](../guides/firmware.md) |
 | Make an SBOM for an AI model | AI model or dataset | [AI model SBOM](../guides/ai-model.md) |
 

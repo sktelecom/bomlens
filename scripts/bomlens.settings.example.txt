@@ -49,9 +49,10 @@
 
 # --- Download behaviour / 다운로드 동작 -------------------------------------
 # missing (default) = download only when the image is absent
-# always            = re-check the registry every run (picks up a newer :latest)
+# always            = pull again every run (only a moving tag such as :latest
+#                     changes; a release tag stays the same)
 # never             = never touch the network; fail instead (air-gapped rooms)
-# missing(기본) = 없을 때만 받음 / always = 매번 최신 확인 / never = 네트워크 사용 안 함
+# missing(기본) = 없을 때만 받음 / always = 매번 다시 받음(릴리스 태그는 바뀌지 않음) / never = 네트워크 사용 안 함
 #SBOM_PULL=missing
 
 # --- Proxy CA certificate / 프록시 CA 인증서 --------------------------------

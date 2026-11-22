@@ -62,12 +62,12 @@ syft의 패키지 식별 단계가 실패해도 스캔은 멈추지 않습니다
 
 ## 스캔이 읽지 못한 버전 채우기
 
-`presence-only` 컴포넌트에는 버전이 없어 CVE 조회에도 purl 조회에도 쓸 수 없습니다. 펌웨어, 루트 파일시스템, 바이너리 스캔은 이런 컴포넌트를 콘솔에 보여 주고 `<Project>_<Version>_component-versions.template.csv` 파일로 씁니다. 각 이름 뒤에 제품에 들어간 버전을 적고 그 파일을 다시 넘깁니다.
+`presence-only` 컴포넌트에는 버전이 없어 CVE 조회에도 purl 조회에도 쓸 수 없습니다. 펌웨어, 루트 파일시스템, 바이너리 스캔은 이런 컴포넌트를 콘솔에 보여 주고 실행 결과 하위 폴더 `<Project>_<Version>/`에 `<Project>_<Version>_component-versions.template.csv` 파일로 씁니다. 각 이름 뒤에 제품에 들어간 버전을 적고 그 파일을 다시 넘깁니다.
 
 ```bash
 ./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
   --target "./device.bin" --firmware \
-  --component-versions device-fw_1.0.0_component-versions.template.csv --generate-only
+  --component-versions device-fw_1.0.0/device-fw_1.0.0_component-versions.template.csv --generate-only
 ```
 
 파일은 `name,version,reason` 세 열로 된 CSV입니다. 세 번째 열은 넣지 않아도 되므로 `name,version` 두 열 파일도 전처럼 읽습니다. `#`으로 시작하는 줄과 버전도 사유도 비워 둔 행은 건너뜁니다. 양식 파일은 그 자리에서 채워도 됩니다. 넘긴 파일이 그 양식이면 스캔은 적은 내용을 그대로 두고, 아직 빠진 항목만 알려 줍니다. 채운 버전에는 `bomlens:versionSource = supplier-declared`가 붙고, 위의 upstream purl도 붙습니다. 스캔이 배포 파일에서 버전을 읽었다면 그 버전을 유지하고 두 값을 경고로 보여 줍니다. 소스 트리에는 한 프로젝트의 여러 릴리스가 함께 있을 수 있고, 실제로 들어간 것은 바이너리가 보여 주기 때문입니다. 스캔이 찾지 못한 이름은 `bomlens:identifiedBy = supplier-declared` 컴포넌트로 추가합니다. 256 KiB를 넘는 파일, 두 열이나 세 열이 아닌 행, 영문자와 숫자와 `. _ + ~ -` 밖의 문자가 든 이름이나 버전, 한 이름에 두 버전을 적은 파일은 줄 번호와 함께 거부합니다. 이때 SBOM과 다른 파일은 그 파일의 버전 없이 쓰고, 스캔은 1로 끝납니다. 버전이 `UNKNOWN`인 컴포넌트(메타데이터에 버전이 없는 커널 모듈)는 버전이 없는 것으로 보고 양식에 넣습니다. 이름에 공백 같은 다른 문자가 든 컴포넌트는 양식 대신 콘솔에 따로 보여 줍니다.

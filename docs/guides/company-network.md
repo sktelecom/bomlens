@@ -21,7 +21,13 @@ A Node.js project with no lock file is resolved by an npm install against the re
 
 ## What do I set for a proxy?
 
-`HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. `sbom-ui.bat` passes the same three variables to the web UI from the Windows environment. A double-clicked `.bat` does not see a variable typed in a command prompt, so write them in `bomlens.settings.txt` next to the scripts (for example `HTTPS_PROXY=http://proxy.example:8080`) or set them with `setx` and double-click it again. The desktop app passes them the same way from its environment (set them with `setx`, then restart the app).
+`HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. `sbom-ui.bat` passes the same three variables to the web UI from the Windows environment. A double-clicked `.bat` does not see a variable typed in a command prompt, so write them in `bomlens.settings.txt` next to the scripts (for example `HTTPS_PROXY=http://proxy.example:8080`) or set them with `setx` and double-click it again. The desktop app passes them the same way from its environment: on Windows set them with `setx`, then restart the app; on macOS run `launchctl setenv HTTPS_PROXY http://proxy.example:8080` in Terminal, then start the app again (the setting is lost on restart).
+
+With `scan-sbom.bat` in PowerShell, set the variable first in the same line:
+
+```powershell
+$env:HTTPS_PROXY="http://proxy.example:8080"; scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-project --generate-only
+```
 
 ## How do I trust my company CA?
 

@@ -50,7 +50,7 @@ Advanced, for automation and CI. Run from the folder you extracted the archive i
 
 This produces a CycloneDX SBOM, an open-source notice, a security report, a risk report and an SPDX copy named `MyApp_1.0.0_…`, all in a `MyApp_1.0.0/` subfolder of the current directory.
 
-To scan a GitHub repository without cloning it, use `--git "https://github.com/org/repo"` in place of `--target`. Other inputs, such as a ZIP source (`--target app.zip`), an existing SBOM (`--analyze sbom.json`), firmware (`--target dev.bin --firmware`) and a Docker image (`--target nginx:latest`), are in the [input-scenarios guide](../guides/by-input.md).
+To scan a GitHub repository without cloning it, use `--git "https://github.com/org/repo"` in place of `--target`. Other inputs, such as a ZIP source (`--target app.zip`), an existing SBOM (`--analyze sbom.json`) and firmware (`--target dev.bin --firmware`), are in the [input-scenarios guide](../guides/by-input.md), and a Docker image (`--target nginx:alpine`) in its [Docker image](../guides/by-input.md#docker-image) section.
 
 > `--generate-only` saves the outputs locally without uploading (the vulnerability scan still runs). `--all` adds the notice, the security report and an SPDX copy to the SBOM; the risk report is made by default. The full options are in the [CLI reference](../reference/cli.md#options-reference). To upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`); the steps are in the [upload guide](../guides/upload.md).
 

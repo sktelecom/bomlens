@@ -15,7 +15,8 @@ BomLens는 SBOM 생성에 더해 오픈소스 고지문(NOTICE)과 보안 취약
 UI를 실행하고 프로젝트 이름과 버전을 입력한 뒤 스캔 대상을 골라 실행하면, 고지문과 보안보고서를 내려받을 수 있습니다.
 
 ```bash
-./scripts/scan-sbom.sh --ui     # http://localhost:8080 (포트 충돌 시 UI_PORT=9090 ./scripts/scan-sbom.sh --ui)
+cd /path/to/your-project
+/path/to/bomlens/scripts/scan-sbom.sh --ui     # http://localhost:8080 (포트 충돌 시 앞에 UI_PORT=9090을 붙임)
 #   Windows: scripts\sbom-ui.bat 더블클릭
 ```
 
@@ -38,7 +39,7 @@ Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그�
 
 - Docker 엔진 20.10 이상. 무료로는 WSL2 + docker-ce나 Rancher Desktop을 쓰면 되고, Docker Desktop은 조직 사용 시 유료입니다.
 - 스캐너 이미지는 직접 받지 않아도 됩니다. 첫 스캔이 릴리스에 맞는 이미지를 받습니다.
-- 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
+- 모든 예시는 스캔할 프로젝트 루트에서 실행합니다. `$SBOM`은 `scan-sbom.sh`의 경로이며, [입력 시나리오 가이드](by-input.ko.md#공통-준비)처럼 한 번 지정해 둡니다: `SBOM=/path/to/bomlens/scripts/scan-sbom.sh`.
 
 > 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. 외부 시스템(Dependency-Track 서버나 TRUSCA) 자동 업로드를 함께 쓰려면 생략하세요. 대상은 `UPLOAD_TARGET`으로 고릅니다.
 
@@ -51,7 +52,7 @@ Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그�
 웹 UI와 데스크톱 앱에서는 고지문과 보안보고서가 새 스캔 화면의 생성 옵션이고, SPDX 사본은 스캔이 끝난 뒤 결과 화면에서 내보냅니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --all --generate-only
 ```
 
 생성 파일, 명령을 실행한 위치 아래 `MyApp_1.0.0/` 하위 폴더에 함께 생깁니다([산출물 위치](../reference/cli.ko.md#산출물-위치) 참고):
@@ -77,7 +78,7 @@ MyApp_1.0.0_risk-report.html    # 오픈소스 위험 보고서 (시각화)
 SBOM의 `components[].licenses` 정보를 모아 라이선스별로 컴포넌트를 묶은 고지문을 생성합니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --notice --generate-only
 ```
 
 - `_NOTICE.txt` — 배포물에 동봉하기 좋은 표준 텍스트.
@@ -100,7 +101,7 @@ Components (1):
 생성된 SBOM을 Trivy로 스캔해 알려진 취약점(CVE)을 보고합니다. (NVD + OSV + GHSA DB)
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --security --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --security --generate-only
 ```
 
 - `_security.json` — Trivy 원본 JSON. CI나 기계 처리용.
@@ -128,18 +129,18 @@ Trivy가 취약점 번호가 아니라 배포판의 권고 번호로 보고한 �
 Trivy는 패키지 식별자(PURL) 기준으로 취약점을 대조하므로 생태계 보안 권고 데이터베이스는 잘 다룹니다. 하지만 오래된 Java 라이브러리의 일부 CVE는 NVD에만 CPE 식별자로 기록되어 있어 PURL 기반 스캔으로는 닿지 않습니다. `--deep-cve`는 두 번째 대조를 더합니다. BomLens가 각 Maven 컴포넌트의 groupId로부터 NVD 대조가 가능한 CPE를 만들어 주고(이 보강 단계는 Maven이 대상입니다), grype는 생태계와 무관하게 컴포넌트가 가진 CPE 전부를 내장 NVD 데이터베이스와 대조합니다. 실제로 추가되는 결과 대부분은 여전히 Maven인데, SBOM에 없던 CPE를 보강이 새로 붙여 주는 대상이 Maven이기 때문입니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --deep-cve --generate-only
 ```
 
 - `--deep-cve`는 `--security`를 자동으로 켭니다. 추가로 찾은 결과는 같은 보안 보고서(`_security.json/.md/.html`)에 `nvd:cpe` 출처 표시와 함께 합쳐집니다.
-- 스캔은 grype와 데이터베이스를 내장한 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-cve:latest`로 실행되며, 플래그를 켜면 자동으로 내려받습니다(`SBOM_DEEP_CVE_IMAGE`로 지정 가능). 기본 이미지 모드(소스, 이미지, 바이너리, rootfs, SBOM 분석)에 적용되고, 펌웨어와 AI 모델 스캔은 매칭할 패키지 purl도 확장할 보안 보고서도 없어 경고를 출력한 뒤 grype 없이 진행합니다. 소스 스캔은 보안 보고서를 만드는 후처리 단계를 deep-cve 이미지로 실행합니다. 이 이미지를 내려받을 수 없으면(오프라인이거나 `SBOM_PULL=never`) grype 대조 없이 스캔을 이어 가고, 그 사실을 알리며, `bomlens-result.json`에 `deep-cve` 단계를 건너뜀(skipped)으로 기록합니다. `SBOM_SCANNER_IMAGE`가 레지스트리 경로 없는 로컬 빌드(`bomlens:dev`)이거나 1.13.2보다 낮은 버전 또는 BomLens 이름이 아닌 이미지이고 `SBOM_DEEP_CVE_IMAGE`를 지정하지 않았을 때도 같습니다. 같은 빌드의 deep-cve 이미지를 알 수 없으므로 후처리는 지정한 이미지에서 그대로 실행됩니다. 그 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 그곳에서 대조를 실행하고 실제 결과대로 기록합니다. deep-cve 이미지에는 scancode가 없으므로, `--deep-license`도 켜면 라이선스 탐지를 먼저 deep-license 이미지에서 실행한 뒤 후처리 단계를 deep-cve 이미지로 실행합니다. 그래서 `_scancode.json`과 `_security_grype.json`이 모두 만들어집니다. 웹 UI도 deep-license 이미지에서 실행 중이면 같은 방식으로 처리합니다. opt-in 이미지는 처음 쓸 때 한 번 내려받으며 docker의 진행 상황을 보여 줍니다. 2분 동안 아무 출력이 없으면 내려받기를 멈추고 그 이미지 없이 스캔을 이어 갑니다.
+- 스캔은 grype와 데이터베이스를 내장한 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-cve`(스캐너 이미지와 같은 릴리스 태그)로 실행되며, 플래그를 켜면 자동으로 내려받습니다(`SBOM_DEEP_CVE_IMAGE`로 지정 가능). 기본 이미지 모드(소스, 이미지, 바이너리, rootfs, SBOM 분석)에 적용되고, 펌웨어와 AI 모델 스캔은 매칭할 패키지 purl도 확장할 보안 보고서도 없어 경고를 출력한 뒤 grype 없이 진행합니다. 소스 스캔은 보안 보고서를 만드는 후처리 단계를 deep-cve 이미지로 실행합니다. 이 이미지를 내려받을 수 없으면(오프라인이거나 `SBOM_PULL=never`) grype 대조 없이 스캔을 이어 가고, 그 사실을 알리며, `bomlens-result.json`에 `deep-cve` 단계를 건너뜀(skipped)으로 기록합니다. `SBOM_SCANNER_IMAGE`가 레지스트리 경로 없는 로컬 빌드(`bomlens:dev`)이거나 1.13.2보다 낮은 버전 또는 BomLens 이름이 아닌 이미지이고 `SBOM_DEEP_CVE_IMAGE`를 지정하지 않았을 때도 같습니다. 같은 빌드의 deep-cve 이미지를 알 수 없으므로 후처리는 지정한 이미지에서 그대로 실행됩니다. 그 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 그곳에서 대조를 실행하고 실제 결과대로 기록합니다. deep-cve 이미지에는 scancode가 없으므로, `--deep-license`도 켜면 라이선스 탐지를 먼저 deep-license 이미지에서 실행한 뒤 후처리 단계를 deep-cve 이미지로 실행합니다. 그래서 `_scancode.json`과 `_security_grype.json`이 모두 만들어집니다. 웹 UI도 deep-license 이미지에서 실행 중이면 같은 방식으로 처리합니다. opt-in 이미지는 처음 쓸 때 한 번 내려받으며 docker의 진행 상황을 보여 줍니다. 2분 동안 아무 출력이 없으면 내려받기를 멈추고 그 이미지 없이 스캔을 이어 갑니다.
 - 웹 UI(와 데스크톱 앱)에서는 같은 옵션이 스캔 옵션의 **심층 CVE 매칭 (NVD CPE)** 토글입니다. 기본 이미지를 쓰는 모든 스캔 모드(소스, Docker 이미지, rootfs, 빌드 산출물, SBOM 업로드)에서 나타나고, CLI와 마찬가지로 펌웨어와 AI 모델 스캔에서만 숨겨집니다. 켜면 보안 보고서도 함께 켜지고, deep-cve 이미지는 처음 쓸 때 한 번 내려받습니다. UI 자체가 그 이미지에서 실행 중이면 곁들임 컨테이너 없이 바로 처리합니다.
 - CPE 대조는 PURL 대조보다 느슨합니다. NVD의 버전 범위가 대략적으로 기록된 경우가 있기 때문입니다. 기본값은 오프라인 동작이라 그런 결과를 버리지 않고 보고서에 **버전 미검증**으로 표시합니다(단검 기호와 각주). 어느 행이 느슨한 버전 대조로 인한 오탐일 수 있는지 읽는 사람이 알 수 있습니다. 더 조이려면 `NVD_API_KEY`와 함께 `SECURITY_NVD_VERIFY=true`를 설정하세요. 각 결과를 NVD 실시간 버전 범위와 대조해 범위 밖 오탐을 걸러냅니다. 이 검증은 네트워크가 필요하고 수 분이 더 걸립니다.
 - OS 패키지(rootfs나 이미지 스캔)는 컴포넌트의 `cpe`가 업스트림 버전만 담고, 배포판 자체의 패치 리비전(Debian의 `+deb12u3`, RPM의 `.el9`, Alpine의 `-r0` 등)은 `purl`과 `version`에만 남습니다. 배포판이 이미 백포트로 고친 CVE라도 CPE의 업스트림 버전은 그대로라서, `--deep-cve` 대조가 NVD 버전 범위만 보고 여전히 취약하다고 표시할 수 있습니다. PURL과 OS 컨텍스트로 대조하는 위의 기본 보안 보고서가 배포판 자체의 보안 권고 상태를 이미 반영하므로, OS 패키지의 실제 취약점 여부는 그쪽을 신뢰하세요. OS 패키지에 대한 `--deep-cve` 결과는 버전 미검증 결과와 같은 방식으로, 최종 판정이 아니라 확인해 볼 단서로 읽으면 됩니다.
 
 ```bash
 SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
-  ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+  $SBOM --project "MyApp" --version "1.0.0" --deep-cve --generate-only
 ```
 
 ---
@@ -149,8 +150,8 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 Go 모듈의 취약점은 프로그램이 영향받는 코드를 실제로 쓸 때만 문제가 됩니다. `--reachability`는 Go 프로젝트가 직접 만든 점검 도구인 govulncheck에게, 스캔한 Go 프로그램이 어느 보안 권고의 코드에 실제로 도달하는지 묻습니다. 소스 트리는 프로그램의 진입점부터 호출 그래프를 따라가고, Go 실행 파일(`--target ./app`)은 실행 파일의 심볼에서 영향받는 함수를 찾습니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --reachability --generate-only
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --reachability --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
 ```
 
 - SBOM의 컴포넌트에 해당하는 Go 보안 권고마다 CycloneDX VEX 문서인 `_reachability.cdx.json`에 판정이 남습니다. 영향받는 코드에 도달하지 않으면 `analysis.state`는 `not_affected`이고, `analysis.detail`에 이유를 적습니다. 영향받는 패키지가 빌드에 없으면 `justification`은 `code_not_present`, 패키지는 있지만 영향받는 함수를 호출하지 않거나(소스) 링크하지 않았으면(실행 파일) `code_not_reachable`입니다. 도달하면 상태는 `exploitable`이고 detail에 호출 경로나 심볼을 적습니다.
@@ -166,14 +167,14 @@ Go 모듈의 취약점은 프로그램이 영향받는 코드를 실제로 쓸 �
 기본 고지문은 의존성(3rd-party)의 라이선스를 다룹니다. `--deep-license`는 scancode-toolkit으로 프로젝트 자체 소스코드(1st-party)의 라이선스 헤더까지 탐지합니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) 기본 이미지에는 넣지 않았습니다. CLI는 이 옵션을 켜면 소스 스캔의 후처리 단계를 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-license:latest`로 실행하며, 이미지는 자동으로 내려받습니다(`SBOM_DEEP_LICENSE_IMAGE`로 지정 가능). 웹 UI에서는 정밀 라이선스 탐지가 생성 옵션 중 하나이며, UI 자체를 이 이미지로 실행해야 합니다.
+scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) 기본 이미지에는 넣지 않았습니다. CLI는 이 옵션을 켜면 소스 스캔의 후처리 단계를 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-license`(스캐너 이미지와 같은 릴리스 태그)로 실행하며, 이미지는 자동으로 내려받습니다(`SBOM_DEEP_LICENSE_IMAGE`로 지정 가능). 웹 UI에서는 정밀 라이선스 탐지가 생성 옵션 중 하나이며, UI 자체를 이 이미지로 실행해야 합니다(`<version>`은 앞의 `v`를 뺀 릴리스 번호).
 
-> ```bash
-> SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest ./scripts/scan-sbom.sh --ui
-> ```
+```bash
+SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:<version> $SBOM --ui
+```
 
 프로젝트 자체 파일만 검사합니다. 의존성 폴더(`node_modules`, `vendor`, 가상 환경), 빌드 산출물, 도구 폴더는 라이선스를 패키지 관리자에서 얻으므로 제외합니다. 검사 대상 파일이 20,000개를 넘는 트리는 검사하지 않고, scancode는 600초가 지나면 멈춥니다. 한도는 `DEEP_LICENSE_MAX_FILES`와 `DEEP_LICENSE_TIMEOUT`으로 바꿀 수 있습니다([Docker 이미지 환경 변수](../reference/docker-image.ko.md#환경-변수)). 어느 경우든 로그와 실행 [결과 매니페스트](../reference/engine-contract.ko.md)에 남습니다.
 
@@ -186,7 +187,7 @@ scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) �
 프로젝트를 배포하는 라이선스를 선언해, 각 의존성을 그 기준으로 판정하게 합니다. 소스 스캔으로는 알아낼 수 없는 값이라(cdxgen이 maven과 gradle에서 루트 라이선스를 비워 둡니다) 지정하지 않으면 판정하지 않습니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
 ```
 
 선언한 값은 SBOM 루트 컴포넌트에 기록되고, 오픈소스 위험 보고서에 충돌 절이 생깁니다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않습니다. 판정을 읽는 방법은 [보고서 읽는 법](../concepts/reports-explained.ko.md#배포-라이선스-충돌)을 참고하세요.
@@ -198,7 +199,7 @@ scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) �
 같은 입력이면 항상 동일한 바이트의 SBOM을 생성합니다. CI에서 의미 없는 diff(타임스탬프, 랜덤 ID, 정렬 차이)를 제거하고 재현성을 확보합니다.
 
 ```bash
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --byte-stable --generate-only
+$SBOM --project "MyApp" --version "1.0.0" --byte-stable --generate-only
 ```
 
 적용 내용: `metadata.timestamp`를 `1970-01-01T00:00:00Z`로 고정, 랜덤 `serialNumber` 제거, `components`를 purl 기준 정렬, 키 정렬.
@@ -210,19 +211,20 @@ scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) �
 cosign으로 SBOM에 detached 서명을 만들어 공급망 신뢰를 확보합니다. 오프라인 키 기반 서명(`--tlog-upload=false`)이라 네트워크나 OIDC가 필요 없습니다.
 
 ```bash
+# <version>은 앞의 v를 뺀 BomLens 릴리스 번호
 # 1) 키 생성 (최초 1회). 무비밀번호 키는 COSIGN_PASSWORD="" 로 생성
 docker run --rm -v "$PWD":/keys -w /keys -e COSIGN_PASSWORD="" \
-  --entrypoint cosign ghcr.io/sktelecom/bomlens:latest generate-key-pair
+  --entrypoint cosign ghcr.io/sktelecom/bomlens:<version> generate-key-pair
 
 # 2) 서명하며 스캔 (COSIGN_KEY=개인키 경로, COSIGN_PASSWORD=키 비밀번호)
 COSIGN_KEY="$PWD/cosign.key" COSIGN_PASSWORD="" \
-  ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --sign --generate-only
+  $SBOM --project MyApp --version 1.0.0 --sign --generate-only
 
 # 3) 검증
 docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
-  ghcr.io/sktelecom/bomlens:latest \
-  verify-blob --key cosign.pub --signature MyApp_1.0.0_bom.json.sig \
-  --insecure-ignore-tlog MyApp_1.0.0_bom.json
+  ghcr.io/sktelecom/bomlens:<version> \
+  verify-blob --key cosign.pub --signature MyApp_1.0.0/MyApp_1.0.0_bom.json.sig \
+  --insecure-ignore-tlog MyApp_1.0.0/MyApp_1.0.0_bom.json
 ```
 
 개인키는 컨테이너에 읽기 전용으로 마운트됩니다. 추가 산출물: `MyApp_1.0.0_bom.json.sig`

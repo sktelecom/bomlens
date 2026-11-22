@@ -14,6 +14,8 @@ In the desktop app or the web UI, add the project folder and run the scan. On th
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./my-maven-project --generate-only
 ```
 
+On Windows, in PowerShell or a command prompt: `scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-maven-project --generate-only`.
+
 The first Java scan downloads a Java image of about 3.8 to 5.6 GB (see [Disk use and cleanup](../reference/docker-image.md#how-much-disk-do-the-images-take)). It stops before the download when the engine does not have that much free space plus 2 GB; `BOMLENS_SKIP_DISK_CHECK=1` scans anyway. Give the Docker engine about 4 GB of memory, or the build step can be killed and the result falls back to direct dependencies.
 
 ## What if the folder has both pom.xml and build.gradle?

@@ -33,7 +33,7 @@ ML-BOM의 대상과 모델 카드 아래의 데이터셋을 읽는 범위는 [�
 
 ### 데스크톱 앱이나 웹 UI에서
 
-데스크톱 앱이나 웹 UI를 엽니다(설치는 [첫 스캔](../start/first-scan.ko.md) 참고). Docker에 접근할 수 있으면 AI 모델 또는 데이터셋 타일이 활성화되고, aibom 이미지는 첫 스캔에서 별도 컨테이너로 받아 실행합니다. 그래서 처음 한 번은 시작이 느립니다. Docker 소켓을 쓸 수 없는 환경에서는 aibom 이미지로 UI 자체를 띄웁니다(`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh --ui`, Windows는 `sbom-ui.bat` 더블클릭 전에 `SBOM_SCANNER_IMAGE`를 지정). 이때는 별도 컨테이너 없이 UI 안에서 바로 처리합니다.
+데스크톱 앱이나 웹 UI를 엽니다(설치는 [첫 스캔](../start/first-scan.ko.md) 참고). Docker에 접근할 수 있으면 AI 모델 또는 데이터셋 타일이 활성화되고, aibom 이미지는 첫 스캔에서 별도 컨테이너로 받아 실행합니다. 그래서 처음 한 번은 시작이 느립니다. Docker 소켓을 쓸 수 없는 환경에서는 aibom 이미지로 UI 자체를 띄웁니다(`SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:<version> ./scripts/scan-sbom.sh --ui`, `<version>`은 앞의 `v`를 뺀 릴리스 번호). Windows에서는 더블클릭한 실행기가 명령 프롬프트에서 입력한 변수를 보지 못하므로, 그 `SBOM_SCANNER_IMAGE=...` 줄을 `sbom-ui.bat` 옆의 `bomlens.settings.txt`에 적습니다([설정 파일](../start/troubleshooting.ko.md#설정-파일-명령줄-불필요)). 이때는 별도 컨테이너 없이 UI 안에서 바로 처리합니다.
 
 새 스캔의 소스 타일에서 **AI 모델 또는 데이터셋**을 고르고, HuggingFace 모델 id를 `org/model` 형식으로 입력한 뒤(예: `google-bert/bert-base-uncased`, `Qwen/Qwen2.5-0.5B`. 컬렉션 이름이나 전체 URL은 안 됩니다) 스캔을 실행합니다.
 

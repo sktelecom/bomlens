@@ -50,6 +50,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 빌드 산출물(`.jar`, `.deb` 등) | BINARY | `$SBOM --target app.jar --all --generate-only` | 〃 |
 | 설치 파일(`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | 〃 |
 | 모바일 앱(`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | 〃 |
+| Docker 이미지 | IMAGE | `$SBOM --target nginx:alpine --all --generate-only` | 〃(비공개 레지스트리는 먼저 `docker login`과 `docker pull`, [Docker 이미지](#docker-이미지)) |
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
 | AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음) |
 | AI 모델 파일(GGUF, safetensors 등) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음) |
@@ -104,7 +105,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --identify-vendor
 ```
 
 - Conan의 `conanfile.txt`나 `conan.lock`에 선언된 의존성과 CMake 파일의 패키지 이름(`find_package`)은 SBOM에 들어갑니다. vcpkg의 `vcpkg.json`과 Conan의 `conanfile.py`는 읽지 않습니다. 여기에 선언된 의존성이 어느 컴포넌트에도 없으면 결과는 부분(사유 `manifest-not-read`)이 되고, 사유에 해당 매니페스트와 의존성 이름이 나옵니다. 프로젝트 최상위 폴더의 `sbom-declared.cdx.json`에 버전과 함께 적거나([선언 구성요소](declared-components.ko.md)) `conanfile.py` 옆에 `conan.lock`을 커밋한 뒤 다시 스캔하세요.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 결과 품질 묶음의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 결과 품질 묶음의 **파일 단위 라이선스 스캔** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 오픈소스 위험 보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 오픈소스 위험 보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
@@ -173,12 +174,25 @@ $SBOM --project bert-base --version 1.0.0 \
   --generate-only
 ```
 
-- opt-in aibom 이미지(`ghcr.io/sktelecom/bomlens-aibom:latest`)가 필요하며 자동으로 받습니다. 다른 태그는 `SBOM_AIBOM_IMAGE`로 지정합니다.
+- opt-in aibom 이미지(`ghcr.io/sktelecom/bomlens-aibom`)가 필요하며, 스캐너 이미지와 같은 릴리스 태그로 자동으로 받습니다. 다른 태그는 `SBOM_AIBOM_IMAGE`로 지정합니다.
 - `--model`은 `--target`/`--analyze`/`--git`/`--merge`와 함께 쓸 수 없습니다.
 - CycloneDX 1.7 **ML-BOM**(1.6 아님), 고지문, 오픈소스 위험 보고서와 G7 최소 요소 적합성 검사를 만듭니다. **보안 보고서는 없습니다.** 모델에는 패키지 CVE가 없습니다.
 - 다른 AI 입력은 [AI 모델 가이드](ai-model.ko.md)에서 실행 방법을 설명합니다. Figshare나 HuggingFace에 공개된 데이터셋([공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)), `.gguf` 같은 모델 파일([모델 파일 스캔](ai-model.ko.md#모델-파일-스캔)), 저장소나 파일이 아직 없어 `--ai-declare`로 기술하는 모델([SPDX 3.0.1 AI 문서](ai-model.ko.md#spdx-301-ai-문서))입니다. 모델 카드, 데이터셋, G7 결과를 읽는 법도 이 가이드에 있습니다.
 
 **산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, G7 적합성
+
+## Docker 이미지
+
+다른 팀이 컨테이너 이미지를 넘겨준 경우입니다. 이미지 이름을 `--target`으로 넘기며, `docker save`로 만든 tar 파일도 같은 방식으로 넘깁니다.
+
+```bash
+$SBOM --project team8-image --version 1.0.0 \
+  --target nginx:alpine \
+  --all --generate-only
+```
+
+- 스캐너는 이 컴퓨터의 Docker 엔진을 거쳐 이미지를 읽습니다. 비공개 레지스트리의 이미지는 이 컴퓨터에서 먼저 `docker login`과 `docker pull <이미지>`를 실행합니다. Docker 로그인 정보는 스캔에 전달되지 않기 때문입니다. 엔진에 없는 이미지는 `SYFT_REGISTRY_AUTH_*` 변수로 읽을 수도 있습니다([CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)).
+- 경로처럼 시작하는 이름(`./`, `/`, `~`)이 존재하지 않으면 이미지 이름으로 읽지 않고 스캔을 멈춥니다.
 
 ## 산출물 4종 해석
 

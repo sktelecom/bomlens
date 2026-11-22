@@ -59,8 +59,10 @@ LICENSE_FILES="LICENSE NOTICE THIRD_PARTY_LICENSES.md"
 # container then checks it. docker/android/Dockerfile is the build recipe for
 # the Android SDK image that Android source scans need. It carries no SDK
 # files: the SDK is downloaded from Google by the user's own machine at build
-# time.
-LIB_FILES="docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py docker/lib/read-python-venv.py docker/android/Dockerfile"
+# time. binarykb.py and binary-kb-review.py are not used by scan-sbom.sh: the
+# firmware guide runs them by hand to build a binary knowledge base and to
+# review its results. Both use the Python standard library only.
+LIB_FILES="docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/image-sizes.json docker/lib/identify-conda.py docker/lib/read-python-venv.py docker/lib/binarykb.py docker/lib/binary-kb-review.py docker/android/Dockerfile"
 
 # The Linux and macOS bundle: the scan script, the setup check the README runs
 # first, and the example project the README's first scan points at.
@@ -75,8 +77,10 @@ WINDOWS_FILES="scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat sc
 
 EXAMPLE_DIR="examples/nodejs"
 
-# The files whose default image tag is :latest in the repository.
-TAGGED_FILES="scripts/scan-sbom.sh scripts/sbom-ui.bat docker/lib/source-detect.sh"
+# The files whose default image tag is :latest in the repository. The settings
+# example only names it in a comment line, which the archive copy shows with
+# the release tag.
+TAGGED_FILES="scripts/scan-sbom.sh scripts/sbom-ui.bat scripts/bomlens.settings.example.txt docker/lib/source-detect.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -178,6 +182,10 @@ check_tags() {
         grep -qF "if not defined SBOM_SCANNER_IMAGE set \"SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:$VERSION\"" "$dir/scripts/sbom-ui.bat" \
             || fail "$file: sbom-ui.bat does not default to ghcr.io/sktelecom/bomlens:$VERSION"
     fi
+    if [ -f "$dir/scripts/bomlens.settings.example.txt" ]; then
+        grep -qx "#SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:$VERSION" "$dir/scripts/bomlens.settings.example.txt" \
+            || fail "$file: bomlens.settings.example.txt does not name ghcr.io/sktelecom/bomlens:$VERSION"
+    fi
     if [ -f "$dir/scripts/check-setup.sh" ]; then
         grep -qx "BOMLENS_CLI_VERSION=\"$VERSION\"" "$dir/scripts/check-setup.sh" || fail "$file: check-setup.sh does not carry $VERSION"
     fi
@@ -210,8 +218,9 @@ verify() {
         for name in LICENSE NOTICE THIRD_PARTY_LICENSES.md; do
             [ -s "$dir/$name" ] || fail "$file: extracted bundle has no $name"
         done
-        # The paths the README's first commands and the zip's README.txt use.
-        for name in scripts/scan-sbom.sh "$EXAMPLE_DIR/package.json" "$EXAMPLE_DIR/package-lock.json"; do
+        # The paths the README's first commands and the zip's README.txt use,
+        # and the binary knowledge base tools the firmware guide runs.
+        for name in scripts/scan-sbom.sh "$EXAMPLE_DIR/package.json" "$EXAMPLE_DIR/package-lock.json" docker/lib/binarykb.py docker/lib/binary-kb-review.py; do
             [ -s "$dir/$name" ] || fail "$file: extracted bundle has no $name"
         done
         case "$kind" in
