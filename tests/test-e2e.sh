@@ -169,6 +169,9 @@ fi
 # from pp_env's forwarding list (regression: D-1.5.1 / D-1). Run the function in
 # isolation and assert it carries the host value through.
 pp_out="$( set +e +u
+    # The helpers pp_env calls are not under test here.
+    stage2_network_env_args() { :; }; trivy_cache_args() { :; }
+    go_vulndb_mount() { :; }; extra_ca_run() { :; }
     eval "$(sed -n '/^pp_env() {/,/^}/p' "$SCAN")"
     SECURITY_ENRICH=false pp_env )"
 if printf '%s' "$pp_out" | grep -q -- "-e SECURITY_ENRICH=false"; then
@@ -1132,13 +1135,13 @@ else
         #
         # Stage 1's own output goes to a log file, not the terminal, so the
         # "cdxgen" trace is no longer in _scan.log itself; the terminal only
-        # gets that log file's path (the "(log: ...)" line). Wait for that
-        # line first, then poll the file it names for the same cdxgen marker
-        # as before.
+        # gets that log file's path (the "(live log: <path>; ...)" line). Wait
+        # for that line first, then poll the file it names for the same cdxgen
+        # marker as before.
         n=0
         stage1_log=""
         while [ -z "$stage1_log" ] && [ "$n" -lt 1200 ]; do
-            stage1_log="$(sed -n 's/^ *(log: \(.*\))$/\1/p' "$out/_scan.log" 2>/dev/null | head -1)"
+            stage1_log="$(sed -n 's/^ *(live log: \([^;]*\);.*$/\1/p' "$out/_scan.log" 2>/dev/null | head -1)"
             if [ -z "$stage1_log" ]; then sleep 0.1; n=$((n + 1)); fi
         done
         while [ -n "$stage1_log" ] && ! grep -q '\[build-prep\] cdxgen' "$stage1_log" 2>/dev/null && [ "$n" -lt 1200 ]; do
