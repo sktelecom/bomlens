@@ -2432,7 +2432,7 @@ if [ -f "$UI_BAT" ]; then
   grep -qi "docker pull" "$UI_BAT"               && pass "sbom-ui.bat pre-pulls the image on first run" || fail "sbom-ui.bat pre-pulls image"
   # SBOM_EXTRA_CA_CERTS: read from the settings file, made absolute (a bare
   # name would be a named volume), comma refused, bind-mounted with --mount.
-  { grep -q 'SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS) do' "$UI_BAT" \
+  { grep -q 'SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS HTTP_PROXY HTTPS_PROXY NO_PROXY) do' "$UI_BAT" \
     && grep -qF 'for %%F in ("%SBOM_EXTRA_CA_CERTS%") do set "SBOM_EXTRA_CA_CERTS=%%~fF"' "$UI_BAT" \
     && grep -qF 'if not "%SBOM_EXTRA_CA_CERTS:,=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"' "$UI_BAT" \
     && grep -qF -- '--mount "type=bind,source=%SBOM_EXTRA_CA_CERTS%,target=/bomlens-ca/extra.pem,readonly"' "$UI_BAT" \
@@ -2445,6 +2445,15 @@ if [ -f "$UI_BAT" ]; then
   { [ -n "$_ui_en" ] && [ "$_ui_en" = "$_ui_ko" ] && printf '%s\n' "$_ui_en" | grep -q M_ERR_CA_NOT_PEM; } \
     && pass "sbom-ui.bat has the same message keys in English and Korean (CA errors included)" \
     || fail "sbom-ui.bat message keys differ between English and Korean"
+  # The proxy reaches the UI container by name in both cases when set, a
+  # loopback proxy left out (the run itself is checked in test-bat-contract.ps1).
+  { grep -q '^    %PROXY_E% ^' "$UI_BAT" \
+    && grep -qF 'if defined HTTP_PROXY if not defined PV_LOOP set "PROXY_E=-e HTTP_PROXY -e http_proxy"' "$UI_BAT" \
+    && grep -qF 'set "PROXY_E=%PROXY_E% -e HTTPS_PROXY -e https_proxy"' "$UI_BAT" \
+    && grep -qF 'if defined NO_PROXY set "PROXY_E=%PROXY_E% -e NO_PROXY -e no_proxy"' "$UI_BAT" \
+    && grep -qF 'if not "%PV:://127.=%"=="%PV%" set "PV_LOOP=1"' "$UI_BAT"; } \
+    && pass "sbom-ui.bat passes HTTP_PROXY, HTTPS_PROXY and NO_PROXY by name, a loopback proxy left out" \
+    || fail "sbom-ui.bat proxy forwarding"
   for n in CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE SBOM_PULL; do
     grep -q -- "-e $n ^" "$UI_BAT" && pass "sbom-ui.bat passes $n to the UI container by name" || fail "sbom-ui.bat does not pass $n"
   done

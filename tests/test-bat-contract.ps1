@@ -194,6 +194,10 @@ try {
     $env:SBOM_OUTPUT_DIR = $uiOut
     $env:UI_PORT = '18093'
     $env:SBOM_SCANNER_IMAGE = 'ghcr.io/example/stub-image:test'
+    # 프록시는 이름으로만 넘어가야 하고, 이 기기의 루프백을 가리키는 프록시는 빠져야 한다.
+    $env:HTTP_PROXY = 'http://proxy.example.com:3128'
+    $env:HTTPS_PROXY = 'http://127.0.0.1:3128'
+    $env:NO_PROXY = 'localhost,.example.com'
     try {
         $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\sbom-ui.bat')
         if ($r.TimedOut) { Failed 'sbom-ui.bat 이 시간 안에 끝나지 않았습니다.' }
@@ -205,11 +209,17 @@ try {
             } else {
                 Failed "docker run 인자가 기대와 다릅니다:`n$log"
             }
+            if ($log -match '-e HTTP_PROXY -e http_proxy' -and $log -match '-e NO_PROXY -e no_proxy' `
+                -and $log -notmatch '(?i)-e HTTPS_PROXY' -and $log -notmatch 'proxy\.example\.com') {
+                Pass 'HTTP_PROXY, NO_PROXY 가 이름으로 전달되고 루프백 HTTPS_PROXY 는 빠졌습니다.'
+            } else {
+                Failed "프록시 인자가 기대와 다릅니다:`n$log"
+            }
             if (Test-Path $uiOut) { Pass "SBOM_OUTPUT_DIR 결과 폴더를 만들었습니다: $uiOut" }
             else { Failed "SBOM_OUTPUT_DIR 결과 폴더가 생성되지 않았습니다: $uiOut" }
         }
     } finally {
-        Remove-Item Env:SBOM_OUTPUT_DIR, Env:UI_PORT, Env:SBOM_SCANNER_IMAGE -ErrorAction SilentlyContinue
+        Remove-Item Env:SBOM_OUTPUT_DIR, Env:UI_PORT, Env:SBOM_SCANNER_IMAGE, Env:HTTP_PROXY, Env:HTTPS_PROXY, Env:NO_PROXY -ErrorAction SilentlyContinue
     }
 
     # -----------------------------------------------------------------------
