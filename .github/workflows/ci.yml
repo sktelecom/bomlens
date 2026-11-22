@@ -213,16 +213,30 @@ jobs:
           gitleaks git --log-opts="$range" --redact --no-banner
 
   contract:
-    name: No-Docker Contract Tests
+    name: No-Docker Contract Tests (${{ matrix.os }}${{ matrix.shard && format(', shard {0}', matrix.shard) || '' }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # The whole of tests/test-windows.sh takes 17 to 20 minutes on Windows
+        # and about 7 on Linux, so the Windows run is split into four shards
+        # (TEST_SHARD, see tests/lib/test-shard.sh) and the Linux run stays
+        # whole. tests/check-test-shards.sh checks the shards listed here
+        # cover every section.
+        include:
+          - os: ubuntu-latest
+            shard: ""
+          - os: windows-latest
+            shard: "1/4"
+          - os: windows-latest
+            shard: "2/4"
+          - os: windows-latest
+            shard: "3/4"
+          - os: windows-latest
+            shard: "4/4"
     runs-on: ${{ matrix.os == 'windows-latest'
       && fromJSON(vars.CI_WINDOWS_RUNNER || '["self-hosted","windows","bomlens-win"]')
       || fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    # The Windows run of tests/test-windows.sh takes 17 to 20 minutes.
-    timeout-minutes: 30
+    timeout-minutes: 20
     needs: [changes]
     # Skipped on a pull request that touches nothing but docs (see the
     # changes job). Dispatch always runs it (except a reseed dispatch). Compared
@@ -248,14 +262,17 @@ jobs:
       # runner's Git Bash (MSYS2), guarding the actual Windows CLI path.
       - name: Run no-Docker orchestration tests
         shell: bash
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
         run: bash tests/test-windows.sh
 
       # The .bat entry points a Windows user actually runs (double-click,
       # cmd) are a separate layer — cmd.exe parsing, Git Bash discovery,
       # PATHEXT resolution — that the bash suite above bypasses. Execute
-      # them for real under cmd.exe with a stub docker.exe on PATH.
+      # them for real under cmd.exe with a stub docker.exe on PATH. Once, on
+      # the shard with the shortest part of the bash suite.
       - name: Run .bat wrapper contract tests
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.shard == '3/4'
         shell: pwsh
         run: ./tests/test-bat-contract.ps1
 
@@ -302,15 +319,50 @@ jobs:
       - name: Boot smoke + recovery e2e (xvfb)
         run: xvfb-run --auto-servernum npm run test:smoke
 
-  postprocess:
-    name: Post-process Unit and Sync Tests
+  # The post-process suites run as three jobs side by side: the long
+  # tests/test-postprocess.sh in shards, the engine contract on its own, and
+  # every other suite in postprocess below.
+  postprocess-unit:
+    name: Post-process Unit Tests (shard ${{ matrix.shard }})
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     needs: [changes]
-    # Skipped on a pull request that touches nothing but docs (see the
-    # changes job). Dispatch always runs it (except a reseed dispatch). Compared
-    # against 'false' rather than 'true' so a classifier failure runs the
-    # job instead of skipping it unnoticed.
+    # Gated like postprocess below.
+    if: >-
+      !cancelled() &&
+      !(github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.reseed_visual == 'true' ||
+       github.event.inputs.reseed_guide_shots == 'true')) && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
+    strategy:
+      fail-fast: false
+      matrix:
+        # TEST_SHARD, see tests/lib/test-shard.sh. tests/check-test-shards.sh
+        # (in postprocess) checks these cover every section.
+        shard: ["1/3", "2/3", "3/3"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # No Docker: drives the jq/bash post-processing scripts against regression
+      # fixtures (byte-stable venv pinning, null components, metadata stamping,
+      # NOTICE dedupe) and keeps the example set in sync with the guide and
+      # test-all.sh. Guards the verification-report defects B-1..B-6 cheaply.
+      - name: Post-process unit tests
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
+        run: bash tests/test-postprocess.sh
+
+  engine-contract:
+    name: Engine Contract Tests
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
+    timeout-minutes: 20
+    needs: [changes]
+    # Gated like postprocess below.
     if: >-
       !cancelled() &&
       !(github.event_name == 'workflow_dispatch' &&
@@ -324,38 +376,6 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-
-      # No Docker: drives the jq/bash post-processing scripts against regression
-      # fixtures (byte-stable venv pinning, null components, metadata stamping,
-      # NOTICE dedupe) and keeps the example set in sync with the guide and
-      # test-all.sh. Guards the verification-report defects B-1..B-6 cheaply.
-      - name: Post-process unit tests
-        run: bash tests/test-postprocess.sh
-
-      - name: Merge-mode unit tests
-        run: bash tests/test-merge.sh
-
-      # No Docker: the AI usage merge build-prep.sh runs in the cdxgen
-      # container, against recorded cdxgen output, and the reports that must
-      # leave those items out.
-      - name: AI usage unit tests
-        run: bash tests/test-ai-usage.sh
-
-      # No Docker, no network: a project's installed Python environment read
-      # when the package index cannot be used (hand-written dist-info folders).
-      - name: Installed Python environment tests
-        run: bash tests/test-python-venv.sh
-
-      # No Docker, no network: AI BOMs written by other tools (k8s-aibom,
-      # AIsbom, Cisco AI BOM, AIBoMGen CLI) through the G7 check.
-      - name: External AI BOM tests
-        run: bash tests/test-external-aibom.sh
-
-      # No Docker, no network: the Go vulnerability database match against a
-      # fixture export, its merge into the security report, and the go-vulndb
-      # step in the result manifest.
-      - name: Go vulnerability database unit tests
-        run: bash tests/test-go-vulndb.sh
 
       # syft for the engine contract's stage 2 fallback cases (the test fails
       # in CI rather than skip when it is missing). The version pinned in
@@ -388,6 +408,80 @@ jobs:
         env:
           BOMLENS_CDX_SCHEMA: "1"
         run: bash tests/test-engine-contract.sh
+
+  postprocess:
+    name: Unit and Sync Tests
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
+    timeout-minutes: 30
+    needs: [changes]
+    # Skipped on a pull request that touches nothing but docs (see the
+    # changes job). Dispatch always runs it (except a reseed dispatch). Compared
+    # against 'false' rather than 'true' so a classifier failure runs the
+    # job instead of skipping it unnoticed.
+    if: >-
+      !cancelled() &&
+      !(github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.reseed_visual == 'true' ||
+       github.event.inputs.reseed_guide_shots == 'true')) && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # No Docker, no test run: the shards of the sharded suites (the matrices
+      # of postprocess-unit and contract, and ui) together cover each of them.
+      - name: Test shard coverage
+        run: bash tests/check-test-shards.sh
+
+      - name: Merge-mode unit tests
+        run: bash tests/test-merge.sh
+
+      # No Docker: the AI usage merge build-prep.sh runs in the cdxgen
+      # container, against recorded cdxgen output, and the reports that must
+      # leave those items out.
+      - name: AI usage unit tests
+        run: bash tests/test-ai-usage.sh
+
+      # No Docker, no network: a project's installed Python environment read
+      # when the package index cannot be used (hand-written dist-info folders).
+      - name: Installed Python environment tests
+        run: bash tests/test-python-venv.sh
+
+      # No Docker, no network: AI BOMs written by other tools (k8s-aibom,
+      # AIsbom, Cisco AI BOM, AIBoMGen CLI) through the G7 check.
+      - name: External AI BOM tests
+        run: bash tests/test-external-aibom.sh
+
+      # No Docker, no network: the Go vulnerability database match against a
+      # fixture export, its merge into the security report, and the go-vulndb
+      # step in the result manifest.
+      - name: Go vulnerability database unit tests
+        run: bash tests/test-go-vulndb.sh
+
+      # syft for the suites below that use it when it is there (declared
+      # components, ecosystem resolution). The version pinned in
+      # docker/Dockerfile, checked against the release's checksum list, into
+      # the job's own temp dir, so the self-hosted runner's system is left as
+      # it was.
+      - name: Install syft (pinned release tarball)
+        run: |
+          SYFT_VERSION=$(grep -oP 'ARG SYFT_VERSION=\K\S+' docker/Dockerfile)
+          ver="${SYFT_VERSION#v}"
+          mkdir -p "$RUNNER_TEMP/syft-bin"
+          base="https://github.com/anchore/syft/releases/download/${SYFT_VERSION}"
+          tgz="syft_${ver}_linux_amd64.tar.gz"
+          curl -sSfL "$base/$tgz" -o "$RUNNER_TEMP/$tgz"
+          # The release's own checksum list, the same check syft's install.sh
+          # makes for the image build: a tarball that does not match stops here.
+          curl -sSfL "$base/syft_${ver}_checksums.txt" -o "$RUNNER_TEMP/syft_checksums.txt"
+          ( cd "$RUNNER_TEMP" && grep " ${tgz}\$" syft_checksums.txt | sha256sum -c - )
+          tar -C "$RUNNER_TEMP/syft-bin" -xzf "$RUNNER_TEMP/$tgz" syft
+          echo "$RUNNER_TEMP/syft-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/syft-bin/syft" version
 
       # No Docker: checks that an archive is routed by what it holds, not by its
       # extension. A root filesystem or a `docker save` tar scanned as source
@@ -917,7 +1011,7 @@ jobs:
           echo "✅ ${{ matrix.example }} validation passed"
   
   ui:
-    name: UI Tests (Playwright)
+    name: UI Tests (Playwright, shard ${{ matrix.shard }})
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 30
     needs: [changes]
@@ -932,6 +1026,13 @@ jobs:
        github.event.inputs.reseed_guide_shots == 'true')) && (
         github.event_name != 'pull_request' ||
         needs.changes.outputs.frontend != 'false')
+    # The Playwright suite runs in two shards side by side (--shard). The
+    # gates before it run once, in the first shard; the list reporter needs no
+    # merging, and the Vitest coverage thresholds are not part of the shards.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
     defaults:
       run:
         working-directory: docker/web/frontend
@@ -947,30 +1048,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Type check
+        if: matrix.shard == '1/2'
         run: npm run typecheck
       - name: Token lint (no hardcoded colours)
+        if: matrix.shard == '1/2'
         run: npm run token:lint
       - name: Token contrast (text 4.5:1, fills 3:1)
+        if: matrix.shard == '1/2'
         run: npm run token:contrast
       - name: Shared tokens CSS in sync with src/index.css
+        if: matrix.shard == '1/2'
         run: npm run tokens:check
       - name: i18n coverage (en ≡ ko)
+        if: matrix.shard == '1/2'
         run: npm run i18n:check
       - name: Lib test gate (every src/lib module has a unit test)
+        if: matrix.shard == '1/2'
         run: npm run test:lib-gate
       - name: Unit tests (Vitest) + coverage thresholds
+        if: matrix.shard == '1/2'
         run: npm run test:coverage
       # The build emits dist/third-party-licenses.txt from the bundled module
       # graph. Build here rather than leaning on the Playwright webServer's
       # build, so the gate runs even when the UI tests are skipped or fail.
       - name: Build the SPA
+        if: matrix.shard == '1/2'
         run: npm run build
       - name: Third-party notices for the bundled npm packages
+        if: matrix.shard == '1/2'
         run: npm run notices:check
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run UI tests (functional + axe)
-        run: npm run test:ui
+        run: npm run test:ui -- --shard=${{ matrix.shard }}
 
   # Enforces the generated HTML reports' colour contrast with axe: zero
   # color-contrast violations in all four reports, in the light and the dark
@@ -1197,7 +1307,7 @@ jobs:
     name: CI Summary
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 15
-    needs: [test, secrets, contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage, desktop-linux]
+    needs: [test, secrets, contract, postprocess-unit, engine-contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage, desktop-linux]
     if: always()
 
     steps:
@@ -1254,15 +1364,17 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secret Scan | ${{ needs.secrets.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| No-Docker Contract (ubuntu+windows) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Post-process & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| No-Docker Contract (ubuntu, windows shards) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-process Unit (shards) | ${{ needs.postprocess-unit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Engine Contract | ${{ needs.engine-contract.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web UI E2E | ${{ needs.web-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Full CLI E2E | ${{ needs.full-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Docs Walkthrough | ${{ needs.docs-walkthrough.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Script Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation | ${{ needs.validate-docs.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| UI (Playwright) | ${{ needs.ui.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI (Playwright shards) | ${{ needs.ui.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| UI Visual Regression | ${{ needs.visual.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Doc Coverage | ${{ needs.doc-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Desktop boot tests (linux) | ${{ needs.desktop-linux.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -1278,8 +1390,14 @@ jobs:
           elif [ "${{ needs.contract.result }}" == "failure" ]; then
             echo "❌ No-Docker contract tests failed" >> $GITHUB_STEP_SUMMARY
             exit 1
+          elif [ "${{ needs.postprocess-unit.result }}" == "failure" ]; then
+            echo "❌ Post-process unit tests failed (one or more shards)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.engine-contract.result }}" == "failure" ]; then
+            echo "❌ Engine contract tests failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
           elif [ "${{ needs.postprocess.result }}" == "failure" ]; then
-            echo "❌ Post-process / sync tests failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Unit / sync tests failed" >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [ "${{ needs.web-e2e.result }}" == "failure" ]; then
             echo "❌ Web UI e2e failed" >> $GITHUB_STEP_SUMMARY
