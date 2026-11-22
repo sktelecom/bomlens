@@ -130,14 +130,14 @@ LENGTH_CAPS="
 README.md :: 60 :: 700
 docs/start/first-scan.md :: 170 :: 0
 docs/start/first-scan.ko.md :: 172 :: 0
-docs/start/no-cli.md :: 197 :: 0
-docs/start/no-cli.ko.md :: 260 :: 0
-docs/guides/supplier-sbom.md :: 239 :: 0
-docs/guides/supplier-sbom.ko.md :: 241 :: 0
+docs/start/no-cli.md :: 199 :: 0
+docs/start/no-cli.ko.md :: 262 :: 0
+docs/guides/supplier-sbom.md :: 246 :: 0
+docs/guides/supplier-sbom.ko.md :: 248 :: 0
 docs/guides/ai-model.md :: 464 :: 0
 docs/guides/ai-model.ko.md :: 464 :: 0
-docs/reference/ui.md :: 239 :: 0
-docs/reference/ui.ko.md :: 239 :: 0
+docs/reference/ui.md :: 246 :: 0
+docs/reference/ui.ko.md :: 246 :: 0
 "
 while IFS= read -r line; do
   [ -z "$line" ] && continue

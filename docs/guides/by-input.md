@@ -17,7 +17,7 @@ An open-source compliance manager receives deliverables from many teams in diffe
 | Open-source risk report | `{Project}_{Version}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
 | Conformance check report | `{Project}_{Version}_conformance.{json,md,html}` | whether the SBOM meets the submission quality criteria, and what is missing |
 
-The conformance check report's file is always produced, but the web UI only shows it as a dedicated pass/fail screen when the input being checked is a supplied SBOM (the `--analyze` path); a self-generated SBOM grading itself is not a meaningful pass/fail signal for most of its checks. For a self-generated scan, open the file directly, or feed the output back in with `--analyze` to see it on screen. See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report).
+The conformance check report's file is always produced, and the web UI shows it under **Conformance check** for a supplied SBOM and a self-generated one alike, naming the profile it was graded against. See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report).
 
 For any input form, adding `--all --generate-only` produces all four at once (they are on by default and are only turned off with `--no-report`).
 
@@ -236,7 +236,7 @@ Deliverables are the same as Scenario 7's, minus what the model card would have 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
 - **SBOM**: CycloneDX 1.6 by default, or 1.7 with `--spec-version 1.7`. The artifact you upload to a vulnerability-management system.
 - **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and the format conformance result.
-- **Conformance check report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three; the web UI shows it as a screen only on the `--analyze` path (see above). See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report) in the supplier SBOM guide.
+- **Conformance check report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three, and the web UI shows it under **Conformance check**. See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report) in the supplier SBOM guide.
 
 ## All at once in the web UI
 
