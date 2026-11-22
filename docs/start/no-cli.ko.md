@@ -35,7 +35,7 @@ BomLens는 소스 코드를 분석해 구성요소 목록([SBOM](../concepts/wha
 ### 방법 A: 데스크톱 앱 (권장)
 
 1. **Docker 엔진 설치**. [rancherdesktop.io](https://rancherdesktop.io/)에서 Windows용 설치
-   파일을 받아 설치하고 실행합니다. 설치 중 Kubernetes 사용 여부를 물으면 꺼도 됩니다. 작업
+   파일을 받아 설치하고 실행합니다. 설치 중 Kubernetes 사용 여부를 물으면 꺼도 됩니다. 컨테이너 엔진은 기본값인 dockerd(moby)로 둡니다. containerd로 바꾸면 `docker` 명령이 엔진에 연결하지 못합니다. WSL과 Rancher Desktop 설치에는 관리자 권한이 한 번 필요하므로, 권한이 없으면 IT 담당 부서에 Rancher Desktop 설치를 요청하세요. BomLens 앱은 관리자 권한 없이 설치됩니다. 작업
    표시줄 아이콘이 안정되면(보통 1~2분) 준비가 끝난 것입니다. macOS에서는 같은 사이트에서 macOS용 Rancher Desktop을 받습니다. 다른 선택지는 [macOS와 Linux에서 Docker를 처음 설치할 때](first-scan.ko.md#macos와-linux에서-docker를-처음-설치할-때)에 있습니다.
 2. **앱 받아 실행**. [Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe)를
    누릅니다. 아직 미서명이라 Windows에서 두 가지 안내가 나올 수 있습니다. Edge는 다운로드 패널에 `BomLens-Setup.exe`가 일반적으로 다운로드되지 않는다는 메시지를 띄우고 열 방법을 보여 주지 않을 수 있습니다. 이때는 항목의 메뉴(점 세 개)에서 "유지"를 고르고, 다시 물으면 "자세히 보기"를 펼쳐 한 번 더 "유지"를 고르세요(정확한 이름은 Edge 버전에 따라 다릅니다). 그다음 받은 파일을 더블클릭합니다. "Windows가 PC를

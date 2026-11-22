@@ -111,7 +111,7 @@ docker run --rm hello-world
 
 점검 스크립트는 이 컴퓨터에 있는 BomLens 이미지와 크기, 그 합계, 엔진의 여유 디스크 공간도 보여 주고 공간이 부족하면 정리 방법을 알려 줍니다. `BOMLENS_SKIP_DISK_CHECK=1`을 지정하면 받기 전의 중단 점검을 건너뜁니다.
 
-BomLens가 `Cannot reach the Docker engine`(Docker 엔진에 연결할 수 없음)이라며 멈추면 `docker` 명령은 있지만 엔진이 켜져 있지 않은 것입니다. Docker Desktop이나 Rancher Desktop을 켜고 아이콘이 안정될 때까지 기다리거나, Colima라면 `colima start`를 실행한 뒤 같은 명령을 다시 실행하세요.
+BomLens가 `Cannot reach the Docker engine`(Docker 엔진에 연결할 수 없음)이라며 멈추면 `docker` 명령은 있지만 엔진이 켜져 있지 않은 것입니다. Docker Desktop이나 Rancher Desktop을 켜고 아이콘이 안정될 때까지 기다리거나(Rancher Desktop은 Preferences > Container Engine이 containerd가 아니라 dockerd(moby)여야 합니다), Colima라면 `colima start`를 실행한 뒤 같은 명령을 다시 실행하세요.
 
 ### macOS와 Linux에서 Docker를 처음 설치할 때
 
