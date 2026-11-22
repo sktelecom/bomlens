@@ -64,8 +64,10 @@ jobs:
           failed=0
           for ex in $EXAMPLES; do
             echo "::group::$ex"
+            # --detection build: an example with a lock file is otherwise read
+            # statically, without cdxgen.
             ( cd "examples/$ex" && ../../scripts/scan-sbom.sh \
-                --project "${ex}-compat" --version "1.0.0" --generate-only ) || {
+                --project "${ex}-compat" --version "1.0.0" --generate-only --detection build ) || {
               report="${report}- ❌ ${ex}: scan-sbom.sh failed (latest cdxgen)\n"
               failed=1; echo "::endgroup::"; continue; }
             # scan-sbom.sh writes into a <project>_<version>/ subfolder, so

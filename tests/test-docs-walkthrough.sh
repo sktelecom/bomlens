@@ -67,6 +67,7 @@ docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.md     ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.html   ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.md  ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.html ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_completeness.json :: .grade=="complete"
 docs/reference/ecosystems.md :: NodeExample_1.0.0/NodeExample_1.0.0_bom.json :: .bomFormat=="CycloneDX" and .specVersion=="1.6"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_NOTICE.txt        ::
@@ -165,8 +166,8 @@ prep_page() {
             # manifest-only path (entrypoint.sh's "else" branch): a project
             # with no committed lockfile now fails that path on purpose (see
             # docker/lib/source-detect.sh and test-e2e.sh's 3h), so the walkthrough
-            # needs a package.json with a matching lockfile, not examples/nodejs
-            # (kept lockfile-less deliberately, to exercise that failure path).
+            # needs a package.json with a matching lockfile (tests/fixtures/node-no-lock
+            # is the lockfile-less input that exercises that failure path).
             cat > "$2/package.json" <<'JSON'
 {"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}
 JSON
