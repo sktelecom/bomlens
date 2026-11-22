@@ -36,7 +36,7 @@ SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my
 `SBOM_EXTRA_CA_CERTS`를 지정하는 방법은 BomLens를 실행하는 방식에 따라 다릅니다.
 
 - `scan-sbom.sh`와 `scan-sbom.bat`은 위 명령처럼 환경 변수에서 읽습니다. 설정 파일은 읽지 않습니다.
-- `sbom-ui.bat`을 더블클릭해 실행하면 명령 프롬프트에서 설정한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적은 `SBOM_EXTRA_CA_CERTS=C:\경로\company-ca.pem`도 읽습니다([설정 파일](../start/no-cli.ko.md#설정-파일-명령줄-불필요)). 경로에는 `&`, `^`, `|`, `<`, `>`, `%`, `!`가 없어야 합니다. 환경 변수가 설정되어 있으면 파일보다 우선합니다.
+- `sbom-ui.bat`을 더블클릭해 실행하면 명령 프롬프트에서 설정한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적은 `SBOM_EXTRA_CA_CERTS=C:\경로\company-ca.pem`도 읽습니다([설정 파일](../start/troubleshooting.ko.md#설정-파일-명령줄-불필요)). 경로에는 `&`, `^`, `|`, `<`, `>`, `%`, `!`가 없어야 합니다. 환경 변수가 설정되어 있으면 파일보다 우선합니다.
 - 데스크톱 앱은 환경 변수에서만 읽습니다. Windows에서는 명령 프롬프트에서 `setx SBOM_EXTRA_CA_CERTS C:\경로\company-ca.pem`을 한 번 실행한 뒤 앱을 종료했다가 다시 실행합니다. macOS에서는 터미널에서 `launchctl setenv SBOM_EXTRA_CA_CERTS /경로/company-ca.pem`을 실행한 뒤 앱을 다시 실행합니다. 이 설정은 재부팅하면 사라집니다. 경로에 쉼표나 큰따옴표가 있으면 시작하지 않습니다.
 
 ## Docker 엔진 자체의 프록시와 인증서는 어떻게 하나요?
@@ -44,7 +44,7 @@ SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my
 이미지 내려받기는 BomLens가 아니라 Docker 엔진이 하므로, 셸에 설정한 프록시나 인증기관은 여기에 효과가 없습니다. 첫 스캔이 이미지 내려받기에서 멈추면 다음을 순서대로 확인합니다.
 
 - 터미널에서 `docker pull hello-world`를 실행합니다. 같은 방식으로 실패하면 BomLens가 아니라 엔진 설정의 문제입니다.
-- 사용하는 Docker 제품의 프록시 설정입니다. Docker Desktop은 `Settings > Resources > Proxies`, Windows의 Rancher Desktop은 `Preferences > WSL > Proxy`에 있습니다.
+- 사용하는 Docker 제품의 프록시 설정입니다. Docker Desktop은 `Settings > Resources > Proxies`, Windows의 Rancher Desktop은 `Preferences > WSL > Proxy`에 있습니다. 프록시가 `localhost`까지 가로채면 웹 UI가 정상 동작해도 브라우저에 오류가 뜨므로 프록시 우회 목록에 `localhost`를 추가합니다.
 - 엔진이 사내 인증기관을 신뢰하는지 확인합니다. HTTPS를 검사하는 프록시는 내려받기 오류에 `x509: certificate signed by unknown authority`로 나타납니다. 인증기관을 추가하는 방법은 제품과 호스트 시스템마다 달라서 해당 제품의 문서를 따릅니다. `SBOM_EXTRA_CA_CERTS`는 이미지 내려받기에는 적용되지 않습니다.
 - 어떤 저장소에도 닿지 않는 호스트는 파일에서 이미지를 불러올 수 있습니다. [CLI 레퍼런스](../reference/cli.ko.md)의 `SBOM_IMAGE_TAR`와 `SBOM_PULL=never`를 참고합니다.
 

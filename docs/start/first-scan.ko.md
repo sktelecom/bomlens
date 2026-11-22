@@ -10,7 +10,7 @@ BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI�
 
 ## 명령어 없이 시작하기 (권장)
 
-사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(디스크에서 약 1.4GB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법, macOS에서 열리지 않을 때의 처리는 [비개발자 빠른 시작](../start/no-cli.ko.md)에 있습니다. 설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b--zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
+사용하는 운영체제에 맞는 설치 파일, [Windows용 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) 또는 [macOS용 (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg)을 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 처음 실행할 때 Docker를 점검하고 스캐너 이미지(디스크에서 약 1.4GB)를 받은 뒤 앱 자체 창에 UI를 보여 줍니다(로컬의 임의 포트를 쓰므로 브라우저에 입력할 고정 주소는 없습니다). 아직 미서명이라 Edge가 다운로드를 막거나 Windows SmartScreen 경고가 뜰 수 있습니다. 각 단계와 앱 업데이트 방법은 [비개발자 빠른 시작](../start/no-cli.ko.md)에, macOS에서 열리지 않을 때의 처리는 [문제 해결](troubleshooting.ko.md)에 있습니다. 내 프로젝트 폴더는 "폴더 선택" 타일의 "폴더 추가…" 버튼으로 고릅니다. 사내 저장소나 프록시가 필요한 프로젝트는 [자바(Maven)](../guides/java-maven.ko.md)와 [사내 네트워크](../guides/company-network.ko.md)를 보세요. 설치 파일 대신 스크립트(`sbom-ui.bat`)로 쓰는 대안은 [비개발자 빠른 시작의 방법 B](../start/no-cli.ko.md#방법-b-zip과-더블클릭-배치-파일-대안)에 단계별로 있습니다.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](../images/desktop-startup.png)
 
@@ -26,7 +26,7 @@ git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 
 `--depth 1`은 저장소 이력을 받지 않아 내려받는 양이 약 465MB에서 약 50MB로 줄어듭니다. 처음 실행할 때는 화면이 뜨기까지 1~2분 걸릴 수 있습니다. 스캐너 이미지가 없으면 받고(디스크에서 약 1.4GB), 있으면 새 버전이 있는지 확인하는 동안 서버가 아직 준비되지 않아, 자동으로 열린 브라우저 탭에 연결 오류가 보일 수 있습니다. 터미널에 `BomLens Web UI listening`이 나오면 탭을 새로고침하세요.
 
-산출물은 `~/sbom-output`에 저장되고(`--output-dir`로 바꿉니다), 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더가 생깁니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 사용 중이면 스크립트는 주소를 출력하기 전에 멈추고 쓸 수 있는 다른 포트를 알려 줍니다. 예: `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`. Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요([설정 파일](no-cli.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(클론 직후의 현재 폴더는 BomLens 저장소 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
+산출물은 `~/sbom-output`에 저장되고(`--output-dir`로 바꿉니다), 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더가 생깁니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 사용 중이면 스크립트는 주소를 출력하기 전에 멈추고 쓸 수 있는 다른 포트를 알려 줍니다. 예: `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`. Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요([설정 파일](troubleshooting.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(클론 직후의 현재 폴더는 BomLens 저장소 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
 
 ![BomLens 웹 UI](../images/web-ui.png)
 

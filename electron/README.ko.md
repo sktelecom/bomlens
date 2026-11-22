@@ -144,5 +144,5 @@ Get-AuthenticodeSignature BomLens-Setup.exe
 ```
 
 서명이 자리 잡으면 후속으로 검토할 것: 사용자 문서의 Gatekeeper 우회 안내
-(`docs/start/no-cli.md`) 축소, 그리고 electron-updater 기반 완전 자동 업데이트 도입
+(`docs/start/troubleshooting.md`, `docs/start/no-cli.md` 첫 문단의 macOS 문장) 축소, 그리고 electron-updater 기반 완전 자동 업데이트 도입
 (macOS 자동 업데이트는 서명된 앱에서만 동작하므로 서명이 선결 조건이다).

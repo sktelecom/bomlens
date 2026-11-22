@@ -36,7 +36,7 @@ The file is added to the system store, Node.js and the Java trust store of the s
 How you set `SBOM_EXTRA_CA_CERTS` depends on how you start BomLens:
 
 - `scan-sbom.sh` and `scan-sbom.bat` read it from the environment, as in the command above. They do not read a settings file.
-- When you double-click `sbom-ui.bat`, it does not see a variable typed in a command prompt, so it also reads `SBOM_EXTRA_CA_CERTS=C:\path\to\company-ca.pem` from `bomlens.settings.txt` next to the scripts ([Settings file](../start/no-cli.md#settings-file-no-command-line-needed)). Use a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`. A variable set in the environment wins over the file.
+- When you double-click `sbom-ui.bat`, it does not see a variable typed in a command prompt, so it also reads `SBOM_EXTRA_CA_CERTS=C:\path\to\company-ca.pem` from `bomlens.settings.txt` next to the scripts ([Settings file](../start/troubleshooting.md#settings-file-no-command-line-needed)). Use a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`. A variable set in the environment wins over the file.
 - The desktop app reads it from the environment only. On Windows, run `setx SBOM_EXTRA_CA_CERTS C:\path\to\company-ca.pem` once in a command prompt, then quit the app and start it again. On macOS, run `launchctl setenv SBOM_EXTRA_CA_CERTS /path/to/company-ca.pem` in Terminal, then start the app again; the setting is lost on restart. A path with a comma or a double quote is refused.
 
 ## What about the Docker engine's own proxy and CA?
@@ -44,7 +44,7 @@ How you set `SBOM_EXTRA_CA_CERTS` depends on how you start BomLens:
 Image downloads are made by the Docker engine, not by BomLens, so a proxy or CA you set in your shell has no effect on them. If the first scan stops at the image download, check these in order:
 
 - `docker pull hello-world` in your terminal. If it fails the same way, the problem is the engine's setting, not BomLens.
-- The proxy setting of your Docker product. Docker Desktop has it under `Settings > Resources > Proxies`, and Rancher Desktop under `Preferences > WSL > Proxy` on Windows.
+- The proxy setting of your Docker product. Docker Desktop has it under `Settings > Resources > Proxies`, and Rancher Desktop under `Preferences > WSL > Proxy` on Windows. If the proxy also intercepts `localhost`, add `localhost` to its bypass list, or the browser shows an error even while the web UI runs.
 - Whether the engine trusts your company CA. A proxy that inspects HTTPS shows up as `x509: certificate signed by unknown authority` in the pull error. How to add a CA depends on the product and the host system, so follow that product's documentation. `SBOM_EXTRA_CA_CERTS` does not cover image downloads.
 - A host that cannot reach any registry can load the image from a file instead: see `SBOM_IMAGE_TAR` and `SBOM_PULL=never` in the [CLI reference](../reference/cli.md).
 

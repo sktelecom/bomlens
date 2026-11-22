@@ -44,4 +44,4 @@ For the full option list, see the [CLI reference](cli.md), and for the design be
 
 ## Installation and removal
 
-The Windows installer lets you choose the installation folder. The repository defines no custom installer steps, so BomLens makes no firewall or registry changes of its own. To remove BomLens, uninstall it from Windows Settings, then delete the settings folder `%APPDATA%\sbom-generator-desktop` if you want to remove the data the app kept. The scanner images stay in Docker until you remove them. For the commands, see the uninstall steps in the [no-CLI quick start](../start/no-cli.md).
+The Windows installer lets you choose the installation folder. The repository defines no custom installer steps, so BomLens makes no firewall or registry changes of its own. To remove BomLens, uninstall it from Windows Settings, then delete the settings folder `%APPDATA%\sbom-generator-desktop` if you want to remove the data the app kept. The scanner images stay in Docker until you remove them. For the commands, see [Removing it](../start/troubleshooting.md#removing-it) in Troubleshooting.

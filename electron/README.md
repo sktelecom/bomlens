@@ -178,6 +178,7 @@ Get-AuthenticodeSignature BomLens-Setup.exe
 ```
 
 Once signing is in place, revisit these follow-up items: trim the Gatekeeper
-bypass instructions in the user docs (`docs/start/no-cli.md`), and add fully
+bypass instructions in the user docs (`docs/start/troubleshooting.md`, and the
+macOS sentence at the top of `docs/start/no-cli.md`), and add fully
 automatic updates through electron-updater (macOS auto-update only works on
 a signed app, so signing is a prerequisite).

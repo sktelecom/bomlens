@@ -96,7 +96,7 @@ export default defineConfig({
       },
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
       sidebar: [
-        { label: 'Get started', translations: { ko: '빠른 시작' }, items: ['concepts/what-is-sbom', 'start/first-scan', 'start/no-cli', 'reference/ui'] },
+        { label: 'Get started', translations: { ko: '빠른 시작' }, items: ['concepts/what-is-sbom', 'start/first-scan', 'start/no-cli', 'start/troubleshooting', 'reference/ui'] },
         { label: 'Guides', translations: { ko: '가이드' }, items: [{ autogenerate: { directory: 'guides' } }] },
         { label: 'Reference', translations: { ko: '레퍼런스' }, items: [{ autogenerate: { directory: 'reference' } }] },
         { label: 'Concepts', translations: { ko: '개념' }, items: [{ autogenerate: { directory: 'concepts' } }] },
