@@ -919,10 +919,11 @@ Environment:
   SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
                          (no per-run subfolder), matching the pre-isolation layout
   VERBOSE                Set to true for the same output as --verbose
-  SBOM_PULL              missing (default): refresh an already-present image in
-                         the background, bounded; an absent one is pulled as
-                         usual. always: block and re-pull every run. never:
-                         touch no network; fail if the image is absent
+  SBOM_PULL              missing (default): pull an absent image; check a
+                         present one for a newer copy in the background,
+                         bounded (only a moving tag such as :latest gets one).
+                         always: block and re-pull every run. never: touch no
+                         network; fail if the image is absent
   BOMLENS_SKIP_DISK_CHECK
                          Set to 1 to skip the free-disk check before an image
                          download (default: stop when the Docker engine has
