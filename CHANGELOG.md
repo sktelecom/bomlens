@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The folder visibility check before a scan runs as root, like the scan itself, so on Linux a folder readable only by its owner (mode 0700) is no longer refused as not visible when the project uses the all-in-one language image (C/C++, mixed or unknown projects).
 - On the static path (a lock file read without a build), the root depends on the lock file's direct dependencies instead of the lock file's own node, so the dependency tree no longer shows an unnamed node under the project, the direct-dependency count is right and the security report names the dependency that brings a vulnerable package in.
 - Docs: guides name the release tag instead of `:latest`; `SBOM_SCANNER_IMAGE` for a double-clicked `sbom-ui.bat` goes in `bomlens.settings.txt`; the `--component-versions` example and the signature check use the run's `{Project}_{Version}/` subfolder; the reports guide runs from the project folder; the input scenarios guide has a Docker image section with the private registry steps; the proxy section has a PowerShell form and `launchctl setenv` for the macOS desktop app; UI names match the screen (Per-file license scan, Reproducible output, Choose folder, Conformance check).
 
