@@ -973,7 +973,7 @@ export const USAGE_CONTEXTS: UsageContext[] = [
 
 /** Conformance check strictness. "default" is the ordinary 90%-PURL /
  *  advisory-pkg:generic thresholds; "skt-submission" is the SKT supplier
- *  submission review (100% PURL, pkg:generic required). Kept as a named
+ *  submission review (100% PURL, no pkg:generic). Kept as a named
  *  profile rather than a boolean so a later addition (e.g. an EU CRA
  *  profile) is a third option here, not a rewrite of the contract. */
 export type ConformanceProfile = "default" | "skt-submission" | "bsi-tr-03183-2";

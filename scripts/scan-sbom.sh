@@ -796,7 +796,7 @@ Options:
                          reports stay English regardless.
   --conformance-profile <default|skt-submission|bsi-tr-03183-2>
                          Conformance check strictness. Default: default (90%
-                         PURL coverage, pkg:generic advisory). skt-submission
+                         PURL coverage, pkg:generic only warns). skt-submission
                          requires 100% PURL coverage and fails on pkg:generic,
                          matching the SKT supplier submission review.
                          bsi-tr-03183-2 requires CycloneDX 1.6 or later, an SBOM
