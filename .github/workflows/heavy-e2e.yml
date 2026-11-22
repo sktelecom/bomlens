@@ -51,15 +51,56 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # The NVD CPE index stage is most of this image's build (about 3.5 of
+      # 4.5 minutes). Pinning the feed to its current HEAD commit builds the
+      # same data an unpinned clone would, and gives the stage a cache key:
+      # the feed moves every two hours, and runs in between reuse the stage
+      # from the Actions cache instead of cloning and distilling it again.
+      - name: Resolve the NVD feed commit
+        id: feed
+        run: |
+          set -euo pipefail
+          repo=$(grep -oP 'ARG NVD_FEED_REPO="\K[^"]+' docker/Dockerfile)
+          ref=$(git ls-remote "$repo" HEAD | cut -f1)
+          [ -n "$ref" ] || { echo "::error::could not resolve HEAD of $repo"; exit 1; }
+          echo "NVD feed $repo at $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       # Base image + SCANOSS only: gives us server.py, run-scan, syft and
       # scanoss-py — enough for the sbom-upload (ANALYZE), docker-image (IMAGE),
       # current-dir (SOURCE/syft) cases and the dot-path SCANOSS regression. The
       # 15GB cdxgen language image and firmware/aibom flavors are deliberately
       # excluded to keep the build light; those scan paths fall back to syft.
+      # The CPE index stage is read from the cache when a run at the same feed
+      # commit saved it (the step below); docker-publish.yml's cpe-index scope
+      # is read too, since a publish at that commit already holds it.
       - name: Build scanner image (base + scanoss)
-        run: |
-          docker build --build-arg SBOM_SCANOSS=true \
-            -t bomlens-e2e:ci ./docker
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          load: true
+          push: false
+          build-args: |
+            SBOM_SCANOSS=true
+            NVD_FEED_REF=${{ steps.feed.outputs.ref }}
+          tags: bomlens-e2e:ci
+          cache-from: |
+            type=gha,scope=web-e2e-cpe-index
+            type=gha,scope=cpe-index
+
+      # Only the CPE index stage is written to the cache (its own scope, about
+      # 180 MB), so the much larger image layers do not fill the repository's
+      # cache quota. The stage is already in this builder from the step above,
+      # so this only exports it.
+      - name: Save the CPE index stage to the cache
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          target: cpe-index
+          outputs: type=cacheonly
+          build-args: |
+            NVD_FEED_REF=${{ steps.feed.outputs.ref }}
+          cache-to: type=gha,mode=max,scope=web-e2e-cpe-index
 
       - name: Run web UI e2e (SSE scan-stream -> done)
         env:
