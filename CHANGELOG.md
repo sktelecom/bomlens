@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.1] - 2026-11-22
+
 ### Added
 
 - A no-derivatives license (CC-BY-ND, "NoDerivatives") is flagged for review as `no-derivatives` in `bomlens:licenseReview`, next to `behavioral-use` and `non-commercial`: the NOTICE review section, the AI profile (`licenseReview.noDerivatives`), the conformance report and the web UI's "License review needed" box list it.
