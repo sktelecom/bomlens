@@ -1692,7 +1692,7 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
              elif $scanmode == "YOCTO" then {
                how: "The Yocto build records these packages without a version. Set the version in the recipe of each package (PV), build the image again, and scan the build directory again. A version template and --component-versions do not apply to a Yocto build, whose versions come from the build records.",
                how_ko: "Yocto 빌드 기록에 버전 없이 남은 패키지입니다. 각 패키지 레시피의 버전(PV)을 지정해 이미지를 다시 빌드하고, 빌드 디렉터리를 다시 스캔합니다. Yocto 빌드는 버전을 빌드 기록에서 읽으므로 버전 양식과 --component-versions는 쓰지 않습니다.",
-               docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
+               docUrl: "https://sktelecom.github.io/bomlens/guides/yocto/"}
              else {
                how: ("The scan found these components but could not read their version. Write the version shipped in the product after each name in " + $tmpl + " (CSV: name,version,reason), then scan again with --component-versions " + $tmpl + ". When there is no version to give, leave it empty and write the reason instead: own-code, not-open-source or version-unknown. A version the scan read from the delivered files is kept."),
                how_ko: ("스캔이 찾았지만 버전을 읽지 못한 구성요소입니다. " + $tmpl + " 파일(CSV, name,version,reason)의 각 이름 뒤에 제품에 들어간 버전을 적고 --component-versions " + $tmpl + " 옵션으로 다시 스캔합니다. 적을 버전이 없으면 버전을 비우고 사유를 적습니다. 사유는 own-code(자체 개발 코드), not-open-source(오픈소스 아님), version-unknown(버전 확인 불가) 중 하나입니다. 스캔이 배포 파일에서 읽은 버전은 그대로 유지됩니다."),
