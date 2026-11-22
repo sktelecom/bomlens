@@ -241,7 +241,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 의존성을 모든 생태계에서 그대로 둠. 대상은 npm `devDependencies`와 그것만 필요로 하는 것(`BOMLENS_NODE_FULL_GRAPH=1`처럼 production 필터를 적용하지 않음), cdxgen이 개발 전용으로 표시한 컴포넌트(npm, pnpm, yarn, bun, uv와 Poetry 의존성 그룹, Cargo, sbt, Crystal, Gleam), 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem, Composer `require-dev`(`BOMLENS_PHP_FULL_GRAPH=1`과 같음), 설치된 Python 가상 환경에서 읽는 Poetry 의존성 그룹임. 개발 전용 표시 필터가 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨. Maven, Gradle, Android 범위 필터는 개발 의존성 말고도 빼는 것이 있어 각자의 스위치(`BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_GRADLE_FULL_GRAPH`, `BOMLENS_ANDROID_FULL_GRAPH`)를 따름 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
-| `BOMLENS_NO_AI_USAGE` | - | - | 소스 스캔: `1`로 설정하면 코드가 쓰는 AI(모델, AI 서비스, MCP 서버, 에이전트 지침 파일)를 기록하는 단계를 건너뜀([소스 스캔의 AI 사용 기록](../guides/ai-model.ko.md#소스-스캔의-ai-사용-기록) 참고) |
+| `BOMLENS_NO_AI_USAGE` | - | - | 소스 스캔: `1`로 설정하면 코드가 쓰는 AI(모델, AI 서비스, MCP 서버, 에이전트 지침 파일)를 기록하는 단계를 건너뜀([소스 스캔의 AI 사용 기록](artifacts.ko.md#소스-스캔의-ai-사용-기록) 참고) |
 | `BOMLENS_AI_USAGE_TIMEOUT` | - | `300` | 소스 스캔: AI 사용 분석 두 가지가 각각 실행될 수 있는 시간(초). 넘으면 멈추고 그 결과는 넣지 않음 |
 | `CYCLONEDX_SPEC_VERSION` | — | `1.6` | 생성하는 SBOM의 CycloneDX 버전. `1.6` 또는 `1.7`(CLI의 `--spec-version`). AI 모델과 데이터셋 SBOM은 항상 1.7. 다른 값이면 실행을 멈춤 |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
