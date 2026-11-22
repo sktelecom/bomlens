@@ -224,6 +224,38 @@ else
     fail "entrypoint.sh no longer stops on a missing Android SDK image"
 fi
 
+echo "== the CLI's folder visibility probe runs as root, as stage 1 does =="
+# The cdxgen all-in-one image runs as a non-root user, which cannot read a
+# folder of mode 0700 that stage 1 (-u 0:0) reads. A fake docker records the
+# probe's arguments and sees the folders only when the probe runs as root.
+PROBE_IN="$WORK/probe-in"; mkdir -p "$PROBE_IN/out"; chmod 700 "$PROBE_IN"; : > "$PROBE_IN/main.c"
+PROBE_ARGS="$WORK/probe-args"
+probe_out="$(cd "$WORK" && PROBE_ARGS="$PROBE_ARGS" bash -c '
+    set +u
+    DOCKER_ENV=()
+    hostpath() { printf "%s" "$1"; }
+    docker() {
+        [ "$1" = image ] && return 0
+        printf "%s\n" "$@" > "$PROBE_ARGS"
+        local prev="" root=0 a
+        for a in "$@"; do [ "$prev" = "-u" ] && [ "$a" = "0:0" ] && root=1; prev="$a"; done
+        [ "$root" = 1 ] && echo IN_OK && echo OUT_OK
+        echo DONE
+    }
+    eval "$(sed -n "/^log_error() {/,/^}/p; /^preflight_scan_paths() {/,/^}/p; /^scan_target_not_visible() {/,/^}/p" "$1")"
+    preflight_scan_paths ghcr.io/cdxgen/cdxgen:test "$2" "$2/out"
+    echo "PROBE_RC=$?"
+' _ "$ROOT_DIR/scripts/scan-sbom.sh" "$PROBE_IN" 2>&1)"
+if printf '%s\n' "$probe_out" | grep -q '^PROBE_RC=0$' \
+   && grep -qx -- '-u' "$PROBE_ARGS" 2>/dev/null \
+   && [ "$(grep -A1 -x -- '-u' "$PROBE_ARGS" | tail -1)" = "0:0" ] \
+   && grep -q 'docker run -u 0:0 \\' "$ROOT_DIR/scripts/scan-sbom.sh"; then
+    pass "the visibility probe passes -u 0:0, the user stage 1 runs as, so a 0700 folder is not refused"
+else
+    fail "the visibility probe does not run as -u 0:0" "$probe_out | args: $(tr '\n' ' ' < "$PROBE_ARGS" 2>/dev/null)"
+fi
+chmod 755 "$PROBE_IN"
+
 # A sub-folder of the launch folder (/src) is a deep-scan target too. The launch
 # folder stands in at $WORK/launch; the server's SRC_DIR is pointed there.
 LAUNCH="$WORK/launch"
