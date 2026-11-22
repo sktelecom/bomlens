@@ -254,7 +254,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Choose folder | a subfolder under the launch folder, a folder mounted with `--ui --mount <dir>`, or a folder picked with the desktop app's "Add folder" button |
 | GitHub URL | enter the URL |
 | ZIP upload | upload a `.zip`/tar file |
-| Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
+| Build artifact | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
 | Firmware upload | upload a `.bin`, etc. — the tile appears automatically whenever Docker is running |
 | Docker image | enter the image name |

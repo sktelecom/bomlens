@@ -21,7 +21,7 @@
     "label": "Scan target",
     "currentDir": "Current folder",
     "currentDirPath": "Current folder",
-    "currentDirHint": "Scans the source in this folder (mounted as /src). To scan another folder, pick Directory / rootfs, or start BomLens from that folder.",
+    "currentDirHint": "Scans the source in this folder (mounted as /src). To scan another folder, use the Choose folder tile, or start BomLens from that folder.",
     "rootfsDir": "Choose folder",
     "yoctoBuildDir": "Yocto build directory",
     "rootfsPlaceholder": "my-project/  (subfolder of the current folder)",
