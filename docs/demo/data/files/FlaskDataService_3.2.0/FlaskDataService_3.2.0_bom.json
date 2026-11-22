@@ -7277,6 +7277,10 @@
       {
         "name": "cdx:bom:componentSrcFiles",
         "value": "requirements.txt"
+      },
+      {
+        "name": "bomlens:sbom-supplied",
+        "value": "true"
       }
     ],
     "timestamp": "2026-08-10T11:09:48Z",

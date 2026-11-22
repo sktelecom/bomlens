@@ -2,7 +2,7 @@
   "project": "NginxRuntimeImage",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-15T13:43:20Z",
+  "generatedAt": "2026-11-22T02:23:15Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-11-15T13:43:15Z",
+      "detail": "2026-11-22T02:23:09Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-11-15T13:43:15Z"
+      "detail_ko": "2026-11-22T02:23:09Z"
     },
     {
       "id": "tools",
@@ -68,6 +68,7 @@
       "label": "Top-level component name+version",
       "required": true,
       "status": "pass",
+      "detail_ko": "nginx@1.24-alpine",
       "detail": "nginx@1.24-alpine",
       "missing": [],
       "regulations": [
@@ -79,8 +80,7 @@
           "short_ko": "BSI TR-03183-2"
         }
       ],
-      "label_ko": "최상위 구성요소 이름+버전",
-      "detail_ko": "nginx@1.24-alpine"
+      "label_ko": "최상위 구성요소 이름+버전"
     },
     {
       "id": "name-version",
@@ -203,6 +203,7 @@
       "required": true,
       "source": "auto",
       "naKind": "",
+      "detail_ko": "142 edge(s), graph completeness unknown (no positive evidence found, not a defect)",
       "status": "pass",
       "detail": "142 edge(s), graph completeness unknown (no positive evidence found, not a defect)",
       "missing": [],
@@ -215,8 +216,7 @@
           "short_ko": "BSI TR-03183-2"
         }
       ],
-      "label_ko": "전이 의존성 (의존 그래프)",
-      "detail_ko": "142 edge(s), graph completeness unknown (no positive evidence found, not a defect)"
+      "label_ko": "전이 의존성 (의존 그래프)"
     },
     {
       "id": "license",
@@ -370,8 +370,8 @@
       "label": "SBOM author",
       "label_ko": "SBOM 작성자",
       "required": false,
-      "status": "warn",
-      "detail": "not present in the SBOM",
+      "status": "pass",
+      "detail": "present",
       "missing": [],
       "evidence": [],
       "cluster": "cisa-metadata",
@@ -390,7 +390,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "SBOM에 없음"
+      "detail_ko": "있음"
     },
     {
       "id": "cisa-sbom-author-signature",
@@ -1279,7 +1279,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-15T13:43:15Z",
+            "detail": "2026-11-22T02:23:09Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1411,17 +1411,17 @@
         "title": "US SBOM minimum elements",
         "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
         "total": 23,
-        "present": 12,
-        "gap": 7,
+        "present": 13,
+        "gap": 6,
         "review": 4,
         "failed": 0,
         "elements": [
           {
             "id": "cisa-sbom-author",
             "label": "SBOM author",
-            "status": "warn",
+            "status": "pass",
             "source": "declared",
-            "detail": "not present in the SBOM",
+            "detail": "present",
             "refs": [
               "SBOM Author"
             ]

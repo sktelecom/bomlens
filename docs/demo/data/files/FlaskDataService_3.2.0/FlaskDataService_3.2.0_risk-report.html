@@ -371,7 +371,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 <div class="page-head">
 <h1>Open-source risk report</h1>
 <p class="subtitle">Supplier SBOM under review</p>
-<p class="desc"><span>FlaskDataService <span class="ver">3.2.0</span></span><span>Received SBOM</span><span><time datetime="2026-11-15T13:41:35Z">2026-11-15 13:41 UTC</time></span><span>39 components</span><span>Input format: CycloneDX</span></p>
+<p class="desc"><span>FlaskDataService <span class="ver">3.2.0</span></span><span>Received SBOM</span><span><time datetime="2026-11-22T02:21:33Z">2026-11-22 02:21 UTC</time></span><span>39 components</span><span>Input format: CycloneDX</span></p>
 </div>
 <h2>1. Requirements met (conformance check)</h2>
 <div class="summary"><span class="lbl lbl-success">Check result: PASS</span></div>
@@ -382,6 +382,7 @@ details.fix .meta{font-size:var(--font-size-label);}
  <div><dt><span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High</span></dt><dd>within 30 days</dd></div>
 </dl>
 <p class="legend">We recommend preparing a remediation plan or risk justification.</p></div>
+<p class="legend">A finding is a match between a component's name and version and a vulnerability database; whether this product uses the vulnerable code is not checked, so some findings may not apply. A source scan also leaves out test, example and sample folders by default.</p>
 <div class="box"><div class="box-head"><span class="box-title" id="box-1">Findings</span><span class="counter">24</span><span class="end">
 <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">1</span></span>
 <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">8</span></span>
@@ -417,6 +418,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 </tbody></table></div></div>
 <h2>3. License summary</h2>
 <p>Distinct licenses identified: <b>9</b> (see the NOTICE artifact for details).</p>
+<p class="legend">Licenses are what each package declares. A declaration can be missing or wrong, and this is not a legal determination.</p>
 <h3>License classification (copyleft strength)</h3>
 <p>Each component is also recorded in the SBOM with a <code>bomlens:licenseClass</code> property. An unrecognized license is left uncategorized rather than assumed permissive.</p>
 <div class="summary">
@@ -429,6 +431,7 @@ details.fix .meta{font-size:var(--font-size-label);}
 <h2>4. Next steps</h2>
 <ol>
  <li>Prepare a <b>remediation plan or risk justification</b> within the recommended deadlines above.</li>
+ <li>Raise or replace the direct dependencies that bring in the most findings: <code>pkg:pypi/app@latest</code> (20 finding(s)), <code>Flask 3.0.0</code> (8 finding(s)), <code>black 23.12.1</code> (2 finding(s)).</li>
  <li>If the conformance check failed, fill the missing items and regenerate the SBOM.</li>
 </ol>
 </body></html>

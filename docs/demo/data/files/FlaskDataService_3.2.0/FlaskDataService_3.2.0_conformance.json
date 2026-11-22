@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-15T13:41:26Z",
+  "generatedAt": "2026-11-22T02:21:24Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -68,6 +68,7 @@
       "label": "Top-level component name+version",
       "required": true,
       "status": "pass",
+      "detail_ko": "FlaskDataService@3.2.0",
       "detail": "FlaskDataService@3.2.0",
       "missing": [],
       "regulations": [
@@ -79,8 +80,7 @@
           "short_ko": "BSI TR-03183-2"
         }
       ],
-      "label_ko": "최상위 구성요소 이름+버전",
-      "detail_ko": "FlaskDataService@3.2.0"
+      "label_ko": "최상위 구성요소 이름+버전"
     },
     {
       "id": "name-version",
@@ -203,6 +203,7 @@
       "required": true,
       "source": "auto",
       "naKind": "",
+      "detail_ko": "의존 관계 89개",
       "status": "pass",
       "detail": "89 edge(s)",
       "missing": [],
@@ -215,8 +216,7 @@
           "short_ko": "BSI TR-03183-2"
         }
       ],
-      "label_ko": "전이 의존성 (의존 그래프)",
-      "detail_ko": "의존 관계 89개"
+      "label_ko": "전이 의존성 (의존 그래프)"
     },
     {
       "id": "license",

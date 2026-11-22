@@ -45875,6 +45875,11 @@
     }
   ],
   "metadata": {
+    "authors": [
+      {
+        "name": "BomLens 1.15.1"
+      }
+    ],
     "component": {
       "bom-ref": "4e2b0a9dc1ca7790",
       "name": "nginx",
@@ -45894,9 +45899,13 @@
       {
         "name": "bomlens:undeclared-fields",
         "value": "unknown-to-author"
+      },
+      {
+        "name": "bomlens:sbom-author-source",
+        "value": "tool"
       }
     ],
-    "timestamp": "2026-11-15T13:43:15Z",
+    "timestamp": "2026-11-22T02:23:09Z",
     "tools": {
       "components": [
         {
@@ -45909,12 +45918,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.15.0"
+          "version": "1.15.1"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:974cab57-1756-4410-b5a8-6a4db596f75c",
+  "serialNumber": "urn:uuid:a8f05231-b08f-493c-b7d3-ed97184d8e2b",
   "specVersion": "1.6",
   "version": 1,
   "compositions": [

@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a1df71-1baa-7ce5-ac08-c7232be29b13",
-  "CreatedAt": "2026-11-15T13:41:34.25084813Z",
+  "ReportID": "01a2010f-0691-7d47-95c6-6cede80a5eb0",
+  "CreatedAt": "2026-11-22T02:21:31.66587166Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -690,7 +690,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-27205"
           ],
           "PublishedDate": "2026-02-21T06:17:00.91Z",
-          "LastModifiedDate": "2026-06-17T10:26:50.7Z"
+          "LastModifiedDate": "2026-06-17T10:26:50.7Z",
+          "introducedBy": [
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-34069",
@@ -745,20 +753,37 @@
             "https://advisory.echohq.com/cve/CVE-2024-34069",
             "https://github.com/pallets/werkzeug",
             "https://github.com/pallets/werkzeug/commit/3386395b24c7371db11a5b8eaac0c91da5362692",
+            "https://github.com/pallets/werkzeug/releases/tag/3.0.3",
             "https://github.com/pallets/werkzeug/security/advisories/GHSA-2g68-c3qc-8985",
+            "https://github.com/pypa/advisory-database/tree/main/vulns/werkzeug/PYSEC-2026-2043.yaml",
             "https://lists.debian.org/debian-lts-announce/2025/02/msg00026.html",
             "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H4SH32AM3CTPMAAEOIDAN7VU565LO4IR",
             "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H4SH32AM3CTPMAAEOIDAN7VU565LO4IR/",
             "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HFERFN7PINV4MOGMGA3DPIXJPDCYOEJZ",
             "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HFERFN7PINV4MOGMGA3DPIXJPDCYOEJZ/",
             "https://nvd.nist.gov/vuln/detail/CVE-2024-34069",
+            "https://pypi.org/project/werkzeug",
             "https://security.netapp.com/advisory/ntap-20240614-0004",
             "https://security.netapp.com/advisory/ntap-20240614-0004/",
             "https://ubuntu.com/security/notices/USN-6799-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-34069"
           ],
           "PublishedDate": "2024-05-06T15:15:23.99Z",
-          "LastModifiedDate": "2026-06-17T07:32:50.85Z"
+          "LastModifiedDate": "2026-06-17T07:32:50.85Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-49766",
@@ -821,7 +846,21 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-49766"
           ],
           "PublishedDate": "2024-10-25T20:15:04.41Z",
-          "LastModifiedDate": "2026-06-17T08:00:24.517Z"
+          "LastModifiedDate": "2026-06-17T08:00:24.517Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-49767",
@@ -894,7 +933,21 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-49767"
           ],
           "PublishedDate": "2024-10-25T20:15:04.53Z",
-          "LastModifiedDate": "2026-06-17T08:00:24.643Z"
+          "LastModifiedDate": "2026-06-17T08:00:24.643Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-66221",
@@ -956,7 +1009,21 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-66221"
           ],
           "PublishedDate": "2025-11-29T03:16:00.05Z",
-          "LastModifiedDate": "2026-10-07T20:10:01.97Z"
+          "LastModifiedDate": "2026-10-07T20:10:01.97Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-102598",
@@ -1013,7 +1080,21 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-102598"
           ],
           "PublishedDate": "2026-09-29T16:17:06.01Z",
-          "LastModifiedDate": "2026-09-30T19:38:27.293Z"
+          "LastModifiedDate": "2026-09-30T19:38:27.293Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-21860",
@@ -1068,7 +1149,21 @@
             "https://nvd.nist.gov/vuln/detail/CVE-2026-21860"
           ],
           "PublishedDate": "2026-01-08T19:15:59Z",
-          "LastModifiedDate": "2026-06-17T10:19:02.74Z"
+          "LastModifiedDate": "2026-06-17T10:19:02.74Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-27199",
@@ -1122,7 +1217,21 @@
             "https://nvd.nist.gov/vuln/detail/CVE-2026-27199"
           ],
           "PublishedDate": "2026-02-21T06:17:00.71Z",
-          "LastModifiedDate": "2026-06-17T10:26:50.207Z"
+          "LastModifiedDate": "2026-06-17T10:26:50.207Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "Flask",
+              "version": "3.0.0",
+              "purl": "pkg:pypi/flask@3.0.0",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-114134",
@@ -1178,7 +1287,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-114134"
           ],
           "PublishedDate": "2026-11-05T21:18:36.887Z",
-          "LastModifiedDate": "2026-11-12T22:18:35.61Z"
+          "LastModifiedDate": "2026-11-12T22:18:35.61Z",
+          "introducedBy": [
+            {
+              "name": "black",
+              "version": "23.12.1",
+              "purl": "pkg:pypi/black@23.12.1",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-21503",
@@ -1236,7 +1353,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-21503"
           ],
           "PublishedDate": "2024-03-19T05:15:09.447Z",
-          "LastModifiedDate": "2026-06-17T07:09:37.93Z"
+          "LastModifiedDate": "2026-06-17T07:09:37.93Z",
+          "introducedBy": [
+            {
+              "name": "black",
+              "version": "23.12.1",
+              "purl": "pkg:pypi/black@23.12.1",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "GHSA-6q48-6c7w-9gw2",
@@ -1277,7 +1402,15 @@
             "https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2"
           ],
           "PublishedDate": "2026-10-20T19:35:05Z",
-          "LastModifiedDate": "2026-10-26T16:02:12Z"
+          "LastModifiedDate": "2026-10-26T16:02:12Z",
+          "introducedBy": [
+            {
+              "name": "certifi",
+              "version": "2026.7.22",
+              "purl": "pkg:pypi/certifi@2026.7.22",
+              "direct": true
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-71176",
@@ -1311,7 +1444,8 @@
           "VendorSeverity": {
             "amazon": 2,
             "ghsa": 2,
-            "redhat": 2
+            "redhat": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "ghsa": {
@@ -1335,7 +1469,21 @@
             "https://www.openwall.com/lists/oss-security/2026/01/21/5"
           ],
           "PublishedDate": "2026-01-22T05:16:17.577Z",
-          "LastModifiedDate": "2026-06-17T10:03:47.83Z"
+          "LastModifiedDate": "2026-06-17T10:03:47.83Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            },
+            {
+              "name": "idna",
+              "version": "3.18",
+              "purl": "pkg:pypi/idna@3.18",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-28684",
@@ -1393,7 +1541,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-28684"
           ],
           "PublishedDate": "2026-04-20T17:16:33.087Z",
-          "LastModifiedDate": "2026-10-26T21:10:00.17Z"
+          "LastModifiedDate": "2026-10-26T21:10:00.17Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-35195",
@@ -1470,7 +1626,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-35195"
           ],
           "PublishedDate": "2024-05-20T21:15:09.99Z",
-          "LastModifiedDate": "2026-06-17T07:34:31.23Z"
+          "LastModifiedDate": "2026-06-17T07:34:31.23Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-47081",
@@ -1530,12 +1694,13 @@
             "http://www.openwall.com/lists/oss-security/2025/06/04/1",
             "http://www.openwall.com/lists/oss-security/2025/06/04/6",
             "https://access.redhat.com/errata/RHSA-2025:12519",
+            "https://access.redhat.com/errata/RHSA-2025:13604",
             "https://access.redhat.com/security/cve/CVE-2024-47081",
             "https://bugzilla.redhat.com/2371272",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2371272",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-47081",
-            "https://errata.almalinux.org/9/ALSA-2025-12519.html",
+            "https://errata.almalinux.org/10/ALSA-2025-13604.html",
             "https://errata.rockylinux.org/RLSA-2025:12519",
             "https://github.com/advisories/GHSA-9hjg-9r4m-mvj7",
             "https://github.com/psf/requests",
@@ -1556,7 +1721,15 @@
             "https://www.openwall.com/lists/oss-security/2025/06/03/9"
           ],
           "PublishedDate": "2025-06-09T18:15:24.983Z",
-          "LastModifiedDate": "2026-06-17T07:56:30.697Z"
+          "LastModifiedDate": "2026-06-17T07:56:30.697Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-25645",
@@ -1620,7 +1793,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-25645"
           ],
           "PublishedDate": "2026-03-25T17:16:52.97Z",
-          "LastModifiedDate": "2026-06-17T10:25:00.443Z"
+          "LastModifiedDate": "2026-06-17T10:25:00.443Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-66418",
@@ -1653,7 +1834,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,
@@ -1679,8 +1860,8 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:1086",
             "https://access.redhat.com/errata/RHSA-2026:1087",
-            "https://access.redhat.com/errata/RHSA-2026:1239",
             "https://access.redhat.com/security/cve/CVE-2025-66418",
             "https://bugzilla.redhat.com/2419455",
             "https://bugzilla.redhat.com/2419467",
@@ -1692,7 +1873,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/10/ALSA-2026-1086.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8",
@@ -1707,7 +1888,15 @@
             "https://www.openwall.com/lists/oss-security/2025/12/05/4"
           ],
           "PublishedDate": "2025-12-05T16:15:51.053Z",
-          "LastModifiedDate": "2026-11-10T17:17:17.047Z"
+          "LastModifiedDate": "2026-11-10T17:17:17.047Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-66471",
@@ -1740,7 +1929,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,
@@ -1766,8 +1955,8 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:1086",
             "https://access.redhat.com/errata/RHSA-2026:1087",
-            "https://access.redhat.com/errata/RHSA-2026:1239",
             "https://access.redhat.com/security/cve/CVE-2025-66471",
             "https://bugzilla.redhat.com/2419455",
             "https://bugzilla.redhat.com/2419467",
@@ -1779,7 +1968,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/10/ALSA-2026-1086.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/advisories/GHSA-2xpw-w6gg-jr37",
             "https://github.com/pypa/advisory-database/tree/main/vulns/urllib3/PYSEC-2026-1994.yaml",
@@ -1801,7 +1990,15 @@
             "https://www.openwall.com/lists/oss-security/2025/12/05/4"
           ],
           "PublishedDate": "2025-12-05T17:16:04.4Z",
-          "LastModifiedDate": "2026-09-25T23:10:00.463Z"
+          "LastModifiedDate": "2026-09-25T23:10:00.463Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-21441",
@@ -1985,7 +2182,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/10/ALSA-2026-1086.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/8864ac407bba8607950025e0979c4c69bc7abc7b",
@@ -2001,7 +2198,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-21441"
           ],
           "PublishedDate": "2026-01-07T22:15:44.04Z",
-          "LastModifiedDate": "2026-11-10T17:17:34.413Z"
+          "LastModifiedDate": "2026-11-10T17:17:34.413Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-44431",
@@ -2061,8 +2266,8 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:28000",
             "https://access.redhat.com/errata/RHSA-2026:28158",
-            "https://access.redhat.com/errata/RHSA-2026:28159",
             "https://access.redhat.com/security/cve/CVE-2026-44431",
             "https://advisory.echohq.com/cve/CVE-2026-44431",
             "https://bugzilla.redhat.com/2477154",
@@ -2072,7 +2277,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44431",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44432",
-            "https://errata.almalinux.org/9/ALSA-2026-28159.html",
+            "https://errata.almalinux.org/10/ALSA-2026-28000.html",
             "https://errata.rockylinux.org/RLSA-2026:28158",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/security/advisories/GHSA-qccp-gfcp-xxvc",
@@ -2085,7 +2290,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-44431"
           ],
           "PublishedDate": "2026-05-13T16:16:57.15Z",
-          "LastModifiedDate": "2026-11-11T20:10:00.273Z"
+          "LastModifiedDate": "2026-11-11T20:10:00.273Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-97687",
@@ -2142,8 +2355,10 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:85930",
             "https://access.redhat.com/errata/RHSA-2026:90494",
             "https://access.redhat.com/security/cve/CVE-2026-97687",
+            "https://advisory.echohq.com/cve/CVE-2026-97687",
             "https://bugzilla.redhat.com/2543245",
             "https://bugzilla.redhat.com/2543255",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2543245",
@@ -2151,7 +2366,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97687",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97689",
-            "https://errata.almalinux.org/9/ALSA-2026-90494.html",
+            "https://errata.almalinux.org/10/ALSA-2026-85930.html",
             "https://errata.rockylinux.org/RLSA-2026:90494",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/07408cec79d1856d81bb42c74a904a24fdb9e465",
@@ -2166,7 +2381,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-97687"
           ],
           "PublishedDate": "2026-09-29T16:17:18.517Z",
-          "LastModifiedDate": "2026-10-13T20:27:23.13Z"
+          "LastModifiedDate": "2026-10-13T20:27:23.13Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2026-97689",
@@ -2224,8 +2447,10 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:85930",
             "https://access.redhat.com/errata/RHSA-2026:90494",
             "https://access.redhat.com/security/cve/CVE-2026-97689",
+            "https://advisory.echohq.com/cve/CVE-2026-97689",
             "https://bugzilla.redhat.com/2543245",
             "https://bugzilla.redhat.com/2543255",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2543245",
@@ -2233,7 +2458,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97687",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97689",
-            "https://errata.almalinux.org/9/ALSA-2026-90494.html",
+            "https://errata.almalinux.org/10/ALSA-2026-85930.html",
             "https://errata.rockylinux.org/RLSA-2026:90494",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/cd770b059b543be29298ea5c52afb0b1b090f5ed",
@@ -2246,7 +2471,15 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-97689"
           ],
           "PublishedDate": "2026-09-29T16:17:18.837Z",
-          "LastModifiedDate": "2026-10-13T20:20:06.95Z"
+          "LastModifiedDate": "2026-10-13T20:20:06.95Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2024-37891",
@@ -2330,7 +2563,15 @@
             "https://www.vicarius.io/vsociety/posts/proxy-authorization-header-handling-vulnerability-in-urllib3-cve-2024-37891"
           ],
           "PublishedDate": "2024-06-17T20:15:13.45Z",
-          "LastModifiedDate": "2026-06-17T07:38:59.98Z"
+          "LastModifiedDate": "2026-06-17T07:38:59.98Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         },
         {
           "VulnerabilityID": "CVE-2025-50181",
@@ -2397,11 +2638,23 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-50181"
           ],
           "PublishedDate": "2025-06-19T01:15:24.453Z",
-          "LastModifiedDate": "2026-06-17T09:34:48.843Z"
+          "LastModifiedDate": "2026-06-17T09:34:48.843Z",
+          "introducedBy": [
+            {
+              "name": "pkg:pypi/app@latest",
+              "version": "",
+              "purl": "",
+              "direct": false
+            }
+          ]
         }
       ]
     }
   ],
+  "IntroducedBy": {
+    "State": "ok",
+    "Max": 3
+  },
   "UncheckedComponents": {
     "Count": 0,
     "Components": []
