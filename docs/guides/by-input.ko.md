@@ -30,8 +30,7 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터
 > - CLI 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
 
 ```bash
-# Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
-docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
+# Docker 20.10+ 필요. 스캐너 이미지는 첫 스캔이 릴리스에 맞는 것을 받습니다.
 
 # 편의를 위해 스크립트 경로를 변수로 둡니다.
 SBOM=/path/to/bomlens/scripts/scan-sbom.sh
@@ -158,7 +157,7 @@ $SBOM --project team6-fw --version 1.0.0 \
   --all --generate-only
 ```
 
-- 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정하거나, 기본값(`ghcr.io/sktelecom/bomlens-firmware:latest`)을 받습니다.
+- 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 스캔이 릴리스 태그의 `ghcr.io/sktelecom/bomlens-firmware`를 받으며, 다른 이미지는 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정합니다.
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 자세한 동작과 한계는 [펌웨어 분석](../guides/firmware.ko.md)을 참고하세요.
 
@@ -207,15 +206,15 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | 빌드 산출물 | 빌드 산출물 업로드 — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM 업로드 | 기존 SBOM(JSON) 업로드, 분석(ANALYZE) 모드 |
 | 펌웨어 업로드 | `.bin` 등 업로드 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
-| Docker 이미지 | 이미지명 입력(비공개 레지스트리는 이 컴퓨터에서 먼저 `docker login` 실행) |
-| AI 모델 | HuggingFace 모델 id 입력 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
+| Docker 이미지 | 이미지명 입력. 비공개 레지스트리는 이 컴퓨터에서 먼저 `docker login`과 `docker pull <이미지>`를 실행합니다. 스캐너는 받아 둔 이미지를 읽고, Docker 로그인 정보는 스캐너에 전달되지 않기 때문입니다 |
+| AI 모델 또는 데이터셋 | HuggingFace 모델 id 입력. Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
 | 모델 파일 | `.gguf`, `.safetensors`, `.pt` 등 업로드(최대 8GB) |
-| 공개 데이터셋 | Figshare 아이템(페이지 URL, DOI, 아이템 번호) 또는 HuggingFace 데이터셋(`datasets/<owner>/<name>`이나 `https://huggingface.co/datasets/...` 주소)을 모델 id와 같은 입력란에 입력 |
+| AI 모델 또는 데이터셋(공개 데이터셋) | Figshare 아이템(페이지 URL, DOI, 아이템 번호) 또는 HuggingFace 데이터셋(`datasets/<owner>/<name>`이나 `https://huggingface.co/datasets/...` 주소)을 모델 id와 같은 입력란에 입력 |
 | 모델 정보 직접 입력 | 저장소나 파일이 아직 없는 모델에 대한 질문(기반 모델, 학습 데이터, 출시일 등)에 답함 |
 
 이 표는 이 가이드가 다루는 시나리오 기준입니다. 전체 12개 스캔 대상은 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)를 참고하세요.
 
-소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **결과 품질** 묶음이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 결과 품질 설명을 참고하세요.
+소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **결과 품질** 묶음이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(ScanCode를 쓰는 파일 단위 라이선스 스캔, SCANOSS를 쓰는 복사해 넣은 오픈소스 탐지)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 결과 품질 설명을 참고하세요.
 
 실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 오픈소스 위험 보고서를 화면에서 보거나 내려받을 수 있습니다. 적합성 검사 보고서 파일도 내려받을 수 있지만, 판정 화면은 업로드한 SBOM을 분석한 경우(`--analyze`)에만 나타납니다.
 

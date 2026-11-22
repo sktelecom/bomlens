@@ -37,7 +37,7 @@ curl -fsSL https://github.com/sktelecom/bomlens/releases/latest/download/bomlens
 cd ~/my-project && ~/bomlens/scripts/scan-sbom.sh --ui
 ```
 
-The archive works on Linux, macOS and WSL, and the first scan pulls the scanner image of that release. The scan writes its files to a `MyApp_1.0.0/` folder in the current directory. `--all` adds the notice, the security report and an SPDX copy to the SBOM, and [Artifacts](docs/reference/artifacts.md) says what each file is. In PowerShell a `.sh` file does not run and prints nothing, so download [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip) instead, unzip it and double-click `scripts\sbom-ui.bat` for the web UI, or run the same scan with `scripts\scan-sbom.bat` (needs Git for Windows).
+The archive works on Linux, macOS and WSL, and the first scan pulls the scanner image of that release. The scan writes its files to a `MyApp_1.0.0/` folder in the current directory. `--all` adds the notice, the security report and an SPDX copy to the SBOM, and [Artifacts](docs/reference/artifacts.md) says what each file is. In PowerShell a `.sh` file does not run and prints nothing, so download [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip) instead, unzip it and double-click `scripts\sbom-ui.bat` for the web UI, or run the same scan with `scripts\scan-sbom.bat` (needs Git for Windows). `sbom-ui.bat` does not pass your Maven or Gradle settings, so a project that needs a company repository is scanned with the desktop app or `scan-sbom.bat` ([Company network](docs/guides/company-network.md)).
 
 ## Documentation
 

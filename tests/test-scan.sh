@@ -181,6 +181,28 @@ assert_root_has_direct_deps() {
     ' "$file" >/dev/null 2>&1
 }
 
+# The dependency graph's shape, for a source scan with components: every
+# dependencies[].ref and every dependsOn target names a component bom-ref or
+# the root, and the root depends on at least one component. Prints what is
+# wrong and returns non-zero, or prints nothing. A lock file node left between
+# the root and the packages showed in the UI as a bare UUID with no direct
+# dependencies.
+graph_shape_problem() {
+    local out grade
+    # A result the scan itself grades partial or unreliable (a failed
+    # resolution step, no lock file) may lack the root's edges; only the
+    # dangling-ref check applies to it.
+    grade=$(jq -r '.grade // empty' "${1%_bom.json}_completeness.json" 2>/dev/null)
+    out=$(jq -r --arg grade "${grade:-complete}" '
+        ([.components[]?["bom-ref"]] + [.metadata.component["bom-ref"]]) as $k
+        | (.metadata.component["bom-ref"] // "") as $r
+        | ([.dependencies[]? | (.ref, .dependsOn[]?) | select(. as $x | $k | index([$x]) == null)] | unique) as $d
+        | if ($d | length) > 0 then "\($d | length) ref(s) name no component: \($d[0:3] | join(", "))"
+          elif $grade == "complete" and ([.dependencies[]? | select(.ref == $r) | .dependsOn[]?] | length) == 0 then "the root has no direct dependency"
+          else empty end' "$1" 2>&1) || out="cannot read ${1}: $out"
+    [ -z "$out" ] || { printf '%s\n' "$out"; return 1; }
+}
+
 # Run scan with logging function
 run_scan_with_logs() {
     local test_name=$1
@@ -347,8 +369,12 @@ npm install --package-lock-only > /dev/null 2>&1 || true
 if run_scan_with_logs "test-nodejs" "TestNodeApp" "1.0.0"; then
     if FOUND=$(find_bom_file "TestNodeApp" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "Node.js project ($COMP_COUNT components)"
+        if [ "$COMP_COUNT" -gt 0 ] && ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "Node.js project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-nodejs"
+            FAILED=$((FAILED + 1))
+        elif [ "$COMP_COUNT" -gt 0 ]; then
+            print_success "Node.js project ($COMP_COUNT components, dependency graph closed)"
             PASSED=$((PASSED + 1))
         else
             print_error "Node.js project (SBOM is empty)"
@@ -390,8 +416,12 @@ EOF
 if run_scan_with_logs "test-python" "TestPythonApp" "1.0.0"; then
     if FOUND=$(find_bom_file "TestPythonApp" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "Python project ($COMP_COUNT components)"
+        if [ "$COMP_COUNT" -gt 0 ] && ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "Python project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-python"
+            FAILED=$((FAILED + 1))
+        elif [ "$COMP_COUNT" -gt 0 ]; then
+            print_success "Python project ($COMP_COUNT components, dependency graph closed)"
             PASSED=$((PASSED + 1))
             # pandas ships its own BSD-3-Clause text with the notices of the
             # libraries it bundles appended, so reading that file whole matches
@@ -478,6 +508,10 @@ if run_scan_with_logs "test-java-maven" "TestJavaMaven" "1.0.0"; then
             print_error "Java Maven project (root metadata.component has no direct dependsOn — direct deps orphaned)"
             show_failure_log "test-java-maven"
             FAILED=$((FAILED + 1))
+        elif ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "Java Maven project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-java-maven"
+            FAILED=$((FAILED + 1))
         elif jq -e '[.components[]? | select((.purl // "") | test("pkg:maven/(org.junit|org.projectlombok)"))] | length > 0' "$FOUND" >/dev/null 2>&1; then
             print_error "Java Maven project (test/provided deps not filtered — junit/lombok present in SBOM)"
             show_failure_log "test-java-maven"
@@ -526,8 +560,12 @@ EOF
 if run_scan_with_logs "test-ruby" "TestRubyApp" "1.0.0"; then
     if FOUND=$(find_bom_file "TestRubyApp" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "Ruby project ($COMP_COUNT components)"
+        if [ "$COMP_COUNT" -gt 0 ] && ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "Ruby project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-ruby"
+            FAILED=$((FAILED + 1))
+        elif [ "$COMP_COUNT" -gt 0 ]; then
+            print_success "Ruby project ($COMP_COUNT components, dependency graph closed)"
             PASSED=$((PASSED + 1))
         else
             print_error "Ruby project (SBOM is empty)"
@@ -568,8 +606,12 @@ EOF
 if run_scan_with_logs "test-php" "TestPHPApp" "1.0.0"; then
     if FOUND=$(find_bom_file "TestPHPApp" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "PHP project ($COMP_COUNT components)"
+        if [ "$COMP_COUNT" -gt 0 ] && ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "PHP project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-php"
+            FAILED=$((FAILED + 1))
+        elif [ "$COMP_COUNT" -gt 0 ]; then
+            print_success "PHP project ($COMP_COUNT components, dependency graph closed)"
             PASSED=$((PASSED + 1))
         else
             print_error "PHP project (SBOM is empty)"
@@ -611,8 +653,12 @@ EOF
 if run_scan_with_logs "test-rust" "TestRustApp" "1.0.0"; then
     if FOUND=$(find_bom_file "TestRustApp" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "Rust project ($COMP_COUNT components)"
+        if [ "$COMP_COUNT" -gt 0 ] && ! GRAPH_PROBLEM=$(graph_shape_problem "$FOUND"); then
+            print_error "Rust project (dependency graph: $GRAPH_PROBLEM)"
+            show_failure_log "test-rust"
+            FAILED=$((FAILED + 1))
+        elif [ "$COMP_COUNT" -gt 0 ]; then
+            print_success "Rust project ($COMP_COUNT components, dependency graph closed)"
             PASSED=$((PASSED + 1))
         else
             print_error "Rust project (SBOM is empty)"

@@ -21,14 +21,14 @@ lock 파일이 없는 Node.js 프로젝트는 프로젝트 `.npmrc`가 가리키
 
 ## 프록시는 어떻게 설정하나요?
 
-`scan-sbom.sh`를 실행하는 셸의 `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`(소문자 이름 포함)는 이름 그대로 스캔 컨테이너에 전달됩니다. 이 기계의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 전달하지 않습니다. 컨테이너 안에서 그 주소는 컨테이너 자신이기 때문입니다. 이때는 Docker 자체의 프록시 설정이 적용됩니다. 데스크톱 앱은 프록시 변수를 전달하지 않으므로, 그쪽에서는 Docker 엔진에 프록시를 설정합니다.
+`scan-sbom.sh`를 실행하는 셸의 `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`(소문자 이름 포함)는 이름 그대로 스캔 컨테이너에 전달됩니다. 이 기계의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 전달하지 않습니다. 컨테이너 안에서 그 주소는 컨테이너 자신이기 때문입니다. 이때는 Docker 자체의 프록시 설정이 적용됩니다. `sbom-ui.bat`은 Windows 환경 변수에 있는 같은 세 변수를 웹 UI에 전달합니다. 더블클릭한 `.bat`은 명령 프롬프트에서 입력한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적거나(예: `HTTPS_PROXY=http://proxy.example:8080`) `setx`로 지정한 뒤 다시 더블클릭합니다. 데스크톱 앱도 자기 환경 변수에서 같은 방식으로 전달합니다(`setx`로 지정한 뒤 앱을 다시 실행).
 
 ## 사내 인증서는 어떻게 신뢰하게 하나요?
 
 HTTPS를 검사하는 프록시는 사내 인증기관(CA)으로 다시 서명하고, 스캔 컨테이너는 그 인증기관을 믿지 않습니다. 호스트마다 검사 여부가 달라서 한 저장소는 실패하고 다른 저장소는 되는 경우도 있습니다. 인증기관을 PEM 파일로 BomLens에 줍니다.
 
 ```bash
-SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-project --generate-only
+SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-project --generate-only
 ```
 
 이 파일은 스캔 컨테이너의 시스템 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. 신뢰할 수 없는 인증서 때문에 스캔이 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. npm은 cdxgen 로그에 `SELF_SIGNED_CERT_IN_CHAIN`으로 보고하며, 그런 저장소를 상대로 의존성 단계가 진행 없이 몇 분씩 이어지는 것도 같은 원인을 가리킵니다.
@@ -36,6 +36,13 @@ SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my
 `SBOM_EXTRA_CA_CERTS`를 지정하는 방법은 BomLens를 실행하는 방식에 따라 다릅니다.
 
 - `scan-sbom.sh`와 `scan-sbom.bat`은 위 명령처럼 환경 변수에서 읽습니다. 설정 파일은 읽지 않습니다.
+
+  PowerShell에서는 같은 줄에서 변수를 먼저 지정합니다.
+
+  ```powershell
+  $env:SBOM_EXTRA_CA_CERTS="C:\path\to\company-ca.pem"; scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-project --generate-only
+  ```
+
 - `sbom-ui.bat`을 더블클릭해 실행하면 명령 프롬프트에서 설정한 변수를 보지 못하므로, 스크립트 옆의 `bomlens.settings.txt`에 적은 `SBOM_EXTRA_CA_CERTS=C:\경로\company-ca.pem`도 읽습니다([설정 파일](../start/troubleshooting.ko.md#설정-파일-명령줄-불필요)). 경로에는 `&`, `^`, `|`, `<`, `>`, `%`, `!`가 없어야 합니다. 환경 변수가 설정되어 있으면 파일보다 우선합니다.
 - 데스크톱 앱은 환경 변수에서만 읽습니다. Windows에서는 명령 프롬프트에서 `setx SBOM_EXTRA_CA_CERTS C:\경로\company-ca.pem`을 한 번 실행한 뒤 앱을 종료했다가 다시 실행합니다. macOS에서는 터미널에서 `launchctl setenv SBOM_EXTRA_CA_CERTS /경로/company-ca.pem`을 실행한 뒤 앱을 다시 실행합니다. 이 설정은 재부팅하면 사라집니다. 경로에 쉼표나 큰따옴표가 있으면 시작하지 않습니다.
 

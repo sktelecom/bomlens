@@ -21,14 +21,14 @@ A Node.js project with no lock file is resolved by an npm install against the re
 
 ## What do I set for a proxy?
 
-`HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. The desktop app does not pass proxy variables, so set the proxy in the Docker engine there.
+`HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (the lower-case names too) from the shell that runs `scan-sbom.sh` are passed on to the scan containers by name. A proxy at your own machine's loopback address (`127.0.0.1`, `localhost`) is not passed, because inside a container that address is the container itself. Docker's own proxy setting applies then. `sbom-ui.bat` passes the same three variables to the web UI from the Windows environment. A double-clicked `.bat` does not see a variable typed in a command prompt, so write them in `bomlens.settings.txt` next to the scripts (for example `HTTPS_PROXY=http://proxy.example:8080`) or set them with `setx` and double-click it again. The desktop app passes them the same way from its environment (set them with `setx`, then restart the app).
 
 ## How do I trust my company CA?
 
 A proxy that inspects HTTPS re-signs it with a company CA, and the scan containers do not trust that CA. Some hosts may be inspected while others are not, so one registry can fail while another works. Give BomLens the CA as a PEM file:
 
 ```bash
-SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --target ./my-project --generate-only
+SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-project --generate-only
 ```
 
 The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way.
@@ -36,6 +36,13 @@ The file is added to the system store, Node.js and the Java trust store of the s
 How you set `SBOM_EXTRA_CA_CERTS` depends on how you start BomLens:
 
 - `scan-sbom.sh` and `scan-sbom.bat` read it from the environment, as in the command above. They do not read a settings file.
+
+  In PowerShell, set the variable first in the same line:
+
+  ```powershell
+  $env:SBOM_EXTRA_CA_CERTS="C:\path\to\company-ca.pem"; scripts\scan-sbom.bat --project MyApp --version 1.0.0 --target .\my-project --generate-only
+  ```
+
 - When you double-click `sbom-ui.bat`, it does not see a variable typed in a command prompt, so it also reads `SBOM_EXTRA_CA_CERTS=C:\path\to\company-ca.pem` from `bomlens.settings.txt` next to the scripts ([Settings file](../start/troubleshooting.md#settings-file-no-command-line-needed)). Use a path without `&`, `^`, `|`, `<`, `>`, `%` or `!`. A variable set in the environment wins over the file.
 - The desktop app reads it from the environment only. On Windows, run `setx SBOM_EXTRA_CA_CERTS C:\path\to\company-ca.pem` once in a command prompt, then quit the app and start it again. On macOS, run `launchctl setenv SBOM_EXTRA_CA_CERTS /path/to/company-ca.pem` in Terminal, then start the app again; the setting is lost on restart. A path with a comma or a double quote is refused.
 

@@ -4,9 +4,9 @@ description: BomLens Windows 설치 파일의 코드 서명 정책(Code signing 
 
 # 코드 서명 정책 (Code signing policy)
 
-Free code signing provided by SignPath.io, certificate by SignPath Foundation
+설치 파일은 아직 서명되지 않았습니다. Windows 설치 파일은 SignPath.io의 무료 코드 서명(인증서는 SignPath Foundation 발급)을 신청해 둔 상태입니다.
 
-Windows 설치 파일의 릴리스는 아래 정책에 따라 서명합니다. 서명하는 파일은 `BomLens-Setup.exe`입니다. 릴리스는 이 저장소에서 GitHub 호스티드 러너로 실행되는 워크플로로 빌드하며, 서명 요청마다 승인자가 직접 승인한 뒤에 파일에 서명합니다.
+서명이 갖춰지면 Windows 설치 파일의 릴리스는 아래 정책에 따라 서명합니다. 서명할 파일은 `BomLens-Setup.exe`입니다. 릴리스는 이 저장소에서 GitHub 호스티드 러너로 실행되는 워크플로로 빌드하며, 서명 요청마다 승인자가 직접 승인한 뒤에 파일에 서명합니다.
 
 ## 팀 역할
 

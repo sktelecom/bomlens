@@ -1,6 +1,6 @@
 # Modelica Example
 
-> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
+**English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](https://sktelecom.github.io/bomlens/start/first-scan/) and the [usage guide](https://sktelecom.github.io/bomlens/reference/cli/).
 
 This example demonstrates dependency identification for a Modelica (`.mo`) project. cdxgen has no Modelica cataloger, so BomLens instead parses the `annotation(uses(...))` block a `.mo` package declares its dependencies in directly.
 
@@ -17,7 +17,7 @@ This is a direct declaration, not a resolved dependency graph: there is no Model
 
 ## Generate SBOM
 
-> **Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](../../docs/start/first-scan.md).
+**Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](https://sktelecom.github.io/bomlens/start/first-scan/).
 
 ```bash
 cd examples/modelica

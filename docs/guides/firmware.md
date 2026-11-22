@@ -12,20 +12,7 @@ Firmware is a single file that packs and seals an operating system and dozens of
 
 1. Unpack the firmware (unblob, falling back to `unsquashfs`, `7z`, then `binwalk`) to extract the rootfs.
 2. Use `syft` to identify components installed by a package manager (opkg, dpkg, apk, rpm).
-   An image can carry more than one filesystem, and a tree sitting beside the rootfs rather
-   than inside it is cataloged too. Three kinds are recognized, each by the record of what is
-   installed in it rather than by its directory name: a container image store, identified by
-   the image index Docker keeps (the usual layout on a switch OS, where most of what runs is in
-   a container); a second filesystem carrying its own package database; and an interpreter's
-   installed library set, such as a Python `site-packages`. Set `FW_EXTRA_ROOTS=false` to read
-   only the rootfs. Components from a container store record the image they belong to in
-   `bomlens:container:image`, and the images themselves appear as `container`
-   components. A package installed by `dpkg` inside a container is identified by the
-   distribution the container runs, read from the `os-release` in its own layers, so that
-   the vulnerability step has something to match it against; those carry
-   `bomlens:purlSource`. An SPDX export keeps this: the images and the
-   distribution are packages there, and the membership is a `CONTAINS`
-   relationship.
+   A container image store, a second filesystem with its own package database, and an interpreter's library set such as a Python `site-packages` are cataloged too ([how](../concepts/pipeline-by-input.md#extra-filesystems-in-an-image)). Set `FW_EXTRA_ROOTS=false` to read only the rootfs.
 3. Use the signature checkers of `cve-bin-tool` to identify stripped static binaries (busybox, openssl, dropbear, and so on) and give them a CPE.
 4. Merge the two results into one SBOM, then run the same post-processing as a normal scan (licenses, CVEs, signing). CVEs of components with no package PURL come from the NVD CPE index in the image (see [How CVEs are matched](#how-cves-are-matched)).
 
@@ -33,13 +20,9 @@ Firmware is a single file that packs and seals an operating system and dozens of
 
 Firmware analysis needs a separate image that bundles the unpacking and binary-identification tools (unblob, cve-bin-tool, and so on). These are GPL-family tools, so they are kept out of the lightweight base image and split into an opt-in firmware image.
 
-On the CLI, pull it once:
+On the CLI, the first `--firmware` scan pulls it, with the same release tag as the scanner image. A root filesystem with no package database uses this image only when it is already here; otherwise the scan prints the `docker pull` command to run.
 
-```bash
-docker pull ghcr.io/sktelecom/bomlens-firmware:latest
-```
-
-In the desktop app and the web UI you do not run that command: the firmware input shows a **Download now** button with the download size and the layer progress.
+In the desktop app and the web UI, the firmware input shows a **Download now** button with the download size and the layer progress.
 
 To use a different tag or an internal mirror registry, set `SBOM_FIRMWARE_IMAGE`. It takes effect only as a real environment variable; the settings file `bomlens.settings.txt` that a double-clicked `.bat` reads does not support this key.
 
@@ -76,7 +59,7 @@ If the syft package-identification pass fails, the scan does not stop: syft's ow
 
 A component read out of a binary or a firmware package database has no purl, a `pkg:generic` one, or a `pkg:opkg` one. None of these names a project, so a tool that looks components up by purl cannot identify it even when the name and version are right. A component read from a Yocto build's own records has the same gap. For firmware, root filesystem and binary scans, and for an SBOM read from a Yocto build's records (a Yocto build directory as `--target`, or its SPDX or manifests under `--analyze`), BomLens sets the purl of the project's upstream source repository at its release tag, for example `pkg:github/mirror/busybox@1_22_1`, `pkg:github/gregkh/linux@v3.10.18`, `pkg:sourceforge/boa@0.94.13` or `pkg:gnu/readline@5.2`.
 
-The conversion uses a closed table (`docker/lib/upstream-purl-map.json`) of projects whose repository and tag spelling were checked: BusyBox, curl, OpenSSL 1.x and 3.x, OpenSSH, Linux, zlib, U-Boot, Net-SNMP, ncurses, net-tools, libxml2, SQLite, glibc, Dropbear, Mbed TLS, Python, Boa, readline, jansson, json-c, libbpf, iproute2, musl and util-linux. json-c tags carry a release date, so only the listed versions 0.13.1 to 0.19 are covered. A component is matched by its own name, by the name of what it was built from, or by its CPE. The name it was built from is the Yocto recipe (`bomlens:yocto:recipe`, so `openssl-bin` and `libssl3` are read as `openssl`), the OpenWrt source package (the last part of `syft:metadata:source`, so `libmbedtls12` is read as `mbedtls` and `ip-full` as `iproute2`), or the product of a CPE whose vendor is `*`, the form in which Yocto writes `CVE_PRODUCT`. A toolchain package (an OpenWrt source path ending in `toolchain`, such as `libc`) and a kernel module package (`kmod-*`, built from `package/kernel/linux`) are not read by their source package name, so they keep what they had; a `kmod-*` package does not take the kernel's purl. A match is used only when it has a version of a form the table covers; a package rebuild count such as `-1` and a kernel build hash are removed first, and a Linux or glibc base release written `5.4.0` takes the tag of `5.4`. A component not in the table keeps the identifier it had, since a guessed repository or tag would name a different version. The one exception is a source download address that states the release, for a project the table does not list (for a listed project the table decides). The Yocto SPDX 2.2 reader records the address of the recipe's first source as `bomlens:sourceUrl`; a GitHub release asset or tag archive there gives `pkg:github/<owner>/<repo>@<tag>` when the tag names the component's version (`v1.2`, `V_1_2`, `name-1.2` or `1.2`), and a GNU release (`ftp.gnu.org` or `ftpmirror.gnu.org`, `/gnu/<name>/<name>-<version>.tar.*`) gives `pkg:gnu/<name>@<version>` when that version equals the component's. A plain tarball elsewhere or a git commit is not read as a release. When a scan reports a project both as the operating-system component and as a package or binary with the same purl, as syft does for BusyBox, only the package or binary gets the purl. The version, the CPE and the evidence are not changed, so the CVEs found from them stay in the report. The new purl is marked `bomlens:purlSource = upstream-map`, and a purl it replaced is kept in `bomlens:originalPurl`. Set `ENRICH_UPSTREAM_PURL=false` to turn it off.
+Only projects in a closed table whose repository and tag spelling were checked are converted, so a component not in it keeps the identifier it had. The version, the CPE and the evidence are not changed, so the CVEs found from them stay in the report. The new purl is marked `bomlens:purlSource = upstream-map`, and a purl it replaced is kept in `bomlens:originalPurl`. Set `ENRICH_UPSTREAM_PURL=false` to turn it off. The projects covered and the matching rules are in [Pipeline by input type](../concepts/pipeline-by-input.md#upstream-repository-purl).
 
 ## Supplying the versions the scan could not read
 
@@ -118,17 +101,7 @@ python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
   --target "./device.bin" --firmware --binary-kb ./kb --generate-only
 ```
 
-The `--bg` folder holds tarballs of packages you do not want reported. Their strings only lower the weight of strings they share with a reported component, which is how a library copied into several programs is credited to the package it came from. Put the neighbours of what you scan in it (the C library, the shell utilities, the router's own daemons); a base without them reports components that merely share code with them. A reference build with symbols per component (`--ref refs.csv`) adds constant-table signatures that survive static linking, and `--ref-bg` lists files whose tables are not signatures. The base is a SQLite file and holds no code; it is opened read-only. The detection thresholds are stored in it (`--rule-score` and `--rule-unique` set them at build time, defaults 300 and 10). They depend on the base: scan root filesystems that hold none of its components, and raise the score until the false positives stop.
-
-What a result carries:
-
-- A component has a `version` only when exactly one release in the base fits. When several fit, the component has no version and `bomlens:versionCandidates` and `bomlens:versionRange` list them, so no vulnerability is matched against a release nobody could pick.
-- When the one release that fits is the newest the base has, the component is reported without a version, with `bomlens:versionMayBeNewer` and that release in `bomlens:versionCandidates`. A version that is not in the base comes back as its nearest neighbour, and for a version newer than every release in the base that neighbour is the last one; written as the version, it would be matched against vulnerabilities a newer release has fixed. The component goes into the component-versions template for you to fill. Set `FW_BINKB_TRUST_NEWEST=true` to write the version anyway, still marked.
-- When a component's code is found inside a file that is not its own library or program (a static link, or a copied source file), the result carries `bomlens:linkage` (`embedded`, or `own-file-and-embedded` when its own file is present too) and `bomlens:embeddedIn` with those files, so a vulnerable library inside a program can be traced to the program that carries it.
-- A result whose score is under 2.5 times the base's stored threshold carries `bomlens:kbConfidence=low`; the review page lists it first with a note to check that the files are really that component. Strong results carry `high`.
-- The builder does not store a string literal that is only an upper-case constant name (for example `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`). The package that defines such a name writes it through a macro, so it never appears as a literal in that package's own source, while every other package that prints it would be credited with it.
-- `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbSha256` (the hash of the base file), `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
-- A component found only by constant tables has no version and is tagged `presence-only`.
+Put the tarballs of packages you do not want reported in the `--bg` folder, above all the neighbours of what you scan (the C library, the shell utilities, the router's own daemons); a base without them reports components that merely share code with them. A component gets a `version` only when exactly one release in the base fits. Otherwise the candidates are listed, no vulnerability is matched, and the component goes into the component-versions template above. The build options, the detection thresholds and every field a result carries are in [Pipeline by input type](../concepts/pipeline-by-input.md#binary-knowledge-base).
 
 A review page turns the results into a queue to decide. It is one HTML file that loads nothing from the network:
 
@@ -151,9 +124,9 @@ Limits: a component the base does not contain is not found; a program that links
 
 ## How CVEs are matched
 
-Trivy matches components by their package PURL, with a database it downloads at scan time as in any other scan. A component with no package PURL (none, `pkg:generic`, `pkg:opkg`, or a source repository PURL such as `pkg:github`) is matched by its CPE against the NVD CPE index built into the image (`cpe_match.sqlite`), and its CVEs go into the same security report. This match runs with `--security` in firmware, root filesystem and binary scans and for a Yocto SPDX 2.2 archive (`<image>.spdx.tar.zst`), once, after every step that adds CPEs. A component identified by name and version through BomLens's name list (`cpe-name-map.json`), OpenSSH or BusyBox for example, is matched as well as one the signature checkers gave a CPE. A Yocto SPDX 3.0 document and a build read through its manifests are not matched this way: they already carry Yocto's own verdicts, and matching their CPEs again would report as open what Yocto judged patched or not affected. Yocto writes a CPE such as `cpe:2.3:*:*:busybox:1.36.1`. A part of `*` is read as an application, and a vendor of `*` is looked up by product alone across every vendor of that product, as Yocto's own cve-check does. Most products listed under more than one vendor are one project that NVD filed under several names (`linux_kernel` under `linux` and `kernel`, `curl` under `haxx`, `curl` and `daniel_stenberg`). Yocto drops the wrong vendors' CVEs with `CVE_STATUS` `cpe-incorrect`, which an SPDX 2.2 build does not carry, so a product name another project shares can bring that project's CVEs too. An SPDX 2.2 build does not record which CVEs a recipe patched either, so the CVEs matched this way can include ones the recipe already patched; SPDX 3.0 records it (`INHERIT += "create-spdx-3.0"`). The result manifest records the step as `match-cpe` with `offered`, `components` and `cves` counts.
+Trivy matches components by their package PURL, with a database it downloads at scan time as in any other scan. A component with no package PURL (none, `pkg:generic`, `pkg:opkg`, or a source repository PURL such as `pkg:github`) is matched by its CPE against the NVD CPE index built into the image (`cpe_match.sqlite`), and its CVEs go into the same security report. This match runs with `--security` in firmware, root filesystem and binary scans and for a Yocto SPDX 2.2 archive (`<image>.spdx.tar.zst`), once, after every step that adds CPEs. A component identified by name and version through BomLens's name list (`cpe-name-map.json`), OpenSSH or BusyBox for example, is matched as well as one the signature checkers gave a CPE. The details for a Yocto build, and the switches that turn the match off, are in [Pipeline by input type](../concepts/pipeline-by-input.md#cve-matching-by-cpe).
 
-The index is distilled from the NVD data when the image is built, so the match needs no network and no NVD API key, and its data is as recent as the image. Pull a newer image to update it. cve-bin-tool only identifies binaries; it does not download or read a vulnerability database. `CVE_BIN_TOOL_MODE=components-only` turns the CPE match off while identification still runs. An image built with `--build-arg SBOM_CPE_INDEX=false` has no index, and the step is recorded as `skipped` (`not_installed`).
+The index is distilled from the NVD data when the image is built, so the match needs no network and no NVD API key, and its data is as recent as the image. A newer release brings a newer index.
 
 A component with no version, or with no package PURL and no CPE the index was asked about, is listed in the security report under "Components that could not be checked" (`UncheckedComponents` in `_security.json`). A short vulnerability table therefore covers only the components that were checked.
 

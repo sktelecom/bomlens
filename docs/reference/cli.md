@@ -86,7 +86,7 @@ Environment variables adjust the behavior.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | Override the scanner image |
+| `SBOM_SCANNER_IMAGE` | The release tag in the release archive (`ghcr.io/sktelecom/bomlens:1.15.2` in v1.15.2); `ghcr.io/sktelecom/bomlens:latest`, built from `main`, in a repository checkout | Override the scanner image. In the archive, the `:latest` defaults in the rows below are the release tag as well |
 | `SBOM_FIRMWARE_IMAGE` | Follows `SBOM_SCANNER_IMAGE` when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-firmware:1.13.2`), else `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
 | `SBOM_AIBOM_IMAGE` | Follows `SBOM_SCANNER_IMAGE` when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-aibom:1.13.2`), else `ghcr.io/sktelecom/bomlens-aibom:latest` | Image used for AI model (ML-BOM) generation |
 | `SBOM_DEEP_CVE_IMAGE` | Follows `SBOM_SCANNER_IMAGE` when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-deep-cve:1.13.2`), else `ghcr.io/sktelecom/bomlens-deep-cve:latest` | Image used for `--deep-cve` (grype CPE matching), and by the same toggle in the web UI |
@@ -311,7 +311,7 @@ Re-scanning the same `--project`/`--version` reuses its output folder, however t
 ### Anything else
 
 1. Run the same command again and read the terminal output. The `[WARN]` and `[ERROR]` lines say what was skipped or what failed.
-2. Update the Docker image: `docker pull ghcr.io/sktelecom/bomlens:latest`.
+2. Move to the current release: download the newer archive, whose scan pulls the matching image. In a repository checkout, run `git pull` and `docker pull ghcr.io/sktelecom/bomlens:latest`.
 3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml) with the command you ran and its terminal output. The issue form lists what it needs.
 
 For how to use each mode, see the [input scenarios guide](../guides/by-input.md); for the kinds of outputs, see the [artifacts reference](artifacts.md); for language detection, see [supported ecosystems](ecosystems.md); to run scans in a pipeline, see [CI/CD integration](../guides/ci-cd.md).

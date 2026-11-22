@@ -1466,7 +1466,7 @@ test("the conformance panel shows its warning in Korean", async ({ page }) => {
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
   await expect(page.getByTestId("conformance-empty-result")).toContainText("소프트웨어 컴포넌트를 찾지 못했습니다");
-  await expect(page.getByText("적합, 아래 안내 확인 필요")).toBeVisible();
+  await expect(page.getByText("통과, 아래 안내 확인 필요")).toBeVisible();
 });
 
 test("the conformance panel keeps a plain pass and shows only the figure for healthy license coverage", async ({ page }) => {

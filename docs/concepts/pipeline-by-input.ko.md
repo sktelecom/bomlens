@@ -39,6 +39,40 @@ cdxgen이 프로젝트를 읽기 전에 빌드 도구가 하는 일과 그 도�
 
 > 펌웨어 도구는 GPL 계열이라 `bomlens-firmware` 이미지에만 들어가고 기본 이미지에는 설치하지 않습니다. [펌웨어 가이드](../guides/firmware.ko.md)와 그 한계를 참고하세요.
 
+### 이미지 안의 추가 파일시스템
+
+하나의 이미지가 파일시스템을 여럿 담을 수 있고, rootfs 안이 아니라 옆에 놓인 트리도 함께 식별합니다. 세 가지를 알아보며, 판정 근거는 디렉터리 이름이 아니라 그 안에 무엇이 설치돼 있는지를 적은 기록입니다. 첫째는 컨테이너 이미지 저장소로 Docker가 남기는 이미지 색인으로 알아봅니다(스위치 운영체제에서 흔한 구조로, 실제로 동작하는 것 대부분이 컨테이너 안에 있습니다). 둘째는 자체 패키지 데이터베이스를 가진 또 하나의 파일시스템입니다. 셋째는 Python `site-packages`처럼 인터프리터가 설치한 라이브러리 묶음입니다. rootfs만 읽으려면 `FW_EXTRA_ROOTS=false`로 둡니다. 컨테이너 저장소에서 나온 구성요소에는 어느 컨테이너 이미지에서 나왔는지가 `bomlens:container:image` 속성으로 남고, 이미지 자체도 `container` 구성요소로 들어갑니다. 컨테이너 안에서 `dpkg`로 설치된 패키지는 그 컨테이너가 어떤 배포판을 쓰는지를 자기 계층의 `os-release`에서 읽어 식별하며, 그래야 취약점 단계에서 대조할 대상이 생깁니다. 이렇게 식별한 것에는 `bomlens:purlSource` 속성이 붙습니다. SPDX로 내보내도 이 내용이 남습니다. 이미지와 배포판은 SPDX 패키지가 되고, 소속은 `CONTAINS` 관계로 들어갑니다.
+
+### upstream 저장소 purl
+
+펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto 빌드의 기록에서 읽은 SBOM은 컴포넌트에 upstream 소스 저장소와 릴리스 태그로 purl을 붙입니다([펌웨어 가이드](../guides/firmware.ko.md#upstream-저장소-purl)). 컴포넌트를 찾는 방식은 다음과 같습니다.
+
+변환에는 저장소와 태그 표기를 확인한 프로젝트만 담은 변환표(`docker/lib/upstream-purl-map.json`)를 씁니다. BusyBox, curl, OpenSSL 1.x와 3.x, OpenSSH, Linux, zlib, U-Boot, Net-SNMP, ncurses, net-tools, libxml2, SQLite, glibc, Dropbear, Mbed TLS, Python, Boa, readline, jansson, json-c, libbpf, iproute2, musl, util-linux가 들어 있습니다. json-c는 태그에 릴리스 날짜가 들어 있어, 변환표에 적은 0.13.1부터 0.19까지의 버전만 다룹니다. 컴포넌트는 자기 이름, 빌드에 쓰인 소스의 이름, CPE 가운데 하나로 찾습니다. 빌드에 쓰인 소스의 이름으로는 Yocto 레시피(`bomlens:yocto:recipe`), OpenWrt 소스 패키지(`syft:metadata:source`의 마지막 부분), 벤더가 `*`인 CPE의 제품명을 씁니다. Yocto는 `CVE_PRODUCT`를 이 형태로 적습니다. 예를 들어 Yocto의 `openssl-bin`과 `libssl3`은 레시피 이름에 따라 `openssl`로, OpenWrt의 `libmbedtls12`와 `ip-full`은 소스 패키지 이름에 따라 `mbedtls`와 `iproute2`로 읽습니다. 툴체인 패키지(`libc`처럼 OpenWrt 소스 경로가 `toolchain`으로 끝나는 패키지)와 커널 모듈 패키지(`package/kernel/linux`에서 빌드한 `kmod-*`)는 소스 패키지 이름으로 찾지 않습니다. 그래서 원래 식별자를 그대로 두고, `kmod-*` 패키지에 커널의 purl이 붙지 않습니다. 찾은 뒤에는 변환표가 다루는 형식의 버전이 있을 때만 바꿉니다. 이때 `-1` 같은 패키지 재빌드 번호와 커널 빌드 해시는 먼저 떼고, `5.4.0`처럼 적힌 Linux와 glibc의 기본 릴리스는 `5.4`의 태그로 바꿉니다. 변환표에 없는 컴포넌트는 원래 식별자를 그대로 둡니다. 저장소나 태그를 추측하면 다른 버전을 가리키게 되기 때문입니다. 예외는 변환표에 없는 프로젝트의 소스 내려받기 주소가 릴리스를 직접 밝히는 경우입니다. 변환표에 있는 프로젝트는 변환표로만 정합니다. Yocto SPDX 2.2 판독기는 레시피의 첫 번째 소스 주소를 `bomlens:sourceUrl`에 기록합니다. 그 주소가 GitHub 릴리스 파일이나 태그 압축 파일이고 태그가 컴포넌트 버전을 나타내면(`v1.2`, `V_1_2`, `name-1.2`, `1.2`) `pkg:github/<owner>/<repo>@<tag>`를 붙이고, GNU 릴리스(`ftp.gnu.org`나 `ftpmirror.gnu.org`의 `/gnu/<name>/<name>-<version>.tar.*`)이면 그 버전이 컴포넌트 버전과 같을 때만 `pkg:gnu/<name>@<version>`을 붙입니다. 다른 곳의 일반 압축 파일이나 git 커밋은 릴리스로 보지 않습니다. syft가 BusyBox를 운영체제 컴포넌트와 바이너리 컴포넌트로 함께 보고할 때처럼 같은 purl이 운영체제 컴포넌트와 패키지나 바이너리 컴포넌트에 함께 붙게 되면 패키지나 바이너리 쪽에만 붙입니다. 버전, CPE, 식별 근거는 바꾸지 않으므로 이를 근거로 찾은 CVE도 보고서에 그대로 남습니다. 새 purl에는 `bomlens:purlSource = upstream-map`이 붙고, 바꾸기 전 purl은 `bomlens:originalPurl`에 남습니다. 끄려면 `ENRICH_UPSTREAM_PURL=false`를 설정합니다.
+
+### 바이너리 지식 베이스
+
+[펌웨어 가이드](../guides/firmware.ko.md#바이너리-지식-베이스로-컴포넌트-식별하기)의 옵트인 베이스를 만드는 방법과 찾은 결과에 기록되는 내용입니다.
+
+`--bg` 폴더에는 보고하지 않을 패키지의 tarball을 넣습니다. 이 패키지의 문자열은 보고 대상 컴포넌트와 공유하는 문자열의 비중을 낮출 뿐이며, 여러 프로그램에 복사된 라이브러리가 원래 패키지의 것으로 판정되는 근거가 됩니다. 스캔 대상의 이웃(C 라이브러리, 셸 도구, 공유기의 자체 데몬)을 넣어야 합니다. 이웃이 없는 베이스는 코드만 공유하는 다른 프로그램을 컴포넌트로 보고합니다. 컴포넌트마다 심볼이 있는 참조 빌드(`--ref refs.csv`)를 주면 정적 링크에서도 남는 상수 테이블 서명이 더해지고, `--ref-bg`에는 테이블을 서명에서 뺄 파일 목록을 줍니다. 베이스는 SQLite 파일이며 코드를 담지 않고 읽기 전용으로 엽니다. 판정 기준값은 베이스에 저장되며, 만들 때 `--rule-score`와 `--rule-unique`로 정합니다(기본값 300과 10). 적정값은 베이스마다 다릅니다. 베이스의 컴포넌트가 하나도 없는 루트 파일시스템을 스캔해서, 오탐이 사라질 때까지 점수 기준을 올립니다.
+
+결과에 담기는 것은 다음과 같습니다.
+
+- 베이스에서 맞는 릴리스가 정확히 하나일 때만 `version`을 씁니다. 여럿이 맞으면 버전 없이 보고하고 `bomlens:versionCandidates`와 `bomlens:versionRange`에 후보를 적습니다. 아무도 고를 수 없는 릴리스에 취약점을 대조하지 않기 위해서입니다.
+- 맞는 릴리스가 하나이고 그것이 베이스가 가진 가장 새 릴리스이면, 버전 없이 보고하고 `bomlens:versionMayBeNewer`를 붙이며 그 릴리스를 `bomlens:versionCandidates`에 적습니다. 베이스에 없는 버전은 가장 가까운 이웃으로 나오고, 베이스의 모든 릴리스보다 새 버전이면 그 이웃은 마지막 릴리스입니다. 이것을 버전으로 쓰면 더 새 릴리스가 이미 고친 취약점에 대조하게 됩니다. 이런 컴포넌트는 버전 보충용 템플릿에 들어가 직접 채우게 합니다. `FW_BINKB_TRUST_NEWEST=true`를 주면 버전을 그대로 쓰되 표시는 남깁니다.
+- 컴포넌트의 코드가 그 컴포넌트 자체 라이브러리나 프로그램이 아닌 파일 안에서 발견되면(정적 링크나 복사된 소스 파일), 결과에 `bomlens:linkage`(`embedded`, 자체 파일도 함께 있으면 `own-file-and-embedded`)와 그 파일 목록을 담은 `bomlens:embeddedIn`이 붙습니다. 취약한 라이브러리가 어느 프로그램에 들어 있는지 따라갈 수 있습니다.
+- 점수가 베이스에 저장된 판정 기준의 2.5배 미만인 결과에는 `bomlens:kbConfidence=low`가 붙고, 검토 화면이 이 항목을 먼저 보여 주며 파일이 정말 그 컴포넌트인지 확인하라고 안내합니다. 점수가 높은 결과에는 `high`가 붙습니다.
+- 빌더는 대문자 상수 이름뿐인 문자열 리터럴(예: `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`)을 저장하지 않습니다. 그 이름을 정의한 패키지는 매크로로 쓰므로 자기 소스에는 리터럴로 나타나지 않고, 그 이름을 출력하는 다른 패키지가 대신 점수를 가져가기 때문입니다.
+- `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbSha256`(DB 파일의 해시), `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙습니다.
+- 상수 테이블로만 찾은 컴포넌트는 버전이 없고 `presence-only`로 표시합니다.
+
+### CPE로 CVE 대조하기
+
+펌웨어, 루트 파일시스템, 바이너리 스캔은 패키지 PURL이 없는 컴포넌트를 CPE로 이미지 안의 NVD CPE 인덱스와 대조합니다([펌웨어 가이드](../guides/firmware.ko.md#cve-대조-방식)).
+
+Yocto SPDX 3.0 문서와 매니페스트로 읽은 빌드는 이렇게 대조하지 않습니다. 이미 Yocto가 내린 판정을 담고 있어서, CPE로 다시 대조하면 Yocto가 패치했거나 해당 없다고 판정한 CVE를 열린 것으로 보고하게 되기 때문입니다. Yocto는 CPE를 `cpe:2.3:*:*:busybox:1.36.1`처럼 적습니다. 종류가 `*`이면 애플리케이션으로 읽고, 벤더가 `*`이면 Yocto의 cve-check와 같이 그 제품명을 쓰는 모든 벤더에서 제품명으로 찾습니다. 여러 벤더 아래 올라 있는 제품은 대부분 NVD가 한 프로젝트를 여러 이름으로 등록한 경우입니다(`linux_kernel`은 `linux`와 `kernel`, `curl`은 `haxx`, `curl`, `daniel_stenberg`). Yocto는 맞지 않는 벤더의 CVE를 `CVE_STATUS`의 `cpe-incorrect`로 걸러 내지만 SPDX 2.2 빌드에는 이 정보가 담기지 않으므로, 다른 프로젝트와 제품명이 같으면 그 프로젝트의 CVE도 함께 나올 수 있습니다. SPDX 2.2를 쓴 빌드는 레시피가 어떤 CVE를 패치했는지도 기록하지 않으므로, 이렇게 찾은 CVE에는 레시피가 이미 패치한 것이 섞일 수 있습니다. SPDX 3.0은 이를 기록합니다(`INHERIT += "create-spdx-3.0"`). 결과 매니페스트에는 이 단계가 `match-cpe`로 남고 `offered`, `components`, `cves` 개수가 함께 기록됩니다.
+
+cve-bin-tool은 바이너리 식별에만 쓰며, 취약점 데이터베이스를 내려받거나 읽지 않습니다. `CVE_BIN_TOOL_MODE=components-only`로 두면 식별은 그대로 하고 CPE 대조만 끕니다. `--build-arg SBOM_CPE_INDEX=false`로 빌드한 이미지에는 인덱스가 없으며, 이때 이 단계는 `skipped`(`not_installed`)로 기록됩니다.
+
 ---
 
 ## 받은 SBOM
@@ -70,6 +104,14 @@ HuggingFace 데이터셋도 같은 경로로 처리합니다. 앞에 아무것�
 어느 AI 스캔이든 선언(`--ai-declare`로 준 파일이나 웹 UI에서 저장해 둔 선언)이 있으면, 위험 판정과 G7 검사 전에 두 단계가 선언의 일부를 CycloneDX SBOM에 반영합니다. 첫 단계는 선언이 허브 id로 적은 데이터셋 원천을 읽어, 그 원천이 데이터셋과 함께 판정되게 합니다. 둘째 단계는 모델을 실행하는 서비스(`services[]`, 그 `dependencies[]`, 표준을 담은 `declarations.claims[]`)와 모델에 선언한 입력과 출력 종류, 학습 연산량, 적대적 시험 여부를 기록하고, 모두 발행자 선언으로 표시합니다. 두 단계 모두 SPDX 3.0.1 변환기가 받아들인 선언만 적용하며, 이어지는 G7 검사가 시스템 속성 요소를 이 서비스에서 읽습니다. [모델을 실행하는 서비스](../guides/ai-model.ko.md#모델을-실행하는-서비스)를 참고하세요.
 
 > 모델 카드의 공개 항목(가중치, 아키텍처, 학습 데이터, 학습 과정)과 G7 결과는 웹 UI의 모델·데이터셋과 G7 섹션에 나타납니다. [웹 UI 레퍼런스](../reference/ui.ko.md)를 참고하세요. 단계별 안내는 [AI 모델 가이드](../guides/ai-model.ko.md)에 있습니다.
+
+### 모델 카드가 적은 데이터셋
+
+[AI 모델 가이드](../guides/ai-model.ko.md#동작-방식)의 ML-BOM 구성과, 모델 카드가 적은 데이터셋을 어디까지 따라가는지 설명합니다.
+
+문서가 기술하는 대상은 모델입니다. CycloneDX가 SBOM의 대상을 적는 자리인 `metadata.component`에 모델이 들어가고, 참조하는 데이터셋은 그 의존 항목으로 `components[]`에 들어갑니다. ML-BOM을 읽는 도구는 구성요소 목록이 아니라 이 자리에서 모델을 찾아야 합니다.
+
+데이터셋 카드도 자신이 만들어진 원천 데이터셋을 적을 수 있습니다(`source_datasets`). BomLens는 이 원천도 같은 방식으로 따라가며, 최대 3단계 아래까지, 스캔 한 번에 최대 40개 데이터셋까지 조회합니다(`AIBOM_DATASET_DEPTH`, `AIBOM_DATASET_MAX_LOOKUPS`. 깊이를 0으로 두면 모델 카드가 적은 데이터셋만 읽습니다). 원천마다 별도 항목이 되고 그 원천에서 나온 데이터셋과 연결됩니다. 그래서 허용적인 라이선스로 공개된 혼합 데이터셋 안에 더 좁은 조건의 원천이 있으면 그것이 드러납니다. HuggingFace 데이터셋 id 형태인 값만 조회하며, `HF_ENDPOINT`가 설정되어 있으면 그 주소로 조회합니다. 카드가 문장으로 적은 원천("Wikipedia dump 2023-01", `extended|other`)이나 자리표시 값(`extended`만 적은 경우, `unknown`, `N/A`)은 적힌 그대로 남기고 검토 필요로 표시합니다. 이름이 비슷한 데이터셋을 찾아 맞추거나 추정하지 않습니다. 대부분의 데이터셋 카드는 원천을 적지 않으므로, 이 기능이 정보를 더하는 것은 주로 학습용 혼합 데이터셋 같은 일부 데이터셋입니다.
 
 ---
 

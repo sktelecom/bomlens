@@ -96,6 +96,22 @@ if errorlevel 1 goto :err_ca_not_pem
 set "CA_V=--mount "type=bind,source=%SBOM_EXTRA_CA_CERTS%,target=/bomlens-ca/extra.pem,readonly" -e BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem"
 :ca_done
 
+REM --- proxy ---------------------------------------------------------------
+REM HTTP_PROXY, HTTPS_PROXY and NO_PROXY reach the UI container by name, and
+REM server.py hands them on to the scans it starts. Same as scan-sbom.sh --ui.
+REM Each is passed in both cases (cmd names are case-insensitive, the tools in
+REM the container are not). A proxy on this machine's loopback address is left
+REM out: inside the container that address is the container itself.
+set "PROXY_E="
+set "PV=%HTTP_PROXY%"
+call :proxy_loopback
+if defined HTTP_PROXY if not defined PV_LOOP set "PROXY_E=-e HTTP_PROXY -e http_proxy"
+set "PV=%HTTPS_PROXY%"
+call :proxy_loopback
+if defined HTTPS_PROXY if not defined PV_LOOP set "PROXY_E=%PROXY_E% -e HTTPS_PROXY -e https_proxy"
+if defined NO_PROXY set "PROXY_E=%PROXY_E% -e NO_PROXY -e no_proxy"
+set "PV="
+
 REM --- Docker checks (the real prerequisite) -------------------------------
 REM `docker version` also talks to the daemon, so it fails when the engine is
 REM merely stopped. Distinguish the two with `where`, otherwise a user whose
@@ -180,6 +196,7 @@ docker run --rm -it ^
     -v "%OUTDIR%":/host-output ^
     %MOUNT_V% ^
     %CA_V% ^
+    %PROXY_E% ^
     %GUARD_V% ^
     %ANDROID_V% ^
     -v /var/run/docker.sock:/var/run/docker.sock ^
@@ -330,6 +347,24 @@ if not "%SBOM_EXTRA_CA_CERTS:>=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
 if not "%SBOM_EXTRA_CA_CERTS:^=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
 goto :eof
 
+REM Set PV_LOOP when the proxy URL in PV points at this machine (127.x,
+REM localhost or [::1], with or without a scheme). Works on the variable
+REM directly, like :check_mount_chars.
+:proxy_loopback
+set "PV_LOOP="
+if not defined PV goto :eof
+if "%PV:~0,4%"=="127." set "PV_LOOP=1"
+if not "%PV:://127.=%"=="%PV%" set "PV_LOOP=1"
+if /i "%PV%"=="localhost" set "PV_LOOP=1"
+if /i "%PV:~0,10%"=="localhost:" set "PV_LOOP=1"
+if /i "%PV:~0,10%"=="localhost/" set "PV_LOOP=1"
+if /i "%PV:~-12%"=="://localhost" set "PV_LOOP=1"
+if not "%PV:://localhost:=%"=="%PV%" set "PV_LOOP=1"
+if not "%PV:://localhost/=%"=="%PV%" set "PV_LOOP=1"
+if "%PV:~0,5%"=="[::1]" set "PV_LOOP=1"
+if not "%PV:://[::1]=%"=="%PV%" set "PV_LOOP=1"
+goto :eof
+
 REM Snapshot the Hyper-V/WSL reserved ranges ONCE. Running netsh per candidate
 REM port cost ~6 seconds on a machine with a handful of ranges, which would be
 REM added to every single launch. A netsh blocked by group policy just leaves the
@@ -380,7 +415,7 @@ set "V=%~2"
 if not defined K goto :eof
 REM Whitelist: never `set` an arbitrary name out of a text file.
 set "OK="
-for %%w in (SBOM_LANG UI_PORT UI_BIND_ADDRESS SBOM_SCANNER_IMAGE SBOM_OUTPUT_DIR SBOM_UI_MOUNT_DIR SBOM_PULL SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS) do if /i "%K%"=="%%w" set "OK=1"
+for %%w in (SBOM_LANG UI_PORT UI_BIND_ADDRESS SBOM_SCANNER_IMAGE SBOM_OUTPUT_DIR SBOM_UI_MOUNT_DIR SBOM_PULL SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS HTTP_PROXY HTTPS_PROXY NO_PROXY) do if /i "%K%"=="%%w" set "OK=1"
 if not defined OK goto :eof
 REM A real environment variable always wins over the file.
 if defined %K% goto :eof

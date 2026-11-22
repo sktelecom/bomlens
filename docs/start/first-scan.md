@@ -6,11 +6,11 @@ description: Install BomLens and generate your first SBOM. The fastest path need
 
 From install to your first [SBOM](../concepts/what-is-sbom.md), step by step. The fastest path needs no command line: download the app and double-click it.
 
-BomLens runs on a Docker engine, but the desktop app and web UI set it up and pull the image for you. You only manage Docker yourself for the CLI — see [Requirements](#requirements) below if you still need to install one.
+BomLens runs on a Docker engine, which you install yourself ([Requirements](#requirements) below). The desktop app and the web UI then check that the engine runs and pull the scanner image for you.
 
 ## Start without the command line (recommended)
 
-Download the installer for your system, [Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 1.4 GB on disk), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so Edge may hold the download back and Windows SmartScreen may warn when you open it. The [no-CLI quick start](../start/no-cli.md) shows each of those steps and how to update the app, and [Troubleshooting](troubleshooting.md) shows what to do on macOS. To scan your own project folder, pick the Choose folder tile and click Add folder… there; for a project that needs a company repository or proxy, see [Java (Maven)](../guides/java-maven.md) and [Company network](../guides/company-network.md). Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step by step in [Path B of the no-CLI quick start](../start/no-cli.md#path-b-zip-and-double-click-batch-file-alternative).
+Download the installer for your system, [Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS (.dmg)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image ([size](#requirements)), and shows the UI in its own window (it listens on a random local port, so there is no fixed address to type in a browser). The app is unsigned for now, so Edge may hold the download back and Windows SmartScreen may warn when you open it. The [no-CLI quick start](../start/no-cli.md) shows each of those steps and how to update the app, and [Troubleshooting](troubleshooting.md) shows what to do on macOS. To scan your own project folder, pick the Choose folder tile and click Add folder… there; for a project that needs a company repository or proxy, see [Java (Maven)](../guides/java-maven.md) and [Company network](../guides/company-network.md). Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step by step in [Path B of the no-CLI quick start](../start/no-cli.md#path-b-zip-and-double-click-batch-file-alternative).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
@@ -21,13 +21,13 @@ No commands beyond launching it: run in the browser, scan, and download results.
 ```bash
 mkdir -p ~/bomlens && cd ~/bomlens
 curl -fsSL https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli.tar.gz | tar -xz
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under ~/sbom-output
+cd ~/my-project && ~/bomlens/scripts/scan-sbom.sh --ui   # run from the folder to scan; opens http://localhost:8080
 #   Windows: unzip bomlens-cli-windows.zip and double-click scripts\sbom-ui.bat
 ```
 
-`bomlens-cli.tar.gz` is the command line of the latest release for Linux, macOS and WSL: the scripts, the license files and the bundled Node.js example. On Windows without WSL, download [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip) from the same release instead. The first launch can take a minute or two before the page loads: the script downloads the scanner image of that release if it is missing (about 1.4 GB on disk), or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
+`bomlens-cli.tar.gz` is the command line of the latest release for Linux, macOS and WSL: the scripts, the license files and the bundled Node.js example. On Windows without WSL, download [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip) from the same release instead. The first launch can take a minute or two before the page loads: the script downloads the scanner image of that release if it is missing, or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
 
-Results go to `~/sbom-output` (change it with `--output-dir`): each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, the script stops before it prints an address and names a free port to use, for example `UI_PORT=8081 ./scripts/scan-sbom.sh --ui`. On Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead (see [Settings file](troubleshooting.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after extracting, that is the BomLens folder itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+Results go to `~/sbom-output` (change it with `--output-dir`): each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, the script stops before it prints an address and names a free port to use, for example `UI_PORT=8081 ~/bomlens/scripts/scan-sbom.sh --ui`. On Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead (see [Settings file](troubleshooting.md#settings-file-no-command-line-needed)). The Current folder tile scans the folder you started from. For a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
@@ -40,7 +40,7 @@ Screen layout and per-target details are in the [web UI reference](../reference/
 
 ## Your first SBOM (CLI)
 
-Advanced, for automation and CI. Run from the folder you extracted the archive into. The first run downloads the scanner image (about 1.4 GB on disk) and a language image (3 to 16 GB on disk, for example 2.9 GB for Node.js and 5.6 GB for Java), so allow a few minutes to tens of minutes depending on the network. Before a download the script prints the size and stops if the Docker engine has less free space than that plus 2 GB ([sizes and cleanup](../reference/docker-image.md#how-much-disk-do-the-images-take)). A long step prints a `Still running` line every minute, so a quiet terminal is not a hang. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
+Advanced, for automation and CI. Run from the folder you extracted the archive into. The first run downloads the scanner image and a language image ([sizes](#requirements)), so allow a few minutes to tens of minutes depending on the network. Before a download the script prints the size and stops if the Docker engine has less free space than that plus 2 GB ([sizes and cleanup](../reference/docker-image.md#how-much-disk-do-the-images-take)). A long step prints a `Still running` line every minute, so a quiet terminal is not a hang. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
 
 <!-- runnable -->
 ```bash
@@ -91,13 +91,15 @@ BomLens needs only a Docker *engine* — not a specific product.
 |------|---------|
 | Docker | 20.10+ |
 | Memory | 4 GB+ allocated to the Docker engine |
-| Disk | about 10 GB free in the Docker engine for a first scan of one language; 20 GB or more for .NET or a mixed-language tree |
+| Disk | about 10 GB free in the Docker engine for a first scan of one language; 20 GB or more for .NET or a mixed-language tree. The scanner image takes about 1.4 GB on disk, and each language adds an image of 3 to 16 GB, for example 2.9 GB for Node.js and 5.6 GB for Java ([every image](../reference/docker-image.md#how-much-disk-do-the-images-take)) |
 | OS | Linux, macOS, Windows |
-| Arch | AMD64, ARM64 |
+| Arch | AMD64, ARM64. Every published image, the opt-in ones included, runs natively on both ([list](../reference/docker-image.md)) |
 
-Every published image, including the opt-in `--firmware` and `--deep-cve` ones, supports both architectures, so pulling any of them on an ARM64 host (an Apple Silicon Mac, an Arm server) works natively; see the [Docker image reference](../reference/docker-image.md) for the full list.
+The memory figure is for the engine (the VM behind Docker Desktop, Rancher Desktop or Colima), not the host. Under 4 GB a Maven or Gradle build (Java, Android, or a mixed project) can run out of memory, and the scan then lists direct dependencies only. Such a scan warns before the build starts, without stopping. To raise the memory:
 
-The memory figure is for the engine itself (the VM behind Docker Desktop, Rancher Desktop, or Colima on macOS), not the host machine. Tools like Colima default to 2 GB, which is enough for a manifest-only scan but too tight for languages where BomLens has to run an actual build to resolve transitive dependencies (Java/Gradle, Java/Maven). Under 4 GB, that build step can be killed for running out of memory, and the scan falls back to a shallower, direct-dependencies-only result. A scan that runs a Maven or Gradle build (Java, Android, or a mixed project with a `pom.xml` or `build.gradle`) on an engine with less than about 4 GB prints a warning before the build starts, with the setting to change (`colima stop && colima start --memory 4` for Colima, Settings > Resources > Memory for Docker Desktop; with the WSL 2 backend, Rancher Desktop on Windows or docker-ce in WSL2, set `memory=4GB` in `%UserProfile%\.wslconfig` and run `wsl --shutdown`). The warning is a hint and does not stop the scan. If the dependency graph still looks thin, check the scan's warnings for a note about it.
+- Colima (2 GB by default): `colima stop && colima start --memory 4`.
+- Docker Desktop: Settings > Resources > Memory.
+- The WSL 2 backend (Rancher Desktop on Windows, docker-ce in WSL2): `memory=4GB` in `%UserProfile%\.wslconfig`, then `wsl --shutdown`.
 
 If you already run a Docker engine (Docker Desktop, Rancher Desktop, Colima, docker-ce in WSL2, anything), confirm it works. On macOS, Linux and WSL2 the extracted archive has a check that tests Docker, the engine, the scanner image, engine memory and the UI port in one go and says what to do about each. Before the first scan it reports the scanner image as missing and prints the `docker pull` command for it; the first scan pulls the image anyway:
 

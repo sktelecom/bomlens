@@ -37,10 +37,7 @@ Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그�
 ## 사전 준비
 
 - Docker 엔진 20.10 이상. 무료로는 WSL2 + docker-ce나 Rancher Desktop을 쓰면 되고, Docker Desktop은 조직 사용 시 유료입니다.
-- 스캐너 이미지 pull:
-  ```bash
-  docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
-  ```
+- 스캐너 이미지는 직접 받지 않아도 됩니다. 첫 스캔이 릴리스에 맞는 이미지를 받습니다.
 - 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 
 > 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. 외부 시스템(Dependency-Track 서버나 TRUSCA) 자동 업로드를 함께 쓰려면 생략하세요. 대상은 `UPLOAD_TARGET`으로 고릅니다.
@@ -236,7 +233,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 
 | 증상 | 원인 / 해결 |
 |------|------------|
-| `trivy not installed ... skipping` | 구버전 이미지. `docker pull`로 최신 이미지를 받으세요. |
+| `trivy not installed ... skipping` | 구버전 이미지. 최신 릴리스 압축 파일을 받으면 그 스캔이 맞는 이미지를 받습니다. |
 | `--deep-license requested but scancode not in image` | `bomlens-deep-license` 이미지로 실행하세요(`SBOM_SCANNER_IMAGE`에 BomLens 이미지가 아닌 이름, 레지스트리 경로가 없는 짧은 로컬 이름, 1.13.2보다 낮은 버전을 지정하지 않았다면 소스 스캔은 CLI가 자동으로 고릅니다). 직접 빌드하려면 `--build-arg SBOM_DEEP_LICENSE=true`를 쓰세요. |
 | UI에서 `Docker is not running` | Docker 엔진(Rancher Desktop/Docker Desktop 등)을 시작한 뒤 다시 실행하세요. |
 | 고지문에 `NOASSERTION`이 많음 | 의존성에 라이선스 메타데이터가 없는 경우입니다. `--deep-license`로 보완하거나 수동 확인하세요. |

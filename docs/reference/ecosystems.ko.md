@@ -86,7 +86,7 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 참고: 최상위 폴더에 `pom.xml`과 `build.gradle`(또는 `build.gradle.kts`)이 함께 있으면 예전처럼 Gradle 프로젝트로 읽습니다. `pom.xml`만 읽으려면 `--build-tool maven`을 쓰고(Gradle 파일은 스캔에서 제외하며 Gradle 단계도 실행하지 않습니다), Gradle 파일만 읽으려면 `--build-tool gradle`을 씁니다. 스캔 로그에 읽는 도구가 출력되고, SBOM에는 `bomlens:build-tool-choice`로 도구가, `bomlens:build-tool-choice-why`로 이유가 남습니다. 같은 프로젝트라도 두 도구가 해석하는 의존성 집합은 다를 수 있으니 고르기 전에 개수를 비교해 보세요. 빌드 도구가 하나뿐인 폴더나 `pom.xml`이 하위 폴더에만 있는 경우에는 영향이 없습니다.
 
-> 참고: 사내 저장소나 미러는 본인의 Maven 설정으로 동작합니다. `~/.m2/settings.xml`과 `~/.m2/settings-security.xml`이 있으면 읽기 전용으로 스캔에 넘기고(컨테이너 안의 `/bomlens-settings/m2`), Gradle 파일인 `~/.gradle/gradle.properties`, `init.gradle`, `init.gradle.kts`, `init.d/`도 같습니다. CLI와 `--ui`, 데스크톱 앱은 이렇게 하지만 더블클릭하는 `sbom-ui.bat`은 하지 않습니다. 미러 주소는 컨테이너 안에서 접속할 수 있어야 합니다. HTTPS를 다시 서명하는 프록시라면 `SBOM_EXTRA_CA_CERTS`가 필요합니다. [Maven으로 빌드하는 자바 프로젝트는 어떻게 스캔하나요?](../guides/java-maven.ko.md)를 보세요.
+사내 저장소나 미러는 본인의 Maven 설정으로 동작합니다. `~/.m2/settings.xml`과 `~/.m2/settings-security.xml`이 있으면 읽기 전용으로 스캔에 넘기고(컨테이너 안의 `/bomlens-settings/m2`), Gradle 파일인 `~/.gradle/gradle.properties`, `init.gradle`, `init.gradle.kts`, `init.d/`도 같습니다. CLI와 `--ui`, 데스크톱 앱은 이렇게 하지만 더블클릭하는 `sbom-ui.bat`은 하지 않으므로 그때는 데스크톱 앱이나 `scan-sbom.bat`을 씁니다. 미러 주소는 컨테이너 안에서 접속할 수 있어야 합니다. HTTPS를 다시 서명하는 프록시라면 `SBOM_EXTRA_CA_CERTS`가 필요합니다. [Maven으로 빌드하는 자바 프로젝트는 어떻게 스캔하나요?](../guides/java-maven.ko.md)를 보세요.
 
 ## Java (Gradle)
 

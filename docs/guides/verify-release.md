@@ -11,14 +11,14 @@ A tool that reports on supply chains should have a supply chain you can check. E
 Compare the file with its line in the release's [`SHA256SUMS.txt`](https://github.com/sktelecom/bomlens/releases/latest/download/SHA256SUMS.txt): `sha256sum -c SHA256SUMS.txt --ignore-missing` on Linux, `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` on macOS, or `(Get-FileHash <file> -Algorithm SHA256).Hash` in PowerShell.
 This detects a damaged download only. It does not detect a forged release, since whoever replaces a file can replace the checksum file too; the cosign steps below check that.
 
-The steps below need `cosign` v2 and check the newest release. For an older one, set `VERSION` to its tag (for example `VERSION=vX.Y.Z`), or in PowerShell use the commented `$base` line.
+The steps below need `cosign` v2 or later (v3 may print a warning; `Verified OK` is the result) and check the newest release. For an older one, set `VERSION` to its tag first (for example `VERSION=vX.Y.Z`); the commands keep a `VERSION` you set. In PowerShell, use the commented `$base` line.
 
 ## Release files (installers, CLI, source bundles)
 
 One signature covers the checksum file, and the checksum file covers every asset, so you verify one file and then the checksums.
 
 ```bash
-VERSION=$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)
+VERSION=${VERSION:-$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)}
 gh release download "$VERSION" --repo sktelecom/bomlens \
   --pattern 'SHA256SUMS.txt*' --pattern 'BomLens-Setup.exe'
 
@@ -65,7 +65,7 @@ If the last line prints `MISMATCH`, do not run the installer.
 The images are signed by digest, and each one carries its own SBOM as a signed attestation. Image tags drop the leading `v` of the release tag.
 
 ```bash
-VERSION=$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)
+VERSION=${VERSION:-$(gh release view --repo sktelecom/bomlens --json tagName -q .tagName)}
 cosign verify "ghcr.io/sktelecom/bomlens:${VERSION#v}" \
   --certificate-identity-regexp '^https://github.com/sktelecom/bomlens/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com

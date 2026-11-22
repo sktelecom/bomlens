@@ -88,12 +88,17 @@ jobs:
 스캔 자체가 게이트하므로 job에 `jq`가 필요 없습니다.
 
 ```yaml
+stages: [security]
+
+# GitLab.com의 Linux 인스턴스 러너처럼 특권 서비스를 허용하는 Docker 실행기를 가정한다.
 generate-sbom:
   stage: security
   image: docker:latest
   services:
     - docker:dind
   variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
     BOMLENS_VERSION: v1.15.2   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
   before_script:
     - apk add --no-cache bash curl
@@ -187,10 +192,12 @@ CI 러너는 이미지도 인증 정보도 없는 상태로 시작하므로, 개
 `scan-sbom.sh`는 컨테이너를 띄우므로 Docker 엔진이 필요합니다. 엔진이 없는 러너(쿠버네티스 러너, `docker:dind`를 쓰지 않는 GitLab 작업)에서는 위 예시를 쓸 수 없습니다. 이때는 스캐너 이미지를 작업 이미지로 그대로 씁니다. lock 파일이 트리 전체를 덮으면(`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock`, `gradle.lockfile` 중 하나이고 루트 아래 다른 매니페스트가 없을 때) 이미지 안의 소스 스캔은 Docker 소켓 없이 lock 파일을 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. 그런 lock 파일이 없는 트리는 syft가 매니페스트를 읽어 직접 의존성만 나오므로(의존성을 선언했는데 lock 파일이 없는 Node 프로젝트는 안내와 함께 거부됩니다) lock 파일을 커밋하거나 Docker가 있는 러너를 쓰세요.
 
 ```yaml
+stages: [security]
+
 generate-sbom:
   stage: security
   image:
-    name: ghcr.io/sktelecom/bomlens:latest
+    name: ghcr.io/sktelecom/bomlens:1.15.2   # 앞의 v를 뺀 릴리스 태그. 새 릴리스를 쓰려면 이 값을 올린다
     entrypoint: [""]
   variables:
     MODE: SOURCE

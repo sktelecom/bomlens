@@ -14,11 +14,9 @@ How to generate a CycloneDX ML-BOM (machine-learning bill of materials) for a Hu
 
 An AI model's "bill of materials" is its model card: identifier, architecture, task, license, supplier, datasets, and the integrity of its files. BomLens uses the [OWASP AIBOM Generator](https://github.com/GenAI-Security-Project/aibom-generator) to read a HuggingFace model card and build a **CycloneDX 1.7 ML-BOM** centered on the model and the datasets it references. It then adds a **G7 minimum-element conformance** check (advisory). Because a model has no package dependencies, there is no security (CVE) report.
 
-The model is the subject of the document: it sits in `metadata.component`, which is where CycloneDX names what an SBOM is about, and the datasets it references sit under `components[]` as its dependencies. A tool reading the ML-BOM should look for the model there rather than in the component list.
+The ML-BOM's subject and the datasets read below a model card are described in [Pipeline by input type](../concepts/pipeline-by-input.md#datasets-a-model-card-names).
 
 A model card names its training datasets and stops there. BomLens looks each one up on HuggingFace and records what it finds — the declared license, the upstream datasets it derives from, and a content digest — as its own entry in the SBOM, linked to the model as a dependency. A dataset that cannot be read (withdrawn, renamed, or private to someone else) is kept in the SBOM as a name marked unreadable; no license is invented for it. This is also what decides the training-data disclosure axis: `open-data` needs at least one dataset that actually opened, and a card naming datasets nobody can retrieve reads `declared-unverified` instead.
-
-A dataset card can in turn name the datasets it was built from (`source_datasets`). BomLens follows those too, the same way, up to three levels down and at most 40 dataset lookups per scan (`AIBOM_DATASET_DEPTH`, `AIBOM_DATASET_MAX_LOOKUPS`; a depth of 0 reads only the datasets the model card names). Each source becomes its own entry linked to the dataset it came from, so a mixture published under a permissive license shows the source inside it that carries narrower terms. Only a value shaped like a HuggingFace dataset id is looked up, at the hub `HF_ENDPOINT` names when it is set. A source the card names in words ("Wikipedia dump 2023-01", `extended|other`) or with a placeholder (`extended` alone, `unknown`, `N/A`) is kept as written and marked for review; nothing is matched to it by name or guessed. Most dataset cards name no sources at all, so this adds information for a minority of datasets, typically training mixtures.
 
 The full tool flow is in [Pipeline by input type](../concepts/pipeline-by-input.md#ai-model).
 
@@ -29,11 +27,7 @@ You need two things.
 - **A Docker engine, installed and running.** If you have none, start with the requirements in [First scan](../start/first-scan.md).
 - **A way to run BomLens.** The desktop app needs no commands; for the command line, [First scan](../start/first-scan.md) covers downloading the command-line archive. AI model scans need a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships separately from the base image.
 
-```bash
-docker pull ghcr.io/sktelecom/bomlens-aibom:latest
-```
-
-That image is about 3.5 GB to download, far larger than the base scanner image (about 250 MB). The first pull can take tens of minutes depending on your connection, so start it with time to spare. It is downloaded once. Pulling ahead of time is optional: `--model` uses this image by default and fetches it when missing, and the web UI and desktop app fetch it on the first AI-model scan while showing progress. To use a different tag, set `SBOM_AIBOM_IMAGE`.
+That image is about 3.5 GB to download, larger than the base scanner image ([sizes](../start/first-scan.md#requirements)). The first pull can take tens of minutes depending on your connection, and it is downloaded once. There is nothing to pull by hand: `--model` fetches it, with the same release tag as the scanner image, when it is missing, and the web UI and desktop app fetch it on the first AI-model scan while showing progress. To use a different tag, set `SBOM_AIBOM_IMAGE`.
 
 ## Running it
 
@@ -109,9 +103,7 @@ The verdict lands on the model component and feeds the file-security axis of the
 
 Two things worth knowing about the middle rows. "Something that needs a look" is common in perfectly legitimate checkpoints — a model class of its own, or a `Lambda` layer used for an ordinary activation function, is enough to trigger it — so it asks for a human rather than raising an alarm. And a clean result answers one question only: it says the weights do not execute code on load by this specific path, not that the file has been cleared of everything. For pickle it is a pickle analysis, not a malware scan; for Keras it is a text search for the `Lambda` marker, not a parse of the model config.
 
-An `.npz` is opened and only the members that actually hold a pickle are examined: a numpy array of dtype `object` stores its contents as a pickle, which is how a payload hides in what looks like a numeric archive. A file with no such member is reported as not applicable rather than as clean, because nothing was examined.
-
-If the scan cannot run at all, no verdict is written and the assessment simply has no file-security axis. A missing scan reads as "not scanned", never as safe.
+An `.npz` archive is checked only in its pickle members, and a scan that could not run leaves no verdict ([details](../reference/artifacts.md#how-a-models-risk-is-judged)).
 
 #### What this path cannot do
 
@@ -171,7 +163,7 @@ To fill them, edit the empty declaration the scan writes, `{Project}_{Version}_a
   --model "acme/support-adapter" --ai-declare my-llm_1.0_ai-declaration.template.json --generate-only
 ```
 
-Most declared values go into the SPDX document only, each marked as declared. The exceptions are the service the model runs in and the model's input and output kinds, training compute and adversarial testing, which also reach the CycloneDX SBOM (see [The service a model runs in](#the-service-a-model-runs-in)). A declaration that names a dataset or base model the scan did not find, a value outside a field's list, or a date not written as `YYYY-MM-DDThh:mm:ssZ` is refused with the reasons. Some fields are a judgement the tool never makes for you: whether the model uses sensitive personal information, its safety risk level, and its autonomy. The check lists them as needing a decision, and leaving them empty is allowed. `model.license` (a HuggingFace licence tag or an SPDX licence id) gives the model's own licence when the scan read none, or only `other`; one that differs from the licence the scan read is listed for review, and the scan's is kept. It is written as an SPDX expression only when it is a hub tag that names exactly one SPDX licence, or a `LicenseRef-`; anything else is kept in words, with `NoAssertionLicense` as the expression.
+Most declared values go into the SPDX document only, each marked as declared. The exceptions are the service the model runs in and the model's input and output kinds, training compute and adversarial testing, which also reach the CycloneDX SBOM (see [The service a model runs in](#the-service-a-model-runs-in)). What is refused, the fields left to your judgement and how `model.license` is written are in [Artifacts](../reference/artifacts.md#spdx-301-ai-document-fields).
 
 In the web UI there is no file to edit: **Models & datasets** shows the document's state and a **Fill in empty fields** button that asks for the open fields one step at a time and saves them as the declaration (see [the web UI reference](../reference/ui.md#ai-surfaces)). The saved declaration is the same `{Project}_{Version}_ai-declaration.json` file, so a re-scan applies it again, from the CLI as well.
 
@@ -186,11 +178,7 @@ A model being prepared for release has no repository or file to scan, so it can 
 
 The model becomes the SBOM's subject under the project name and version, marked `bomlens:origin=declared-input`. The base models listed in `model.baseModels[].ref` and the datasets in `datasets[].ref` (`huggingface:<owner>/<name>`) are read from the hub by id, so their lineage, licences and traced sources are the same as in a model scan, and `datasets[].local` holds data the hub does not have. The risk assessment, the G7 check and this document follow as usual. No hub supplies the download address and supplier, so the document stays a draft until they are declared.
 
-Here the whole SBOM is the publisher's statement, so two declared values enter it. The names in `document.createdBy` become the SBOM author when `--sbom-author` is not given, marked `bomlens:sbom-author-source=declaration`. The model's own licence, `model.license`, is the other: the risk assessment judges the model on it, and an ancestor under the same terms is not flagged as a mismatch. Without it the model has no licence and its verdict reads `review`. It enters the SBOM when the scan runs, so a licence changed later with **Fill in empty fields** is listed for review until the model is scanned again.
-
-A dataset's card often lists no sources, so the scan cannot trace them. The declaration can name them for each dataset (`sources[]`, and a "Where this data came from" row in the web UI's questions). A source given by its HuggingFace id is read from the hub on the next scan, before the risk assessment, so its recorded licence counts in the dataset's verdict just as a traced source's does. A source known only by name is written to the SPDX 3.0.1 document with the licence you give, marked as declared and not verified, and does not change the verdict. A declaration the converter refuses is not applied here either. A dataset the model card names (or the dataset a scan describes) with no source on record anywhere is listed in the check for review.
-
-Two rules apply. A value that is not in the scan and not declared is left out rather than estimated, and a base model is written by its id and licence only, so nothing the publisher declares about the model is copied onto it. `--no-spdx3` skips the document.
+`--no-spdx3` skips the document. How a declaration-only scan records the author and licence, declared dataset sources, and what is never estimated are in [Artifacts](../reference/artifacts.md#spdx-301-ai-document-fields).
 
 ## The service a model runs in
 
@@ -309,15 +297,7 @@ The AI compliance profile also carries a usability verdict per model, answering 
 | caution | A known blocking signal — for example a non-commercial or research-only license. |
 | review | The tool cannot judge: an unrecognized license, a missing license, or a dataset that could not be read. A person has to look. |
 
-The file-security axis reads the scan results Hugging Face itself runs over every repository — ClamAV for malware and picklescan for executable pickle imports, per file. BomLens reads them through the metadata API without downloading a single file, records the worst status with the flagged file names, and notes whether the weights use a pickle-family format (which can execute code on load) or a safe one such as safetensors. A model whose scan is still pending reads review, not safe. Set `ENRICH_HF_SECURITY=false` to skip the lookup.
-
-The license verdict comes from a curated registry (`docker/lib/ai-risk-knowledge.json`) covering the complete Hugging Face license tag list. Each entry records whether commercial use, redistribution and derivatives are allowed, the conditions that apply, and a link to the license text; the profile prints the summary and the conditions next to the verdict, so the grounds travel with the judgement. A license the registry does not know falls to review — it is never guessed. A model's overall verdict is the worst across its assessed axes, and an axis nothing evaluated shows as not assessed rather than being read as safe.
-
-Two further checks deepen the license verdict. For a model tagged `other`, BomLens reads the repository's LICENSE file (one small text file — still no weight download) and searches it for restrictive wording such as non-commercial, research-only or no-derivatives clauses; a match is quoted verbatim next to the verdict, so the report says "review needed because of this sentence" rather than only "unclassified". No match still reads review — a pattern miss proves nothing. And for a fine-tuned model, BomLens walks the declared base-model chain (up to five ancestors) and compares licenses: when an ancestor carries a license whose conditions extend to derivatives (Llama, Gemma, the RAIL family, non-commercial CC) but the model itself declares something else, the mismatch is flagged as a caution — a common mislabeling on the hub that a tag-only check cannot see.
-
-The datasets axis rolls the referenced datasets up into the model's verdict. Each dataset entry is judged on its own license and on its declared risk markers: a publisher tag such as `pii` (personally identifiable information) or `not-for-all-audiences`, and an access restriction (gated or private repository). The model takes the worst dataset verdict, with the offending datasets named. These markers are the publisher's own declarations — their absence proves nothing, so they only ever raise a verdict, never clear one.
-
-A dataset's traced sources are judged the same way and carried into the dataset's own verdict: the strictest verdict anywhere below a dataset decides it, and the reason names the source and its license (for example `source org/nc: cc-by-nc-4.0 (caution)`). A source that could not be read, declares no license, or is named only in words reads review, and so does a dataset whose sources lie past the depth limit, since those were not read. The rule reads recorded licenses and nothing else; whether a source's owner relicensed the derived data on other terms is not something it can see.
+A model's verdict is the worst across the axes that were assessed: file security (the malware and pickle scans Hugging Face runs, `ENRICH_HF_SECURITY=false` skips them), the license (from a registry of every Hugging Face license tag, never guessed), the base-model chain and the referenced datasets with their traced sources. An axis nothing evaluated reads not assessed, not safe. How each axis is judged is in [Artifacts](../reference/artifacts.md#how-a-models-risk-is-judged).
 
 The verdict can be tailored to how you will actually use the model. Pass `--usage` with one of `internal` (in-house review and research), `product` (shipping in a product or service), `redistribute` (fine-tuning and redistribution) or `outputs-only` (using only what the model generates), and only the license conditions that bind that scenario decide the verdict — a non-commercial model, for example, reads conditional for internal research but caution for product use. The report always states which scenario it judged for; without `--usage` every condition counts.
 

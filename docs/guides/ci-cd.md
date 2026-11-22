@@ -89,12 +89,17 @@ jobs:
 The scan itself gates, so the job needs no `jq`.
 
 ```yaml
+stages: [security]
+
+# Assumes a Docker executor that allows privileged services, as GitLab.com's Linux instance runners do.
 generate-sbom:
   stage: security
   image: docker:latest
   services:
     - docker:dind
   variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
     BOMLENS_VERSION: v1.15.2   # the BomLens release to use; raise it to take a newer one
   before_script:
     - apk add --no-cache bash curl
@@ -188,10 +193,12 @@ A CI runner starts with no images and no credentials, so a few things that are a
 `scan-sbom.sh` starts containers, so it needs a Docker engine: a runner without one (a Kubernetes runner, a GitLab job without `docker:dind`) cannot use the examples above. Run the scanner image itself as the job image instead. A source scan inside it needs no Docker socket when a lock file covers the whole tree (a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile`, with no other manifest below the root): it reads the lock file as it is and fills the licenses it lacks from the package registry. A tree without such a lock file is read by syft from its manifests, which gives direct dependencies only (a Node project with none is refused with guidance), so commit a lock file or use a runner that has Docker.
 
 ```yaml
+stages: [security]
+
 generate-sbom:
   stage: security
   image:
-    name: ghcr.io/sktelecom/bomlens:latest
+    name: ghcr.io/sktelecom/bomlens:1.15.2   # a release tag without the leading v; raise it to take a newer one
     entrypoint: [""]
   variables:
     MODE: SOURCE

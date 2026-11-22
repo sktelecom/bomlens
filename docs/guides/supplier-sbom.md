@@ -30,7 +30,7 @@ BomLens was built for SK Telecom's supplier SBOM submission, and the table below
 
 > The accepted format ranges above are the SK Telecom submission defaults. If your organization accepts a different range, override them with the `CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS` (AI SBOMs), and `SPDX_SPEC_VERSIONS` environment variables (space-separated lists). They are listed in the [Docker image environment variables](../reference/docker-image.md).
 
-The `pkg:generic` line above is the `skt-submission` conformance profile (`--conformance-profile skt-submission`), not the tool's own default. The default profile treats `pkg:generic` as advisory instead of a failing requirement and accepts 90% PURL coverage rather than 100%; the web UI's submission-review screen already defaults to `skt-submission`, but the CLI does not, so pass the flag explicitly when checking against this table.
+The `pkg:generic` line above comes from the `skt-submission` profile, not the default one, which treats `pkg:generic` as advisory and accepts 90% PURL coverage rather than 100%. An SBOM upload in the web UI uses `skt-submission` unless you change it; the CLI needs `--conformance-profile skt-submission`.
 
 ## Running it all at once
 
@@ -44,7 +44,7 @@ If the SBOM leans Java (Maven), turn on **Deep CVE matching (NVD CPE)** in the s
 
 Prefer no command line? See the [no-CLI quick start](../start/no-cli.md) first. What follows is the CLI path.
 
-Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), then pass the SBOM file to `--analyze`:
+Pass the SBOM file to `--analyze`. The first scan pulls the scanner image by itself.
 
 ```bash
 ./scripts/scan-sbom.sh --project supplier-app --version 2.0.0 \
@@ -68,7 +68,7 @@ A self-generated scan produces the same conformance check report file by default
 
 ## Reading the conformance check report
 
-The report checks the SBOM's own fields row by row against the selected profile. For SPDX input it checks the original document before conversion. Pass and fail here are results against the format requirements of the selected conformance profile. This is not a legal compliance determination.
+The report checks the SBOM's own fields row by row against the selected profile. For SPDX input it checks the original document before conversion. Pass and fail here are results against the format requirements of the selected conformance profile. This is not a legal compliance determination. The screen shows the verdict as Pass or Fail; `fail` and `warn` below are the values written in the report file.
 
 - A required row that falls short is a `fail`, and one `fail` fails the SBOM.
 - A recommended row that falls short is a `warn`. It does not change the verdict.
@@ -111,9 +111,9 @@ A Yocto SPDX document is read with its own parser, as is a Yocto build directory
 After validation and analysis, send the risk report (`_risk-report.html`) to whoever sent the SBOM and ask for the following.
 
 - Fix the conformance `fail` items and send the SBOM again.
+- Prepare a response plan or risk justification for Critical vulnerabilities within 7 days and High within 30 days (recommended deadlines).
 
 The conformance report ends with a "Message for the supplier" section under `--analyze`: one sentence per failed item (and per warning that names components) with the affected component names and how to fix it. Copy it into the request as it is. Each failed item also carries its own fix in the report, and a missing top-level name or version is stated in words.
-- Prepare a response plan or risk justification for Critical vulnerabilities within 7 days and High within 30 days (recommended deadlines).
 
 Response tracking, exception approval, and history management are out of scope for this tool — they belong to a separate vulnerability and risk management system. This tool covers validating, analyzing, and reporting on a single SBOM locally.
 

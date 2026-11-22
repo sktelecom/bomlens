@@ -39,7 +39,7 @@ The build directory is recognized as one, and the image SBOM it published is ana
 
 When several machines or images were built, the most recently written SBOM is analyzed and all the candidates are listed in the log; pass a specific one with `--analyze <file>` to choose another. A build that writes its images somewhere else entirely (a relocated `DEPLOY_DIR`) is not found this way either, so name that document the same way. When all you were sent is the SBOM file, upload it in the web UI or pass it to `--analyze`.
 
-The web UI reads the same folder: pick it with the Directory input (mount it first with `--ui --mount ~/poky/build`, or use Add folder in the desktop app) and the detection runs exactly as it does on the command line.
+The web UI reads the same folder: pick it with the Choose folder tile (mount it first with `--ui --mount ~/poky/build`, or use Add folder… in the desktop app) and the detection runs exactly as it does on the command line.
 
 The conformance check report of a build directory scan measures the SBOM the scan writes (`<Project>_<Version>_bom.json`), which is the file to submit, rather than the build's own document. That SBOM records `bomlens:scanMode` `YOCTO`, and under `--conformance-profile skt-submission` it is judged the way a firmware scan is: it records the packages installed, not a dependency graph. A Yocto document passed to `--analyze` is judged as it was written.
 

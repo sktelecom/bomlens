@@ -1,6 +1,6 @@
 # Java Gradle Example
 
-> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
+**English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](https://sktelecom.github.io/bomlens/start/first-scan/) and the [usage guide](https://sktelecom.github.io/bomlens/reference/cli/).
 
 This example demonstrates SBOM generation for Java projects using Gradle.
 
@@ -20,7 +20,7 @@ This example demonstrates SBOM generation for Java projects using Gradle.
 
 ## Generate SBOM
 
-> **Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](../../docs/start/first-scan.md).
+**Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](https://sktelecom.github.io/bomlens/start/first-scan/).
 
 ```bash
 cd examples/java-gradle

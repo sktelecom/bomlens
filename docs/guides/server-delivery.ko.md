@@ -24,8 +24,7 @@ description: 서버의 SBOM을 만드는 방법. OS rootfs, 애플리케이션, 
 > **Windows**: 아래 명령은 macOS/Linux 기준입니다. `scan-sbom.bat`와 WSL2 사용법은 [첫 스캔](../start/first-scan.ko.md)를 참고하세요.
 
 ```bash
-# Docker 20.10+ 필요. 스캐너 이미지를 한 번 받습니다.
-docker pull ghcr.io/sktelecom/bomlens:latest
+# Docker 20.10+ 필요. 스캐너 이미지는 첫 스캔이 릴리스에 맞는 것을 받습니다.
 
 # 스크립트 경로와, 모든 층의 산출물을 모을 공유 디렉터리를 변수에 둡니다
 # (각 층은 그 안에서도 자기만의 {project}_{version}/ 하위 폴더에 생깁니다 —

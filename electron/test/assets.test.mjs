@@ -83,3 +83,16 @@ test("the installer's side picture is the BomLens icon on a 164x314 24-bit bitma
     assert.equal(bmp.readUInt16LE(28), 24, `${m[1]} must be 24-bit for the installer`);
   }
 });
+
+test("the engine-not-running screen names the Rancher Desktop engine setting in both languages", () => {
+  const html = read(path.join(assets, "docker-missing.html"));
+  const notes = [...html.matchAll(/engineNote:\s*"([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(notes.length, 2, "one engineNote per language");
+  for (const note of notes) {
+    assert.match(note, /Preferences > Container Engine/);
+    assert.match(note, /dockerd \(moby\)/);
+    assert.match(note, /containerd/);
+  }
+  assert.match(html, /<p id="engine-note"><\/p>/);
+  assert.match(html, /reason === "not-running" && platform !== "linux" \? s\.engineNote : ""/);
+});

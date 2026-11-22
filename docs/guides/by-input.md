@@ -30,8 +30,7 @@ For any input form, adding `--all --generate-only` produces all four at once (th
 > - To work without a command line, double-click `scripts\sbom-ui.bat`.
 
 ```bash
-# Docker 20.10+ required. Pull the scanner image once (or build it yourself).
-docker pull ghcr.io/sktelecom/bomlens:latest   # legacy name sbom-scanner serves the same image
+# Docker 20.10+ required. The first scan pulls the scanner image of your release.
 
 # For convenience, keep the script path in a variable.
 SBOM=/path/to/bomlens/scripts/scan-sbom.sh
@@ -158,7 +157,7 @@ $SBOM --project team6-fw --version 1.0.0 \
   --all --generate-only
 ```
 
-- Firmware analysis needs the opt-in firmware image, which includes GPL tools (unblob, cve-bin-tool, etc.). Set it via `SBOM_FIRMWARE_IMAGE`, or pull the default (`ghcr.io/sktelecom/bomlens-firmware:latest`).
+- Firmware analysis needs the opt-in firmware image, which includes GPL tools (unblob, cve-bin-tool, etc.). The scan pulls `ghcr.io/sktelecom/bomlens-firmware` with your release tag; set `SBOM_FIRMWARE_IMAGE` to use another.
 - Recognized extensions (`.bin/.img/.squashfs/.ubi/...`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - For behavior and limits, see the [firmware analysis guide](../guides/firmware.md).
 
@@ -207,15 +206,15 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Build artifact | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
 | Firmware upload | upload a `.bin`, etc. — the tile appears automatically whenever Docker is running |
-| Docker image | enter the image name (for a private registry, run `docker login` on this machine first) |
-| AI model | enter a HuggingFace model id — the tile appears automatically whenever Docker is running |
+| Docker image | enter the image name. For a private registry, run `docker login` and `docker pull <image>` on this machine first: the scanner reads the pulled image, and your Docker login is not passed into it |
+| AI model or dataset | enter a HuggingFace model id; the tile appears automatically whenever Docker is running |
 | Model file | upload a `.gguf`, `.safetensors`, `.pt`, etc. (up to 8 GB) |
-| Published dataset | enter a Figshare item (its page URL, its DOI, or the item number) or a HuggingFace dataset (`datasets/<owner>/<name>` or its `https://huggingface.co/datasets/...` address) in the same field as the model id |
+| AI model or dataset, for a published dataset | enter a Figshare item (its page URL, its DOI, or the item number) or a HuggingFace dataset (`datasets/<owner>/<name>` or its `https://huggingface.co/datasets/...` address) in the same field as the model id |
 | Enter model information | answer the questions about a model that has no repository or file yet (base models, training data, release date and the like) |
 
 This table lists what the input scenarios in this guide cover; the full set (12 targets) is in the [web UI reference](../reference/ui.md#new-scan).
 
-For source-code scans (current folder, GitHub URL, ZIP upload), a **Result quality** group offers toggles (License scan / ScanCode, File-level identification / SCANOSS) that change how the source is analyzed rather than which files are produced, both off by default. See [Result quality](../reference/ui.md#new-scan) in the Web UI reference for what each one does and per-target availability.
+For source-code scans (current folder, GitHub URL, ZIP upload), a **Result quality** group offers toggles (Per-file license scan with ScanCode, Detect copied-in open source with SCANOSS) that change how the source is analyzed rather than which files are produced, both off by default. See [Result quality](../reference/ui.md#new-scan) in the Web UI reference for what each one does and per-target availability.
 
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report. The conformance check report file is downloadable too; its pass/fail screen only appears when the input was an uploaded SBOM (`--analyze`) rather than a fresh scan.
 
