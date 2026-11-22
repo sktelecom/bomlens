@@ -9,13 +9,30 @@
  * Pure and unit tested — every count comes from the check statuses and sources,
  * none is invented.
  */
-import type {
-  AiProfile,
-  ConformanceCheck,
-  ConformanceSummary,
-  ExplainedComponent,
-  ExplainedReason,
+import {
+  type AiProfile,
+  type ConformanceCheck,
+  type ConformanceProfile,
+  CONFORMANCE_PROFILES,
+  type ConformanceSummary,
+  type ExplainedComponent,
+  type ExplainedReason,
 } from "./api";
+
+/** i18n label key per conformance-profile value, shared by the scan form and
+ *  the result's conformance screen. */
+export const CONFORMANCE_PROFILE_LABEL_KEY: Record<ConformanceProfile, string> = {
+  default: "options.conformanceProfileDefault",
+  "skt-submission": "options.conformanceProfileSktSubmission",
+  "bsi-tr-03183-2": "options.conformanceProfileBsi",
+};
+
+/** The label key of the profile a scan ran with, or null when the scan did not
+ *  record one (an older scan) or recorded a value this client does not know. */
+export function profileLabelKey(profile: string | null | undefined): string | null {
+  if (!profile || !(CONFORMANCE_PROFILES as string[]).includes(profile)) return null;
+  return CONFORMANCE_PROFILE_LABEL_KEY[profile as ConformanceProfile];
+}
 
 export function isG7(check: ConformanceCheck): boolean {
   return check.id.startsWith("g7-");

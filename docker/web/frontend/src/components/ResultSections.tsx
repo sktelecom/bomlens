@@ -263,6 +263,7 @@ export function ResultSection({
           isSuppliedDocument={Boolean(inputSbomFileName(result))}
           isAiDocument={isAiScan(result)}
           completeness={result.completeness}
+          profile={result.scanConfig?.conformanceProfile}
           query={query}
           onQueryChange={onQueryChange}
         />

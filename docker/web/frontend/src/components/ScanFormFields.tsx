@@ -31,6 +31,7 @@ import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "@/lib/demo";
 import { analyzeMinutesEstimate } from "@/lib/analyzeEstimate";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { BUILD_TOOLS, BUILD_TOOL_LABEL_KEY, type BuildTool } from "@/lib/buildTool";
+import { CONFORMANCE_PROFILE_LABEL_KEY } from "@/lib/conformance";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
 
@@ -49,13 +50,6 @@ const UPLOAD_LABEL: Record<UploadKind, string> = {
   firmware: "source.firmwareUpload",
   model: "source.modelUpload",
   declaration: "source.aiDeclare",
-};
-
-/** i18n label key per conformance-profile value. */
-const CONFORMANCE_PROFILE_LABEL_KEY: Record<ConformanceProfile, string> = {
-  default: "options.conformanceProfileDefault",
-  "skt-submission": "options.conformanceProfileSktSubmission",
-  "bsi-tr-03183-2": "options.conformanceProfileBsi",
 };
 
 /** The `aria-describedby` of a field: its error message first, then its hint.

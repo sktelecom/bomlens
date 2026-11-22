@@ -19,6 +19,7 @@ import {
   groupG7ByCluster,
   kindTally,
   matchesQuery,
+  profileLabelKey,
   registryTally,
   resultQuality,
   splitChecks,
@@ -59,10 +60,14 @@ export function ConformancePanel({
   isSuppliedDocument = false,
   isAiDocument = false,
   completeness = null,
+  profile = null,
   query,
   onQueryChange,
 }: {
   conformance: ConformanceSummary;
+  /** The conformance profile the scan ran with (scanConfig.conformanceProfile);
+   *  named in the summary box so a pass is read against the right criteria. */
+  profile?: string | null;
   /** Scoping for the report download links; omit to hide them. */
   scanId?: string | null;
   /** This scan's artifacts, to offer the same report as a file. */
@@ -144,6 +149,7 @@ export function ConformancePanel({
   const incomplete = !isAiDocument && isIncomplete(completeness);
   const pass = conformance.result === "pass";
   const warnPass = pass && (quality.empty || quality.noLicenses);
+  const profileKey = profileLabelKey(profile);
 
   if (checks.length === 0) {
     return (
@@ -218,9 +224,14 @@ export function ConformancePanel({
               </Label>
             </div>
             <div className="bl-cf-body">
-              {/* What "conformance" measures: this SBOM's own fields against the
-                  format and the regulatory requirements, not a judgment of the
-                  scanned software. */}
+              {profileKey && (
+                <p className="bl-small" data-testid="conformance-profile">
+                  {t("options.conformanceProfile")}: <span className="bl-strong">{t(profileKey)}</span>
+                </p>
+              )}
+              {/* What a pass and a fail mean: this SBOM's own fields against the
+                  selected profile's format requirements, not a judgment of the
+                  scanned software and not a legal compliance determination. */}
               <p className="bl-muted bl-small">{t("g7.panelIntro")}</p>
               <p className="bl-strong">{t("g7.verdictFailed", { count: verdict.mandatoryFailed })}</p>
               {(quality.empty || quality.noLicenses) && <QualityNote quality={quality} supplied={isSuppliedDocument} completeness={completeness} />}

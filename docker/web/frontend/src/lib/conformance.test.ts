@@ -20,6 +20,7 @@ import {
   matchesQuery,
   missingOverflow,
   profileCard,
+  profileLabelKey,
   resultQuality,
   sortByAttention,
   splitChecks,
@@ -549,5 +550,20 @@ describe("formatMeasure", () => {
     expect(formatMeasure("32/40 component(s)", fmt, unit)).toBe("32/40 components");
     expect(formatMeasure("0/1 component(s)", fmt, unit)).toBe("0/1 component");
     expect(formatMeasure("not present in the SBOM", fmt, unit)).toBe("not present in the SBOM");
+  });
+});
+
+describe("profileLabelKey", () => {
+  it("names each profile a scan can record with the scan form's label", () => {
+    expect(profileLabelKey("default")).toBe("options.conformanceProfileDefault");
+    expect(profileLabelKey("skt-submission")).toBe("options.conformanceProfileSktSubmission");
+    expect(profileLabelKey("bsi-tr-03183-2")).toBe("options.conformanceProfileBsi");
+  });
+
+  it("shows nothing for a scan that recorded no profile or an unknown one", () => {
+    expect(profileLabelKey(undefined)).toBeNull();
+    expect(profileLabelKey(null)).toBeNull();
+    expect(profileLabelKey("")).toBeNull();
+    expect(profileLabelKey("eu-cra")).toBeNull();
   });
 });
