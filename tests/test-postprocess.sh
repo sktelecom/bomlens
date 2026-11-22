@@ -5864,6 +5864,9 @@ else
 fi
 
 echo "== sbom-size-cap: an oversized SBOM body is stamped, not truncated or rejected =="
+# mark_document_status comes from pipeline-step.sh; source it here so this
+# section does not depend on an earlier one (TEST_SHARD runs sections apart).
+. "$LIB/pipeline-step.sh"
 # Extracted verbatim from docker/entrypoint.sh (between its literal anchor
 # comments), so this test tracks the shipped logic rather than a hand-copied
 # duplicate that could silently drift from it.
