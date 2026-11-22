@@ -8,9 +8,18 @@
  * language; any other warning is shown as the scanner wrote it.
  */
 
-/** i18n key for each code the server may send. */
+/** i18n key for each code the server may send. SAME_FOLDER_SCAN_RUNNING
+ *  comes as a warning only from an older scanner image, which went ahead while
+ *  another scan of the folder ran; the current one waits for it instead (see
+ *  `scanWaitingText`). */
 const WARNING_CODE_KEY: Record<string, string> = {
   SAME_FOLDER_SCAN_RUNNING: "result.warnSameFolderScan",
+};
+
+/** i18n key for each reason a scan may wait before it starts (the `waiting`
+ *  event's code). */
+const WAITING_CODE_KEY: Record<string, string> = {
+  SAME_FOLDER_SCAN_RUNNING: "run.waitingSameFolder",
 };
 
 const CODED = /^([A-Z][A-Z0-9_]+):\s*([\s\S]*)$/;
@@ -29,4 +38,14 @@ export function scanWarningText(raw: string): ScanWarningText {
   if (code && code in WARNING_CODE_KEY) return { key: WARNING_CODE_KEY[code], text: rest };
   // A line that merely starts like a code but is not one stays whole.
   return { key: null, text: raw.replace(/^\[WARN\]\s*/, "") };
+}
+
+/**
+ * What the running view says while the scan waits (a `waiting` event): the
+ * translation for a code it knows, otherwise the scanner's own line without
+ * its "[INFO]" marker.
+ */
+export function scanWaitingText(code: string, detail: string): ScanWarningText {
+  if (code in WAITING_CODE_KEY) return { key: WAITING_CODE_KEY[code], text: detail };
+  return { key: null, text: detail.replace(/^\[INFO\]\s*/, "") };
 }

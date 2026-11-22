@@ -1765,8 +1765,8 @@ export function AiDeclarationWizard({
                     type="button"
                     onClick={() => go(s)}
                     aria-current={s === step ? "step" : undefined}
-                    // The count is a description, so the button keeps the step's name.
-                    aria-label={stepName(s)}
+                    // The step's name is its visible text. The number and the
+                    // count are hidden from it; the count is the description.
                     aria-describedby={open > 0 ? `${headingId}-open-${s}` : undefined}
                     data-step={s}
                   >
@@ -1775,7 +1775,7 @@ export function AiDeclarationWizard({
                     </span>
                     <span className="min-w-0 flex-1">{stepName(s)}</span>
                     {open > 0 && (
-                      <span id={`${headingId}-open-${s}`} data-open={open} className="bl-muted bl-small">
+                      <span id={`${headingId}-open-${s}`} data-open={open} className="bl-muted bl-small" aria-hidden>
                         {t("aiDecl.preview.openInStep", { count: open })}
                       </span>
                     )}

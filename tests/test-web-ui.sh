@@ -4451,6 +4451,22 @@ write_bom() {
 case "$mode" in
     ok) write_bom; echo "[stub] done" ;;
     progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
+    waitturn|waithang)
+        # The scanner waiting for another scan of the same folder
+        # (docker/entrypoint.sh), then starting once that one has ended.
+        echo "[INFO] Another scan of this folder is running (a command-line scan, process 4242 on this computer); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting."
+        if [ "$mode" = waithang ]; then
+            i=0
+            while [ "$i" -lt 100 ]; do
+                date +%s >> "$STUB_HEARTBEAT"
+                sleep 0.2
+                i=$((i + 1))
+            done
+        fi
+        sleep 0.5
+        echo "[INFO] The earlier scan of this folder has finished; this scan starts now."
+        write_bom
+        ;;
     deepcve-progress) echo "[deep-cve-progress] 55%"; write_bom ;;
     fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
     # entrypoint.sh's declared-components refusal: the step's reasons, its
@@ -5539,6 +5555,32 @@ else
     fail "starting tab did not see the cancel" "$(tail -c 300 "$WORK/owner.sse")"
 fi
 
+# Once a cancelled scan has sent its done event it is no longer listed, even
+# while the server is still cleaning up after it (a cancelled run waits a
+# second between its two container sweeps before it releases its folder).
+echo hang > "$STUB_MODE_FILE"
+curl -sN --max-time 8 "$BASE2/scan-stream?project=stopq&version=1.0&source=current-dir" >/dev/null 2>&1 &
+STOPQ_OWNER=$!
+sleep 1
+curl -sN --max-time 8 "$BASE2/scan-attach?id=stopq_1.0" > "$WORK/stopq.sse" 2>/dev/null &
+STOPQ_TAB=$!
+sleep 0.5
+during=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+curl -s -X POST "$BASE2/scan-cancel?id=stopq_1.0" >/dev/null
+for _ in $(seq 1 80); do
+    grep -q '^event: done' "$WORK/stopq.sse" 2>/dev/null && break
+    sleep 0.1
+done
+right_after=$(curl -fsS "$BASE2/running-scans" 2>/dev/null)
+wait "$STOPQ_TAB" "$STOPQ_OWNER" 2>/dev/null || true
+if grep -q '^event: done' "$WORK/stopq.sse" \
+    && echo "$during" | python3 -c "import sys,json; assert [x for x in json.load(sys.stdin) if x['id'] == 'stopq_1.0']" \
+    && echo "$right_after" | python3 -c "import sys,json; assert not [x for x in json.load(sys.stdin) if x['id'] == 'stopq_1.0']"; then
+    pass "/running-scans drops a cancelled scan as soon as it has stopped"
+else
+    fail "/running-scans still lists a stopped scan" "during: $during right after done: $right_after"
+fi
+
 # The starting tab closes; a tab that joined keeps the scan running past the
 # grace, and once that tab closes too the scan stops after the grace.
 rm -f "$STUB_HEARTBEAT"
@@ -5595,6 +5637,275 @@ fi
 # ...but cancelling it does nothing.
 cend=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE2/scan-cancel?id=ended_1.0")
 [ "$cend" = "404" ] && pass "/scan-cancel on an ended scan answers 404" || fail "/scan-cancel ended" "$cend"
+
+# A scan waiting for another scan of the same folder: the scanner's wait line
+# becomes a `waiting` event the running view shows, and its "starts now" line
+# ends the wait. The [INFO] lines stay in the log and are not warnings.
+echo waitturn > "$STUB_MODE_FILE"
+events=$(sse_events "project=waitturn&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+kinds = [(e['event'], e['data']) for e in evs]
+wi = [i for i, (k, d) in enumerate(kinds) if k == 'waiting']
+assert len(wi) == 2, kinds
+first, last = kinds[wi[0]][1], kinds[wi[1]][1]
+assert first['waiting'] is True and first['code'] == 'SAME_FOLDER_SCAN_RUNNING', first
+assert first['detail'].startswith('[INFO] Another scan of this folder is running (a command-line scan'), first
+assert last == {'waiting': False, 'code': 'SAME_FOLDER_SCAN_RUNNING'}, last
+logs = [(i, d) for i, (k, d) in enumerate(kinds) if k == 'log']
+wait_log = [i for i, d in logs if 'Another scan of this folder is running' in d]
+end_log = [i for i, d in logs if 'this scan starts now' in d]
+# Each event follows its own log line.
+assert wait_log and wait_log[0] < wi[0] < end_log[0] < wi[1], (wait_log, wi, end_log)
+done = [d for k, d in kinds if k == 'done'][0]
+assert done['ok'] is True, done
+assert not any('this folder' in w for w in (done.get('warnings') or [])), done.get('warnings')
+"; then
+    pass "the same-folder wait line gives a waiting event, the starts-now line clears it, neither is a warning"
+else
+    fail "same-folder waiting events" "$events"
+fi
+
+# A tab that joins while the scan waits is sent the wait after the log so far.
+echo waithang > "$STUB_MODE_FILE"
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 6 "$BASE2/scan-stream?project=waitjoin&version=1.0&source=current-dir" > /dev/null 2>&1 &
+WOWNER_PID=$!
+sleep 1.5
+curl -sN --max-time 1.5 "$BASE2/scan-attach?id=waitjoin_1.0" > "$WORK/waitjoin.sse" 2>/dev/null || true
+curl -s -X POST "$BASE2/scan-cancel?id=waitjoin_1.0" >/dev/null
+wait "$WOWNER_PID" 2>/dev/null || true
+if sse_file_events "$WORK/waitjoin.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[0]['event'] == 'started' and evs[0]['data']['attached'] is True, evs[:1]
+kinds = [e['event'] for e in evs]
+assert kinds.count('waiting') == 1, kinds
+w = evs[kinds.index('waiting')]['data']
+assert w['waiting'] is True and w['code'] == 'SAME_FOLDER_SCAN_RUNNING', w
+wait_log = [i for i, e in enumerate(evs) if e['event'] == 'log' and 'Another scan of this folder' in e['data']]
+assert wait_log and wait_log[0] < kinds.index('waiting'), kinds
+"; then
+    pass "/scan-attach replays a same-folder wait still under way after the log so far"
+else
+    fail "/scan-attach waiting replay" "$(head -c 600 "$WORK/waitjoin.sse")"
+fi
+sleep 1.5
+echo ok > "$STUB_MODE_FILE"
+
+# The replay keeps only a wait still under way: one that has ended, or a scan
+# that has ended, sends none. Lines that are not the scanner's wait give none.
+if python3 - "$ROOT_DIR" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+wait = "[INFO] Another scan of this folder is running (a web UI scan); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting."
+end = "[INFO] The earlier scan of this folder has finished; this scan starts now."
+on = server.same_folder_wait_event(wait)
+assert on["waiting"] is True and on["code"] == "SAME_FOLDER_SCAN_RUNNING" and on["detail"] == wait, on
+assert server.same_folder_wait_event(end) == {"waiting": False, "code": "SAME_FOLDER_SCAN_RUNNING"}
+for other in ("[INFO] scanning", "[WARN] a previous scan of this folder (x) appears to still be running", None, 3,
+              "[stub] [INFO] Another scan of this folder is running"):
+    assert server.same_folder_wait_event(other) is None, other
+b = server._ScanBroadcast("w_1", {})
+b.publish("log", json.dumps(wait))
+b.publish("waiting", json.dumps(on))
+b.publish("progress", json.dumps({"phase": "pull", "complete": 1, "total": 2}))
+_, replay, _ = b.attach()
+assert ("waiting", json.dumps(on)) in replay, replay
+assert [e for e, _ in replay].index("waiting") > [e for e, _ in replay].index("log"), replay
+b.publish("waiting", json.dumps(server.same_folder_wait_event(end)))
+_, replay, _ = b.attach()
+assert not [e for e, _ in replay if e == "waiting"], replay
+b.publish("waiting", json.dumps(on))
+b.publish("done", json.dumps({"ok": False}))
+_, replay, _ = b.attach()
+assert not [e for e, _ in replay if e == "waiting"] and replay[-1][0] == "done", replay
+PY
+then
+    pass "the replay keeps a same-folder wait only while it is under way"
+else
+    fail "same-folder wait replay rules"
+fi
+
+# The source folder's lock, shared with the command line (take_source_lock in
+# scripts/scan-sbom.sh): the server takes it on the user's own folder before it
+# copies the folder, holds it until the scan ends, and tells the scanner so.
+echo "== source folder lock: taken before the copy, shared with the command line =="
+LK="$WORK/lk"; mkdir -p "$LK/state" "$LK/out" "$LK/added/rust" "$LK/log"
+printf '[package]\nname = "rust"\nversion = "0.5.0"\n' > "$LK/added/rust/Cargo.toml"
+LK_SELF=0123456789ab
+cat > "$WORK/bin/lk-run-scan" <<'LKSTUB'
+#!/bin/bash
+# Records what the scan saw: the lock key it was handed, whether the scanned
+# copy holds a Cargo.lock, and who held the folder's lock meanwhile.
+d="$LK_DIR/log/${PROJECT_VERSION}"
+{ echo "HELD=${BOMLENS_SOURCE_LOCK_HELD:-}"
+  echo "SOURCE_ROOT=${SOURCE_ROOT:-}"
+  echo "CARGO_LOCK=$([ -e "${SOURCE_ROOT:-/nonexistent}/Cargo.lock" ] && echo yes || echo no)"
+  echo "LOCK_PID=$(cat "$LK_DIR/state/${BOMLENS_SOURCE_LOCK_HELD:-none}.lock/pid" 2>/dev/null)"
+} > "$d.env"
+python3 -c 'import time; print(time.time())' > "$d.start"
+sleep "$(cat "$LK_DIR/secs" 2>/dev/null || echo 0)"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[]}' > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
+python3 -c 'import time; print(time.time())' > "$d.end"
+LKSTUB
+chmod +x "$WORK/bin/lk-run-scan"
+LK_PORT=$((PORT + 6)); LK_BASE="http://127.0.0.1:${LK_PORT}"
+SBOM_OUTPUT_DIR="$LK/out" UI_PORT="$LK_PORT" SBOM_UI_HOST_DIR="$LK/launch" \
+    SBOM_UI_SCAN_ROOTS="$LK/added|C:\\Users\\Dev\\added" BOMLENS_STATE_DIR="$LK/state" HOSTNAME="$LK_SELF" \
+    SBOM_RUN_SCAN="$WORK/bin/lk-run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" BOMLENS_REATTACH_GRACE=2 \
+    LK_DIR="$LK" python3 "$SERVER" > "$WORK/server-lk.log" 2>&1 &
+LK_PID=$!
+disown "$LK_PID" 2>/dev/null || true
+trap 'kill "$LK_PID" 2>/dev/null; cleanup2; cleanup' EXIT
+for _ in $(seq 1 30); do curl -fsS "$LK_BASE/capabilities" >/dev/null 2>&1 && break; sleep 0.3; done
+# source_lock_key from one of the shell scripts.
+lk_shell_key() { # <script> <path>
+    ( eval "$(awk '$0 ~ "^guard_hash\\(\\) \\{" { i = 1 } i { print } i && $0 == "}" { exit }' "$1")"
+      eval "$(awk '$0 ~ "^source_lock_key\\(\\) \\{" { i = 1 } i { print } i && $0 == "}" { exit }' "$1")"
+      source_lock_key "$2" )
+}
+# The key the command line computes for this folder as Git Bash names it.
+LK_KEY="$(lk_shell_key "$ROOT_DIR/scripts/scan-sbom.sh" 'C:/Users/Dev/added/rust')"
+LK_LOCK="$LK/state/$LK_KEY.lock"
+lk_scan() { # <version> -> SSE body in $LK/<version>.sse
+    curl -sN "$LK_BASE/scan-stream?project=rust&version=$1&source=scan-target-src&target=$LK/added/rust" > "$LK/$1.sse" 2>/dev/null
+}
+lk_copies() { find "$LK/out/.srccopy" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' '; }
+
+# The keys agree: the server's source_lock_key and the two shell ones, for the
+# Windows forms (Git Bash C:/..., the desktop app C:\...) and POSIX paths; and
+# a picked folder maps to the host path the command line would name.
+LK_ROWS=""
+for p in 'C:/Users/Dev/rt' 'C:\Users\Dev\rt' 'c:/users/dev/rt/' 'C:\Users\Dev\rt\' 'C:' 'C:/' '/home/u/rt' '/home/u/rt/' '/Users/Ünï/rt'; do
+    LK_ROWS="$LK_ROWS$p|$(lk_shell_key "$ROOT_DIR/scripts/scan-sbom.sh" "$p")|$(lk_shell_key "$ROOT_DIR/docker/entrypoint.sh" "$p")"$'\n'
+done
+if python3 - "$ROOT_DIR" "$LK_ROWS" "$LK" <<'PY'
+import os, sys
+os.environ["SBOM_UI_HOST_DIR"] = "C:\\Users\\Dev\\proj"
+os.environ["SBOM_UI_SCAN_ROOTS"] = sys.argv[3] + "/added|C:\\Users\\Dev\\added"
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+rows = [line.split("|") for line in sys.argv[2].splitlines() if line]
+assert len(rows) == 9, rows
+for path, cli, entry in rows:
+    assert server.source_lock_key(path) == cli == entry, (path, server.source_lock_key(path), cli, entry)
+keys = [server.source_lock_key(r[0]) for r in rows]
+assert len(set(keys[0:4])) == 1 and len(set(keys[4:6])) == 1 and len(set(keys[6:8])) == 1, keys
+assert server.source_folder_host_path(sys.argv[3] + "/added/rust") == "C:/Users/Dev/added/rust"
+assert server.source_folder_host_path(sys.argv[3] + "/added") == "C:/Users/Dev/added"
+assert server.source_folder_host_path(os.path.join(server.SRC_DIR, "rust")) == "C:/Users/Dev/proj/rust"
+assert server.source_folder_host_path(server.SRC_DIR) == "C:/Users/Dev/proj"
+assert server.source_folder_host_path("/elsewhere") == ""
+PY
+then
+    pass "the server, the command line and the scanner key one folder's lock the same way (Windows and POSIX forms), from the user's folder"
+else
+    fail "source folder lock keys differ"
+fi
+
+# A command-line scan holds the folder (and has a Cargo.lock of its build in
+# it for now): the web scan waits, says so, copies nothing until the lock is
+# freed, then scans a copy without that file.
+mkdir -p "$LK_LOCK"; echo 4242 > "$LK_LOCK/pid"; echo cli > "$LK_LOCK/origin"
+echo '# from the command-line build' > "$LK/added/rust/Cargo.lock"
+echo 0 > "$LK/secs"
+lk_scan c1 & LKC1=$!
+sleep 2.5
+LK_EARLY_COPIES="$(lk_copies)"; LK_EARLY_STARTED="$([ -e "$LK/log/c1.start" ] && echo yes || echo no)"
+cp "$LK/c1.sse" "$LK/c1-early.sse"
+rm -f "$LK/added/rust/Cargo.lock"; rm -rf "$LK_LOCK"
+wait "$LKC1"
+if [ "$LK_EARLY_COPIES" = 0 ] && [ "$LK_EARLY_STARTED" = no ] \
+   && sse_file_events "$LK/c1-early.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+kinds = [e['event'] for e in evs]
+assert 'waiting' in kinds and 'done' not in kinds, kinds
+w = evs[kinds.index('waiting')]['data']
+assert w['waiting'] is True and w['code'] == 'SAME_FOLDER_SCAN_RUNNING', w
+assert 'a command-line scan, process 4242 on this computer' in w['detail'], w
+logs = [e['data'] for e in evs if e['event'] == 'log']
+assert any('the next command-line scan of the folder clears it' in l for l in logs), logs
+assert not any('writable copy' in l for l in logs), logs
+" && sse_file_events "$LK/c1.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+kinds = [e['event'] for e in evs]
+assert kinds.count('waiting') == 2 and evs[-1]['event'] == 'done' and evs[-1]['data']['ok'] is True, kinds
+assert evs[[i for i, k in enumerate(kinds) if k == 'waiting'][1]]['data']['waiting'] is False
+logs = [e['data'] for e in evs if e['event'] == 'log']
+starts = [i for i, l in enumerate(logs) if 'this scan starts now' in l]
+copies = [i for i, l in enumerate(logs) if 'writable copy' in l]
+assert starts and copies and starts[0] < copies[0], logs
+" && grep -qx "HELD=$LK_KEY" "$LK/log/c1.env" && grep -qx 'CARGO_LOCK=no' "$LK/log/c1.env" \
+   && grep -qx "LOCK_PID=$LK_PID" "$LK/log/c1.env" && [ ! -e "$LK_LOCK" ] && [ "$(lk_copies)" = 0 ]; then
+    pass "a command-line scan's lock makes a web scan of the folder wait before it copies it, then scan a clean copy and free the lock"
+else
+    fail "web scan behind a command-line lock" "early=$LK_EARLY_COPIES/$LK_EARLY_STARTED $(tr '\n' ' ' < "$LK/log/c1.env" 2>/dev/null) $(head -c 600 "$LK/c1.sse")"
+fi
+
+# Cancelled while it waits: no copy, no scan, and the command line's lock stays.
+mkdir -p "$LK_LOCK"; echo 4242 > "$LK_LOCK/pid"; echo cli > "$LK_LOCK/origin"
+lk_scan c2 & LKC2=$!
+sleep 1.5
+curl -s -X POST "$LK_BASE/scan-cancel?id=rust_c2" >/dev/null
+wait "$LKC2"
+if sse_file_events "$LK/c2.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert evs[-1]['event'] == 'done' and evs[-1]['data']['ok'] is False and evs[-1]['data']['cancelled'] is True, evs[-1:]
+" && [ ! -e "$LK/log/c2.start" ] && [ "$(lk_copies)" = 0 ] && [ "$(cat "$LK_LOCK/origin" 2>/dev/null)" = cli ]; then
+    pass "a web scan cancelled while it waits makes no copy, runs nothing and leaves the other scan's lock"
+else
+    fail "cancel while waiting" "$(head -c 600 "$LK/c2.sse")"
+fi
+rm -rf "$LK_LOCK"
+
+# A web scan that holds the folder makes a second web scan of it (another
+# version) wait until the first has ended.
+echo 3 > "$LK/secs"
+lk_scan w1 & LKW1=$!
+for _ in $(seq 1 50); do [ -e "$LK/log/w1.start" ] && break; sleep 0.1; done
+lk_scan w2 & LKW2=$!
+sleep 1.5
+LK_W2_EARLY="$([ -e "$LK/log/w2.start" ] && echo yes || echo no)"
+cp "$LK/w2.sse" "$LK/w2-early.sse"
+echo 0 > "$LK/secs"
+wait "$LKW1"; wait "$LKW2"
+if [ "$LK_W2_EARLY" = no ] && sse_file_events "$LK/w2-early.sse" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+w = [e['data'] for e in evs if e['event'] == 'waiting']
+assert w and w[0]['waiting'] is True and '(a web UI scan)' in w[0]['detail'], w
+" && python3 -c "
+import sys
+assert float(open(sys.argv[2]).read()) >= float(open(sys.argv[1]).read())
+" "$LK/log/w1.end" "$LK/log/w2.start" && grep -qx "HELD=$LK_KEY" "$LK/log/w2.env" && [ ! -e "$LK_LOCK" ] \
+   && ! grep -q 'Another scan of this folder' "$LK/w1.sse" && grep -q 'starts now' "$LK/w2.sse"; then
+    pass "a web scan holding the folder makes a second web scan of it wait until it has ended"
+else
+    fail "two web scans of one folder" "early=$LK_W2_EARLY $(head -c 600 "$LK/w2.sse")"
+fi
+
+# Stale locks from scans in this container are taken over without a wait: one
+# naming this server with no scan of it holding it (the server restarted in the
+# same container), and one naming a scanner process that has ended.
+( exit 0 ) & LK_DEAD=$!; wait "$LK_DEAD"
+for holder in "$LK_PID" "$LK_DEAD"; do
+    mkdir -p "$LK_LOCK"; echo "$holder" > "$LK_LOCK/pid"; echo "container $LK_SELF" > "$LK_LOCK/origin"
+    lk_scan "s$holder"
+done
+if ! grep -q 'Another scan of this folder' "$LK/s$LK_PID.sse" "$LK/s$LK_DEAD.sse" \
+   && [ -e "$LK/log/s$LK_PID.start" ] && [ -e "$LK/log/s$LK_DEAD.start" ] && [ ! -e "$LK_LOCK" ]; then
+    pass "a stale lock from a scan in this container (this server's own, or an ended process) is taken over"
+else
+    fail "stale in-container lock" "$(grep -h 'Another scan' "$LK/s$LK_PID.sse" "$LK/s$LK_DEAD.sse" | head -2)"
+fi
+kill "$LK_PID" 2>/dev/null
+trap 'cleanup2; cleanup' EXIT
 
 # Ids are checked strictly; an unknown one is 404, and nothing reads a path.
 bad_ok=1
@@ -8492,6 +8803,28 @@ if st_out=$(bash "$ROOT_DIR/tests/test-scan-target-paths.sh" 2>&1); then
     pass "tests/test-scan-target-paths.sh passes ($(echo "$st_out" | grep -c '^  PASS:') checks)"
 else
     fail "tests/test-scan-target-paths.sh failed" "$(echo "$st_out" | grep -E 'FAIL|ERROR' | head -5)"
+fi
+
+echo ""
+echo "== a picked folder's path is shown in the host's own separator =="
+if SBOM_UI_HOST_DIR='C:\\Users\\a\\out' python3 - "$SERVER" <<'DISPPY'
+import importlib.util, os, sys, tempfile
+spec = importlib.util.spec_from_file_location("server", sys.argv[1])
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+root = tempfile.mkdtemp()
+os.makedirs(os.path.join(root, "rust", "src"))
+server.EXTRA_SCAN_ROOTS[:] = [{"path": root, "hostPath": "C:\\Users\\a\\r2"}]
+assert server.display_path_of(root) == "C:\\Users\\a\\r2"
+assert server.display_path_of(os.path.join(root, "rust")) == "C:\\Users\\a\\r2\\rust", server.display_path_of(os.path.join(root, "rust"))
+assert server.display_path_of(os.path.join(root, "rust", "src")) == "C:\\Users\\a\\r2\\rust\\src"
+server.EXTRA_SCAN_ROOTS[:] = [{"path": root, "hostPath": "/Users/a/r2"}]
+assert server.display_path_of(os.path.join(root, "rust")) == "/Users/a/r2/rust"
+DISPPY
+then
+    pass "display_path_of joins a sub-folder with backslashes under a Windows host path and slashes under a POSIX one"
+else
+    fail "display_path_of separators"
 fi
 
 echo ""

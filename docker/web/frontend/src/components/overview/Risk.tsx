@@ -124,7 +124,7 @@ export function SeverityPanel({
                     <span className="bl-sevcell-num" style={{ color: severityFg(s) }}>
                       <Marker shape={severityShape(s)} />
                       <b>{fmt(security[s])}</b>
-                    </span>
+                    </span>{" "}
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t(`severity.${s}`)}</span>
                   </>
                 );
@@ -142,11 +142,12 @@ export function SeverityPanel({
                     </span>
                   );
                 return (
+                  // Named by what it shows, "3 Critical" (the space between
+                  // the two lines is the word break; the cell is a flex column).
                   <a
                     key={s}
                     className="bl-sevcell"
                     href={scanHash(scanId, "vulnerabilities", { severity: s as Severity })}
-                    aria-label={`${t(`severity.${s}`)} ${fmt(security[s])}`}
                   >
                     {inner}
                   </a>

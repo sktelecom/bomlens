@@ -58,6 +58,30 @@ if [ -d "$SCAN_DIR" ]; then
 fi
 ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-bomlens-android-sdk}"
 
+# Git Bash on Windows rewrites an argument that looks like a POSIX path before
+# docker.exe sees it: "/" became "C:/Program Files/Git/" for the df probe (no
+# free-disk line) and "<folder>:/probe:ro" a Windows path list (a false "cannot
+# see this folder"). The docker run calls below carry MSYS_NO_PATHCONV and
+# MSYS2_ARG_CONV_EXCL (ignored elsewhere), and a mount source goes in Windows
+# form (C:/Users/...), as scan-sbom.sh does. A folder is shown as C:\Users\...
+case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+        hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
+        shownpath() { cygpath -w -l -- "$1" 2>/dev/null || cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; } ;;
+    *)
+        hostpath() { printf '%s' "$1"; }
+        shownpath() { printf '%s' "$1"; } ;;
+esac
+SCAN_DIR_SHOWN="$(shownpath "$SCAN_DIR")"
+# Run from a clone or bundle that carries the Android SDK image's Dockerfile:
+# the build command names that folder, as scan-sbom.sh does, rather than the
+# copy on GitHub.
+ANDROID_BUILD_CTX="https://github.com/sktelecom/bomlens.git#main:docker/android"
+_cs_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if [ -n "$_cs_dir" ] && [ -f "$_cs_dir/../docker/android/Dockerfile" ]; then
+    ANDROID_BUILD_CTX="\"$(hostpath "$(cd "$_cs_dir/../docker/android" && pwd)")\""
+fi
+
 OK="✅"
 NG="❌"
 problems=0
@@ -204,7 +228,7 @@ if [ -n "$android_imgs" ]; then
     ok "$M_O_ANDROID ${android_imgs% }"
 else
     note "-  $M_N_ANDROID"
-    note "     docker build --build-arg ANDROID_API=34 -t ${ANDROID_IMAGE_PREFIX}34:latest https://github.com/sktelecom/bomlens.git#main:docker/android"
+    note "     docker build --build-arg ANDROID_API=34 -t ${ANDROID_IMAGE_PREFIX}34:latest $ANDROID_BUILD_CTX"
 fi
 
 # 3c) Shared folder: a folder the engine's VM does not share (Colima shares only
@@ -212,16 +236,16 @@ fi
 # would run for minutes and find nothing. Needs the scanner image to start a
 # container, and a folder that has something in it to compare with.
 if docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1 && [ -d "$SCAN_DIR" ] && [ -n "$(ls -A "$SCAN_DIR" 2>/dev/null)" ]; then
-    seen=$(docker run --rm --entrypoint sh -v "$SCAN_DIR":/probe:ro "$DOCKER_IMAGE" -c 'ls -A /probe | head -n 1' 2>/dev/null)
+    seen=$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm --entrypoint sh -v "$(hostpath "$SCAN_DIR")":/probe:ro "$DOCKER_IMAGE" -c 'ls -A /probe | head -n 1' 2>/dev/null)
     if [ -n "$seen" ]; then
-        ok "$M_O_SHARE $SCAN_DIR"
+        ok "$M_O_SHARE $SCAN_DIR_SHOWN"
     else
-        bad "$M_X_SHARE $SCAN_DIR"
+        bad "$M_X_SHARE $SCAN_DIR_SHOWN"
         note "$M_SHARE_FIX"
         problems=$((problems + 1))
     fi
 else
-    note "-  $M_S_SHARE $SCAN_DIR"
+    note "-  $M_S_SHARE $SCAN_DIR_SHOWN"
 fi
 
 # 4) Engine memory for Maven/Gradle builds. A hint, like the warning scan-sbom.sh
@@ -278,7 +302,7 @@ free_mb=""
 if [ -n "${BOMLENS_FAKE_FREE_MB:-}" ]; then
     free_mb="$BOMLENS_FAKE_FREE_MB"
 elif [ -n "$probe_img" ]; then
-    free_mb=$(docker run --rm --pull never --entrypoint df "$probe_img" -Pm / 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}')
+    free_mb=$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm --pull never --entrypoint df "$probe_img" -Pm / 2>/dev/null | tr -d '\r' | awk 'NR==2 {print $4}')
 fi
 # On macOS and Windows the engine's VM disk is a file on the host disk that holds
 # the home folder, and the VM can report its maximum size rather than what the

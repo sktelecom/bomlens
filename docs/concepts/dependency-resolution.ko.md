@@ -68,8 +68,8 @@ cdxgen이 프로젝트를 읽기 전에 `docker/lib/build-prep.sh`가 프로젝�
 | Maven | `compile`, `runtime` 범위 | `test`, `provided`, `system` | `BOMLENS_MAVEN_FULL_GRAPH=1` |
 | Gradle(Java) | 각 프로젝트의 런타임 클래스패스 | 테스트, compileOnly, annotation processor 의존성 | `BOMLENS_GRADLE_FULL_GRAPH=1` |
 | Android | release 런타임 클래스패스, 없으면 알파벳순 첫 flavor의 release 변형 | 테스트, lint, 빌드 도구 | `BOMLENS_ANDROID_FULL_GRAPH=1` |
-| Node.js (npm) | 임시 사본에서 `npm install --omit=dev --package-lock-only`로 해석한 프로덕션 의존성 | `devDependencies`와 그것만 필요로 하는 것 | `BOMLENS_NODE_FULL_GRAPH=1` |
-| PHP | `require` | `require-dev` | `BOMLENS_PHP_FULL_GRAPH=1` |
+| Node.js (npm) | 임시 사본에서 `npm install --omit=dev --package-lock-only`로 해석한 프로덕션 의존성 | `devDependencies`와 그것만 필요로 하는 것 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1` 또는 `BOMLENS_NODE_FULL_GRAPH=1` |
+| PHP | `require` | `require-dev` | `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1` 또는 `BOMLENS_PHP_FULL_GRAPH=1` |
 
 Gradle(Java)은 BomLens의 init script로 Gradle을 한 번 실행해(그 실행에서만 configuration cache를 끔) 모든 프로젝트의 `runtimeClasspath`를 해석하고, 그 결과를 SBOM에 남깁니다. `runtimeClasspath`가 없는 프로젝트(Kotlin Multiplatform, 커버리지 플러그인만 쓰는 루트 등)는 테스트 구성과 커버리지, lint, 컴파일러, 문서 생성, annotation processor 도구의 구성을 뺀 나머지 구성이 해석한 의존성을 남깁니다. 빌드가 코드를 쓰려고 다른 빌드를 포함하거나(`includeBuild`, `pluginManagement`로만 포함한 빌드는 해당하지 않음, 아래 참고), 해석하지 못한 구성이 있거나, Gradle 실행이 실패하거나 시간을 넘기면 Gradle 전체 그래프를 그대로 둡니다. configuration cache를 끄는 옵션을 모르는 6.6 미만 Gradle은 실행이 실패하는 경우에 해당합니다. Android에서 release 런타임 클래스패스가 없는 빌드(Android SDK 이미지로 스캔한 Java Gradle 빌드)는 Android 단계가 시간을 넘기지 않았다면 Java 방식으로 좁힙니다. 두 경우 모두 Gradle 해석이 아니라 소스 트리에서 찾은 jar는 항상 남습니다.
 

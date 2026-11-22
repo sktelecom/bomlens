@@ -87,8 +87,11 @@ export function Distribution({
               <span title={`${label}. ${hint(tier)}`} className="bl-licrow-mark" aria-hidden>
                 <LicenseTierMark tier={tier} />
               </span>
-              <span className="bl-mono bl-licrow-name">{g.name}</span>
-              <span className="bl-muted bl-small bl-licrow-tier">{label}</span>
+              {/* The spaces keep the cells apart as words (the row is a flex
+                  box, so they take no room): the link is named by what it
+                  shows, "MIT Permissive 3", then the hint. */}
+              <span className="bl-mono bl-licrow-name">{g.name}</span>{" "}
+              <span className="bl-muted bl-small bl-licrow-tier">{label}</span>{" "}
               {bar(g.count, tierFill(tier))}
               <span className="bl-num bl-licrow-count">{fmt(g.count)}</span>
             </>
@@ -96,12 +99,9 @@ export function Distribution({
           return (
             <li key={g.name}>
               {href ? (
-                <a
-                  className="bl-licrow"
-                  href={href}
-                  aria-label={`${g.name}, ${label}, ${fmt(g.count)}. ${t("result.licenseRowHint")}`}
-                >
-                  {inner}
+                <a className="bl-licrow" href={href}>
+                  {inner}{" "}
+                  <span className="bl-visually-hidden">{t("result.licenseRowHint")}</span>
                 </a>
               ) : (
                 <div className="bl-licrow">{inner}</div>

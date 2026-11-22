@@ -71,8 +71,11 @@ case "$(uname -s 2>/dev/null)" in
         DOCKER_MSYS="MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "
         DOCKER_ENV=(env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*')
         hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
-        # A path printed for the user to open: C:\Users\... on Windows.
-        shownpath() { cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; }
+        # A path printed for the user to open: C:\Users\... on Windows. -l
+        # gives the long form of a short (8.3) name such as SKTELE~1 that
+        # TEMP often holds; a cygpath without -l, or a path that does not
+        # exist yet, falls back to the plain form.
+        shownpath() { cygpath -w -l -- "$1" 2>/dev/null || cygpath -w -- "$1" 2>/dev/null || printf '%s' "$1"; }
         # A POSIX path this shell can mkdir/read directly; hostpath() (above)
         # still does the cygpath -m conversion when this needs to reach a
         # docker -v flag, same as every other mount in this script.
@@ -1015,13 +1018,43 @@ windows_path_too_long() {
 
 docker_check() {
     command -v docker &>/dev/null || { log_error "Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
-    if ! docker info >/dev/null 2>&1; then
+    # One `docker info` both checks the engine and says whether it is rootless
+    # (handback_ids). Podman's own CLI has no SecurityOptions field, so a failed
+    # template is followed by a plain check before the engine counts as down.
+    local _sec _sec_rc=0
+    _sec="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)" || _sec_rc=$?
+    if [ "$_sec_rc" -ne 0 ] && ! docker info >/dev/null 2>&1; then
         # Windows (Git Bash): a working folder of 260 characters or more makes
         # docker.exe fail before it reaches the engine, with the same outcome as
         # an engine that is not running. Tell the two apart.
         windows_path_too_long "$(pwd)" "the working folder" && exit 1
         log_error "Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1
     fi
+    handback_ids "$_sec_rc" "$_sec"
+}
+
+# HANDBACK_UID/HANDBACK_GID: the owner the (root) containers give their files
+# back to, sent as HOST_UID/HOST_GID. Under a rootless engine (Docker or Podman)
+# the container's root is this user already, and a chown to our own uid from in
+# there would give the files to a subordinate uid, so 0:0 is sent instead.
+# Set once from docker_check's SecurityOptions answer (args: its exit code and
+# output); when the engine cannot say, the calling user's ids are kept.
+# HANDBACK_UID/HANDBACK_GID already set: an internal override, used by the
+# rootless check workflow to send the ids a CLI without this check would. They
+# reach `eval docker run` strings, so only digits are taken; anything else is
+# replaced.
+handback_ids() {
+    if [[ "${HANDBACK_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HANDBACK_GID:-}" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+    HANDBACK_UID="$(id -u)"; HANDBACK_GID="$(id -g)"
+    [ "$HANDBACK_UID" != 0 ] || return 0
+    if [ "${1:-1}" -eq 0 ]; then
+        case "${2:-}" in *name=rootless*) HANDBACK_UID=0; HANDBACK_GID=0 ;; esac
+    elif [ "$(docker info --format '{{.Host.Security.Rootless}}' 2>/dev/null || true)" = true ]; then
+        HANDBACK_UID=0; HANDBACK_GID=0
+    fi
+    return 0
 }
 
 # A failure before post-processing could start (the image is missing or cannot
@@ -1367,7 +1400,7 @@ if [ "$UI_MODE" = "true" ]; then
     MOUNT_FLAGS=(); SCAN_ROOTS=""; SEEN_NAMES=" "
     for m in "${UI_MOUNTS[@]}"; do
         [ -d "$m" ] || { log_error "--mount path is not a directory: $m"; exit 1; }
-        abs="$(cd "$m" && pwd)"
+        abs="$(cd "$m" && pwd -P)"
         name="$(printf '%s' "$(basename "$abs")" | tr -c 'A-Za-z0-9._-' '-')"
         case "$name" in ''|-|.|..) name="root" ;; esac
         n=2; uniq="$name"
@@ -1648,7 +1681,9 @@ take_scan_lock() {
     fi
     other="$(cat "$SCAN_LOCK_DIR/pid" 2>/dev/null || true)"
     case "$other" in ''|*[!0-9]*) other="" ;; esac
-    if [ -n "$other" ] && ! kill -0 "$other" 2>/dev/null; then
+    # The same process id: this scan before an exec of itself (the rerun with
+    # --detection build), which ran no trap to free it.
+    if [ -n "$other" ] && { [ "$other" = "$$" ] || ! kill -0 "$other" 2>/dev/null; }; then
         rm -rf -- "$SCAN_LOCK_DIR" 2>/dev/null || true
         if mkdir "$SCAN_LOCK_DIR" 2>/dev/null; then
             echo "$$" > "$SCAN_LOCK_DIR/pid" 2>/dev/null || true
@@ -1659,9 +1694,9 @@ take_scan_lock() {
     return 1
 }
 if ! take_scan_lock; then
-    log_error "Another scan of ${PROJECT_NAME} ${PROJECT_VERSION} is already running into this folder: $OUTPUT_HOST_DIR"
+    log_error "Another scan of ${PROJECT_NAME} ${PROJECT_VERSION} is already running into this folder: $(shownpath "$OUTPUT_HOST_DIR")"
     echo "        Wait for it to finish, or give this scan another --version, another folder with -o <folder>, or --timestamp to keep both." >&2
-    echo "        If no scan is running, remove the leftover lock and run again: $SCAN_LOCK_DIR" >&2
+    echo "        If no scan is running, remove the leftover lock and run again: $(shownpath "$SCAN_LOCK_DIR")" >&2
     echo "        같은 이름(${PROJECT_NAME} ${PROJECT_VERSION})의 스캔이 이 폴더에서 이미 진행 중입니다. 끝난 뒤 다시 실행하거나, --version, -o <폴더>, --timestamp 중 하나로 결과 위치를 나눠 주세요." >&2
     exit 1
 fi
@@ -1837,6 +1872,7 @@ cleanup() {
         fi
     done
     release_scan_lock
+    release_source_lock
     # A run that ended in failure leaves no result folder holding nothing but
     # its own .scanmeta.json: an empty folder reads as a scan that produced
     # something. Only a per-run folder (not the flat layout, not the folder the
@@ -1923,33 +1959,48 @@ setup_guard_state() {
             return 0
         fi
         if [ -n "$ps_out" ]; then
-            log_warn "a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
-            return 0
+            # This scan holds the folder's lock (take_source_lock), so no other
+            # command-line scan of it is running: this is a container an
+            # earlier scan left running when it was stopped outright, or a web
+            # UI scan of the same folder. It still changes the folder, so wait
+            # for it; when it ends it puts the folder back itself.
+            echo "[INFO] Another scan container is still working in this folder ($owner): one an earlier scan left running when it was stopped, or a web UI scan of the same folder. This scan waits for it to end. To end a leftover one now: docker stop $owner"
+            while [ -n "$ps_out" ]; do
+                sleep 2
+                ps_out=$("${DOCKER_ENV[@]}" docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null) || {
+                    log_warn "could not confirm whether the earlier scan container ($owner) is still running; leaving its leftovers in place this time. Run the scan again once it has ended (docker ps)."
+                    return 0
+                }
+            done
+            # It finished on its own and removed its record: nothing to clean up.
+            [ -f "$owner_file" ] || owner=""
         fi
-        # Confirmed gone and the path matches: finish what it started
-        # (guard_restore, reused via build-prep.sh's restore-only mode)
-        # before this run's own guard takes over the same slot. Reuses that
-        # run's own cdxgen image (recorded below), or the already-local
-        # postprocess image, rather than pulling anything new just for
-        # cleanup — an offline host must not fail a scan over this.
-        recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
-        cleanup_image=""
-        if [ -n "$recorded_image" ] && "${DOCKER_ENV[@]}" docker image inspect "$recorded_image" >/dev/null 2>&1; then
-            cleanup_image="$recorded_image"
-        elif "${DOCKER_ENV[@]}" docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1; then
-            cleanup_image="$POSTPROCESS_IMAGE"
+        if [ -n "$owner" ]; then
+            # Confirmed gone and the path matches: finish what it started
+            # (guard_restore, reused via build-prep.sh's restore-only mode)
+            # before this run's own guard takes over the same slot. Reuses that
+            # run's own cdxgen image (recorded below), or the already-local
+            # postprocess image, rather than pulling anything new just for
+            # cleanup: an offline host must not fail a scan over this.
+            recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
+            cleanup_image=""
+            if [ -n "$recorded_image" ] && "${DOCKER_ENV[@]}" docker image inspect "$recorded_image" >/dev/null 2>&1; then
+                cleanup_image="$recorded_image"
+            elif "${DOCKER_ENV[@]}" docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1; then
+                cleanup_image="$POSTPROCESS_IMAGE"
+            fi
+            if [ -z "$cleanup_image" ]; then
+                log_warn "no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+                return 0
+            fi
+            echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
+            "${DOCKER_ENV[@]}" docker run --rm -u 0:0 \
+                -v "$(hostpath "$SCAN_INPUT_DIR")":/app \
+                -v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state \
+                -v "$(hostpath "$BUILD_PREP")":/tmp/build-prep.sh:ro \
+                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+                --entrypoint sh "$cleanup_image" /tmp/build-prep.sh /app >/dev/null 2>&1 || true
         fi
-        if [ -z "$cleanup_image" ]; then
-            log_warn "no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
-            return 0
-        fi
-        echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
-        "${DOCKER_ENV[@]}" docker run --rm -u 0:0 \
-            -v "$(hostpath "$SCAN_INPUT_DIR")":/app \
-            -v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state \
-            -v "$(hostpath "$BUILD_PREP")":/tmp/build-prep.sh:ro \
-            -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-            --entrypoint sh "$cleanup_image" /tmp/build-prep.sh /app >/dev/null 2>&1 || true
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
     printf '%s\n' "$RUNNING_CONTAINER_NAME" > "$GUARD_STATE_DIR/$key/owner" 2>/dev/null || return 0
@@ -1971,6 +2022,111 @@ drop_unused_guard_state() {
         rm -rf -- "$d"
     fi
     GUARD_ID=""
+}
+
+# One scan at a time per source folder. Stage 1 resolves dependencies in the
+# folder itself (a Cargo.lock or go.sum is written there and removed again by
+# the source-tree guard), and later steps read the folder to grade the result.
+# A second scan of the same folder, with another --version or other options,
+# waits here until the first has finished, so neither one records or reads the
+# other's working files. The lock sits beside the guard-state record, keyed the
+# same way, and holds the scan's process id and where it runs ("cli" here). A
+# lock whose scan is gone (killed outright, so no trap ran) is taken over, as
+# take_scan_lock does for the result folder. Scope: the same as
+# setup_guard_state, a folder the user named, not a --git clone or archive
+# extract (a new temp folder each run).
+SOURCE_LOCK_DIR=""
+SOURCE_LOCK_HELD=0
+release_source_lock() {
+    if [ "${SOURCE_LOCK_HELD:-0}" = "1" ]; then
+        rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+        SOURCE_LOCK_HELD=0
+    fi
+}
+# source_lock_holder_gone PID ORIGIN: true when the scan that holds the lock is
+# known to have ended. A lock this process wrote before an exec of itself
+# (same PID) counts as gone, so the rerun takes it back.
+source_lock_holder_gone() {
+    local pid="$1" origin="$2" ps_out rc
+    case "$origin" in
+        container\ *)
+            # Written by a scan inside a container (the web UI): gone when
+            # that container no longer runs, or when the scan process in it
+            # has ended. Unconfirmed counts as running.
+            command -v docker >/dev/null 2>&1 || return 1
+            ps_out=$("${DOCKER_ENV[@]}" docker ps -q --no-trunc --filter "id=${origin#container }" 2>/dev/null) || return 1
+            [ -n "$ps_out" ] || return 0
+            # The container runs; the scan in it may have been stopped
+            # outright while the container stayed up (the web UI's own one).
+            rc=0
+            "${DOCKER_ENV[@]}" docker exec "${origin#container }" sh -c 'kill -0 "$1" 2>/dev/null || [ -d "/proc/$1" ]' _ "$pid" >/dev/null 2>&1 || rc=$?
+            [ "$rc" = 1 ] ;;
+        *)
+            [ "$pid" = "$$" ] && return 0
+            ! kill -0 "$pid" 2>/dev/null ;;
+    esac
+}
+# source_lock_key PATH: the key of a folder's lock, from its host path
+# (hostpath: C:/Users/... under Git Bash). The path is put in one form first, so
+# the command line and the web UI (docker/entrypoint.sh, which hashes the host
+# path the web server hands it) find the same lock for the same folder:
+# backslashes become slashes, a Windows drive path is lower-cased (names are not
+# case-sensitive there), and a trailing slash is dropped. The same function is
+# in docker/entrypoint.sh; keep the two in step.
+source_lock_key() {
+    local p
+    p=$(printf '%s' "$1" | tr '\\' '/')
+    case "$p" in
+        [A-Za-z]:|[A-Za-z]:/*) p=$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]') ;;
+    esac
+    while [ "${#p}" -gt 1 ] && [ "${p%/}" != "$p" ]; do
+        case "$p" in [a-z]:/) break ;; esac
+        p="${p%/}"
+    done
+    case "$p" in [a-z]:) p="$p/" ;; esac
+    printf '%s' "$p" | guard_hash
+}
+take_source_lock() {
+    [ "${#CLEANUP_DIRS[@]}" -eq 0 ] || return 0
+    mkdir -p "$GUARD_STATE_DIR" 2>/dev/null || return 0
+    local target_real key pid origin who said=0 empty_polls=0
+    target_real=$(cd "$SCAN_INPUT_DIR" 2>/dev/null && pwd -P) || return 0
+    key=$(source_lock_key "$(hostpath "$target_real")") || return 0
+    [ -n "$key" ] || return 0
+    SOURCE_LOCK_DIR="$GUARD_STATE_DIR/$key.lock"
+    while :; do
+        if mkdir "$SOURCE_LOCK_DIR" 2>/dev/null; then
+            echo "$$" > "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true
+            echo "cli" > "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true
+            SOURCE_LOCK_HELD=1
+            [ "$said" = 0 ] || echo "[INFO] The earlier scan of this folder has finished; this scan starts now."
+            return 0
+        fi
+        pid="$(cat "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true)"
+        origin="$(cat "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true)"
+        case "$pid" in *[!0-9]*) pid="" ;; esac
+        if [ -z "$pid" ]; then
+            # Another scan made the lock a moment ago and has not written its
+            # id yet; one left without an id for longer is taken over.
+            empty_polls=$((empty_polls + 1))
+            if [ "$empty_polls" -ge 10 ]; then
+                rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+                empty_polls=0
+                continue
+            fi
+        elif source_lock_holder_gone "$pid" "$origin"; then
+            rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+            continue
+        elif [ "$said" = 0 ]; then
+            case "$origin" in
+                container\ *) who="a web UI scan" ;;
+                *) who="process $pid" ;;
+            esac
+            echo "[INFO] Another scan of this folder is running ($who); this scan waits for it to finish, so that neither one sees the other's build files. Press Ctrl+C to stop waiting."
+            said=1
+        fi
+        sleep 1
+    done
 }
 
 # A reproducible (--byte-stable) build must not resolve dependency licenses over
@@ -2016,7 +2172,7 @@ pp_env() {
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
     printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e PRODUCT_SUPPLIER=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e REACHABILITY_NONCE=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${PRODUCT_SUPPLIER:-}" "${SRC_TREE_EXCLUDE:-}" \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "${HANDBACK_UID:-$(id -u)}" "${HANDBACK_GID:-$(id -g)}" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${PRODUCT_SUPPLIER:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
@@ -3532,6 +3688,11 @@ case "$OUTPUT_HOST_DIR" in
     "$SCAN_INPUT_DIR"/*) SRC_TREE_EXCLUDE="$RUN_NAME" ;;
 esac
 
+# A second scan of this same folder waits here for the first (take_source_lock),
+# before anything below reads the folder: the --exclude copy, language and
+# lock-file detection, the build and the grading all see it as it is.
+[ "$MODE" != "SOURCE" ] || take_source_lock
+
 # --exclude: scan a copy of the tree that lacks the named paths, so every step
 # below (language detection, build, cdxgen, license and vendored-code scans, the
 # file tree) sees the same smaller tree and none needs its own exclusion list.
@@ -3822,7 +3983,7 @@ GRADLE_USER_CACHE_EOF
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
-        -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+        -e HOST_UID="${HANDBACK_UID:-$(id -u)}" -e HOST_GID="${HANDBACK_GID:-$(id -g)}" \
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
         $REACH_ARGS \
@@ -4121,7 +4282,7 @@ GRADLE_USER_CACHE_EOF
             -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
             -w /host-output \
             -e DEEP_LICENSE_EXCLUDE="\"$_dl_exclude\"" -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL \
-            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -e HOST_UID="${HANDBACK_UID:-$(id -u)}" -e HOST_GID="${HANDBACK_GID:-$(id -g)}" \
             --entrypoint bash "\"$DL_PRE_IMAGE\"" /usr/local/lib/sbom/deep-license.sh /src "\"/host-output/$_dl_out\"" &
         _dl_pid=$!
         wait "$_dl_pid" || _dl_rc=$?
@@ -4387,7 +4548,7 @@ SUMMARY_BUF="$(mktemp)"; SUMMARY_ERR="$(mktemp)"
 {
 if [ "$UPLOAD_VAR" = "false" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
-    echo "  Output dir: ${OUTPUT_HOST_DIR}"
+    echo "  Output dir: $(shownpath "$OUTPUT_HOST_DIR")"
     echo "  SBOM: ${OUTPUT_FILE}"
     if [ "$GENERATE_NOTICE" = "true" ]; then
         summary_line "Notice:" "${P}_NOTICE.txt" "${P}_NOTICE.html" || note_missing "notice"

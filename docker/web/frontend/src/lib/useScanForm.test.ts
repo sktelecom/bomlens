@@ -89,6 +89,13 @@ describe("composeRootfsTarget", () => {
     expect(composeRootfsTarget("/scan-targets/root", "   ")).toBe("/scan-targets/root");
   });
 
+  it("reads \".\" and a leading \"./\" as the selected root itself", () => {
+    expect(composeRootfsTarget("/scan-targets/root", ".")).toBe("/scan-targets/root");
+    expect(composeRootfsTarget("/scan-targets/root", "./")).toBe("/scan-targets/root");
+    expect(composeRootfsTarget("/scan-targets/root", "./rust")).toBe("/scan-targets/root/rust");
+    expect(composeRootfsTarget("", ".")).toBe(".");
+  });
+
   it("joins a subpath under the selected root", () => {
     expect(composeRootfsTarget("/scan-targets/root", "usr/lib")).toBe(
       "/scan-targets/root/usr/lib",

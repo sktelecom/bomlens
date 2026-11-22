@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FileNode } from "./scancode";
-import { ancestorDirs, dirsWithMatchBelow, filterNodes } from "./sourceTreeFilter";
+import { ancestorDirs, dirsWithMatchBelow, fileRowName, filterNodes } from "./sourceTreeFilter";
 
 const file = (path: string): FileNode => ({
   name: path.split("/").pop()!,
@@ -73,5 +73,17 @@ describe("ancestorDirs", () => {
     expect([...ancestorDirs("a/b/c.txt")]).toEqual(["a", "a/b"]);
     expect(ancestorDirs("top.txt").size).toBe(0);
     expect(ancestorDirs(null).size).toBe(0);
+  });
+});
+
+describe("fileRowName", () => {
+  it("is the name alone without licences", () => {
+    expect(fileRowName({ name: "main.go", licenses: [] })).toBe("main.go");
+  });
+  it("lists the labels as the row shows them", () => {
+    expect(fileRowName({ name: "LICENSE", licenses: ["MIT", "ISC"] })).toBe("LICENSE, MIT, ISC");
+  });
+  it("names the folded count and then the folded licences", () => {
+    expect(fileRowName({ name: "a.c", licenses: ["MIT", "ISC", "Zlib", "BSD-3-Clause"] })).toBe("a.c, MIT, ISC, +2 (Zlib, BSD-3-Clause)");
   });
 });

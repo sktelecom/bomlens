@@ -510,7 +510,7 @@ test.describe("the rebuilt screen", () => {
     expect(requested?.searchParams.get("version")).toBe("4.17.21");
   });
 
-  test("the row summary takes a keyboard focus ring and a short accessible name", async ({ page }) => {
+  test("the row summary takes a keyboard focus ring and is named by its visible text", async ({ page }) => {
     await seeded(page);
     await page.route("**/package-advisories**", (r) =>
       r.fulfill({ contentType: "application/json", body: JSON.stringify(PACKAGE_MANY) }),
@@ -522,11 +522,10 @@ test.describe("the rebuilt screen", () => {
     await page.keyboard.press("Shift+Tab");
     const outline = await first.evaluate((el) => getComputedStyle(el).outlineStyle);
     expect(outline).not.toBe("none");
-    const name = await first.evaluate((el) => {
-      const ids = (el.getAttribute("aria-labelledby") ?? "").split(" ");
-      return ids.map((i) => document.getElementById(i)?.textContent ?? "").join(" ");
-    });
-    expect(name).not.toContain("4.17.21");
+    // No aria-label or aria-labelledby: the name is the row as it reads, so it
+    // holds every word on screen (id, grade, title, affected range, date).
+    expect(await first.getAttribute("aria-labelledby")).toBeNull();
+    await expect(first).toHaveAccessibleName(/^GHSA-aaaa-bbbb-cccc-dddd-eeee-ffff High Withdrawn A deliberately long .* lodash .*4\.17\.21/);
   });
 
   test("the rows line up: every severity and title starts at the same x", async ({ page }) => {

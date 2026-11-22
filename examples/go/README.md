@@ -80,9 +80,9 @@ jq -r '.components[] | select(.name | startswith("github.com")) | .name' GoExamp
 
 ### go.sum Missing
 
-The scan may generate `go.sum` automatically during dependency resolution.
+This example commits `go.sum`. In your own project without one, the scan resolves modules during the scan and grades the result partial (`lockfile-missing`).
 
-**Solution:** This is normal. Go modules will be downloaded during the scan.
+**Solution:** Run `go mod tidy` and commit `go.sum`.
 
 ### Module Download Fails
 

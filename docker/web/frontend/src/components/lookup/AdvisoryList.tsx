@@ -16,41 +16,39 @@ import "./lookup.css";
  *  rest of the record opens inside the row. */
 function AdvisoryRow({ advisory: a, open }: { advisory: AdvisoryRecord; open?: boolean }) {
   const { t, i18n } = useTranslation();
-  const base = useId();
   const affected = a.affected
     .map((x) => `${x.name}${x.ranges?.length ? ` ${x.ranges.map(formatRange).filter(Boolean).join("; ")}` : ""}`)
     .join(", ");
   return (
     <li className="bl-lk-row" data-testid="lookup-advisory">
       <details open={open || undefined}>
-        <summary
-          className="bl-lk-sum"
-          aria-labelledby={`${base}-id ${base}-sev ${base}-title`}
-          aria-describedby={affected ? `${base}-aff` : undefined}
-        >
+        {/* The row is named by what it shows, in reading order. The spaces
+            separate the cells as words; in the grid, and at the end of a
+            line, they take no room. */}
+        <summary className="bl-lk-sum">
           <span className="bl-lk-chev" aria-hidden>
             <ChevronRightIcon size={16} />
           </span>
-          <span id={`${base}-id`} className="bl-mono bl-lk-id">{a.id}</span>
-          <span id={`${base}-sev`}>
+          <span className="bl-mono bl-lk-id">{a.id}</span>{" "}
+          <span>
             {/* A missing grade is Unknown, never a reassuring None. */}
             <SeverityLabel severity={a.severity === "NONE" ? "UNKNOWN" : a.severity} />
-          </span>
+          </span>{" "}
           <span className="bl-lk-titlecell">
-            <span id={`${base}-title`} className="bl-lk-title">
+            <span className="bl-lk-title">
               {a.withdrawn && (
                 <Label variant="attention" className="bl-lk-lbl bl-lk-withdrawn">
-                  {t("lookup.withdrawn")}
+                  {t("lookup.withdrawn")}{" "}
                 </Label>
               )}
               <span className={a.withdrawn ? "bl-lk-struck" : undefined}>{a.title || a.id}</span>
-            </span>
+            </span>{" "}
             {affected && (
-              <span id={`${base}-aff`} className="bl-mono bl-lk-aff">
+              <span className="bl-mono bl-lk-aff">
                 {affected}
               </span>
             )}
-          </span>
+          </span>{" "}
           <span className="bl-lk-date">{a.published ? formatLookupDate(a.published, i18n.language) : ""}</span>
         </summary>
         <div className="bl-lk-body">

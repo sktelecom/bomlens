@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 import { SeverityLabel, severityLabelKey } from "@/components/primer";
 import { formatNumber } from "@/lib/format";
-import { licenseOperands } from "@/lib/licenseOperands";
+import { licenseOperands, shownLicenseLabels } from "@/lib/licenseOperands";
 import { findFirstMatch, findPathToRef, type TreeNode } from "@/lib/sbomGraph";
 
 import { LicenseLabels } from "./dependencies/LicenseLabels";
@@ -108,8 +108,10 @@ export function DependencyTree({
     );
   }
 
+  // The description adds only what the name does not hold: "Direct", which a
+  // top-level row does not show, and the licences folded into "+N".
   const describe = (node: TreeNode, level: number) =>
-    [level === 1 ? t("deps.direct") : null, node.vuln ? t(severityLabelKey(node.vuln)) : null, ...licenseOperands(node.licenses)]
+    [level === 1 ? t("deps.direct") : null, ...licenseOperands(node.licenses).slice(2)]
       .filter(Boolean)
       .join(", ");
 
@@ -118,7 +120,17 @@ export function DependencyTree({
       const path = prefix ? `${prefix}.${i}` : String(i);
       const hasChildren = node.children.length > 0 && !node.cycle;
       const expanded = open.has(path);
-      const label = node.version ? `${node.name} ${node.version}` : node.name;
+      // The name holds the row's visible words in order (name, version, cycle,
+      // severity, the licence labels as shown), so it contains what is on screen.
+      const label = [
+        node.name,
+        node.version,
+        node.cycle ? t("deps.cycle") : null,
+        node.vuln ? t(severityLabelKey(node.vuln)) : null,
+        ...shownLicenseLabels(node.licenses),
+      ]
+        .filter(Boolean)
+        .join(" ");
       return (
         <TreeView.Item
           key={path}
@@ -143,14 +155,17 @@ export function DependencyTree({
             {node.version && <span className="bl-muted"> {node.version}</span>}
             {node.cycle && (
               <Label variant="secondary" className="bl-dep-label bl-dep-cycle">
+                {/* A word break from the version; it starts the line, so it takes no room. */}{" "}
                 {t("deps.cycle")}
               </Label>
             )}
           </span>
+          {/* Ends the label's line, so it takes no room; it keeps the label and
+              the trailing words apart in the text. */}{" "}
           {/* The visible trailing part is aria-hidden in Primer, so what it shows
               is also given as the row's description (its `label`): a direct
               dependency has no visible label (it sits at the top level), so the
-              word is there for assistive technology, with severity and licences. */}
+              word is there for assistive technology, with the folded licences. */}
           <TreeView.TrailingVisual label={describe(node, level)}>
             <span className="bl-dep-trail">
               {node.vuln && (
@@ -158,6 +173,7 @@ export function DependencyTree({
                   <SeverityLabel severity={node.vuln} />
                 </span>
               )}
+              {node.vuln && node.licenses.length > 0 && " "}
               <LicenseLabels licenses={node.licenses} />
             </span>
           </TreeView.TrailingVisual>

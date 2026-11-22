@@ -102,11 +102,19 @@ er_init
 # way out, a refused declaration included.
 YOCTO_FILES_LIST=""
 YOCTO_READER_REFS=""
+# The source folder's lock (take_source_lock, SOURCE flow), freed on every way
+# out. Only a lock that still names this process is removed.
+SOURCE_LOCK_DIR=""
+SOURCE_LOCK_HELD=0
 entry_exit_trap() {
     local rc=$?
     set +e
     [ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
     [ -z "$YOCTO_READER_REFS" ] || rm -f "$YOCTO_READER_REFS"
+    if [ "$SOURCE_LOCK_HELD" = 1 ] && [ "$(cat "$SOURCE_LOCK_DIR/pid" 2>/dev/null)" = "$$" ]; then
+        rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null
+    fi
+    SOURCE_LOCK_HELD=0
     # er_exit_trap reads the exit code from $?.
     ( exit "$rc" )
     er_exit_trap
@@ -428,34 +436,49 @@ setup_guard_state() {
             return 0
         fi
         if [ -n "$ps_out" ]; then
-            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers." >&2
-            return 0
+            # This scan holds the folder's lock (take_source_lock), so no other
+            # scan of it is running: this is a container an earlier scan left
+            # running when it was stopped outright. It still changes the
+            # folder, so wait for it; when it ends it puts the folder back
+            # itself. The same as scripts/scan-sbom.sh.
+            echo "[INFO] Another scan container is still working in this folder ($owner), one an earlier scan left running when it was stopped. This scan waits for it to end. To end it now: docker stop $owner"
+            while [ -n "$ps_out" ]; do
+                sleep 2
+                ps_out=$(docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null) || {
+                    echo "[WARN] could not confirm whether the earlier scan container ($owner) is still running; leaving its leftovers in place this time. Scan again once it has ended (docker ps)." >&2
+                    return 0
+                }
+            done
+            # It finished on its own and removed its record: nothing to clean up.
+            [ -f "$owner_file" ] || owner=""
         fi
-        recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
-        cleanup_image=""
-        if [ -n "$recorded_image" ] && docker image inspect "$recorded_image" >/dev/null 2>&1; then
-            cleanup_image="$recorded_image"
-        else
-            self_image=$(docker inspect -f '{{.Config.Image}}' "$self" 2>/dev/null)
-            if [ -n "$self_image" ] && docker image inspect "$self_image" >/dev/null 2>&1; then
-                cleanup_image="$self_image"
+        if [ -n "$owner" ]; then
+            recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
+            cleanup_image=""
+            if [ -n "$recorded_image" ] && docker image inspect "$recorded_image" >/dev/null 2>&1; then
+                cleanup_image="$recorded_image"
+            else
+                self_image=$(docker inspect -f '{{.Config.Image}}' "$self" 2>/dev/null)
+                if [ -n "$self_image" ] && docker image inspect "$self_image" >/dev/null 2>&1; then
+                    cleanup_image="$self_image"
+                fi
             fi
-        fi
-        if [ -z "$cleanup_image" ]; then
-            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place." >&2
-            return 0
-        fi
-        echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
-        local cleanup_prep_file; cleanup_prep_file=$(write_prep_file "$prep")
-        if [ -n "$cleanup_prep_file" ]; then
-            docker run --rm -u 0:0 \
-                --volumes-from "$self" \
-                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-                --entrypoint sh "$cleanup_image" \
-                "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
-            rm -f "$cleanup_prep_file"
-        else
-            echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place." >&2
+            if [ -z "$cleanup_image" ]; then
+                echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place." >&2
+                return 0
+            fi
+            echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
+            local cleanup_prep_file; cleanup_prep_file=$(write_prep_file "$prep")
+            if [ -n "$cleanup_prep_file" ]; then
+                docker run --rm -u 0:0 \
+                    --volumes-from "$self" \
+                    -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+                    --entrypoint sh "$cleanup_image" \
+                    "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
+                rm -f "$cleanup_prep_file"
+            else
+                echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place." >&2
+            fi
         fi
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
@@ -478,6 +501,128 @@ drop_unused_guard_state() {
         rm -rf -- "$d"
     fi
     GUARD_ID=""
+}
+
+# One scan at a time per source folder, the lock scripts/scan-sbom.sh takes for
+# its own source scans (take_source_lock there), in the same place and format:
+# $GUARD_STATE_DIR/<key>.lock with the files pid and origin. A web UI scan
+# writes "container <this container's id>" as its origin; a command-line scan
+# writes "cli". A second scan of the same folder, from either one, waits until
+# the first has finished, so neither one records or reads the other's working
+# files (a Cargo.lock the first one generated is not taken as the user's own).
+# Scope: a scan with SOURCE_ROOT_HOST, the same as setup_guard_state.
+#
+# source_lock_key PATH: the key of a folder's lock, from its host path. The
+# path is put in one form first, so the command line and the web UI find the
+# same lock for the same folder: backslashes become slashes, a Windows drive
+# path (C:/Users/...) is lower-cased (names are not case-sensitive there), and
+# a trailing slash is dropped. The same function is in scripts/scan-sbom.sh;
+# keep the two in step.
+source_lock_key() {
+    local p
+    p=$(printf '%s' "$1" | tr '\\' '/')
+    case "$p" in
+        [A-Za-z]:|[A-Za-z]:/*) p=$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]') ;;
+    esac
+    while [ "${#p}" -gt 1 ] && [ "${p%/}" != "$p" ]; do
+        case "$p" in [a-z]:/) break ;; esac
+        p="${p%/}"
+    done
+    case "$p" in [a-z]:) p="$p/" ;; esac
+    printf '%s' "$p" | guard_hash
+}
+# source_lock_holder_gone PID ORIGIN: true when the scan that holds the lock is
+# known to have ended. Unconfirmed counts as running. A process of another user
+# answers kill -0 with "not permitted", so /proc is asked as well.
+source_lock_holder_gone() {
+    local pid="$1" origin="$2" id ps_out rc
+    case "$origin" in
+        container\ *)
+            id="${origin#container }"
+            [ -n "$id" ] || return 1
+            case "$SELF_CONTAINER_ID:$id" in
+                "$id"*|*:"$SELF_CONTAINER_ID"*)
+                    # Another scan in this same container (the web UI runs
+                    # one entrypoint per scan).
+                    [ "$pid" = "$$" ] && return 0
+                    kill -0 "$pid" 2>/dev/null && return 1
+                    [ ! -d "/proc/$pid" ]
+                    return ;;
+            esac
+            command -v docker >/dev/null 2>&1 || return 1
+            ps_out=$(docker ps -q --no-trunc --filter "id=$id" 2>/dev/null) || return 1
+            [ -n "$ps_out" ] || return 0
+            # The container runs; the scan in it may have been stopped
+            # outright while the container stayed up (the web UI's own one).
+            rc=0
+            docker exec "$id" sh -c 'kill -0 "$1" 2>/dev/null || [ -d "/proc/$1" ]' _ "$pid" >/dev/null 2>&1 || rc=$?
+            [ "$rc" = 1 ] ;;
+        *)
+            # A command-line scan on the computer: its process cannot be seen
+            # from this container. The next command-line scan of the folder
+            # takes over a lock its scan left behind.
+            return 1 ;;
+    esac
+}
+# take_source_lock: wait for and take the lock of the folder SOURCE_ROOT_HOST
+# names. Returns without a lock when there is no guard-state mount or no
+# SOURCE_ROOT_HOST (the scan then runs as before). The web server takes the
+# lock of the user's folder itself, before it copies the folder, and names it
+# in BOMLENS_SOURCE_LOCK_HELD: this scan then already holds its folder's lock
+# and does not wait on it (the server frees it when the scan has ended).
+SELF_CONTAINER_ID=""
+take_source_lock() {
+    [[ "${BOMLENS_SOURCE_LOCK_HELD:-}" =~ ^[0-9a-f]{64}$ ]] && return 0
+    [ -n "${SOURCE_ROOT_HOST:-}" ] || return 0
+    [ -d "$GUARD_STATE_DIR" ] || return 0
+    local key pid origin who said=0 empty_polls=0
+    SELF_CONTAINER_ID=$(self_container_id)
+    case "$SELF_CONTAINER_ID" in
+        ""|*[!0-9a-f]*|?|??|???|????|?????|??????|???????|????????|?????????|??????????|???????????)
+            # Not a container id another scan could look up.
+            echo "[WARN] could not read this container's id, so this scan does not wait for another scan of the same folder; start one scan of a folder at a time." >&2
+            return 0 ;;
+    esac
+    key=$(source_lock_key "$SOURCE_ROOT_HOST") || return 0
+    [ -n "$key" ] || return 0
+    SOURCE_LOCK_DIR="$GUARD_STATE_DIR/$key.lock"
+    while :; do
+        if mkdir "$SOURCE_LOCK_DIR" 2>/dev/null; then
+            echo "$$" > "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true
+            echo "container $SELF_CONTAINER_ID" > "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true
+            SOURCE_LOCK_HELD=1
+            [ "$said" = 0 ] || echo "[INFO] The earlier scan of this folder has finished; this scan starts now."
+            return 0
+        fi
+        pid="$(cat "$SOURCE_LOCK_DIR/pid" 2>/dev/null || true)"
+        origin="$(cat "$SOURCE_LOCK_DIR/origin" 2>/dev/null || true)"
+        case "$pid" in *[!0-9]*) pid="" ;; esac
+        if [ -z "$pid" ]; then
+            # Another scan made the lock a moment ago and has not written its
+            # id yet; one left without an id for longer is taken over.
+            empty_polls=$((empty_polls + 1))
+            if [ "$empty_polls" -ge 10 ]; then
+                rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+                empty_polls=0
+                continue
+            fi
+        elif source_lock_holder_gone "$pid" "$origin"; then
+            rm -rf -- "$SOURCE_LOCK_DIR" 2>/dev/null || true
+            continue
+        elif [ "$said" = 0 ]; then
+            case "$origin" in
+                container\ *) who="a web UI scan" ;;
+                *) who="a command-line scan, process $pid on this computer" ;;
+            esac
+            echo "[INFO] Another scan of this folder is running ($who); this scan waits for it to finish, so that neither one sees the other's build files. Cancel this scan to stop waiting."
+            case "$origin" in
+                container\ *) ;;
+                *) echo "[INFO]   If no command-line scan of this folder is running, one that was stopped outright left its lock: the next command-line scan of the folder clears it, or remove $key.lock from the BomLens guard state folder (bomlens/guard)." ;;
+            esac
+            said=1
+        fi
+        sleep 1
+    done
 }
 
 # Manifest-only syft read of a source tree (the fallback when cdxgen cannot run
@@ -1002,6 +1147,9 @@ case "$SCAN_MODE" in
         SRC_ROOT="${SOURCE_ROOT:-/src}"
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT" >&2; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT" >&2; exit 1; fi
+        # A second scan of the same folder (web UI or command line) waits here
+        # for the first, before anything below reads or builds in the folder.
+        take_source_lock
         # The syft fallback leaves out the same non-shipped trees and installed
         # Python environments as the cdxgen path (see NON_SHIPPED_DIRS and
         # python_venv_folders in source-detect.sh).
@@ -1718,7 +1866,7 @@ if command -v jq >/dev/null 2>&1; then
         # runtime dependencies; its development-only ones are left out.
         if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set") and (any(.name == "bomlens:pipeline-step-failed" and .value == "npm-production-set") | not)' "$OUTPUT_FILE" >/dev/null 2>&1; then
             echo "       The lock file was read: this project has no runtime dependencies, and its development-only dependencies are left out."
-            echo "       Set BOMLENS_NODE_FULL_GRAPH=1 to list them as well."
+            echo "       Set BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 to list them as well."
         fi
         # A directory --target that is not itself a root filesystem but
         # has one a level or two below it (a delivery folder wrapping the
@@ -2063,7 +2211,7 @@ sync_artifacts() {
                 echo "[WARN] copy failed for $art (available in container at: $art)" >&2
                 continue
             fi
-            if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+            if owner_handback_wanted; then
                 chown "${HOST_UID}:${HOST_GID}" "$dest" 2>/dev/null || true
             fi
         done
@@ -3050,6 +3198,7 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; 
     [ -f "${OUT_PREFIX}_security_trivy.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security_trivy.json")
     [ -f "${OUT_PREFIX}_security.md" ] && ARTIFACTS+=("${OUT_PREFIX}_security.md")
     [ -f "${OUT_PREFIX}_security.html" ] && ARTIFACTS+=("${OUT_PREFIX}_security.html")
+    [ -f "${OUT_PREFIX}_security_epss.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security_epss.json")
     sync_artifacts
 fi
 # A security scan that was asked for and gave no result (Trivy failed, its

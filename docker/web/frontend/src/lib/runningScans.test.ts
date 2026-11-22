@@ -4,7 +4,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { cancelScan, parseScanStarted } from "./api";
-import { attachedLogStart, runningLabel, scanEndOf } from "./runningScans";
+import {
+  attachedLogStart,
+  clearStoppingScans,
+  nextRunningPoll,
+  noteScanStopping,
+  RUNNING_POLL_MS,
+  runningLabel,
+  scanEndOf,
+  STOPPING_POLL_MS,
+  STOPPING_WATCH_MS,
+} from "./runningScans";
 
 describe("runningLabel", () => {
   it("joins name and version, and leaves the name alone without a version", () => {
@@ -91,5 +101,38 @@ describe("cancelScan", () => {
     expect(await cancelScan("a_1")).toBe(false);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     expect(await cancelScan("a_1")).toBe(false);
+  });
+});
+
+describe("nextRunningPoll", () => {
+  afterEach(() => clearStoppingScans());
+  const row = (id: string) => ({ id });
+
+  it("asks at the usual interval when no listed scan was seen stopped", () => {
+    expect(nextRunningPoll([row("a_1")], 0)).toBe(RUNNING_POLL_MS);
+    expect(nextRunningPoll([], 0)).toBe(RUNNING_POLL_MS);
+  });
+
+  it("asks sooner while a scan this tab saw stopped is still listed", () => {
+    noteScanStopping("a_1", 1000);
+    expect(nextRunningPoll([row("b_1"), row("a_1")], 2000)).toBe(STOPPING_POLL_MS);
+    expect(nextRunningPoll([row("a_1")], 3000)).toBe(STOPPING_POLL_MS);
+  });
+
+  it("drops the note once the server no longer lists the scan", () => {
+    noteScanStopping("a_1", 1000);
+    expect(nextRunningPoll([], 2000)).toBe(RUNNING_POLL_MS);
+    // Listed again later (a new scan of the same name): the usual pace.
+    expect(nextRunningPoll([row("a_1")], 3000)).toBe(RUNNING_POLL_MS);
+  });
+
+  it("stops asking sooner after the watch window", () => {
+    noteScanStopping("a_1", 0);
+    expect(nextRunningPoll([row("a_1")], STOPPING_WATCH_MS)).toBe(RUNNING_POLL_MS);
+  });
+
+  it("ignores an empty id", () => {
+    noteScanStopping("", 0);
+    expect(nextRunningPoll([row("")], 1)).toBe(RUNNING_POLL_MS);
   });
 });

@@ -684,13 +684,39 @@ def _scrub_error_text(text):
 _SCAN_ERROR_MAX_CHARS = 500
 
 _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
+# An older scanner image's note that another scan of the same folder was still
+# running while this one went ahead. It reaches the result screen as a warning
+# with this code in front.
+_SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
+# The scanner waits for another scan of the same folder (from the web UI or the
+# command line) before it starts: one [INFO] line when the wait begins and one
+# when it ends. The running view shows the wait from a `waiting` SSE event.
+_SAME_FOLDER_WAIT_RE = re.compile(r"^\[INFO\]\s+Another scan of this folder is running\b")
+_SAME_FOLDER_WAIT_END_RE = re.compile(
+    r"^\[INFO\]\s+The earlier scan of this folder has finished; this scan starts now")
+SAME_FOLDER_WAIT_CODE = "SAME_FOLDER_SCAN_RUNNING"
+
+
+def same_folder_wait_event(line):
+    """The `waiting` event payload a scanner log line stands for: a dict with
+    waiting true (and the code and the masked line) when the scan starts to
+    wait for another scan of its folder, waiting false when that wait ends,
+    and None for any other line."""
+    if not isinstance(line, str):
+        return None
+    text = line.strip()
+    if _SAME_FOLDER_WAIT_RE.search(text):
+        return {"waiting": True, "code": SAME_FOLDER_WAIT_CODE,
+                "detail": _mask_credentials(text)[:_SCAN_ERROR_MAX_CHARS]}
+    if _SAME_FOLDER_WAIT_END_RE.search(text):
+        return {"waiting": False, "code": SAME_FOLDER_WAIT_CODE}
+    return None
+
+
 # A scanner [ERROR] line may carry a machine-readable code right after the
 # marker ("[ERROR] ANDROID_SDK_IMAGE_MISSING: ..."), for a program that shows
 # its own dialog instead of the text. Only the codes listed here are passed on,
 # so a log line can never put arbitrary text into the `code` field.
-# The scanner's note that another scan of the same folder is still running. It
-# reaches the result screen as a warning with this code in front.
-_SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
 KNOWN_ERROR_CODES = (
     "ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE",
     # Upload-time refusals of a supplier SBOM that cannot be parsed (the code
@@ -3926,11 +3952,14 @@ SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 
 def running_scans():
     """Scans running now, newest first: id, project, version and start time.
-    Read-only. Another tab joins one through GET /scan-attach?id=."""
+    Read-only. Another tab joins one through GET /scan-attach?id=. A scan
+    whose stream has sent its done event has stopped and is not listed, even
+    while it still holds its folder for the cleanup that follows."""
     with _scan_lock:
         rows = [
             {"id": rid, **_scan_started.get(rid, {"project": rid, "version": "", "startedAt": 0})}
             for rid in _scan_active
+            if not (rid in _scan_streams and _scan_streams[rid].ended_at is not None)
         ]
         for stale in [k for k in _scan_started if k not in _scan_active]:
             del _scan_started[stale]
@@ -4717,8 +4746,262 @@ def display_path_of(container_path):
         if p == base:
             return host
         if p.startswith(base + os.sep):
-            return os.path.join(host, os.path.relpath(p, base))
-    return host_path_of(p) or os.path.normpath(container_path)
+            return _host_display_join(host, os.path.relpath(p, base))
+    shown = host_path_of(p)
+    if shown and _WINDOWS_HOST_PATH_RE.match(shown):
+        return shown.replace("/", "\\")
+    return shown or os.path.normpath(container_path)
+
+
+# A Windows host path (C:\... or C:/...): shown with backslashes throughout.
+_WINDOWS_HOST_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _host_display_join(host, rel):
+    """host + rel for display, in the host's own separator: a Windows host path
+    gets backslashes for the added part too, so the user sees one form."""
+    if _WINDOWS_HOST_PATH_RE.match(host) or "\\" in host:
+        return host.rstrip("\\/").replace("/", "\\") + "\\" + rel.replace("/", "\\")
+    return os.path.join(host, rel)
+
+
+# One scan at a time per source folder, shared with the command line: the lock
+# scripts/scan-sbom.sh takes for its own source scans (take_source_lock there)
+# and docker/entrypoint.sh takes for a SOURCE scan this server did not lock, in
+# the same place and format. GUARD/<key>.lock is a directory holding the files
+# pid and origin; this server writes its own process id and "container <this
+# container's id>", a command-line scan writes "cli". The server takes the lock
+# on the user's own folder before it copies the folder for the scan, and keeps
+# it until the scan has ended, so a scan never copies or reads another scan's
+# working files (a Cargo.lock a command-line build writes for a while). It
+# hands the key to the entrypoint as BOMLENS_SOURCE_LOCK_HELD, which then does
+# not wait on the lock this scan already holds.
+SOURCE_LOCK_ENV = "BOMLENS_SOURCE_LOCK_HELD"
+_SOURCE_LOCK_KEY_RE = re.compile(r"[0-9a-f]{64}")
+# The lock directories this server holds now (one per running scan that took
+# one). A lock that names this server's process but is not here was left by a
+# scan of this server that is gone (the server was restarted in the same
+# container), and is taken over.
+_held_source_locks = set()
+_source_lock_mutex = threading.Lock()
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def guard_state_dir():
+    """The host-persistent guard-state folder the launcher mounted
+    (scan-sbom.sh --ui, the desktop app, sbom-ui.bat), or None when there is
+    none. BOMLENS_STATE_DIR points elsewhere for the contract tests."""
+    override = os.environ.get("BOMLENS_STATE_DIR", "").strip()
+    if override and os.path.isabs(override):
+        return override if os.path.isdir(override) else None
+    return "/bomlens-state" if os.path.isdir("/bomlens-state") else None
+
+
+def source_lock_key(host_path):
+    """The key of a folder's lock, from its host path, exactly as
+    source_lock_key in scripts/scan-sbom.sh and docker/entrypoint.sh: the path
+    in one form (backslashes become slashes, a Windows drive path is
+    lower-cased in its ASCII letters, a trailing slash is dropped), then its
+    SHA-256 in hex. Keep the three in step."""
+    p = host_path.replace("\\", "/")
+    if re.match(r"[A-Za-z]:(/|$)", p):
+        p = p.translate(_ASCII_LOWER)
+    while len(p) > 1 and p.endswith("/"):
+        if re.fullmatch(r"[a-z]:/", p):
+            break
+        p = p[:-1]
+    if re.fullmatch(r"[a-z]:", p):
+        p += "/"
+    return hashlib.sha256(p.encode("utf-8")).hexdigest()
+
+
+def source_folder_host_path(container_dir):
+    """The host path of a folder the user scans as source, in the form the
+    command line keys its lock on, or "" when it is not known: an added folder
+    (--mount, the desktop app's Add folder) maps through its recorded host
+    path, the launch folder and its sub-folders through SBOM_UI_HOST_DIR.
+    `container_dir` is SRC_DIR or a safe_scan_dir() result."""
+    real = os.path.realpath(container_dir)
+    picked = picked_scan_root(real)
+    if picked is not None:
+        host = (picked.get("hostPath") or "").replace("\\", "/")
+        if not host:
+            return ""
+        rel = os.path.relpath(real, os.path.realpath(picked["path"]))
+        if rel == ".":
+            return host
+        return host.rstrip("/") + "/" + rel.replace(os.sep, "/")
+    base = os.path.realpath(SRC_DIR)
+    if real != base and not real.startswith(base + os.sep):
+        return ""
+    return host_path_of(SRC_DIR if real == base else os.path.join(SRC_DIR, os.path.relpath(real, base)))
+
+
+def _source_lock_dir(key):
+    """GUARD/<key>.lock, or None without a guard-state folder or for a key
+    that is not a SHA-256 in hex."""
+    state = guard_state_dir()
+    if not state or not _SOURCE_LOCK_KEY_RE.fullmatch(key or ""):
+        return None
+    base = os.path.realpath(state)
+    path = os.path.realpath(os.path.join(base, key + ".lock"))
+    if os.path.dirname(path) != base:
+        return None
+    return path
+
+
+def _read_lock_field(lock_dir, name):
+    try:
+        with open(os.path.join(lock_dir, name), encoding="utf-8") as fh:
+            return fh.read(256).strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _local_pid_running(pid):
+    """True unless process `pid` in this container is known to have ended."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return os.path.isdir("/proc/%d" % pid)
+    except (PermissionError, OSError):
+        return True
+    return True
+
+
+def _source_lock_holder_gone(lock_dir, pid, origin, self_id):
+    """True when the scan that holds the lock is known to have ended.
+    Unconfirmed counts as running. A command-line scan runs on the computer,
+    where this container cannot see its process, so its lock is never taken
+    over here (the next command-line scan of the folder does that)."""
+    if not origin.startswith("container "):
+        return False
+    cid = origin[len("container "):].strip()
+    if not re.fullmatch(r"[0-9a-f]{1,64}", cid):
+        return False
+    if self_id.startswith(cid) or cid.startswith(self_id):
+        # A scan in this container: this server's own, or a scanner process
+        # it started.
+        if pid == os.getpid():
+            with _source_lock_mutex:
+                return lock_dir not in _held_source_locks
+        return not _local_pid_running(pid)
+    if not docker_capable():
+        return False
+    try:
+        ps = subprocess.run(["docker", "ps", "-q", "--no-trunc", "--filter", "id=" + cid],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if ps.returncode != 0:
+        return False
+    if not ps.stdout.strip():
+        return True
+    # The container runs; the scan in it may have ended while it stayed up.
+    try:
+        ex = subprocess.run(["docker", "exec", cid, "sh", "-c",
+                             'kill -0 "$1" 2>/dev/null || [ -d "/proc/$1" ]', "_", str(pid)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return ex.returncode == 1
+
+
+def _try_take_source_lock(lock_dir, self_id):
+    """Make the lock directory and record this server in it. True on success."""
+    with _source_lock_mutex:
+        try:
+            os.mkdir(lock_dir)
+        except FileExistsError:
+            return False
+        try:
+            with open(os.path.join(lock_dir, "pid"), "w", encoding="utf-8") as fh:
+                fh.write("%d\n" % os.getpid())
+            with open(os.path.join(lock_dir, "origin"), "w", encoding="utf-8") as fh:
+                fh.write("container %s\n" % self_id)
+        except OSError:
+            pass
+        _held_source_locks.add(lock_dir)
+        return True
+
+
+def _drop_lock_dir(lock_dir):
+    shutil.rmtree(lock_dir, ignore_errors=True)
+
+
+SOURCE_LOCK_CANCELLED = "cancelled"
+
+
+def wait_for_source_lock(host_path, emit, cancelled, poll_seconds=1.0):
+    """Wait for and take the lock of the source folder at `host_path` (a host
+    path, see source_folder_host_path). `emit` gets the [INFO] lines the
+    scanner itself prints for the same wait (same_folder_wait_event reads
+    them), `cancelled` is asked between polls. Returns the lock directory when
+    taken, None when the scan runs without one (no host path, no guard-state
+    folder, or no container id another scan could look up: the entrypoint then
+    says so), or SOURCE_LOCK_CANCELLED when the scan was stopped while it
+    waited."""
+    if not host_path:
+        return None
+    key = source_lock_key(host_path)
+    lock_dir = _source_lock_dir(key)
+    if lock_dir is None:
+        return None
+    self_id = _self_container_id()
+    if not re.fullmatch(r"[0-9a-f]{12,64}", self_id or ""):
+        return None
+    said = False
+    empty_polls = 0
+    while True:
+        if _try_take_source_lock(lock_dir, self_id):
+            if said:
+                emit("[INFO] The earlier scan of this folder has finished; this scan starts now.")
+            return lock_dir
+        pid_text = _read_lock_field(lock_dir, "pid")
+        origin = _read_lock_field(lock_dir, "origin")
+        pid = int(pid_text) if pid_text.isdigit() else None
+        if pid is None:
+            # Another scan made the lock a moment ago and has not written its
+            # id yet; one left without an id for longer is taken over.
+            empty_polls += 1
+            if empty_polls >= 10:
+                _drop_lock_dir(lock_dir)
+                empty_polls = 0
+                continue
+        elif _source_lock_holder_gone(lock_dir, pid, origin, self_id):
+            _drop_lock_dir(lock_dir)
+            continue
+        elif not said:
+            if origin.startswith("container "):
+                who = "a web UI scan"
+            else:
+                who = "a command-line scan, process %d on this computer" % pid
+            emit("[INFO] Another scan of this folder is running (%s); this scan waits for it "
+                 "to finish, so that neither one sees the other's build files. Cancel this "
+                 "scan to stop waiting." % who)
+            if not origin.startswith("container "):
+                emit("[INFO]   If no command-line scan of this folder is running, one that was "
+                     "stopped outright left its lock: the next command-line scan of the folder "
+                     "clears it, or remove %s.lock from the BomLens guard state folder "
+                     "(bomlens/guard)." % key)
+            said = True
+        if cancelled():
+            return SOURCE_LOCK_CANCELLED
+        time.sleep(poll_seconds)
+        if cancelled():
+            return SOURCE_LOCK_CANCELLED
+
+
+def release_source_lock(lock_dir):
+    """Free a lock wait_for_source_lock took, if it still names this server."""
+    if not lock_dir:
+        return
+    with _source_lock_mutex:
+        if lock_dir not in _held_source_locks:
+            return
+        _held_source_locks.discard(lock_dir)
+        if _read_lock_field(lock_dir, "pid") == str(os.getpid()):
+            _drop_lock_dir(lock_dir)
 
 
 # Allowlist charsets for the image ref / model id / container name interpolated into
@@ -5478,6 +5761,10 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # falling back to syft (see host_path_of()).
         if env.get("SOURCE_ROOT_HOST"):
             args += ["-e", "SOURCE_ROOT_HOST=%s" % env["SOURCE_ROOT_HOST"]]
+        # This scan holds its folder's lock: the sibling does not wait on it.
+        held_key = env.get(SOURCE_LOCK_ENV, "")
+        if _SOURCE_LOCK_KEY_RE.fullmatch(held_key):
+            args += ["-e", "%s=%s" % (SOURCE_LOCK_ENV, held_key)]
     if target_dir is not None:
         args += ["-e", "TARGET_DIR=%s" % target_dir]
     if target_image is not None:
@@ -6003,7 +6290,8 @@ def _bounded_int_env(name, default, low, high):
 # (GET /scan-attach): a reloaded tab, or another one. The events are kept in a
 # bounded buffer per scan so a tab that joins late is shown the log so far, and
 # then follows it. Only log and error events are kept, oldest first out past
-# either cap; the last progress event and the final done event are kept apart.
+# either cap; the last progress event, a same-folder wait still under way
+# (`waiting`) and the final done event are kept apart.
 SCAN_REPLAY_MAX_EVENTS = 5000
 SCAN_REPLAY_MAX_BYTES = 1024 * 1024
 # Error events pushed out of the buffer are still replayed, up to this many.
@@ -6045,6 +6333,7 @@ class _ScanBroadcast:
         self.dropped_lines = 0
         self._kept_errors = []
         self._progress = None
+        self._waiting = None
         self._done = None
         self._followers = set()
         self.owner_alive = True
@@ -6060,6 +6349,13 @@ class _ScanBroadcast:
                 self.ended_at = time.monotonic()
             elif event == "progress":
                 self._progress = payload
+            elif event == "waiting":
+                # Only a wait still under way is replayed to a joining tab.
+                try:
+                    still = json.loads(payload).get("waiting") is True
+                except (ValueError, AttributeError):
+                    still = False
+                self._waiting = payload if still else None
             else:
                 self._events.append((event, payload))
                 self._bytes += len(payload)
@@ -6090,6 +6386,8 @@ class _ScanBroadcast:
             if self._done is None and len(self._followers) >= SCAN_ATTACH_MAX_CLIENTS:
                 return None
             replay = list(self._kept_errors) + list(self._events)
+            if self._waiting is not None and self._done is None:
+                replay.append(("waiting", self._waiting))
             if self._progress is not None:
                 replay.append(("progress", self._progress))
             if self._done is not None:
@@ -8783,6 +9081,8 @@ class Handler(BaseHTTPRequestHandler):
         # whatever this server's own environment happens to carry.
         for _dc_name in DECLARED_ENV_NAMES:
             env.pop(_dc_name, None)
+        # Set only when this scan took its folder's lock (hold_source_folder).
+        env.pop(SOURCE_LOCK_ENV, None)
         env.update({
             # Tells this run's entrypoint.sh it may sweep known-suffix
             # leftovers of an earlier scan of the same project/version before
@@ -8895,6 +9195,35 @@ class Handler(BaseHTTPRequestHandler):
         cwd = run_out
         cleanup_dir = None
         mode = None
+        # The source folder's lock while this scan holds it (hold_source_folder),
+        # freed when the scan ends.
+        source_lock_ref = [None]
+
+        def hold_source_folder(container_dir):
+            """Wait for and take the lock of the folder the user picked, before
+            anything copies or reads it. The wait is told the way the scanner
+            tells it: its [INFO] line in the log and a `waiting` event after it.
+            False when the scan was stopped while it waited (the done event has
+            then been sent)."""
+            def emit(ln):
+                sse("log", json.dumps(ln))
+                waiting_ = same_folder_wait_event(ln)
+                if waiting_ is not None:
+                    sse("waiting", json.dumps(waiting_))
+            held = wait_for_source_lock(source_folder_host_path(container_dir), emit,
+                                        lambda: disconnected[0])
+            if held == SOURCE_LOCK_CANCELLED:
+                decide_cancel(False)
+                record_outcome(False)
+                sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
+                                        "sbom": None, "security": None, "conformance": None,
+                                        "cancelled": cancel_state["cancelled"]}))
+                return False
+            if held:
+                source_lock_ref[0] = held
+                env[SOURCE_LOCK_ENV] = os.path.basename(held)[:-len(".lock")]
+            return True
+
         # When set, run the scan in a SIBLING container (firmware/aibom image)
         # instead of in-process run-scan. dict: {image, upload_file?, model_id?}.
         sibling = None
@@ -9075,6 +9404,8 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
                 env["SOURCE_ROOT"] = SRC_DIR
+                if not hold_source_folder(SRC_DIR):
+                    return
                 # The launch folder is scanned as source on request, so this one
                 # is not switched under the user — but a Yocto build directory
                 # scanned as source reads the build tree rather than the image,
@@ -9130,6 +9461,10 @@ class Handler(BaseHTTPRequestHandler):
                 hidden = scan_target_not_visible(scan_dir)
                 if hidden:
                     fail(hidden, code="SCAN_TARGET_NOT_VISIBLE"); return
+                # The user's own folder is locked before it is copied, so the copy
+                # never takes in another scan's working files.
+                if not hold_source_folder(scan_dir):
+                    return
                 cleanup_dir = new_source_copy_dir()
                 sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
                                       % os.path.basename(copy_src.rstrip("/"))))
@@ -9578,6 +9913,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Credential-shaped text is masked before it reaches the browser
                 # (and so the copy-log button); digests and checksums are kept.
                 sse("log", json.dumps(_mask_credentials(ln) if isinstance(ln, str) else ln))
+                # The scan waits for another scan of the same folder, or that
+                # wait has ended: the running view says so, after the line.
+                waiting = same_folder_wait_event(ln)
+                if waiting is not None:
+                    sse("waiting", json.dumps(waiting))
             if (sibling is not None and env.get("MODE") == "SOURCE" and sibling.get("source_root")
                     and env.get("DEEP_LICENSE") == "true" and deep_license_capable()):
                 # Deep license with deep CVE on a source tree: the sibling runs
@@ -9766,6 +10106,7 @@ class Handler(BaseHTTPRequestHandler):
             # passes here: a finished scan, a failure, and a client that closed
             # the stream mid-scan.
             decide_cancel(False)
+            release_source_lock(source_lock_ref[0])
             # A container this run started and nobody removed (a cancel that
             # arrived during an image pull, say) goes now, by its label. A
             # finished scan has none, so the docker call is only for a run

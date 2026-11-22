@@ -978,13 +978,14 @@ if [ -f composer.json ] && [ ! -f composer.lock ] && command -v composer >/dev/n
     # manifest without require-dev and config.lock, and ignore platform
     # requirements (nothing runs here; a project pinned to an older PHP than the
     # image still resolves, though a dependency version needing a newer PHP can
-    # then be picked). BOMLENS_PHP_FULL_GRAPH keeps the full manifest. The
+    # then be picked). BOMLENS_PHP_FULL_GRAPH or BOMLENS_INCLUDE_DEV_DEPENDENCIES
+    # keeps the full manifest. The
     # original is copied outside the tree, written back in place (so a symlinked
     # composer.json stays a link) right after the resolve, and is also covered
     # by the source-tree guard if the run is killed in between. php is always
     # there where composer is; jq covers a stub or an unusual image.
     _cj_orig=""; _cj_new=""
-    if ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
+    if ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}" && ! opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then
         _cj_orig=$(mktemp 2>/dev/null) && _cj_new=$(mktemp 2>/dev/null) || { rm -f "$_cj_orig" "$_cj_new"; _cj_orig=""; }
     fi
     if [ -n "$_cj_orig" ] && cp -p composer.json "$_cj_orig" 2>/dev/null; then
@@ -1699,10 +1700,13 @@ fi
 # cdxgen already tags each composer component's resolved scope (require ->
 # required, require-dev -> optional), so no composer run or second resolve is
 # needed here either, confirmed against the pinned cdxgen PHP image and not
-# just assumed from cdxgen's own upstream behavior. BOMLENS_PHP_FULL_GRAPH=1
-# opts out (keep the require+require-dev superset).
+# just assumed from cdxgen's own upstream behavior. BOMLENS_PHP_FULL_GRAPH=1 or
+# BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 opts out (keep the require+require-dev
+# superset).
 PHP_SCOPE_FILTER=""
-if [ -f composer.json ] && ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
+if [ -f composer.json ] && opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then
+    log "php: require-dev kept (BOMLENS_INCLUDE_DEV_DEPENDENCIES)"
+elif [ -f composer.json ] && ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
     PHP_SCOPE_FILTER=1
 fi
 
@@ -3211,8 +3215,14 @@ fi
 # resolve the production dependency set OURSELVES — a lockfile-only npm resolve in a
 # scratch copy (metadata only, no tarball downloads, source tree untouched) — and
 # post-filter cdxgen's BOM to it near the end, mirroring the Android release-scope
-# filter. BOMLENS_NODE_FULL_GRAPH=1 opts out (keep the dev+prod superset).
+# filter. BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 (every ecosystem) and
+# BOMLENS_NODE_FULL_GRAPH=1 (Node.js only) opt out (keep the dev+prod superset).
 NODE_PROD_SET=""
+if [ -f package.json ] && opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then
+    log "node: development dependencies kept (BOMLENS_INCLUDE_DEV_DEPENDENCIES); the production filter is not applied"
+elif [ -f package.json ] && opted_out "${BOMLENS_NODE_FULL_GRAPH:-}"; then
+    log "node: full graph kept (BOMLENS_NODE_FULL_GRAPH); the production filter is not applied"
+fi
 # A workspace root with no package-lock.json (yarn, pnpm or bun workspaces):
 # only the root package.json reaches the scratch resolve, so the members'
 # production dependencies would be missing from the set and filtered out.
@@ -3233,6 +3243,7 @@ if [ -f package.json ] && [ ! -f package-lock.json ] \
     fi
 fi
 if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
+   && ! opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}" \
    && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
     log "node: resolving production dependency set"
     _npmtmp=$(mktemp -d)
@@ -4887,7 +4898,9 @@ fi
 # The dropped components are recorded in
 # bomlens:excluded-components. Guard: the root must be in the dependency graph,
 # otherwise nothing is dropped. BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 turns the
-# whole filter off; BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
+# whole filter off (and the npm production filter and the Composer require-dev
+# filter above); BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components and
+# leaves the other markers in force.
 if opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then
     log "dev-marker: development dependencies kept (BOMLENS_INCLUDE_DEV_DEPENDENCIES)"
 elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
@@ -8110,6 +8123,13 @@ cache_handback_wanted() {
     [ "${HOST_UID:-0}" != 0 ] || [ "${HOST_GID:-0}" != 0 ] || return 1
     cache_chown_has_effect "$1"
 }
+# userns_remapped: the same check as owner-handback.sh in the post-process
+# image (this script runs alone in a language image, so it carries a copy).
+userns_remapped() {
+    _um_f="${BOMLENS_UID_MAP:-/proc/self/uid_map}"
+    [ -r "$_um_f" ] || return 1
+    awk '$1 == 0 { f = ($2 != 0) } END { exit !f }' "$_um_f" 2>/dev/null
+}
 # --- end cache hand-back helpers --------------------------------------------
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
@@ -8118,7 +8138,11 @@ cache_handback_wanted() {
 # clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
 # arrive via `docker run -e`; best-effort, never fail the prep on this.
 gradle_settings_remove
-if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
+# In a user namespace (rootless engine, userns-remap) a chown to HOST_UID would
+# give the tree to a subordinate uid (owner-handback.sh).
+if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ] && userns_remapped; then
+    echo "[INFO] This container runs in a user namespace (a rootless engine or userns-remap): the project folder's ownership is left as the engine maps it." >&2
+elif [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
     # The Maven and Gradle caches are host folders too (cache-maven,
     # cache-gradle): hand back what this run wrote there. Only a mounted one,

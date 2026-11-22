@@ -3,11 +3,11 @@
 
 import { FileIcon, FileSymlinkFileIcon, FilterIcon, XIcon } from "@primer/octicons-react";
 import { Label, TextInput, TreeView } from "@primer/react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FileNode } from "@/lib/scancode";
-import { ancestorDirs, dirsWithMatchBelow, filterNodes } from "@/lib/sourceTreeFilter";
+import { ancestorDirs, dirsWithMatchBelow, fileRowName, filterNodes } from "@/lib/sourceTreeFilter";
 
 import "./source-tree.css";
 
@@ -20,16 +20,25 @@ const FILTER_DELAY_MS = 150;
 function Licenses({ licenses }: { licenses: string[] }) {
   if (licenses.length === 0) return null;
   return (
+    // The spaces keep the file name and the labels apart as words in the text;
+    // inside this flex box they take no room.
     <span className="bl-src-licenses">
-      {licenses.slice(0, 2).map((l) => (
-        <Label key={l} variant="secondary" title={l}>
-          {l}
-        </Label>
+      {" "}
+      {licenses.slice(0, 2).map((l, i) => (
+        <Fragment key={l}>
+          {i > 0 && " "}
+          <Label variant="secondary" title={l}>
+            {l}
+          </Label>
+        </Fragment>
       ))}
       {licenses.length > 2 && (
-        <Label variant="secondary" title={licenses.slice(2).join(", ")}>
-          +{licenses.length - 2}
-        </Label>
+        <>
+          {" "}
+          <Label variant="secondary" title={licenses.slice(2).join(", ")}>
+            +{licenses.length - 2}
+          </Label>
+        </>
       )}
     </span>
   );
@@ -88,7 +97,7 @@ export function SourceFileTree({
       <TreeView.Item
         key={n.path}
         id={`src-${encodeURIComponent(n.path)}`}
-        aria-label={n.licenses.length ? `${n.name}, ${n.licenses.join(", ")}` : n.name}
+        aria-label={fileRowName(n)}
         defaultExpanded={n.isDir ? expandedAtStart(n, depth) : undefined}
         onExpandedChange={
           n.isDir

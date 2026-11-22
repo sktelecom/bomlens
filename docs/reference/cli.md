@@ -148,7 +148,7 @@ A short local name with no registry path, such as `sbom-scanner:local`, and a ve
 
 When `SBOM_SCANNER_IMAGE` is pinned by digest only, the opt-in images use `:latest` in the CLI and the web UI and the app's own version in the desktop app; to pin them as well, set each `SBOM_*_IMAGE`.
 
-Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way.
+Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way. To list development dependencies, set `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`: it covers every ecosystem, so `BOMLENS_NODE_FULL_GRAPH` and `BOMLENS_PHP_FULL_GRAPH` are needed only to keep one ecosystem's development dependencies and not the others'.
 
 On Windows, environment variables set in a command prompt do not survive a
 double-click. The launchers therefore also read `UI_PORT`, `SBOM_LANG`,
@@ -213,7 +213,7 @@ Each scan is isolated in its own `{Project}_{Version}/` subfolder, so the files 
 
 For `--git` or archive ingestion the clone or extract happens in a temp directory that is cleaned up on exit, and only the output subfolder remains.
 
-A re-scan of the same project and version overwrites its subfolder by default, keeping just the latest result. Add `--timestamp` to keep each run instead: it appends `_YYYYMMDD-HHMMSS` to the folder name, for example `MyApp_1.0.0_20260626-143000/`. The flag changes the folder name only, not the SBOM file names or bytes, so it works together with `--byte-stable`. Only one scan of a project and version runs into a folder at a time: a second one started while the first is running stops at once with exit code 1 and says so, and runs again fine once the first has finished. Use another `--version`, another `-o` folder or `--timestamp` to run both together.
+A re-scan of the same project and version overwrites its subfolder by default, keeping just the latest result. Add `--timestamp` to keep each run instead: it appends `_YYYYMMDD-HHMMSS` to the folder name, for example `MyApp_1.0.0_20260626-143000/`. The flag changes the folder name only, not the SBOM file names or bytes, so it works together with `--byte-stable`. Only one scan of a project and version runs into a folder at a time: a second one started while the first is running stops at once with exit code 1 and says so, and runs again fine once the first has finished. Use another `--version`, another `-o` folder or `--timestamp` to run both together. Scans of one source folder also take turns, whatever their version or options: a second scan of the folder prints an `[INFO]` line saying it waits, and starts when the first has finished, so neither one sees the build files the other writes there for a while (a generated `Cargo.lock`, for example) or is graded on them.
 
 To restore the previous flat layout, where every file is written directly in the base with no per-run subfolder, set `SBOM_OUTPUT_FLAT=1`. This is meant for CI that expects the old paths.
 

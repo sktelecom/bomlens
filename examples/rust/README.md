@@ -59,7 +59,7 @@ jq -r '.components[].name' RustExample_1.0.0/RustExample_1.0.0_bom.json | sort -
 
 ### Cargo.lock for exact versions
 
-A committed `Cargo.lock` pins exact versions. Without it, Cargo resolves the latest compatible versions during the scan.
+This example commits `Cargo.lock`, which pins exact versions, so the result is graded complete. Without it, Cargo resolves the latest compatible versions during the scan and the result is partial (`lockfile-missing`); run `cargo generate-lockfile` to write it.
 
 ## Next Steps
 

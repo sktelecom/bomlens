@@ -49,6 +49,9 @@ case "$1" in
         case "$*" in
             *" df "*|*"--entrypoint df"*)
                 [ -n "${FAKE_DF_MB:-}" ] || exit 1
+                # FAKE_MSYS=1: Git Bash, which turns the "/" argument into its
+                # own install folder unless MSYS_NO_PATHCONV is set.
+                [ "${FAKE_MSYS:-0}" != 1 ] || [ "${MSYS_NO_PATHCONV:-}" = 1 ] || exit 1
                 printf 'Filesystem 1M-blocks Used Available Capacity Mounted on\noverlay 100000 1 %s 1%% /\n' "$FAKE_DF_MB"
                 exit 0 ;;
         esac
@@ -145,7 +148,20 @@ case "$out" in *"Free disk space in the Docker engine is low: 3.0 GB"*) pass "ch
 out="$(BOMLENS_FAKE_HOST_FREE_MB=3000 setup "$ROOT_DIR/scripts/check-setup.sh" 900000)"
 case "$out" in *"Free disk space in the Docker engine is low: 3.0 GB"*) pass "check-setup uses the host disk when it has less room than the VM reports" ;; *) fail "check-setup host disk" "$out" ;; esac
 out="$(SBOM_SCANNER_IMAGE=bomlens-retest:main setup "$ROOT_DIR/scripts/check-setup.sh" 30000)"
-case "$out" in *"bomlens-retest:main"*) pass "check-setup lists the scanner image SBOM_SCANNER_IMAGE names" ;; *) fail "check-setup own image" "$out" ;; esac
+if printf '%s\n' "$out" | grep -Eq '^ +bomlens-retest:main +1\.4 GB$'; then
+    pass "check-setup lists the scanner image SBOM_SCANNER_IMAGE names in the image sizes"
+else
+    fail "check-setup own image" "$out"
+fi
+# Git Bash: the df probe reaches docker unconverted, so the free-disk line is
+# there. A stand-in uname and cygpath make this shell look like Git Bash.
+mkdir -p "$WORK/msysbin"
+printf '#!/bin/sh\necho MINGW64_NT-10.0-19045\n' > "$WORK/msysbin/uname"
+printf '#!/bin/sh\nshift; [ "$1" = -l ] && shift; [ "$1" = -- ] && shift; printf "C:%%s" "$1"\n' > "$WORK/msysbin/cygpath"
+chmod +x "$WORK/msysbin/uname" "$WORK/msysbin/cygpath"
+out="$(FAKE_MSYS=1 BOMLENS_FAKE_FREE_MB='' FAKE_DF_MB=30000 BOMLENS_FAKE_HOST_FREE_MB=900000 \
+    PATH="$WORK/msysbin:$WORK/bin:$PATH" SBOM_LANG=en FAKE_HAVE_IMAGES=1 UI_PORT=1 bash "$ROOT_DIR/scripts/check-setup.sh" "$WORK/proj" 2>&1)"
+case "$out" in *"Free disk space in the Docker engine: 30.0 GB"*) pass "check-setup reads the engine's free disk under Git Bash" ;; *) fail "check-setup free disk under Git Bash" "$out" ;; esac
 sed 's/@BOMLENS_VERSION@/1.15.0/' "$ROOT_DIR/scripts/check-setup.sh" > "$WORK/check-setup-stamped.sh"
 out="$(setup "$WORK/check-setup-stamped.sh" 30000)"
 case "$out" in *"Scanner image is present: ghcr.io/sktelecom/bomlens:1.15.0"*) pass "a release bundle checks the image of its own version" ;; *) fail "stamped tag" "$out" ;; esac

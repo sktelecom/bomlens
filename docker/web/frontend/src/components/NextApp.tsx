@@ -42,6 +42,7 @@ import {
   type ScanConfig,
   type ScanHandlers,
   type ScanParams,
+  type ScanWaiting,
   type Severity,
 } from "@/lib/api";
 import { failureKeyForCode } from "@/lib/failureExplain";
@@ -65,7 +66,7 @@ import {
   scanHash,
   type RouteQuery,
 } from "@/lib/route";
-import { attachedLogStart, scanEndOf } from "@/lib/runningScans";
+import { attachedLogStart, noteScanStopping, scanEndOf } from "@/lib/runningScans";
 import { formatNumber } from "@/lib/format";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 import { type ProjectName, projectText, scanProjectName } from "@/lib/scanTitle";
@@ -158,6 +159,9 @@ export function NextApp() {
   const { toast } = useToast();
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  // The running scan waits for another scan of the same folder (the server's
+  // `waiting` event, replayed to a tab that joins while it waits).
+  const [waiting, setWaiting] = useState<ScanWaiting | null>(null);
   // The failure message surfaced on the Scan-running screen when a scan can't
   // run (stream/launch error), so it isn't buried in the log.
   const [scanError, setScanError] = useState<string | null>(null);
@@ -309,6 +313,7 @@ export function NextApp() {
     loadedIdRef.current = null;
     setStatus("idle");
     setLogs([]);
+    setWaiting(null);
     setResult(null);
     setLiveProject(undefined);
     setOpening(null);
@@ -570,6 +575,7 @@ export function NextApp() {
     setOpening(null);
     setStatus("running");
     setLogs([]);
+    setWaiting(null);
     setScanError(null);
     setScanErrorKey(null);
     setAndroidNeed(null);
@@ -600,11 +606,15 @@ export function NextApp() {
       if (window.location.hash !== target) window.history.replaceState(null, "", target);
     },
     onLog: (line) => setLogs((prev) => [...prev, line]),
+    onWaiting: setWaiting,
     onDone: (done) => {
       streamRef.current = null;
+      setWaiting(null);
       // Cancelled from another tab: nothing was kept, so there is no result
       // to land on. This tab's own Cancel closes the stream before this.
       if (scanEndOf(done) === "cancelled") {
+        // Listed as running until the server has finished stopping it.
+        noteScanStopping(done.id || runningIdRef.current || "");
         toast(t("run.cancelledElsewhere"));
         resetToHome();
         setHomeView("new");
@@ -660,6 +670,7 @@ export function NextApp() {
     setOpening(null);
     setStatus("running");
     setLogs([]);
+    setWaiting(null);
     setScanError(null);
     setScanErrorKey(null);
     setAndroidNeed(null);
@@ -957,6 +968,7 @@ export function NextApp() {
         <>
         <ScanRunning
           logs={logs}
+          waiting={waiting}
           status={status === "error" ? "error" : "running"}
           projectLabel={projectText(projectInfo) || undefined}
           errorMessage={scanError}
@@ -971,7 +983,10 @@ export function NextApp() {
             // Stopped by id, so a cancel from a joined tab works the same as
             // from the one that started it; the server stops it once.
             const id = runningIdRef.current;
-            if (id) void cancelScan(id);
+            if (id) {
+              void cancelScan(id);
+              noteScanStopping(id);
+            }
             closeStream();
             resetToHome();
             setHomeView("new");

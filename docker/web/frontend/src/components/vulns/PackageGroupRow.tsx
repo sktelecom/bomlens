@@ -26,24 +26,25 @@ export function PackageGroupRow({ group: g, isOpen, onToggle }: { group: Package
           type="button"
           className="bl-v-disclose"
           aria-expanded={isOpen}
-          aria-label={t("result.pkgGroupToggle", { pkg: g.pkg })}
           onClick={onToggle}
         >
+          {/* Named by what it shows; aria-expanded says it opens the rows. The
+              spaces separate the parts as words and take no room in the flex row. */}
           <span className="bl-muted bl-inline">{isOpen ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}</span>
-          <SeverityLabel severity={g.maxSeverity} quiet />
-          <PackageCoordinate {...splitPackage(g.pkg)} title={g.pkg} strongName className="bl-mono bl-breakall" />
-          <span className="bl-mono bl-muted">{g.installed || "-"}</span>
+          <SeverityLabel severity={g.maxSeverity} quiet />{" "}
+          <PackageCoordinate {...splitPackage(g.pkg)} title={g.pkg} strongName className="bl-mono bl-breakall" />{" "}
+          <span className="bl-mono bl-muted">{g.installed || "-"}</span>{" "}
           {g.vulns.some((v) => v.buildTool) && (
             <span className="bl-small bl-muted" title={t("result.buildToolHint")} data-testid="vuln-build-tool">
               {t("result.buildToolTag")}
             </span>
-          )}
-          <span className="bl-muted bl-small">{t("result.pkgGroupCount", { count: g.vulns.length, n: fmt(g.vulns.length) })}</span>
+          )}{" "}
+          <span className="bl-muted bl-small">{t("result.pkgGroupCount", { count: g.vulns.length, n: fmt(g.vulns.length) })}</span>{" "}
           {g.kev && (
             <Label variant="danger" title={t("result.kevHint")}>
               {t("result.kevBadge")}
             </Label>
-          )}
+          )}{" "}
           <span className="bl-small bl-v-upgrade">
             {top
               ? lower.length === 0
