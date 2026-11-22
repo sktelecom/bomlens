@@ -700,7 +700,7 @@ test("proxyEnvArgs passes the proxy settings by name and leaves out a loopback p
   };
   const args = proxyEnvArgs({ env });
   assert.deepEqual(args, ["-e", "HTTP_PROXY", "-e", "NO_PROXY", "-e", "https_proxy"]);
-  assert.ok(!args.some((a) => a.includes("example.com") || a.includes("secret")), "no value on the command line");
+  assert.ok(args.every((a) => a === "-e" || /^[A-Za-z_]+$/.test(a)), "only variable names on the command line, no values");
   for (const v of ["http://localhost", "https://localhost/", "[::1]:8080", "http://[::1]:3128", "127.0.0.2:80"]) {
     assert.deepEqual(proxyEnvArgs({ env: { HTTP_PROXY: v } }), [], v);
   }

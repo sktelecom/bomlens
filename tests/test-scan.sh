@@ -188,13 +188,17 @@ assert_root_has_direct_deps() {
 # the root and the packages showed in the UI as a bare UUID with no direct
 # dependencies.
 graph_shape_problem() {
-    local out
-    out=$(jq -r '
+    local out grade
+    # A result the scan itself grades partial or unreliable (a failed
+    # resolution step, no lock file) may lack the root's edges; only the
+    # dangling-ref check applies to it.
+    grade=$(jq -r '.grade // empty' "${1%_bom.json}_completeness.json" 2>/dev/null)
+    out=$(jq -r --arg grade "${grade:-complete}" '
         ([.components[]?["bom-ref"]] + [.metadata.component["bom-ref"]]) as $k
         | (.metadata.component["bom-ref"] // "") as $r
         | ([.dependencies[]? | (.ref, .dependsOn[]?) | select(. as $x | $k | index([$x]) == null)] | unique) as $d
         | if ($d | length) > 0 then "\($d | length) ref(s) name no component: \($d[0:3] | join(", "))"
-          elif ([.dependencies[]? | select(.ref == $r) | .dependsOn[]?] | length) == 0 then "the root has no direct dependency"
+          elif $grade == "complete" and ([.dependencies[]? | select(.ref == $r) | .dependsOn[]?] | length) == 0 then "the root has no direct dependency"
           else empty end' "$1" 2>&1) || out="cannot read ${1}: $out"
     [ -z "$out" ] || { printf '%s\n' "$out"; return 1; }
 }
