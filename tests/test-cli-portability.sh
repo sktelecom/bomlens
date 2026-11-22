@@ -8,7 +8,8 @@
 # failed run removes, two scans of one result or one source folder at once
 # (the second waits, the folder is left as it was), the progress line of a long image scan, the container's
 # [ERROR]/[WARN] lines on stderr, a Gradle root whose folder name starts with a
-# dot, the Xcode-held Package.resolved, and check-setup's own-UI port.
+# dot, the Xcode-held Package.resolved, check-setup's own-UI port, the scan
+# container's output on a terminal and the scan log, and --ui from a BomLens clone.
 # A fake `docker` on PATH answers the few calls these paths make.
 set -u
 
@@ -511,6 +512,115 @@ JSON
         fail "summary basis" "$(cat "$WORK/img_summary.result" 2>&1)"
     fi
 fi
+
+# --- 9) the scan container's processing lines on a terminal, and the scan log
+echo "== container output and the scan log"
+mkdir -p "$WORK/qbin"
+cat > "$WORK/qbin/docker" <<'MOCK'
+#!/bin/bash
+case "$1" in
+    run)
+        for a in "$@"; do
+            case "$a" in
+                *:/host-output|*:/host-output:*)
+                    d="${a%%:/host-output*}"; d="${d%\"}"; d="${d#\"}"
+                    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[]}' > "$d/q_1_bom.json" ;;
+            esac
+        done
+        echo "[1/2] Scanning the image"
+        echo "[cpe] set a cpe:2.3 on 0 component(s)"
+        echo "[notice] PDF skipped: no PDF renderer in image"
+        echo "    a continuation of the notice line"
+        echo "[validate] CycloneDX -> result=pass (mandatory fails=0)"
+        echo "[INFO] source-snapshot: captured 4 file(s)"
+        echo "[security] the advisory lookup failed: timeout"
+        echo "[WARN] a warning from the container" >&2
+        echo "an unknown line" ;;
+    *) exit 0 ;;
+esac
+MOCK
+for opener in open xdg-open; do printf '#!/bin/sh\nexit 0\n' > "$WORK/qbin/$opener"; chmod +x "$WORK/qbin/$opener"; done
+chmod +x "$WORK/qbin/docker"
+run_q() {
+    ( cd "$WORK/cwd" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never "$@" >"$WORK/out" 2>"$WORK/err" )
+    RC=$?
+}
+QARGS="--project q --version 1 --target alpine:3.20 --generate-only --notice"
+rm -rf "$WORK/q1"
+# shellcheck disable=SC2086
+_BOMLENS_FORCE_TTY=1 VERBOSE=false run_q bash "$SCRIPT" $QARGS -o "$WORK/q1"
+if [ "$RC" = 0 ] && grep -q '^\[1/2\] Scanning the image' "$WORK/out" && grep -q '^an unknown line' "$WORK/out" \
+   && ! grep -qE '^\[(cpe|notice|validate)\]|source-snapshot|a continuation' "$WORK/out"; then
+    pass "on a terminal the processing lines are hidden; stage lines and unknown lines stay"
+else
+    fail "quiet terminal output" "rc=$RC $(head -c 400 "$WORK/out")"
+fi
+if grep -q '^\[WARN\] a warning from the container' "$WORK/err" && grep -q 'the advisory lookup failed' "$WORK/out"; then
+    pass "a [WARN] line and a line naming a failure are shown on a terminal"
+else
+    fail "warnings on a terminal" "out=$(head -c 300 "$WORK/out") err=$(head -c 300 "$WORK/err")"
+fi
+if grep -q '^\[cpe\] set a cpe' "$WORK/q1/q_1/q_1_scan.log" 2>/dev/null && grep -q '^\[WARN\] a warning' "$WORK/q1/q_1/q_1_scan.log" \
+   && grep -q 'q_1_scan.log' "$WORK/out"; then
+    pass "every container line is kept in <prefix>_scan.log and the summary names it"
+else
+    fail "scan log" "$(ls "$WORK/q1/q_1" 2>&1)"
+fi
+# The notice is requested and not produced: the summary's pointer to the details.
+if grep -q 'check q_1_scan.log for its warning' "$WORK/err"; then
+    pass "on a terminal the summary points to the scan log for details"
+else
+    fail "quiet log pointer" "$(grep -i 'degraded' "$WORK/err")"
+fi
+rm -rf "$WORK/q2"
+# shellcheck disable=SC2086
+_BOMLENS_FORCE_TTY=1 VERBOSE=true run_q bash "$SCRIPT" $QARGS -o "$WORK/q2"
+if grep -q '^\[cpe\] set a cpe' "$WORK/out" && grep -q '^\[notice\] PDF skipped' "$WORK/out"; then
+    pass "VERBOSE=true shows every processing line on a terminal"
+else
+    fail "VERBOSE=true" "$(head -c 400 "$WORK/out")"
+fi
+rm -rf "$WORK/q3"
+# shellcheck disable=SC2086
+_BOMLENS_FORCE_TTY=1 VERBOSE=false run_q bash "$SCRIPT" $QARGS --verbose -o "$WORK/q3"
+if grep -q '^\[cpe\] set a cpe' "$WORK/out"; then pass "--verbose shows every processing line"; else fail "--verbose" "$(head -c 400 "$WORK/out")"; fi
+rm -rf "$WORK/q4"
+# shellcheck disable=SC2086
+VERBOSE=false run_q bash "$SCRIPT" $QARGS -o "$WORK/q4"
+if grep -q '^\[cpe\] set a cpe' "$WORK/out" && grep -q '^\[WARN\] a warning' "$WORK/err" && ! grep -q '^\[WARN\]' "$WORK/out"; then
+    pass "output to a file is not shortened, and the container's stderr stays on stderr"
+else
+    fail "output to a file" "out=$(head -c 300 "$WORK/out") err=$(head -c 300 "$WORK/err")"
+fi
+if grep -q 'check the log above for its warning' "$WORK/err"; then pass "output to a file keeps 'the log above'"; else fail "log pointer in a file" "$(grep -i 'degraded' "$WORK/err")"; fi
+# A source scan's post-processing container numbers its own steps; on a
+# terminal only the CLI's stages are shown then, and a single-container scan's
+# own stages stay.
+(
+    eval "$(extract_fn "$SCRIPT" container_line_names_problem)"
+    eval "$(extract_fn "$SCRIPT" container_line_is_detail)"
+    # shellcheck disable=SC2034  # read by the lifted container_line_is_detail
+    HIDE_CONTAINER_STAGES=1
+    container_line_is_detail out "[1/2] static: source dir /src (lock file, no build)" || exit 1
+    # shellcheck disable=SC2034
+    HIDE_CONTAINER_STAGES=0
+    container_line_is_detail out "[1/2] syft: Docker image alpine:3.20" && exit 1
+    exit 0
+) && pass "the post-processing container's own [N/M] lines are hidden, a single-container scan's are not" \
+  || fail "container stage lines"
+# --ui started from a BomLens clone says the folder it would scan is BomLens itself.
+mkdir -p "$WORK/repo/scripts" "$WORK/repo/docker/web"
+: > "$WORK/repo/scripts/scan-sbom.sh"; : > "$WORK/repo/docker/web/server.py"
+( cd "$WORK/repo" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never UI_PORT=18397 \
+    bash "$SCRIPT" --ui -o "$WORK/uiout" >"$WORK/out" 2>"$WORK/err" ); RC=$?
+if grep -q 'The current folder is the BomLens repository' "$WORK/out" && grep -q '현재 폴더는 BomLens 저장소입니다' "$WORK/out" && [ "$RC" = 0 ]; then
+    pass "--ui from the BomLens repository says so in English and Korean, and starts"
+else
+    fail "--ui repository notice" "rc=$RC $(head -c 300 "$WORK/out") $(head -c 300 "$WORK/err")"
+fi
+( cd "$WORK/cwd" && PATH="$WORK/qbin:$PATH" HOME="$WORK/home" SBOM_PULL=never UI_PORT=18397 \
+    bash "$SCRIPT" --ui -o "$WORK/uiout" >"$WORK/out" 2>"$WORK/err" )
+if ! grep -q 'BomLens repository' "$WORK/out"; then pass "--ui from another folder does not"; else fail "--ui notice elsewhere"; fi
 
 echo ""
 echo "== summary: $PASS passed, $FAIL failed =="

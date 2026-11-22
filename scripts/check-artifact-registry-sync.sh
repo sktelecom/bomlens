@@ -104,6 +104,7 @@ _govulncheck_stage1.json :: no :: yes :: skip
 _govulncheck_stage1.err :: no  :: yes :: skip
 _govulncheck_stage1.rc  :: no  :: yes :: skip
 _cdxgen.log             :: no  :: yes :: _cdxgen\.log
+_scan.log               :: no  :: yes :: _scan\.log
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's
@@ -124,7 +125,8 @@ _cdxgen.log             :: no  :: yes :: _cdxgen\.log
 # read. scan-sbom.sh removes an earlier run's copies before stage 1 instead.
 # _cdxgen.log is the stage 1 log scan-sbom.sh keeps when a preprocessing step
 # failed; it is written before stage 2 starts, and scan-sbom.sh removes an
-# earlier run's copy itself.
+# earlier run's copy itself. _scan.log, the scan container's own output, is
+# written by scan-sbom.sh after that container ends, and removed the same way.
 CLEANUP_EXEMPT="
 _vex.json
 _vex_imported.json
@@ -133,6 +135,7 @@ _govulncheck_stage1.json
 _govulncheck_stage1.err
 _govulncheck_stage1.rc
 _cdxgen.log
+_scan.log
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }

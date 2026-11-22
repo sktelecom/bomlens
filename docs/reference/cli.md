@@ -75,6 +75,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
 | `--output-dir <dir>` | current directory (`~/sbom-output` with `--ui`) | Base directory for outputs (alias `-o`). Each scan lands in a `{Project}_{Version}/` subfolder under it, keeping the bundle together and out of the source tree |
 | `--timestamp` | false | Append `_YYYYMMDD-HHMMSS` to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged. With `SBOM_OUTPUT_FLAT=1` there is no subfolder to name, so it has no effect and a warning says so |
+| `--verbose` | false | Print every processing line of the scan container, as `VERBOSE` set to `true` does. Without it, a terminal shows the stages, warnings, errors and the summary. The full log is always kept as `{Project}_{Version}_scan.log` in the output folder, and output to a pipe or a file is never shortened |
 | `--ui` | — | Launch the local web UI |
 | `--mount <dir>` | — | With `--ui`: expose an extra host directory to the web UI as a read-only target for the **Choose folder** input (repeatable). Lets the UI scan an OS tree outside the launch folder — including the running host OS with `--mount /`. Results still save under the launch folder |
 | `--help` | — | Print help |

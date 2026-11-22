@@ -228,6 +228,10 @@ TRUSCA_PROJECT_ID="${TRUSCA_PROJECT_ID:-}"
 TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""; NESTED_ROOTFS_HINT=""
+# Every line the scan container prints reaches the terminal with --verbose or
+# VERBOSE=true; without it, a terminal gets the stages, warnings, errors and the
+# summary (see container_output_quiet). The scan log keeps every line either way.
+VERBOSE="${VERBOSE:-false}"
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
 # Go reachability (--reachability): opt-in, it reads the Go vulnerability database online.
 # REACHABILITY_NONCE: set when stage 1 is handed govulncheck (see there).
@@ -482,6 +486,7 @@ while [[ "$#" -gt 0 ]]; do
         --as-source) FORCE_SOURCE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
+        --verbose) VERBOSE="true" ;;
         --ui) UI_MODE="true" ;;
         --mount) UI_MOUNTS+=("$2"); shift ;;
         --help)
@@ -844,6 +849,10 @@ Options:
                          scans of the same project/version are kept side by side
                          instead of overwritten. Folder name only; SBOM bytes are
                          unchanged (orthogonal to --byte-stable).
+  --verbose              Print every processing line of the scan container (as
+                         VERBOSE=true). Without it, a terminal shows the stages,
+                         warnings, errors and the summary; the full log is kept
+                         as <project>_<version>_scan.log in the output folder
   --ui                   Launch local web UI
   --mount <dir>          With --ui: expose an extra host directory to the web
                          UI as a read-only rootfs scan target (repeatable).
@@ -909,6 +918,7 @@ Environment:
   CYCLONEDX_SPEC_VERSION Same as --spec-version: 1.6 (default) or 1.7
   SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
                          (no per-run subfolder), matching the pre-isolation layout
+  VERBOSE                Set to true for the same output as --verbose
   SBOM_PULL              missing (default): refresh an already-present image in
                          the background, bounded; an absent one is pulled as
                          usual. always: block and re-pull every run. never:
@@ -1374,6 +1384,12 @@ if [ "$UI_MODE" = "true" ]; then
     # a CLI scan of that path would, so a scan interrupted from one side is still
     # found and cleaned up by a rescan from the other.
     UI_BASE="$(pwd -P)"
+    # Started from a clone of BomLens itself, the folder the UI scans is
+    # BomLens's own source. Said once; the UI starts all the same.
+    if [ -f "$UI_BASE/scripts/scan-sbom.sh" ] && [ -f "$UI_BASE/docker/web/server.py" ]; then
+        echo "[INFO] The current folder is the BomLens repository. To scan your project, run this command from the project folder, or add --mount <folder>."
+        echo "[INFO] 현재 폴더는 BomLens 저장소입니다. 프로젝트를 스캔하려면 프로젝트 폴더에서 이 명령을 실행하거나 --mount <폴더>를 추가하세요."
+    fi
     UI_OUT_DEFAULT="${HOME:-$UI_BASE}/sbom-output"
     UI_OUT_FRESH="false"
     [ -d "${OUTPUT_BASE:-$UI_OUT_DEFAULT}" ] || UI_OUT_FRESH="true"
@@ -1741,6 +1757,9 @@ remove_earlier_result "$SUMMARY_RESULT_FILE"
 # A cdxgen log an earlier source scan kept (see stage 1 below) is not this
 # run's, whatever mode this run is.
 remove_earlier_result "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
+# Every line the scan container printed (run_container_logged), this run's only.
+SCAN_LOG_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_scan.log"
+remove_earlier_result "$SCAN_LOG_FILE"
 
 # A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
 # the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
@@ -1803,6 +1822,110 @@ wait_with_progress() {
         fi
     done
     wait "$pid" || true
+}
+
+# The scan container's output, in one place for every mode: each line goes to
+# the scan log (<prefix>_scan.log in the output folder), and to the terminal
+# unless it is a processing detail and the run is quiet. Quiet means stdout is
+# a terminal and neither --verbose nor VERBOSE=true was given; a pipe, a file
+# or CI gets every line as before (Git Bash under mintty reports no terminal,
+# so it does too). _BOMLENS_FORCE_TTY=1 stands in for a terminal in the tests.
+container_output_quiet() {
+    case "$VERBOSE" in true|1|yes) return 1 ;; esac
+    [ -t 1 ] || [ "${_BOMLENS_FORCE_TTY:-}" = 1 ]
+}
+
+# container_line_names_problem <line>: 0 for a line naming a warning, an error
+# or a failure, always shown. A zero count ("0 failed", "fails=0") is not one.
+container_line_names_problem() {
+    local _l="$1"
+    case "$_l" in *WARN*|*ERROR*) return 0 ;; esac
+    _l="${_l// 0 failed/}"; _l="${_l//failed=0/}"
+    case "$_l" in
+        *[Ff]ailed*|*[Ff]ailure*|*[Ff]ailing*|*[Ff]ail|*[Ff]ail[!a-zA-Z=]*) return 0 ;;
+    esac
+    return 1
+}
+# container_line_is_detail <out|err> <line>: 0 for a line a quiet run hides.
+# What is hidden is named; anything else is shown, so a message of a new or
+# unknown shape is never lost.
+container_line_is_detail() {
+    local _tag
+    if container_line_names_problem "$2"; then return 1; fi
+    if [ "$1" = err ]; then
+        # The licence lookup's count line; its failures name themselves above.
+        case "$2" in "[license-registry] "*) return 0 ;; esac
+        return 1
+    fi
+    case "$2" in
+        # The container's own banner repeats the heading printed here.
+        ==========*|" BomLens ("*|" Mode: "*|" Project: "*) return 0 ;;
+        "[INFO] source-file-tree: "*|"[INFO] source-snapshot: "*|"[INFO] SBOM ready: "*) return 0 ;;
+        "[INFO] Looking up licences in the package registries"*|"[INFO] Generate-only mode. Done.") return 0 ;;
+        "[INFO] cleaned "*" stale artifact(s) from a previous scan"*) return 0 ;;
+        # A source scan's post-processing run numbers its own steps; the stages
+        # printed here are the ones the reader follows (HIDE_CONTAINER_STAGES).
+        "["[0-9]"/"[0-9]"] "*) [ "${HIDE_CONTAINER_STAGES:-0}" = 1 ] && return 0 ;;
+        "["[a-z]*"] "*)
+            # A step's own lowercase tag ([cpe], [notice], [validate], ...).
+            _tag="${2#\[}"; _tag="${_tag%%\]*}"
+            case "$_tag" in *[!a-z0-9_.-]*) return 1 ;; esac
+            return 0 ;;
+    esac
+    return 1
+}
+
+# filter_container_output <log> <quiet 0|1> <out|err>: copy stdin to the log,
+# and to stdout except the details a quiet run hides. An indented line after a
+# hidden one is its continuation and is hidden with it.
+filter_container_output() {
+    local _line _prev_hidden=0
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        printf '%s\n' "$_line" >> "$1" 2>/dev/null || true
+        if [ "$2" = 1 ]; then
+            case "$_line" in
+                " "*|"	"*)
+                    if [ "$_prev_hidden" = 1 ] && ! container_line_names_problem "$_line"; then continue; fi ;;
+                *)
+                    if container_line_is_detail "$3" "$_line"; then _prev_hidden=1; continue; fi ;;
+            esac
+        fi
+        _prev_hidden=0
+        printf '%s\n' "$_line"
+    done
+    return 0
+}
+
+# run_container_logged <log> [NAME=value...] docker run ...: run the command,
+# with the container's stdout and stderr each kept on its own stream through
+# filter_container_output. Called through eval, as the docker run lines were,
+# so the words arrive split; env takes the DOCKER_MSYS assignments in front.
+# Returns the run's exit code.
+run_container_logged() {
+    local _log="$1" _quiet=0
+    shift
+    if container_output_quiet; then _quiet=1; fi
+    { set -o pipefail; env "$@" 2>&1 1>&3 3>&- | filter_container_output "$_log" "$_quiet" err 1>&2 3>&-; } 3>&1 \
+        | filter_container_output "$_log" "$_quiet" out
+    return "${PIPESTATUS[0]}"
+}
+
+# keep_scan_log <temp log> <exit code>: mask the run's log into
+# <prefix>_scan.log in the output folder, as the kept cdxgen log is masked; a
+# log that cannot be masked is not kept. After a failed quiet run its last
+# lines are printed too, since the folder may not stay.
+keep_scan_log() {
+    local _rc="${2:-0}"
+    [ -n "$1" ] && [ -f "$1" ] || return 0
+    if [ "$_rc" -ne 0 ] && container_output_quiet && [ -s "$1" ]; then
+        echo "[INFO] The scan container stopped (rc=$_rc). Its last lines:" >&2
+        tail -n 20 "$1" | sed 's/^/        /' >&2
+    fi
+    if [ -d "$OUTPUT_HOST_DIR" ] && mask_log_secrets "$1" "$SCAN_LOG_FILE"; then
+        rm -f "$1"
+    else
+        rm -f "$1" "$SCAN_LOG_FILE"
+    fi
 }
 
 # start_progress_ticker <what> / stop_progress_ticker: the same one-line-a-minute
@@ -1881,8 +2004,8 @@ cleanup() {
     if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
        && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
        && [ "${OUTPUT_DIR_OURS:-0}" = "1" ] \
-       && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json -not -name bomlens-result.json 2>/dev/null | head -n 1)" ]; then
-        rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" "$OUTPUT_HOST_DIR/bomlens-result.json" 2>/dev/null || true
+       && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json -not -name bomlens-result.json -not -name "${SCAN_LOG_FILE##*/}" 2>/dev/null | head -n 1)" ]; then
+        rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" "$OUTPUT_HOST_DIR/bomlens-result.json" "${SCAN_LOG_FILE:-}" 2>/dev/null || true
         rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true
     fi
     # An -o folder this run created and nothing was written to goes too.
@@ -1894,6 +2017,8 @@ cleanup() {
     [ -z "${REACH_TOOLS_DIR:-}" ] || rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null || true
     # The first stage 1 result, kept aside while a Java rerun runs.
     [ -z "${STAGE1_FIRST_SBOM:-}" ] || rm -f -- "$STAGE1_FIRST_SBOM" 2>/dev/null || true
+    # The scan log of a container stopped by Ctrl+C before it was kept.
+    [ -z "${SCAN_LOG_TMP:-}" ] || rm -f -- "$SCAN_LOG_TMP" 2>/dev/null || true
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
 # next step. The container is stopped before its mounted temp dirs are
@@ -4332,14 +4457,22 @@ EOF
         "$SCAN_INPUT_DIR"/*) STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_FINGERPRINT_EXCLUDE=\"${OUTPUT_HOST_DIR#"$SCAN_INPUT_DIR"/}\"" ;;
     esac
     export_scan_secrets
+    SCAN_LOG_TMP="$(mktemp)"
+    _pp_rc=0
+    # Quiet, the step lines are hidden: a line a minute says it is still going.
+    if container_output_quiet; then start_progress_ticker "post-processing"; fi
+    HIDE_CONTAINER_STAGES=1
     # shellcheck disable=SC2046
-    eval "$DOCKER_MSYS"docker run --rm \
+    eval run_container_logged "\"$SCAN_LOG_TMP\"" "$DOCKER_MSYS"docker run --rm \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
         -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(model_sbom_run)$(gate_run) \
-        "\"$PP_IMAGE\"" || {
-        _pp_rc=$?
+        "\"$PP_IMAGE\"" || _pp_rc=$?
+    HIDE_CONTAINER_STAGES=0
+    stop_progress_ticker
+    keep_scan_log "$SCAN_LOG_TMP" "$_pp_rc"
+    if [ "$_pp_rc" -ne 0 ]; then
         # Refused declared components rename the SBOM to _bom.refused.json and
         # say why; that is not a generation failure to retry or explain.
         if [ -f "$OUTPUT_HOST_DIR/${OUTPUT_FILE%_bom.json}_bom.refused.json" ]; then
@@ -4363,7 +4496,7 @@ EOF
             fi
         fi
         docker_run_failure_code "$_pp_rc" "the post-processing container" || exit $?
-    }
+    fi
     if [ -n "$STAGE1_FAILED" ]; then
         # The fallback reads manifests only. When it found no component, "direct
         # dependencies only" would say the opposite of what the SBOM holds.
@@ -4499,12 +4632,14 @@ else
     else
         start_progress_ticker "$MODE scan"
     fi
+    SCAN_LOG_TMP="$(mktemp)"
     # shellcheck disable=SC2046
-    eval "$DOCKER_MSYS"docker run --rm $VOL \
+    eval run_container_logged "\"$SCAN_LOG_TMP\"" "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(binary_kb_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\"" || _run_rc=$?
     stop_progress_ticker
+    keep_scan_log "$SCAN_LOG_TMP" "$_run_rc"
     if [ "$_run_rc" -ne 0 ]; then
         docker_run_failure_code "$_run_rc" "the scan container" || exit $?
     fi
@@ -4525,6 +4660,11 @@ if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
     echo "  Run from a shared path (e.g. under your home directory) and retry." >&2
     exit 1
 fi
+
+# Where the summary's warnings send the reader for details: the lines above,
+# or, when a quiet run hid them, the scan log that has them.
+LOG_REF="the log above"
+if container_output_quiet && [ -f "${SCAN_LOG_FILE:-}" ]; then LOG_REF="${SCAN_LOG_FILE##*/}"; fi
 
 # The summary must describe what is ON DISK, not what was requested: an older
 # scanner image, or a step that degraded, leaves a requested artifact
@@ -4593,13 +4733,14 @@ if [ "$UPLOAD_VAR" = "false" ]; then
         summary_line "Risk report:" "${P}_risk-report.md" "${P}_risk-report.html" \
             || note_missing "open-source risk report"
     fi
+    summary_line "Log:" "${P}_scan.log" || true
     if [ -n "$missing" ]; then
         echo ""
         log_warn "requested but not produced: ${missing}"
         echo "  The scan finished, but these artifacts are not in the output folder." >&2
         echo "  If the scanner image predates the feature, refresh it:" >&2
         echo "    docker pull ${RUN_IMAGE}" >&2
-        echo "  Otherwise the step degraded — check the log above for its warning." >&2
+        echo "  Otherwise the step degraded; check ${LOG_REF} for its warning." >&2
     fi
 fi
 } > "$SUMMARY_BUF" 2> "$SUMMARY_ERR"
@@ -4645,7 +4786,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                     *,only-excluded-dependencies,*)
                         log_warn "No software was listed: every dependency the project declares is for development only or is not deployed, and a source scan leaves those out (see Completeness below)." ;;
                     *)
-                        log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above." ;;
+                        log_warn "No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read ${LOG_REF}." ;;
                 esac
             else
                 sum_detail=""
@@ -4656,7 +4797,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 esac
                 printf '  %-12s %s\n' "Components:" "${sum_components} identified${sum_detail:+ ($sum_detail)}"
                 if [ -n "$sum_basis" ]; then printf '  %-12s %s\n' "" "counted: ${sum_basis}"; fi
-                [ "${sum_licensed:-0}" != "0" ] || log_warn "No component declares a license, so license checks have nothing to work with. Read the log above."
+                [ "${sum_licensed:-0}" != "0" ] || log_warn "No component declares a license, so license checks have nothing to work with. Read ${LOG_REF}."
             fi
             # Under --analyze these describe the submitted document's history, not
             # this run, so they are not reported.
@@ -4676,11 +4817,11 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                 if [ -n "$sum_empty_manifests" ] && [ "${sum_components:-}" = "0" ]; then
                     case ",${sum_complete_reasons}," in
                         *,lockfile-corrupt,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. A lock file is damaged: re-create it with the package manager and scan again." ;;
-                        *,resolution-failed,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see the log above)." ;;
-                        *) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed." ;;
+                        *,resolution-failed,*) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see ${LOG_REF})." ;;
+                        *) log_warn "No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check ${LOG_REF} for why resolution failed." ;;
                     esac
                 fi
-                [ -z "$sum_failed" ] || log_warn "Steps that failed: ${sum_failed} (details in the log above)"
+                [ -z "$sum_failed" ] || log_warn "Steps that failed: ${sum_failed} (details in ${LOG_REF})"
             fi
             ;;
     esac
