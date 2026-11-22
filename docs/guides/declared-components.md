@@ -268,7 +268,7 @@ Under the BSI profile the two libraries appear on the advisory row for declared 
 
 ### A Yocto image
 
-A Yocto build records its packages in its own SPDX output, which BomLens reads from the build directory (see [Yocto images](supplier-sbom.md#yocto-images) in the supplier SBOM guide). The packages are already there, with their versions, purls and file hashes, so a declaration names the recipe (PN) in `bomlens:yocto-recipe` instead of a build output, and adds what the build does not know: the supplier, the concluded licence and the origin.
+A Yocto build records its packages in its own SPDX output, which BomLens reads from the build directory (see the [Yocto build SBOM guide](yocto.md)). The packages are already there, with their versions, purls and file hashes, so a declaration names the recipe (PN) in `bomlens:yocto-recipe` instead of a build output, and adds what the build does not know: the supplier, the concluded licence and the origin.
 
 ```json
 {

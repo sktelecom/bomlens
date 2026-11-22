@@ -268,7 +268,7 @@ BSI 프로필에서 두 라이브러리는 자체 파일이 없는 선언 라이
 
 ### Yocto 이미지
 
-Yocto 빌드는 자체 SPDX 출력에 패키지를 기록하고, BomLens는 빌드 디렉터리에서 그 출력을 읽습니다(공급사 SBOM 가이드의 [Yocto 이미지](supplier-sbom.ko.md#yocto-이미지) 참고). 패키지와 버전, purl, 파일 해시는 이미 들어 있으므로, 선언에는 빌드 산출물 대신 `bomlens:yocto-recipe`에 레시피 이름(PN)을 적고 빌드가 모르는 공급자, 배포 라이선스, 출처만 더합니다.
+Yocto 빌드는 자체 SPDX 출력에 패키지를 기록하고, BomLens는 빌드 디렉터리에서 그 출력을 읽습니다([Yocto 빌드 SBOM 가이드](yocto.ko.md) 참고). 패키지와 버전, purl, 파일 해시는 이미 들어 있으므로, 선언에는 빌드 산출물 대신 `bomlens:yocto-recipe`에 레시피 이름(PN)을 적고 빌드가 모르는 공급자, 배포 라이선스, 출처만 더합니다.
 
 ```json
 {
