@@ -29,15 +29,15 @@ BomLens generates an [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is
 Everything runs on a Docker engine (20.10+). On Windows the desktop app needs [Rancher Desktop](https://rancherdesktop.io/) (free) or Docker Desktop; docker-ce inside WSL2 works for the command line only.
 
 ```bash
-git clone --depth 1 https://github.com/sktelecom/bomlens.git ~/bomlens && cd ~/bomlens
-docker pull ghcr.io/sktelecom/bomlens:latest
+mkdir -p ~/bomlens && cd ~/bomlens
+curl -fsSL https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli.tar.gz | tar -xz
 ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target examples/nodejs --all --generate-only
 
 # Web UI: run it from the folder you want to scan; it opens http://localhost:8080
 cd ~/my-project && ~/bomlens/scripts/scan-sbom.sh --ui
 ```
 
-The scan writes its files to a `MyApp_1.0.0/` folder in the current directory. `--all` adds the notice, the security report and an SPDX copy to the SBOM, and [Artifacts](docs/reference/artifacts.md) says what each file is. In PowerShell a `.sh` file does not run and prints nothing, so double-click `scripts\sbom-ui.bat` for the web UI, or run the same scan with `scripts\scan-sbom.bat` (needs Git for Windows).
+The archive works on Linux, macOS and WSL, and the first scan pulls the scanner image of that release. The scan writes its files to a `MyApp_1.0.0/` folder in the current directory. `--all` adds the notice, the security report and an SPDX copy to the SBOM, and [Artifacts](docs/reference/artifacts.md) says what each file is. In PowerShell a `.sh` file does not run and prints nothing, so download [bomlens-cli-windows.zip](https://github.com/sktelecom/bomlens/releases/latest/download/bomlens-cli-windows.zip) instead, unzip it and double-click `scripts\sbom-ui.bat` for the web UI, or run the same scan with `scripts\scan-sbom.bat` (needs Git for Windows).
 
 ## Documentation
 
