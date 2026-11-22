@@ -301,15 +301,19 @@ jobs:
           sudo tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy
           trivy --version
 
-      # examples/ is skipped on purpose. Those fixtures pin old versions so the
-      # scanner has something to find, and new advisories keep landing on them;
-      # reporting that every night would drown the entries that can be acted on.
+      # examples/, tests/fixtures/ and docs/demo/inputs/ are skipped on purpose.
+      # Those inputs pin old versions so the scanner has something to find, and
+      # new advisories keep landing on them; reporting that every night would
+      # drown the entries that can be acted on. Their Maven POMs would also make
+      # Trivy fetch parent POMs from Maven Central, which rate-limits the shared
+      # runner IPs (429) and fails the sweep.
       - name: Scan the shipped dependency manifests
         run: |
           set -euo pipefail
           trivy fs --quiet --format sarif --output trivy-deps.sarif \
             --exit-code 0 --scanners vuln \
-            --skip-dirs examples --skip-dirs tests/test-workspace .
+            --skip-dirs examples --skip-dirs tests/test-workspace \
+            --skip-dirs tests/fixtures --skip-dirs docs/demo/inputs .
 
       - name: Upload results
         uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3

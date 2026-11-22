@@ -71,8 +71,12 @@ judge() {
     fi
     title="$(jq -r .labels.title.en "$LIB_REAL/completeness-reasons.json")"
     if [ "$grade" = complete ]; then
-        has "${p}_security.md" "No known vulnerabilities found" \
-            || broke "$id" "a complete result lost the clean sentence in the security report"
+        # The clean sentence is for a result with no finding; a complete scan of
+        # a project with known vulnerabilities lists them instead.
+        if [ "$(jq '[.Results[]?.Vulnerabilities[]?] | length' "${p}_security.json" 2>/dev/null || echo 0)" = 0 ]; then
+            has "${p}_security.md" "No known vulnerabilities found" \
+                || broke "$id" "a complete result lost the clean sentence in the security report"
+        fi
         for f in security.md security.html NOTICE.txt NOTICE.html risk-report.md risk-report.html; do
             has "${p}_$f" "$title" && broke "$id" "$f carries an incompleteness notice on a complete result"
         done
@@ -263,6 +267,12 @@ if [ "${BOMLENS_MATRIX_DOCKER:-}" = "1" ]; then
             ( cd "$T2/out" && SBOM_SCANNER_IMAGE="$IMG" bash "$ROOT_DIR/scripts/scan-sbom.sh" \
                 --project "$name" --version 1 --target "$T2/in/$name" --all --generate-only ) \
                 > "$T2/$name.log" 2>&1 || true
+            # An Android tree stops before any report when its SDK image is not
+            # on this machine (the image is built where it is used).
+            if grep -q 'ANDROID_SDK_IMAGE_MISSING' "$T2/$name.log"; then
+                echo "  SKIP: $name (the Android SDK image is not on this machine)"
+                continue
+            fi
             judge "${name}_1" "$T2/out/${name}_1" "$want"
             ids="$ids ${name}_1"
         done <<'CASES'
