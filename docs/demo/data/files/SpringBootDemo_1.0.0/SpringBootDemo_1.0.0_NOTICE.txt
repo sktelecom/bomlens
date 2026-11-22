@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-11-22T02:22:39Z
+Generated: 2026-11-22T09:40:32Z
 Total components: 64 · Distinct licenses: 10
 
 This product includes the following open source software.

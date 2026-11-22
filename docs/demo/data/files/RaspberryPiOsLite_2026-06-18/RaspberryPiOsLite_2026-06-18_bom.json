@@ -13667,7 +13667,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "usr/share/locale/fr/LC_MESSAGES/net-tools.mo"
+            "location": "usr/share/locale/de/LC_MESSAGES/net-tools.mo"
           }
         ]
       },
@@ -1552583,7 +1552583,7 @@
   "metadata": {
     "authors": [
       {
-        "name": "BomLens 1.15.1"
+        "name": "BomLens 1.15.2"
       }
     ],
     "component": {
@@ -1552617,7 +1552617,7 @@
         "value": "FIRMWARE"
       }
     ],
-    "timestamp": "2026-11-22T02:23:46Z",
+    "timestamp": "2026-11-22T09:41:43Z",
     "tools": {
       "components": [
         {
@@ -1552639,7 +1552639,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.15.1"
+          "version": "1.15.2"
         }
       ]
     }

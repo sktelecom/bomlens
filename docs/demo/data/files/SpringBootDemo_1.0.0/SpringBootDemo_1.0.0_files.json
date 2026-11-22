@@ -21,15 +21,19 @@
       "type": "directory"
     },
     {
-      "path": "pom.xml",
-      "type": "file"
-    },
-    {
       "path": "src/.gitkeep",
       "type": "file"
     },
     {
       "path": "src/main/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/.gitkeep",
       "type": "file"
     },
     {
@@ -41,11 +45,7 @@
       "type": "file"
     },
     {
-      "path": "src/main/java/com/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/java/.gitkeep",
+      "path": "pom.xml",
       "type": "file"
     },
     {
