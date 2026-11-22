@@ -104,12 +104,14 @@ jobs:
 
       # 1) 공급사가 제출한 SBOM 을 받아 검증·분석하는 경로. 입력은 저장소에 둔다
       #    — 업로드 파일은 이름만으로는 재현되지 않는 유일한 입력이었다.
+      #    웹 UI가 업로드한 SBOM에 쓰는 기본 기준(SKT 제출 기준)으로 검사한다.
       - name: Scan the supplier SBOM
         run: |
           set -euo pipefail
           ./scripts/scan-sbom.sh \
             --project "$FLASK_ID" --version "$FLASK_VER" \
             --analyze docs/demo/inputs/flask-data-service.cdx.json \
+            --conformance-profile skt-submission \
             --generate-only -o "$PWD/out"
 
       # 2) 소스 스캔. 저장소 안의 예제를 그대로 쓴다.
