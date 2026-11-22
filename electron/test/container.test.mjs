@@ -28,6 +28,7 @@ import {
   extraCaArgs,
   findFreePort,
   imageEnvArgs,
+  proxyEnvArgs,
   imageRef,
   optinImageRef,
   resetDockerBin,
@@ -686,4 +687,23 @@ test("mavenRepositoryMountArgs follows <localRepository> outside comments and ho
       [],
     );
   }
+});
+
+test("proxyEnvArgs passes the proxy settings by name and leaves out a loopback proxy", () => {
+  const env = {
+    HTTP_PROXY: "http://proxy.example.com:3128",
+    https_proxy: "http://user:secret@proxy.example.com:3128",
+    HTTPS_PROXY: "http://127.0.0.1:3128",
+    http_proxy: "localhost:3128",
+    NO_PROXY: "localhost,.example.com",
+    no_proxy: "",
+  };
+  const args = proxyEnvArgs({ env });
+  assert.deepEqual(args, ["-e", "HTTP_PROXY", "-e", "NO_PROXY", "-e", "https_proxy"]);
+  assert.ok(!args.some((a) => a.includes("example.com") || a.includes("secret")), "no value on the command line");
+  for (const v of ["http://localhost", "https://localhost/", "[::1]:8080", "http://[::1]:3128", "127.0.0.2:80"]) {
+    assert.deepEqual(proxyEnvArgs({ env: { HTTP_PROXY: v } }), [], v);
+  }
+  assert.deepEqual(proxyEnvArgs({ env: { HTTP_PROXY: "http://localhost.corp.example:3128" } }), ["-e", "HTTP_PROXY"]);
+  assert.deepEqual(proxyEnvArgs({ env: {} }), []);
 });

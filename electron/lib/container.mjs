@@ -174,6 +174,24 @@ export function imageEnvArgs(images = {}) {
   return args;
 }
 
+// 프록시 설정(HTTP_PROXY, HTTPS_PROXY, NO_PROXY와 소문자 이름)을 이름만 docker run 인자로
+// 변환한다(순수). 값은 docker가 이 프로세스의 환경에서 읽으므로 인자에 남지 않는다.
+// scan-sbom.sh --ui, sbom-ui.bat과 같은 규칙: 이 기기의 루프백(127.x, localhost, [::1])을
+// 가리키는 프록시는 컨테이너 안에서는 컨테이너 자신이므로 넘기지 않는다. server.py가
+// 받은 값을 스캔 컨테이너에 다시 넘긴다.
+export const PROXY_ENV_NAMES = ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"];
+const LOOPBACK_PROXY = /^(?:.*:\/\/)?(?:127\.|localhost(?:[:/]|$)|\[::1\])/i;
+export function proxyEnvArgs({ env = process.env } = {}) {
+  const args = [];
+  for (const name of PROXY_ENV_NAMES) {
+    const value = env[name];
+    if (!value) continue;
+    if (!/no_proxy/i.test(name) && LOOPBACK_PROXY.test(value)) continue;
+    args.push("-e", name);
+  }
+  return args;
+}
+
 // TLS를 검사하는 프록시의 CA 번들(SBOM_EXTRA_CA_CERTS, PEM)을 docker run 인자로 변환한다.
 // scan-sbom.sh --ui와 같은 규칙: 읽기 전용으로 /bomlens-ca/extra.pem에 붙이고
 // BOMLENS_EXTRA_CA_CERTS로 그 경로를 알린다. UI 컨테이너가 띄우는 형제 컨테이너는
@@ -724,6 +742,7 @@ export class UiContainer {
       "-e",
       "CDXGEN_JAVA_IMAGE",
       ...extraCaArgs(),
+      ...proxyEnvArgs(),
       // How the source scans fetch a cdxgen Java image for a rerun (never,
       // missing or always), by name only, as the CLI passes it.
       "-e",
