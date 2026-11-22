@@ -51,11 +51,17 @@ jobs:
     name: Integration Tests
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 45
-    # A reseed dispatch runs only the reseed job it asks for.
+    needs: [changes]
+    # A reseed dispatch runs only the reseed job it asks for. A docs-only pull
+    # request skips it: the scanner integration suite exercises nothing such a
+    # change touches, and the docs/tool drift checks run in doc-coverage.
     if: >-
+      !cancelled() &&
       !(github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.reseed_visual == 'true' ||
-       github.event.inputs.reseed_guide_shots == 'true'))
+       github.event.inputs.reseed_guide_shots == 'true')) && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
 
     steps:
       - name: Checkout repository
@@ -741,11 +747,11 @@ jobs:
           # of a docs match, not another membership test, so it cannot go
           # through emit(): that helper answers "does anything match", and
           # this needs "does everything match". Gates contract and the
-          # post-process jobs so a docs-only PR is not queued behind the
-          # scanner/CLI-script suites, none of which can exercise anything it
-          # touched; lint also runs when a shell script changed, so a doc
-          # check script is still linted. `test`, `secrets` and doc-coverage
-          # stay unconditional: doc-coverage also runs the docs/tool drift
+          # post-process jobs and the integration tests (`test`) so a docs-only PR
+          # is not queued behind the scanner/CLI-script suites, none of which
+          # can exercise anything it touched; lint also runs when a shell
+          # script changed, so a doc check script is still linted. `secrets`
+          # and doc-coverage stay unconditional: doc-coverage also runs the docs/tool drift
           # checks (check-docs-drift.sh, check-examples-sync.sh) that verify
           # docs content against the code, which is exactly what a docs-only
           # change must not skip, and a secrets scan should never depend on
