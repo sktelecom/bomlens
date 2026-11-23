@@ -134,8 +134,12 @@ a.ext:hover { color: var(--brand); border-bottom-style: solid; }
   <div class="ctx" style="top:56px"><span>왜 SBOM인가</span><span style="margin:0 12px">/</span><span style="color:var(--fg);font-weight:600">최근 사례</span></div>
   <h1 class="abs" style="left:120px;top:110px;width:1680px;font-size:56px;font-weight:600;line-height:1.22;letter-spacing:-0.02em">긴급 취약점 대응은 ‘어디에 들어 있나’를 찾는 일부터 시작합니다</h1>
   <div class="abs" style="left:120px;top:262px;display:flex;align-items:center;gap:18px;font-size:28px"><span class="label l-danger" style="">Critical</span><span style="font-weight:600">nginx2root</span><span style="color:var(--fg-muted)">nginx HTTP/2 원격 명령 실행, 2026-11-18 공개</span></div>
-  <div class="abs" style="left:120px;top:360px;width:1680px;padding:48px 60px;border-radius:12px;background:var(--bg-muted);font-size:36px;line-height:1.62">nginx는 직접 설치한 웹 서버뿐 아니라 리버스 프록시, 로드밸런서, 쿠버네티스 인그레스, 컨테이너 이미지, <span style="background:#fff8c5;padding:2px 4px">납품받은 장비 안에도 들어 있습니다.</span><div style="margin-top:22px">공급사 제품 안의 nginx는 공급사에 묻기 전에는 알기 어렵습니다. <span style="background:#fff8c5;padding:2px 4px">SBOM이 있으면 어디에 들어 있는지 바로 찾을 수 있습니다.</span></div></div>
-<p class="foot" style="width:1450px;">CVE-2026-123007 외 4건. 수정 버전은 nginx 1.30.7(안정화), 1.31.9(메인라인)입니다.</p>
+  <div class="abs" style="left:120px;top:360px;width:1680px;padding:48px 60px;border-radius:12px;background:var(--bg-muted);font-size:36px;line-height:1.62">
+    “먼저 nginx를 쓰는 시스템을 찾아주십시오. 직접 설치한 웹 서버뿐 아니라 리버스 프록시, 로드밸런서, 쿠버네티스 인그레스, 컨테이너 이미지, <span style="background:#fff8c5;padding:2px 4px">납품 받은 장비 안에도 들어 있습니다.</span>
+    <div style="margin-top:22px">… 그리고 nginx가 들어 있는 솔루션과 장비는 공급사에 패치 일정을 바로 문의하시기 바랍니다. … <span style="background:#fff8c5;padding:2px 4px">SBOM으로 어디에 있는지 바로 찾을 수 있느냐가 대응 속도를 가릅니다.”</span></div>
+  </div>
+  <div class="abs" style="left:120px;top:740px;font-size:28px;color:var(--fg-muted)">이만희 교수, nginx2root 대응 안내, 2026-11</div>
+  <p class="foot" style="width:1450px;">CVE-2026-123007 외 4건. 수정 버전은 nginx 1.30.7(안정화), 1.31.9(메인라인)입니다.</p>
 <div class="folio">2 / 26</div>
 </section>
 <section class="slide" id="s03" data-name="why-sbom">
