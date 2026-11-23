@@ -100,6 +100,7 @@ export default defineConfig({
         { label: 'Guides', translations: { ko: '가이드' }, items: [{ autogenerate: { directory: 'guides' } }] },
         { label: 'Reference', translations: { ko: '레퍼런스' }, items: [{ autogenerate: { directory: 'reference' } }] },
         { label: 'Concepts', translations: { ko: '개념' }, items: [{ autogenerate: { directory: 'concepts' } }] },
+        { slug: 'talks/index' },
       ],
     }),
   ],
