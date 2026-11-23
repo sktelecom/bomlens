@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The engine runner's Docker backend looks up a container with `docker container inspect`, so behind a socket proxy that refuses image, network and volume lookups a removed container is confirmed gone instead of failing the scan after the grace period.
+
 ## [v1.15.3] - 2026-11-22
 
 ### Added
