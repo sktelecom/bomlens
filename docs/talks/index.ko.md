@@ -14,6 +14,7 @@ BomLens를 발표한 자리와 외부에 소개된 기사를 모읍니다. 행�
 
 | 일자 | 내용 | 링크 |
 |------|------|------|
+| 2026-11-23 | **SW 공급망보안 강화를 위한 오픈소스 도구 활용 사례**<br>2026 SW 공급망보안 컨퍼런스, 서울 엘리에나호텔 2층 컨벤션홀, SW 공급망보안 적용사례 세션, 30분 | [슬라이드](sw-supply-chain-conf-2026/slides.ko.html){ target=_blank } |
 | 2026-11-04 | **투명성 확보를 위한 AI-BOM**<br>[ICOTEC 2026 국제저작권기술 콘퍼런스](http://www.icotec.or.kr/)(한국저작권위원회), 서울 JW 메리어트 동대문 스퀘어 호텔 그랜드볼룸, 20분 세션 | [슬라이드](icotec-2026/slides.ko.html){ target=_blank } |
 | 2026-09-08 | **오픈소스 공급망 보안 도구**<br>[OpenChain Korea Work Group 31차 정기모임](https://openchain-project.github.io/OpenChain-KWG/), 25분 세션 | [슬라이드](kwg-31-supply-chain-tools/slides.ko.html){ target=_blank } |
 | 2026-09-07 | **AI 시대 오픈소스 점검 교육**<br>온라인 교육 | [슬라이드](oss-check-training-2026-09/slides.ko.html){ target=_blank } |

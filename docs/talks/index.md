@@ -14,6 +14,7 @@ On 2026-10-19, BomLens was accepted as an [OWASP Incubator project](https://owas
 
 | Date | Details | Link |
 |------|---------|------|
+| 2026-11-23 | **Using Open Source Tools to Strengthen Software Supply Chain Security**<br>2026 SW Supply Chain Security Conference, Elliena Hotel Convention Hall, Seoul, 30-minute session in the supply chain security case studies track. Slides are in Korean. | [Slides](sw-supply-chain-conf-2026/slides.html){ target=_blank } |
 | 2026-11-04 | **Transparency Through AI-BOM**<br>[ICOTEC 2026, International Copyright Technology Conference](http://www.icotec.or.kr/) (Korea Copyright Commission), JW Marriott Dongdaemun Square Seoul, 20-minute session. Slides are in Korean. | [Slides](icotec-2026/slides.html){ target=_blank } |
 | 2026-09-08 | **Open Source Supply Chain Security Tools**<br>[OpenChain Korea Work Group, 31st Meeting](https://openchain-project.github.io/OpenChain-KWG/), 25-minute session | [Slides](kwg-31-supply-chain-tools/slides.html){ target=_blank } |
 | 2026-09-07 | **AI-Era Open Source Check Training**<br>Online training session. Slides shown here are translated from the original Korean session. | [Slides](oss-check-training-2026-09/slides.html){ target=_blank } |
