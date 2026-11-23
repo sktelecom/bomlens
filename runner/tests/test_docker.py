@@ -66,6 +66,11 @@ class FakeCli:
     def run(self, argv, timeout):
         self.calls.append(argv)
         cmd = argv[0]
+        if cmd == "inspect":
+            # a socket proxy that refuses image, network and volume lookups
+            return done(1, err="403 Forbidden")
+        if cmd == "container":
+            argv, cmd = argv[1:], argv[1]
         if cmd == "version":
             return done(out="1.47")
         if cmd == "image":

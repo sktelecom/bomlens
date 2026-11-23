@@ -401,8 +401,12 @@ class DockerBackend:
         return self.opts.egress_network
 
     def _inspect(self, cid: str) -> dict | None:
+        # "container inspect", not "inspect": without the type the CLI asks
+        # for an image, a network and a volume next when no container
+        # matches, and a socket proxy that refuses those answers 403 where
+        # "no such object" is needed.
         for _ in range(3):
-            done = self.cli.run(["inspect", "--format", "{{json .}}", cid], 60)
+            done = self.cli.run(["container", "inspect", "--format", "{{json .}}", cid], 60)
             if done.returncode == 0:
                 try:
                     doc = json.loads(_text(done) or "{}")
@@ -559,7 +563,7 @@ class DockerBackend:
         deadline = self.clock() + self.opts.exit_grace
         while True:
             self.cli.run(["rm", "--force", cid], 60)
-            done = self.cli.run(["inspect", "--format", "{{.Id}}", cid], 60)
+            done = self.cli.run(["container", "inspect", "--format", "{{.Id}}", cid], 60)
             if done.returncode != 0 and any(s in _err(done) for s in _NO_SUCH):
                 return
             if self.clock() > deadline:
