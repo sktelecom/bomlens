@@ -15835,8 +15835,8 @@ cat > "$GB/in.json" <<'JSON'
   {"ref":"pkg:maven/com.fasterxml.jackson/jackson-bom@2.13.0","dependsOn":[]}]}
 JSON
 cp "$GB/in.json" "$GB/out.json"; cp "$GB/in.json" "$GB/same.json"
-GB_OUT="$( . "$ROOT_DIR/docker/lib/source-detect.sh"; static_drop_gradle_boms "$GB/gradle" "$GB/out.json" && static_drop_gradle_boms "$GB/other" "$GB/same.json" && echo done )"
-[ "$GB_OUT" = done ] \
+GB_OUT="$( . "$ROOT_DIR/docker/lib/source-detect.sh"; static_drop_gradle_boms "$GB/gradle" "$GB/out.json" && static_drop_gradle_boms "$GB/other" "$GB/same.json" && echo ok )"
+[ "$GB_OUT" = ok ] \
     && [ "$(jq -c '[.components[].name]' "$GB/out.json")" = '["jackson-databind","no-ref","x-bom-core"]' ] \
     && [ "$(jq -c '.dependencies' "$GB/out.json")" = '[{"ref":"root","dependsOn":["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.0"]}]' ] \
     && cmp -s "$GB/in.json" "$GB/same.json" \
