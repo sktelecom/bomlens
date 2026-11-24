@@ -836,9 +836,10 @@ static_lift_lock_file_nodes() {
 # the one that needs no vulnerability database), the lock files themselves come
 # out of the list (Trivy lists each as a component without a purl) and the root
 # depends on their direct dependencies (static_lift_lock_file_nodes), the project's
-# own package comes out for yarn.lock and uv.lock (static_drop_project_package), and a
-# Trivy's 1.7 document is lowered to 1.6 when the pipeline emits 1.6. Returns 1
-# when anything fails, so the caller can fall back to a build.
+# own package comes out for yarn.lock and uv.lock (static_drop_project_package), the
+# lock file's package hashes are added (static-lock-hashes.py), and Trivy's 1.7
+# document is lowered to 1.6 when the pipeline emits 1.6. Returns 1 when anything
+# fails, so the caller can fall back to a build.
 generate_sbom_static() {
     local root="$1" out="$2" tmp="$2.static.tmp" skip=() have
     command -v trivy >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
@@ -853,6 +854,10 @@ generate_sbom_static() {
     rm -f "$tmp"
     static_lift_lock_file_nodes "$out" || { rm -f "$out"; return 1; }
     static_drop_project_package "$root" "$out" || { rm -f "$out"; return 1; }
+    # Trivy leaves out the hashes the lock file records; a build writes them.
+    if command -v python3 >/dev/null 2>&1; then
+        python3 "${LIBDIR:-$(dirname "${BASH_SOURCE[0]}")}/static-lock-hashes.py" "$root" "$out" >/dev/null 2>&1 || true
+    fi
     # Trivy writes 1.7. The pipeline's later step raises a 1.6 document to 1.7 when
     # asked, and lowering 1.7 to 1.6 is what cdx-copy-as-1.6.sh does (syft's own
     # convert would turn the root component into a component).
