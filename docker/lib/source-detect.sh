@@ -831,12 +831,41 @@ static_lift_lock_file_nodes() {
     fi
 }
 
+# static_drop_gradle_boms <root> <sbom>: takes the BOMs out of a static read of
+# gradle.lockfile. The lock file lists every module Gradle resolved, and a BOM
+# (jackson-bom, kotlinx-coroutines-bom) is resolved as a platform: it has no
+# jar and ships nothing. The lock file does not say which module is one, so a
+# Maven component whose name ends in -bom is taken as a BOM (a build tells them
+# apart exactly, by the platform variant). The graph loses the same refs.
+# Nothing changes for a tree with no gradle.lockfile.
+static_drop_gradle_boms() {
+    local root="$1" sbom="$2" tmp="$2.bom.tmp"
+    [ -f "$root/gradle.lockfile" ] || return 0
+    if jq '
+        def bom: ((.purl // "") | test("^pkg:maven/[^@?]*-bom(@|\\?|$)"));
+        ([.components[]? | select(bom) | ."bom-ref" // empty]) as $drop
+        | if ([.components[]? | select(bom)] | length) == 0 then .
+          else
+            .components |= map(select(bom | not))
+            | if has("dependencies") then
+                .dependencies |= (map(select(.ref as $r | $drop | any(. == $r) | not))
+                  | map(if (.dependsOn | type) == "array"
+                        then .dependsOn = (.dependsOn - $drop) else . end))
+              else . end
+          end' "$sbom" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$sbom"
+    else
+        rm -f "$tmp"; return 1
+    fi
+}
+
 # generate_sbom_static <root> <out>: the SBOM of a source tree read from its lock
 # file, with no build. `trivy fs` reads the lock files (the license scanner is
 # the one that needs no vulnerability database), the lock files themselves come
 # out of the list (Trivy lists each as a component without a purl) and the root
 # depends on their direct dependencies (static_lift_lock_file_nodes), the project's
-# own package comes out for yarn.lock and uv.lock (static_drop_project_package), the
+# own package comes out for yarn.lock and uv.lock (static_drop_project_package), the BOMs
+# of gradle.lockfile come out (static_drop_gradle_boms), the
 # lock file's package hashes are added (static-lock-hashes.py), and Trivy's 1.7
 # document is lowered to 1.6 when the pipeline emits 1.6. Returns 1 when anything
 # fails, so the caller can fall back to a build.
@@ -854,6 +883,7 @@ generate_sbom_static() {
     rm -f "$tmp"
     static_lift_lock_file_nodes "$out" || { rm -f "$out"; return 1; }
     static_drop_project_package "$root" "$out" || { rm -f "$out"; return 1; }
+    static_drop_gradle_boms "$root" "$out" || { rm -f "$out"; return 1; }
     # Trivy leaves out the hashes the lock file records; a build writes them.
     if command -v python3 >/dev/null 2>&1; then
         python3 "${LIBDIR:-$(dirname "${BASH_SOURCE[0]}")}/static-lock-hashes.py" "$root" "$out" >/dev/null 2>&1 || true

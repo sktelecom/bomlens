@@ -2089,10 +2089,23 @@ if (gradle.parent == null) {
                 def gavs = { cfg ->
                     def found = new TreeSet()
                     def res = cfg.incoming.resolutionResult
+                    // A BOM (a platform) is selected as a platform variant: it has no
+                    // artifact and ships nothing, so it is not a component of the build.
+                    // Unreadable variants (an older Gradle): the component stays.
+                    def platformOnly = { c ->
+                        try {
+                            def vs = c.variants
+                            return !vs.isEmpty() && vs.every { v ->
+                                def cat = v.attributes.keySet().find { k -> k.name == 'org.gradle.category' }
+                                cat != null && v.attributes.getAttribute(cat).toString() in ['platform', 'enforced-platform']
+                            }
+                        } catch (Throwable e) { }
+                        false
+                    }
                     res.allComponents.each { c ->
                         def id = c.id
                         if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
-                            found << (id.group + ':' + id.module + ':' + id.version)
+                            if (!platformOnly(c)) { found << (id.group + ':' + id.module + ':' + id.version) }
                         } else if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier && inOtherBuild(id)) {
                             lines << ("F\t" + path + "\t" + id.displayName)
                         }

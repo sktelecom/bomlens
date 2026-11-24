@@ -15822,6 +15822,28 @@ JSON
     || fail "generate_sbom_static left the lock file's hashes out"
 rm -f "$GS/src/package-lock.json"; rm -rf "$LH"
 
+# gradle.lockfile lists the BOMs Gradle resolved (jackson-bom), which ship nothing.
+GB="$(mktemp -d)"; mkdir -p "$GB/gradle" "$GB/other"; echo 'x' > "$GB/gradle/gradle.lockfile"
+cat > "$GB/in.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"bom-ref":"root","type":"application","name":"r"}},
+ "components":[{"type":"library","name":"jackson-databind","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.0","bom-ref":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.0"},
+  {"type":"library","name":"jackson-bom","purl":"pkg:maven/com.fasterxml.jackson/jackson-bom@2.13.0","bom-ref":"pkg:maven/com.fasterxml.jackson/jackson-bom@2.13.0"},
+  {"type":"library","name":"kotlinx-coroutines-bom","purl":"pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom@1.7.3?type=pom","bom-ref":"b2"},
+  {"type":"library","name":"no-ref","purl":"pkg:maven/a/bomber@1.0"},
+  {"type":"library","name":"x-bom-core","purl":"pkg:maven/a/x-bom-core@1.0","bom-ref":"b3"}],
+ "dependencies":[{"ref":"root","dependsOn":["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.0","pkg:maven/com.fasterxml.jackson/jackson-bom@2.13.0","b2"]},
+  {"ref":"pkg:maven/com.fasterxml.jackson/jackson-bom@2.13.0","dependsOn":[]}]}
+JSON
+cp "$GB/in.json" "$GB/out.json"; cp "$GB/in.json" "$GB/same.json"
+GB_OUT="$( . "$ROOT_DIR/docker/lib/source-detect.sh"; static_drop_gradle_boms "$GB/gradle" "$GB/out.json" && static_drop_gradle_boms "$GB/other" "$GB/same.json" && echo done )"
+[ "$GB_OUT" = done ] \
+    && [ "$(jq -c '[.components[].name]' "$GB/out.json")" = '["jackson-databind","no-ref","x-bom-core"]' ] \
+    && [ "$(jq -c '.dependencies' "$GB/out.json")" = '[{"ref":"root","dependsOn":["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.0"]}]' ] \
+    && cmp -s "$GB/in.json" "$GB/same.json" \
+    && pass "static read of gradle.lockfile: a Maven component named -bom (a BOM, no jar) comes out with its graph entries, other components stay, and a tree with no gradle.lockfile is untouched" \
+    || fail "static read of gradle.lockfile: BOMs" "$(jq -c '[.components[].name]' "$GB/out.json")"
+rm -rf "$GB"
+
 rm -rf "$GS"
 
 echo "== static detection: the root depends on the lock file's direct dependencies =="
