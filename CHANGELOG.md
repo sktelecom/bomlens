@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.4] - 2026-11-24
+
 ### Fixed
 
 - A BOM that Gradle resolves as a platform (`jackson-bom`, `kotlinx-coroutines-bom`) and the root module of a Kotlin Multiplatform library (`okio`, `kotlinx-coroutines-core`, whose jar is in `okio-jvm`) are no longer components of a Gradle scan: the build path leaves out a component selected as a platform variant or redirected to another module, and the static read of `gradle.lockfile` leaves out a Maven component whose name ends in `-bom`.
 - An SBOM read from a lock file (`--detection auto` or `static`) carries each package's hash, as a build does: the `integrity` of `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml` and `bun.lock`, and the jar checksums of `gradle/verification-metadata.xml` when the project has one.
 - The engine runner's Docker backend looks up a container with `docker container inspect`, so behind a socket proxy that refuses image, network and volume lookups a removed container is confirmed gone instead of failing the scan after the grace period.
+
+### Documentation
+
+- The Android guide explains how to build the SDK image behind a proxy that inspects HTTPS, with the company CA added to the build recipe.
 
 ## [v1.15.3] - 2026-11-22
 
