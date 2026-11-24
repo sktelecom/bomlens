@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a2040c-8b5c-70f5-8b11-964ba5f1db88",
-  "CreatedAt": "2026-11-22T16:17:40.700064052Z",
+  "ReportID": "01a20e98-a2d8-72de-9558-7600cfb96a4c",
+  "CreatedAt": "2026-11-24T17:26:53.912190041Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -2907,6 +2907,7 @@
             "https://security.netapp.com/advisory/ntap-20250321-0001/",
             "https://ubuntu.com/security/notices/USN-7525-1",
             "https://ubuntu.com/security/notices/USN-7525-2",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
             "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2025-24813",
             "https://www.cve.org/CVERecord?id=CVE-2025-24813",
@@ -3045,6 +3046,7 @@
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8417-1",
             "https://ubuntu.com/security/notices/USN-8450-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-41293"
           ],
           "PublishedDate": "2026-05-12T16:16:17.553Z",
@@ -3170,6 +3172,7 @@
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8383-1",
             "https://ubuntu.com/security/notices/USN-8417-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-43512"
           ],
           "PublishedDate": "2026-05-12T16:16:17.99Z",
@@ -3298,6 +3301,7 @@
             "https://ubuntu.com/security/notices/USN-8417-1",
             "https://ubuntu.com/security/notices/USN-8450-1",
             "https://ubuntu.com/security/notices/USN-8551-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-43515"
           ],
           "PublishedDate": "2026-05-12T16:16:18.553Z",
@@ -3425,6 +3429,7 @@
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8551-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-55276"
           ],
           "PublishedDate": "2026-06-29T21:16:45.38Z",
@@ -3475,7 +3480,8 @@
             "ghsa": 4,
             "oracle-oval": 3,
             "redhat": 3,
-            "rocky": 3
+            "rocky": 3,
+            "ubuntu": 2
           },
           "CVSS": {
             "bitnami": {
@@ -3520,8 +3526,11 @@
             "https://errata.almalinux.org/9/ALSA-2026-98523.html",
             "https://errata.rockylinux.org/RLSA-2026:98523",
             "https://github.com/apache/tomcat/commit/8bafd79a3b54684e80e9cb1bafd4746aede7d3f5",
+            "https://github.com/apache/tomcat/commit/8bafd79a3b54684e80e9cb1bafd4746aede7d3f5%20%2811.0.25%29",
             "https://github.com/apache/tomcat/commit/b2c56ec8f20c66773a1a813034ffcdb60841f1cf",
+            "https://github.com/apache/tomcat/commit/b2c56ec8f20c66773a1a813034ffcdb60841f1cf%20%289.0.121%29",
             "https://github.com/apache/tomcat/commit/b79752d2a8578d94743e2a95c50af297f780c0df",
+            "https://github.com/apache/tomcat/commit/b79752d2a8578d94743e2a95c50af297f780c0df%20%2810.1.58%29",
             "https://linux.oracle.com/cve/CVE-2026-65182.html",
             "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/joosxvzc9b49ttj8lj0jw9mqt0ml767m",
@@ -3529,6 +3538,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-65182"
           ],
           "PublishedDate": "2026-08-25T22:17:04.9Z",
@@ -3631,6 +3641,7 @@
             "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/9v114xlpgbzrrbzz5vf9f6r2q4wnxwwj",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-65905",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-65905"
           ],
           "PublishedDate": "2026-08-25T22:17:05.303Z",
@@ -3680,7 +3691,8 @@
             "ghsa": 4,
             "oracle-oval": 3,
             "redhat": 2,
-            "rocky": 3
+            "rocky": 3,
+            "ubuntu": 2
           },
           "CVSS": {
             "bitnami": {
@@ -3726,8 +3738,11 @@
             "https://errata.rockylinux.org/RLSA-2026:98523",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/10d048e16034ddf12055e0cede0da05b15c823b8",
+            "https://github.com/apache/tomcat/commit/10d048e16034ddf12055e0cede0da05b15c823b8%20%2811.0.25%29",
             "https://github.com/apache/tomcat/commit/32f0c38526b4e655ff0c17cd97afedefc624fe43",
+            "https://github.com/apache/tomcat/commit/32f0c38526b4e655ff0c17cd97afedefc624fe43%20%289.0.121%29",
             "https://github.com/apache/tomcat/commit/58123aa468a20e2a079b7e0c68a4009e2475c098",
+            "https://github.com/apache/tomcat/commit/58123aa468a20e2a079b7e0c68a4009e2475c098%20%2810.1.58%29",
             "https://linux.oracle.com/cve/CVE-2026-68525.html",
             "https://linux.oracle.com/errata/ELSA-2026-98523.html",
             "https://lists.apache.org/thread/x1y2lfsgzxwzc456f8954vbvgn03zhd7",
@@ -3735,6 +3750,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-68525"
           ],
           "PublishedDate": "2026-08-25T22:17:05.7Z",
@@ -3829,6 +3845,7 @@
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-7562-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-34750"
           ],
           "PublishedDate": "2024-07-03T20:15:04.083Z",
@@ -3918,6 +3935,7 @@
             "https://security.netapp.com/advisory/ntap-20241101-0010",
             "https://security.netapp.com/advisory/ntap-20241101-0010/",
             "https://ubuntu.com/security/notices/USN-7562-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-38286"
           ],
           "PublishedDate": "2024-11-07T08:15:13.007Z",
@@ -4023,6 +4041,7 @@
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.2",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.98",
             "https://ubuntu.com/security/notices/USN-7705-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-50379"
           ],
           "PublishedDate": "2024-12-17T13:15:18.81Z",
@@ -4226,6 +4245,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-48988"
           ],
           "PublishedDate": "2025-06-16T15:15:24.563Z",
@@ -4337,6 +4357,7 @@
             "https://tomcat.apache.org/security-10.html#Fixed_in_Apache_Tomcat_10.1.44",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-48989",
             "https://www.kb.cert.org/vuls/id/767506"
           ],
@@ -4445,6 +4466,7 @@
             "https://lists.apache.org/thread/trqq01bbxw6c92zx69kx2mw2qgmfy0o5",
             "https://lists.debian.org/debian-lts-announce/2025/07/msg00009.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2025-52520",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-52520"
           ],
           "PublishedDate": "2025-07-10T19:15:25.57Z",
@@ -4552,6 +4574,7 @@
             "https://lists.apache.org/thread/p09775q0rd185m6zz98krg0fp45j8kr0",
             "https://lists.debian.org/debian-lts-announce/2025/07/msg00009.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2025-53506",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-53506"
           ],
           "PublishedDate": "2025-07-10T20:15:26.97Z",
@@ -4648,6 +4671,7 @@
             "https://tomcat.apache.org/security-10.html#Fixed_in_Apache_Tomcat_10.1.45",
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.11",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.109",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-55752",
             "https://www.vicarius.io/vsociety/posts/cve-2025-55752-detect-apache-tomcat-vulnerability",
             "https://www.vicarius.io/vsociety/posts/cve-2025-55752-mitigate-apache-tomcat-vulnerability"
@@ -4746,6 +4770,7 @@
             "https://lists.apache.org/thread/292dlmx3fz1888v6v16221kpozq56gml",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-24734",
             "https://security.access.redhat.com/data/csaf/v2/vex/2026/cve-2026-24734.json",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-24734"
           ],
           "PublishedDate": "2026-02-17T19:21:56.953Z",
@@ -4890,6 +4915,7 @@
             "https://tomcat.apache.org/security-10.html#Fixed_in_Apache_Tomcat_10.1.53",
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.20",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.116",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-24880",
             "https://www.herodevs.com/vulnerability-directory/cve-2026-24880"
           ],
@@ -5026,6 +5052,7 @@
             "https://github.com/apache/tomcat",
             "https://lists.apache.org/thread/j1w7304yonlr8vo1tkb5nfs7od1y228b",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-34483",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-34483"
           ],
           "PublishedDate": "2026-04-09T20:16:24.937Z",
@@ -5167,6 +5194,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-34487"
           ],
           "PublishedDate": "2026-04-09T20:16:25.203Z",
@@ -5290,6 +5318,7 @@
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8417-1",
             "https://ubuntu.com/security/notices/USN-8450-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-41284"
           ],
           "PublishedDate": "2026-05-12T16:16:15.933Z",
@@ -5416,6 +5445,7 @@
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8417-1",
             "https://ubuntu.com/security/notices/USN-8450-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-42498"
           ],
           "PublishedDate": "2026-05-12T16:16:17.8Z",
@@ -5542,6 +5572,7 @@
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8383-1",
             "https://ubuntu.com/security/notices/USN-8417-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-43513"
           ],
           "PublishedDate": "2026-05-12T16:16:18.177Z",
@@ -5667,6 +5698,7 @@
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-8551-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-53404"
           ],
           "PublishedDate": "2026-06-29T21:16:44.527Z",
@@ -5716,7 +5748,8 @@
             "ghsa": 3,
             "oracle-oval": 3,
             "redhat": 3,
-            "rocky": 3
+            "rocky": 3,
+            "ubuntu": 2
           },
           "CVSS": {
             "bitnami": {
@@ -5807,8 +5840,11 @@
             "https://errata.rockylinux.org/RLSA-2026:68677",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/0cd21c0393b8811af22daddbba7b4e7328e2d79e",
+            "https://github.com/apache/tomcat/commit/0cd21c0393b8811af22daddbba7b4e7328e2d79e%20%2810.1.37%29",
             "https://github.com/apache/tomcat/commit/c32bbd37ea9ee0aaab848af4ee1c9a76e84240ea",
+            "https://github.com/apache/tomcat/commit/c32bbd37ea9ee0aaab848af4ee1c9a76e84240ea%20%289.0.101%29",
             "https://github.com/apache/tomcat/commit/fd96ab415631eea44636c94f911dd38427070ef9",
+            "https://github.com/apache/tomcat/commit/fd96ab415631eea44636c94f911dd38427070ef9%20%2811.0.5%29",
             "https://linux.oracle.com/cve/CVE-2026-55957.html",
             "https://linux.oracle.com/errata/ELSA-2026-68677.html",
             "https://lists.apache.org/thread/7fk339o5jvd4mcgsf0chbrn4o525ccjh",
@@ -5816,6 +5852,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-55957"
           ],
           "PublishedDate": "2026-06-29T21:16:45.7Z",
@@ -5916,6 +5953,7 @@
             "https://security.netapp.com/advisory/ntap-20240402-0002",
             "https://security.netapp.com/advisory/ntap-20240402-0002/",
             "https://ubuntu.com/security/notices/USN-7562-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-24549"
           ],
           "PublishedDate": "2024-03-13T16:15:29.373Z",
@@ -6020,6 +6058,7 @@
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-7705-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-31650"
           ],
           "PublishedDate": "2025-04-28T20:15:20.653Z",
@@ -6197,6 +6236,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-49125"
           ],
           "PublishedDate": "2025-06-16T15:15:24.85Z",
@@ -6350,6 +6390,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-55668"
           ],
           "PublishedDate": "2025-08-13T14:15:33.33Z",
@@ -6501,6 +6542,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-66614"
           ],
           "PublishedDate": "2026-02-17T19:21:55.31Z",
@@ -6638,6 +6680,7 @@
             "https://github.com/apache/tomcat",
             "https://lists.apache.org/thread/ghct3b6o74bp2vm7q875s1zh0dqrz3h0",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-25854",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-25854"
           ],
           "PublishedDate": "2026-04-09T20:16:24.207Z",
@@ -6686,7 +6729,8 @@
             "bitnami": 2,
             "ghsa": 2,
             "redhat": 2,
-            "rocky": 2
+            "rocky": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "bitnami": {
@@ -6751,13 +6795,17 @@
             "https://errata.rockylinux.org/RLSA-2026:68660",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/3f6bd2ba5e53d1f340bbe5ad2d42a28b29440b7a",
+            "https://github.com/apache/tomcat/commit/3f6bd2ba5e53d1f340bbe5ad2d42a28b29440b7a%20%2811.0.23%29",
             "https://github.com/apache/tomcat/commit/9c3b1efb74fd04f77639720af1d48a8f664ad9bb",
+            "https://github.com/apache/tomcat/commit/9c3b1efb74fd04f77639720af1d48a8f664ad9bb%20%2810.1.56%29",
             "https://github.com/apache/tomcat/commit/a0374c450970760efafbd8806a1db278830ba7bd",
+            "https://github.com/apache/tomcat/commit/a0374c450970760efafbd8806a1db278830ba7bd%20%289.0.119%29",
             "https://lists.apache.org/thread/dcjdcnnnww9hhdm016hr0l7hpw1bzjfp",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-55956",
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-55956"
           ],
           "PublishedDate": "2026-06-29T21:16:45.597Z",
@@ -6857,6 +6905,7 @@
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
             "https://ubuntu.com/security/notices/USN-7705-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-31651"
           ],
           "PublishedDate": "2025-04-28T20:15:20.783Z",
@@ -7019,6 +7068,7 @@
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.7",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.105",
             "https://ubuntu.com/security/notices/USN-7705-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-46701"
           ],
           "PublishedDate": "2025-05-29T19:15:27.983Z",
@@ -7174,6 +7224,7 @@
             "https://tomcat.apache.org/security-10.html#Fixed_in_Apache_Tomcat_10.1.45",
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.11",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.109",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-55754"
           ],
           "PublishedDate": "2025-10-27T18:15:42.71Z",
@@ -7330,6 +7381,7 @@
             "https://tomcat.apache.org/security-10.html#Fixed_in_Apache_Tomcat_10.1.47",
             "https://tomcat.apache.org/security-11.html#Fixed_in_Apache_Tomcat_11.0.12",
             "https://tomcat.apache.org/security-9.html#Fixed_in_Apache_Tomcat_9.0.110",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2025-61795"
           ],
           "PublishedDate": "2025-10-27T18:15:44.2Z",
@@ -7451,6 +7503,7 @@
             "https://tomcat.apache.org/security-10.html",
             "https://tomcat.apache.org/security-11.html",
             "https://tomcat.apache.org/security-9.html",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2026-43514"
           ],
           "PublishedDate": "2026-05-12T16:16:18.37Z",
@@ -7551,6 +7604,7 @@
             "https://security.netapp.com/advisory/ntap-20240402-0002/",
             "https://ubuntu.com/security/notices/USN-7106-1",
             "https://ubuntu.com/security/notices/USN-7562-1",
+            "https://ubuntu.com/security/notices/USN-9186-1",
             "https://www.cve.org/CVERecord?id=CVE-2024-23672"
           ],
           "PublishedDate": "2024-03-13T16:15:29.287Z",

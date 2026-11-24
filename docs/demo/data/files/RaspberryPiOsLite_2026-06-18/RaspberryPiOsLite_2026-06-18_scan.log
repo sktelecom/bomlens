@@ -33,7 +33,7 @@
 [firmware] 17 of those are present with no version recovered. They cannot be matched against a vulnerability database — a clean vulnerability result does not cover them.
 [INFO] SBOM ready: RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
-[docmeta] tool=BomLens@1.15.3, lifecycle=post-build, sha256=acff736c…: RaspberryPiOsLite_2026-06-18_bom.json
+[docmeta] tool=BomLens@1.15.4, lifecycle=post-build, sha256=acff736c…: RaspberryPiOsLite_2026-06-18_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [component-versions] 1787 component(s) still have no version: 6lowpan, 6pack, 9p, 9pnet, 9pnet_fd, a8293, act_csum, act_ctinfo, act_gact, act_mirred, act_nat, act_pedit, act_police, act_simple, act_skbedit, ad5398_vcm, ad714x, ad714x_i2c, ad714x_spi, ad799x, adiantum, ads7828, ads7846, adt7410, adt7x10, adutux, adv7180, adxl34x, adxl34x_i2c, adxl34x_spi (and 1757 more)
 [component-versions]   Fill in RaspberryPiOsLite_2026-06-18_component-versions.template.csv and pass it with --component-versions to add them.
@@ -44,8 +44,8 @@
 [cpe] withheld a name-derived cpe from 1904 Linux kernel module(s); the module name is not a product and the kernel is reported separately.
 [upstream-purl] set the upstream repository purl on 6 component(s); 135 versioned component(s) with no usable purl were left as they are (not in the table, or a version form it does not cover).
 [distro-supplier] filled supplier (Debian) on 632 component(s).
-[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
-[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-24.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-24).
 [validate] detected format: CycloneDX
 [validate] added the 2026 SBOM minimum-element checks
 [validate] CycloneDX -> result=fail (mandatory fails=1, warns=12, review=5, n/a=1, untraceable=1904): RaspberryPiOsLite_2026-06-18_conformance.json, RaspberryPiOsLite_2026-06-18_conformance.md, RaspberryPiOsLite_2026-06-18_conformance.html
@@ -57,10 +57,10 @@
 [cpe-index] 59198 component(s) with no package purl offered; 1022 CVE(s) matched on 1 of them.
 [security] running Trivy SBOM scan...
 [security] Trivy could not decode the SBOM's root component type; re-ran with it coerced to 'application' for Trivy input (delivered SBOM unchanged).
-[go-vulndb] 53 Go module(s) checked against 4783 record(s) (database of 2026-11-11T02:51:11Z): 0 new finding(s), 37 already reported by another engine -> RaspberryPiOsLite_2026-06-18_security_govulndb.json
+[go-vulndb] 53 Go module(s) checked against 4865 record(s) (database of 2026-11-23T20:05:14Z): 0 new finding(s), 38 already reported by another engine -> RaspberryPiOsLite_2026-06-18_security_govulndb.json
 [security] merged 1022 new cvebintool CVE(s) (of 1022; overlap deduped) from RaspberryPiOsLite_2026-06-18_security_cvebintool.json.
 [security] enriching with EPSS + CISA KEV...
-[security] generated: RaspberryPiOsLite_2026-06-18_security.json, RaspberryPiOsLite_2026-06-18_security.md, RaspberryPiOsLite_2026-06-18_security.html (total=10530, critical=25, high=1137, kev=5, unchecked=1926, advisories=10)
+[security] generated: RaspberryPiOsLite_2026-06-18_security.json, RaspberryPiOsLite_2026-06-18_security.md, RaspberryPiOsLite_2026-06-18_security.html (total=7813, critical=25, high=842, kev=5, unchecked=1926, advisories=10)
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_component-versions.template.csv
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_files.json
@@ -85,7 +85,7 @@
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_security_epss.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_NOTICE.txt
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_NOTICE.html
-[risk] generated: RaspberryPiOsLite_2026-06-18_risk-report.md, RaspberryPiOsLite_2026-06-18_risk-report.html (conformance=fail, vulns total=11552, crit=103, high=1621, copyleft=2276 strong/network + 33 weak, malicious=0)
+[risk] generated: RaspberryPiOsLite_2026-06-18_risk-report.md, RaspberryPiOsLite_2026-06-18_risk-report.html (conformance=fail, vulns total=8835, crit=103, high=1326, copyleft=2276 strong/network + 33 weak, malicious=0)
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_bom.json
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_component-versions.template.csv
 [SUCCESS] copied: /host-output/RaspberryPiOsLite_2026-06-18_files.json
