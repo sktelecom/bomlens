@@ -16599,6 +16599,32 @@ grep -q '^\[proprietary\] commercial  (1 component(s)):' "$LRD/p_NOTICE.txt" 2>/
     && pass "licenseReview: the NOTICE (text and HTML) lists the proprietary licenses under license review with the class explained" \
     || fail "licenseReview: NOTICE review section" "$(grep -A3 'License review' "$LRD/p_NOTICE.txt" 2>&1 | head -8)"
 
+# Android release filter: a BOM and a Kotlin Multiplatform root in the release
+# set are dropped, the -jvm module and ordinary artifacts stay.
+AF="$(mktemp -d)"
+sed -n "/^    cat > \"\$_flt\" <<'FILTER_JS'\$/,/^FILTER_JS\$/p" "$LIB/build-prep.sh" | sed '1d;$d' > "$AF/flt.js"
+cat > "$AF/rel" <<'RELEOF'
+com.squareup.okio:okio-jvm:3.6.0
+com.squareup.okio:okio:3.6.0
+org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.6.1
+org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.1
+com.google.guava:guava:32.0.0
+RELEOF
+jq -n '{components:[
+  "com.squareup.okio/okio-jvm@3.6.0","com.squareup.okio/okio@3.6.0",
+  "org.jetbrains.kotlinx/kotlinx-coroutines-bom@1.6.1",
+  "org.jetbrains.kotlinx/kotlinx-coroutines-core@1.6.1",
+  "org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.6.1",
+  "com.google.guava/guava@32.0.0"
+  | {type:"library",name:.,purl:("pkg:maven/"+.),properties:[{name:"internal:GradleProfileName",value:"debugAndroidTestCompileClasspath"}]}]}' > "$AF/bom.json"
+node "$AF/flt.js" "$AF/bom.json" "$AF/rel" android >/dev/null 2>&1
+af_got="$(jq -r '[.components[].purl|sub("pkg:maven/";"")]|sort|join(",")' "$AF/bom.json" 2>/dev/null)"
+[ "$af_got" = "com.google.guava/guava@32.0.0,com.squareup.okio/okio-jvm@3.6.0,org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.6.1" ] \
+    && pass "android filter: a BOM and a Multiplatform root are dropped, the -jvm modules and ordinary artifacts stay" \
+    || fail "android filter: BOM and Multiplatform root" "$af_got"
+rm -rf "$AF"
+
 # shard: closing summary
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

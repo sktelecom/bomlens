@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An Android scan no longer lists a BOM (`kotlinx-coroutines-bom`) or the root module of a Kotlin Multiplatform library (`okio`, `kotlinx-coroutines-core`) as components: the release runtime filter leaves out an artifact whose name ends in `-bom` and a module whose `-jvm` or `-android` module is in the same release set.
+
 ## [v1.15.4] - 2026-11-24
 
 ### Fixed
