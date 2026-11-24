@@ -37,7 +37,7 @@ HTTPS를 검사하는 프록시는 사내 인증기관(CA)으로 다시 서명�
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-project --generate-only
 ```
 
-이 파일은 스캔 컨테이너의 시스템 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. 신뢰할 수 없는 인증서 때문에 스캔이 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. npm은 cdxgen 로그에 `SELF_SIGNED_CERT_IN_CHAIN`으로 보고하며, 그런 저장소를 상대로 의존성 단계가 진행 없이 몇 분씩 이어지는 것도 같은 원인을 가리킵니다.
+이 파일은 스캔 컨테이너의 시스템 저장소, Node.js, Java 신뢰 저장소에 추가됩니다. `docker build`에는 적용되지 않아서, 안드로이드 SDK 이미지는 레시피에 인증기관을 직접 추가해 빌드합니다([Gradle로 빌드하는 안드로이드 앱](android-gradle.ko.md#사내망이-https를-검사하면-어떻게-하나요) 참고). 신뢰할 수 없는 인증서 때문에 스캔이 실패하면 이 옵션을 알려 주는 `[WARN]` 줄이 출력됩니다. npm은 cdxgen 로그에 `SELF_SIGNED_CERT_IN_CHAIN`으로 보고하며, 그런 저장소를 상대로 의존성 단계가 진행 없이 몇 분씩 이어지는 것도 같은 원인을 가리킵니다.
 
 `SBOM_EXTRA_CA_CERTS`를 지정하는 방법은 BomLens를 실행하는 방식에 따라 다릅니다.
 

@@ -24,6 +24,29 @@ On the command line, a scan with no SDK image stops before it starts and prints 
 
 The build recipe is `docker/android/Dockerfile`, which the CLI download and a clone of the repository both contain.
 
+## What if my network inspects HTTPS?
+
+Building the SDK image downloads the Android command-line tools and platform from `dl.google.com`. A proxy that inspects HTTPS re-signs that traffic with a company CA, and the build does not trust it. `SBOM_EXTRA_CA_CERTS` does not help here: it applies to the scan containers, not to `docker build`. The build then stops with `curl: (60) SSL certificate problem`, or with `[build] ERROR: sdk-install: Android platform ... was not installed` and a `PKIX path building failed` line from `sdkmanager`. The dialog of the desktop app and `sbom-ui.bat` runs the same recipe, so it fails the same way. Build the image by hand with the CA in it:
+
+1. Copy the recipe folder and put your company CA, as a PEM file named `company-ca.pem`, next to the Dockerfile:
+
+   ```bash
+   cp -R docker/android my-android-sdk && cp /path/to/company-ca.pem my-android-sdk/
+   ```
+
+2. In `my-android-sdk/Dockerfile`, add these lines after the first `RUN` (the one that checks for `unzip` and `curl`) and before the `RUN mkdir -p "$ANDROID_HOME/cmdline-tools"` line. The base image is Red Hat Enterprise Linux 9, so the system store is updated with `update-ca-trust` and the Java store with `keytool`:
+
+   ```dockerfile
+   COPY company-ca.pem /tmp/company-ca.pem
+   RUN cp /tmp/company-ca.pem /etc/pki/ca-trust/source/anchors/company-ca.pem \
+       && update-ca-trust extract \
+       && keytool -importcert -noprompt -trustcacerts -alias company-ca -file /tmp/company-ca.pem -cacerts -storepass changeit
+   ```
+
+3. Run the `docker build` command the scan printed, with `my-android-sdk` as the folder instead of `docker/android`. Running it means you accept [Google's SDK terms](https://developer.android.com/studio/terms).
+
+The scan itself still needs the CA for the Gradle build, which downloads dependencies: set `SBOM_EXTRA_CA_CERTS` as described in [How do I trust my company CA?](company-network.md#how-do-i-trust-my-company-ca).
+
 ## Does my private repository work?
 
 Dependencies from a company repository need the credentials your own Gradle build uses. BomLens passes `~/.gradle/gradle.properties`, `~/.gradle/init.gradle`, `~/.gradle/init.gradle.kts` and the `~/.gradle/init.d` folder into the scan, read-only, when they exist. Put the repository address and credentials there, as you would for a local build. [How do I scan a Maven project](java-maven.md#does-my-private-repository-work) lists where each tool reads its settings from and what to check when a dependency stays unresolved.
