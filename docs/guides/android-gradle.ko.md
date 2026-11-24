@@ -24,6 +24,29 @@ description: Gradle로 빌드하는 안드로이드 앱을 스캔합니다. 준�
 
 빌드 레시피는 `docker/android/Dockerfile`이며, CLI 내려받기 파일과 저장소 클론에 모두 들어 있습니다.
 
+## 사내망이 HTTPS를 검사하면 어떻게 하나요?
+
+SDK 이미지를 만들 때는 `dl.google.com`에서 안드로이드 명령줄 도구와 플랫폼을 내려받습니다. HTTPS를 검사하는 프록시는 이 통신을 회사 인증서(CA)로 다시 서명하는데, 이미지 빌드는 그 CA를 신뢰하지 않습니다. `SBOM_EXTRA_CA_CERTS`는 스캔 컨테이너에만 적용되고 `docker build`에는 적용되지 않으므로 여기서는 도움이 되지 않습니다. 빌드는 `curl: (60) SSL certificate problem`으로 멈추거나, `[build] ERROR: sdk-install: Android platform ... was not installed`와 함께 `sdkmanager`의 `PKIX path building failed` 줄을 출력하고 멈춥니다. 데스크톱 앱과 `sbom-ui.bat`의 대화상자도 같은 레시피를 실행하므로 똑같이 실패합니다. 이때는 CA를 넣어 이미지를 직접 빌드하세요.
+
+1. 레시피 폴더를 복사하고, 회사 CA를 `company-ca.pem` 이름의 PEM 파일로 Dockerfile 옆에 둡니다.
+
+   ```bash
+   cp -R docker/android my-android-sdk && cp /path/to/company-ca.pem my-android-sdk/
+   ```
+
+2. `my-android-sdk/Dockerfile`에서 첫 번째 `RUN`(`unzip`과 `curl`이 있는지 확인하는 줄) 뒤, `RUN mkdir -p "$ANDROID_HOME/cmdline-tools"` 줄 앞에 아래 줄을 추가합니다. 기반 이미지가 Red Hat Enterprise Linux 9이므로 시스템 저장소는 `update-ca-trust`로, 자바 저장소는 `keytool`로 갱신합니다.
+
+   ```dockerfile
+   COPY company-ca.pem /tmp/company-ca.pem
+   RUN cp /tmp/company-ca.pem /etc/pki/ca-trust/source/anchors/company-ca.pem \
+       && update-ca-trust extract \
+       && keytool -importcert -noprompt -trustcacerts -alias company-ca -file /tmp/company-ca.pem -cacerts -storepass changeit
+   ```
+
+3. 스캔이 출력한 `docker build` 명령을 `docker/android` 대신 `my-android-sdk` 폴더로 바꿔 실행합니다. 실행하면 [구글 SDK 약관](https://developer.android.com/studio/terms)에 동의하는 것입니다.
+
+스캔 자체도 Gradle 빌드가 의존성을 내려받을 때 CA가 필요합니다. [사내 인증서는 어떻게 신뢰하게 하나요?](company-network.ko.md#사내-인증서는-어떻게-신뢰하게-하나요)에 따라 `SBOM_EXTRA_CA_CERTS`를 설정하세요.
+
 ## 사내 저장소도 되나요?
 
 사내 저장소의 의존성은 본인의 Gradle 빌드가 쓰는 인증 정보가 있어야 받을 수 있습니다. BomLens는 `~/.gradle/gradle.properties`, `~/.gradle/init.gradle`, `~/.gradle/init.gradle.kts`, `~/.gradle/init.d` 폴더가 있으면 읽기 전용으로 스캔에 넘깁니다. 로컬 빌드에서 하듯 저장소 주소와 인증 정보를 그 파일에 적어 두세요. 도구별로 설정을 어디서 읽는지, 의존성이 해석되지 않을 때 무엇을 확인하는지는 [Maven으로 빌드하는 자바 프로젝트는 어떻게 스캔하나요?](java-maven.ko.md#사내-저장소도-되나요)에 있습니다.

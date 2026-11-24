@@ -37,7 +37,7 @@ A proxy that inspects HTTPS re-signs it with a company CA, and the scan containe
 SBOM_EXTRA_CA_CERTS=/path/to/company-ca.pem ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target ./my-project --generate-only
 ```
 
-The file is added to the system store, Node.js and the Java trust store of the scan containers. A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way.
+The file is added to the system store, Node.js and the Java trust store of the scan containers. It does not reach `docker build`: the Android SDK image is built with the CA added to its recipe, see [Android with Gradle](android-gradle.md#what-if-my-network-inspects-https). A scan that fails on an untrusted certificate prints a `[WARN]` line that names this option. npm reports it as `SELF_SIGNED_CERT_IN_CHAIN` in the cdxgen log, and a dependency step that runs for minutes with no progress against such a registry points the same way.
 
 How you set `SBOM_EXTRA_CA_CERTS` depends on how you start BomLens:
 
