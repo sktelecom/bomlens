@@ -2089,10 +2089,29 @@ if (gradle.parent == null) {
                 def gavs = { cfg ->
                     def found = new TreeSet()
                     def res = cfg.incoming.resolutionResult
+                    // Two kinds of module ship nothing of their own and are not components
+                    // of the build. A BOM (a platform) is selected as a platform variant and
+                    // has no artifact. The root module of a Kotlin Multiplatform library
+                    // (okio, kotlinx-coroutines-core) redirects to the module that holds the
+                    // jar (okio-jvm): its variant has an external variant. The redirect target
+                    // stays. Unreadable variants (an older Gradle): the component stays.
+                    def ships = { c ->
+                        try {
+                            def vs = c.variants
+                            if (vs.isEmpty()) { return true }
+                            def cats = vs.collect { v ->
+                                def cat = v.attributes.keySet().find { k -> k.name == 'org.gradle.category' }
+                                cat == null ? '' : v.attributes.getAttribute(cat).toString()
+                            }
+                            if (cats.every { it in ['platform', 'enforced-platform'] }) { return false }
+                            if (vs.every { v -> v.externalVariant.isPresent() }) { return false }
+                        } catch (Throwable e) { }
+                        true
+                    }
                     res.allComponents.each { c ->
                         def id = c.id
                         if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
-                            found << (id.group + ':' + id.module + ':' + id.version)
+                            if (ships(c)) { found << (id.group + ':' + id.module + ':' + id.version) }
                         } else if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier && inOtherBuild(id)) {
                             lines << ("F\t" + path + "\t" + id.displayName)
                         }

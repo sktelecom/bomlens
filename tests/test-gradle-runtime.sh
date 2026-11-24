@@ -164,8 +164,25 @@ $deps
 EOF
 }
 
-make_build() {  # <dir> <composite: yes|no|tc|kmptc|kmpsoft|pm|pmkts|pmlib|pmsame|pmdep> <guava: yes|no>
+make_build() {  # <dir> <composite: yes|no|tc|kmptc|kmpsoft|bom|pm|pmkts|pmlib|pmsame|pmdep> <guava: yes|no>
     local d="$1" comp="$2" guava="$3"
+    if [ "$comp" = bom ]; then
+        # jackson-databind's metadata brings jackson-bom in as a platform: a BOM has no
+        # artifact and ships nothing, so it is not part of the runtime classpath. okio is
+        # the root module of a Kotlin Multiplatform library: it redirects to okio-jvm,
+        # which holds the jar, and only okio-jvm is part of the classpath.
+        mkdir -p "$d"
+        printf "rootProject.name = 'bomcase'\n" > "$d/settings.gradle"
+        cat > "$d/build.gradle" <<'EOF'
+plugins { id 'java' }
+repositories { mavenCentral() }
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.0'
+    implementation 'com.squareup.okio:okio:3.6.0'
+}
+EOF
+        return 0
+    fi
     case "$comp" in pm|pmkts|pmlib|pmsame|pmdep) make_plugin_build "$d" "$comp"; return 0 ;; esac
     case "$comp" in kmptc|kmpsoft)
         # One project with no runtimeClasspath, only a configuration of its own that
@@ -308,6 +325,20 @@ if grep -q 'the build includes the build other; using full graph' "$log" && [ -z
 else
     fail "Gradle $v: included build" "$(tail -5 "$log" | tr '\n' ' ')"
 fi
+
+# A BOM that a dependency's metadata brings in is selected as a platform and has no
+# artifact: it is left out of the set (Gradle 7 on, where the variants are read).
+for c in $CASES; do
+    v="${c%%:*}"; jdk="${c##*:}"
+    old_gradle "$v" || [ "${v%%.*}" -ge 7 ] || continue
+    log="$(run_step "$v" "$jdk" off bom)"
+    if [ "$(set_of "$log")" = "$(printf '%s\n' com.fasterxml.jackson.core:jackson-annotations:2.13.0 com.fasterxml.jackson.core:jackson-core:2.13.0 com.fasterxml.jackson.core:jackson-databind:2.13.0 com.squareup.okio:okio-jvm:3.6.0 org.jetbrains.kotlin:kotlin-stdlib-common:1.9.10 org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10 org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10 org.jetbrains.kotlin:kotlin-stdlib:1.9.10 org.jetbrains:annotations:13.0)" ]; then
+        pass "Gradle $v: a BOM (jackson-bom) and a Kotlin Multiplatform root module (okio) are not part of the runtime classpath, okio-jvm is"
+    else
+        fail "Gradle $v: a BOM in the runtime classpath" "got: $(set_of "$log" | tr '\n' ' ')"
+    fi
+    break
+done
 
 # A build included only through pluginManagement is a plugin build: it cannot
 # replace a dependency, and what it needs to build does not ship, so it does not
