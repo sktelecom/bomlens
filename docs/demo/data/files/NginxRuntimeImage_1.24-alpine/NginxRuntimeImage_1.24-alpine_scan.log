@@ -8,15 +8,15 @@
 [INFO] SBOM ready: NginxRuntimeImage_1.24-alpine_bom.json
 [os-licenses] 0 Debian package(s) from Trivy, 0 with a file hash cleaned
 [SUCCESS] copied: /host-output/NginxRuntimeImage_1.24-alpine_bom.json
-[docmeta] tool=BomLens@1.15.3, lifecycle=post-build: NginxRuntimeImage_1.24-alpine_bom.json
+[docmeta] tool=BomLens@1.15.4, lifecycle=post-build: NginxRuntimeImage_1.24-alpine_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [normalize] normalized: NginxRuntimeImage_1.24-alpine_bom.json (mode=sort-only)
 [cpe] set/normalized a whitelisted cpe:2.3 on 14 component(s) for CVE matching.
 [cpe] stripped the distro revision from 48 more deb/rpm/apk cpe(s) (vendor/product left as-is).
 [cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
 [distro-supplier] filled supplier (Alpine) on 62 component(s).
-[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
-[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-24.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-24).
 [validate] detected format: CycloneDX
 [validate] added the 2026 SBOM minimum-element checks
 [validate] CycloneDX -> result=pass (mandatory fails=0, warns=9, review=5, n/a=2, untraceable=0): NginxRuntimeImage_1.24-alpine_conformance.json, NginxRuntimeImage_1.24-alpine_conformance.md, NginxRuntimeImage_1.24-alpine_conformance.html

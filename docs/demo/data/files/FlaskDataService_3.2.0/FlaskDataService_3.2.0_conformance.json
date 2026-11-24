@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-22T16:16:20Z",
+  "generatedAt": "2026-11-24T17:25:24Z",
   "profile": "skt-submission",
   "untraceableComponents": 0,
   "checks": [

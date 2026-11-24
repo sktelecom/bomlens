@@ -1,6 +1,6 @@
 Unable to find image 'ghcr.io/sktelecom/bomlens:latest' locally
 latest: Pulling from sktelecom/bomlens
-Digest: sha256:9a857b20f348c6b1ceae554c6566165c35cf24a71b12fb488b8a0e39aac7cf89
+Digest: sha256:4205bf1375a47280104fba6cfd2695d8942e2f14a65689435d9d4400e9689a21
 Status: Downloaded newer image for ghcr.io/sktelecom/bomlens:latest
 ==========================================
  BomLens (post-process)
@@ -21,8 +21,8 @@ Status: Downloaded newer image for ghcr.io/sktelecom/bomlens:latest
 [normalize] normalized: FlaskDataService_3.2.0_bom.json (mode=sort-only)
 [cpe] set/normalized a whitelisted cpe:2.3 on 0 component(s) for CVE matching.
 [cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
-[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-22.
-[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-22).
+[eol] flagged 0 end-of-life and 0 still-supported component(s), 0 behind the latest patch in their cycle, from endoflife.date@2026-11-24.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-24).
 [assess] no AI model or collected dataset component; skipping.
 [SUCCESS] copied: /host-output/FlaskDataService_3.2.0_bom.json
 [SUCCESS] copied: /host-output/FlaskDataService_3.2.0_input.json
