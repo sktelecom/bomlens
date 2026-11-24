@@ -33,6 +33,7 @@ from urllib.parse import unquote
 
 SRI_ALGS = {"sha512": "SHA-512", "sha384": "SHA-384", "sha256": "SHA-256", "sha1": "SHA-1"}
 GRADLE_ALGS = {"sha512": "SHA-512", "sha256": "SHA-256", "sha1": "SHA-1", "md5": "MD5"}
+DIGEST_BYTES = {"SHA-512": 64, "SHA-384": 48, "SHA-256": 32, "SHA-1": 20, "MD5": 16}
 HEX = re.compile(r"^[0-9a-f]+$")
 
 
@@ -48,7 +49,7 @@ def sri_hashes(value):
             digest = base64.b64decode(b64.split("?")[0], validate=True)
         except (binascii.Error, ValueError):
             continue
-        if digest and all(h["alg"] != name for h in out):
+        if len(digest) == DIGEST_BYTES[name] and all(h["alg"] != name for h in out):
             out.append({"alg": name, "content": digest.hex()})
     return out
 
@@ -69,6 +70,8 @@ def npm_lock(path, table):
         doc = json.loads(text)
     except ValueError:
         return
+    if not isinstance(doc, dict):
+        return
     packages = doc.get("packages")
     if isinstance(packages, dict):
         for key, entry in packages.items():
@@ -87,14 +90,19 @@ def npm_lock(path, table):
     walk(doc.get("dependencies"))
 
 
-def split_name_version(spec):
-    """'@scope/name@1.2.3' or 'name@1.2.3(peer@x)' -> (name, version)."""
+def split_name_version(spec, slash_version=False):
+    """'@scope/name@1.2.3' or 'name@1.2.3(peer@x)' -> (name, version).
+
+    With slash_version (pnpm-lock.yaml before 6.0), '/name/1.2.3' and
+    '/@scope/name/1.2.3_peer@4.5.6'.
+    """
     spec = spec.strip().strip("'\"").lstrip("/")
     spec = spec.split("(", 1)[0]
-    # pnpm-lock.yaml 5.x writes '/name/1.2.3' and '/@scope/name/1.2.3_peer@4.5.6'.
-    name, slash, version = spec.rpartition("/")
-    if slash and name and version[:1].isdigit():
-        return name, version.split("_", 1)[0]
+    if slash_version:
+        name, slash, version = spec.rpartition("/")
+        if slash and name and version[:1].isdigit():
+            return name, version.split("_", 1)[0]
+        return None, None
     at = spec.rfind("@")
     if at > 0:
         return spec[:at], spec[at + 1:]
@@ -107,6 +115,8 @@ def pnpm_lock(path, table):
         return
     section = None
     current = None
+    m = re.search(r"^lockfileVersion:\s*['\"]?(\d+)", text, re.M)
+    slash_version = bool(m) and int(m.group(1)) < 6
     for line in text.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
@@ -118,7 +128,7 @@ def pnpm_lock(path, table):
         if section != "packages":
             continue
         if indent == 2 and line.rstrip().endswith(":"):
-            current = split_name_version(line.strip()[:-1])
+            current = split_name_version(line.strip()[:-1], slash_version)
             continue
         if current and current[0] and indent >= 4:
             m = re.search(r"integrity:\s*['\"]?([A-Za-z0-9+/=_-]+-[A-Za-z0-9+/=]+)", line)
@@ -135,7 +145,7 @@ def bun_lock(path, table):
         doc = json.loads(re.sub(r",(\s*[}\]])", r"\1", text))
     except ValueError:
         return
-    packages = doc.get("packages")
+    packages = doc.get("packages") if isinstance(doc, dict) else None
     if not isinstance(packages, dict):
         return
     for entry in packages.values():
@@ -159,22 +169,23 @@ def gradle_verification(path, table):
         if not (group and name and version):
             continue
         artifacts = [a for a in comp if a.tag.endswith("artifact")]
-        wanted = "%s-%s.jar" % (name, version)
-        jar = next((a for a in artifacts if a.get("name") == wanted), None) \
-            or next((a for a in artifacts if (a.get("name") or "").endswith((".jar", ".aar"))), None)
+        # Only the main artifact: sources, javadoc and classifier jars have other checksums.
+        wanted = ("%s-%s.jar" % (name, version), "%s-%s.aar" % (name, version))
+        jar = next((a for a in artifacts if a.get("name") == wanted[0]), None) \
+            or next((a for a in artifacts if a.get("name") == wanted[1]), None)
         if jar is None:
             continue
         hashes = []
         for h in jar:
             alg = GRADLE_ALGS.get(h.tag.rsplit("}", 1)[-1].lower())
             value = (h.get("value") or "").lower()
-            if alg and HEX.match(value) and all(x["alg"] != alg for x in hashes):
+            if alg and HEX.match(value) and len(value) == 2 * DIGEST_BYTES[alg] and all(x["alg"] != alg for x in hashes):
                 hashes.append({"alg": alg, "content": value})
         add(table, "maven", "%s/%s" % (group, name), version, hashes)
 
 
 def add(table, kind, name, version, hashes):
-    if name and version and hashes:
+    if isinstance(name, str) and isinstance(version, (str, int, float)) and name and version and hashes:
         table.setdefault((kind, name, str(version)), hashes)
 
 
@@ -195,11 +206,15 @@ def main(argv):
         return 2
     root, sbom_path = argv[1], argv[2]
     table = {}
-    for lock in ("package-lock.json", "npm-shrinkwrap.json"):
-        npm_lock(os.path.join(root, lock), table)
-    pnpm_lock(os.path.join(root, "pnpm-lock.yaml"), table)
-    bun_lock(os.path.join(root, "bun.lock"), table)
-    gradle_verification(os.path.join(root, "gradle", "verification-metadata.xml"), table)
+    # npm uses npm-shrinkwrap.json when both are there, so it is read first.
+    readers = ((npm_lock, "npm-shrinkwrap.json"), (npm_lock, "package-lock.json"),
+               (pnpm_lock, "pnpm-lock.yaml"), (bun_lock, "bun.lock"),
+               (gradle_verification, os.path.join("gradle", "verification-metadata.xml")))
+    for reader, lock in readers:
+        try:
+            reader(os.path.join(root, lock), table)
+        except Exception:  # pylint: disable=broad-except  # one odd lock file must not stop the others
+            continue
     if not table:
         return 0
     try:
@@ -207,8 +222,11 @@ def main(argv):
             sbom = json.load(fh)
     except (OSError, ValueError):
         return 0
+    components = sbom.get("components") if isinstance(sbom, dict) else None
+    if not isinstance(components, list):
+        return 0
     added = 0
-    for comp in sbom.get("components") or []:
+    for comp in components:
         if not isinstance(comp, dict) or comp.get("hashes"):
             continue
         hashes = table.get(purl_key(comp.get("purl")))
@@ -217,10 +235,17 @@ def main(argv):
             added += 1
     if added:
         tmp = sbom_path + ".hashes.tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(sbom, fh, indent=2)
-            fh.write("\n")
-        os.replace(tmp, sbom_path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(sbom, fh, indent=2)
+                fh.write("\n")
+            os.replace(tmp, sbom_path)
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            return 0
     print(added)
     return 0
 

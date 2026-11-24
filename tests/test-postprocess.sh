@@ -15672,14 +15672,16 @@ done <<< "$SELF_OUT"
 
 # The lock file's package hashes, which `trivy fs` leaves out and a build writes.
 # The SHA-512 value is the digest of "a"; the SHA-1 one is a real npm integrity.
-LH="$(mktemp -d)"; mkdir -p "$LH/npm" "$LH/pnpm9" "$LH/pnpm5" "$LH/bun" "$LH/gradle/gradle" "$LH/bad"
+LH="$(mktemp -d)"; mkdir -p "$LH/npm" "$LH/pnpm9" "$LH/pnpm6" "$LH/pnpm5" "$LH/bun" "$LH/gradle/gradle" "$LH/bad" "$LH/odd"
 SRI512='sha512-H0D8ktokFpR1CXnubPWC8tXX0o4YM13gWrxU0FYOD1MChgxlK/CNVgJSql50IQVG82n7u86MEs/HlXsmUv6adQ=='
 HEX512=1f40fc92da241694750979ee6cf582f2d5d7d28e18335de05abc54d0560e0f5302860c652bf08d560252aa5e74210546f369fbbbce8c12cfc7957b2652fe9a75
 cat > "$LH/npm/package-lock.json" <<JSON
 {"lockfileVersion":3,"packages":{"":{"name":"app"},
  "node_modules/debug":{"version":"4.3.1","integrity":"$SRI512"},
  "node_modules/debug/node_modules/ms":{"version":"2.1.2","integrity":"sha1-hrvvACgaeiWlKCcmF0xYm0Xaa9I="},
- "node_modules/@scope/pkg":{"version":"1.0.0","integrity":"$SRI512"}}}
+ "node_modules/@scope/pkg":{"version":"1.0.0","integrity":"$SRI512"},
+ "node_modules/alias":{"name":"real","version":"3.0.0","integrity":"$SRI512"},
+ "node_modules/short":{"version":"1.0.0","integrity":"sha512-YQ=="}}}
 JSON
 cat > "$LH/pnpm9/pnpm-lock.yaml" <<YAML
 lockfileVersion: '9.0'
@@ -15698,6 +15700,20 @@ packages:
 
   debug@4.3.1:
     resolution: {integrity: $SRI512}
+
+  react-dom@18.2.0(react@18.2.0):
+    resolution: {integrity: $SRI512}
+YAML
+cat > "$LH/pnpm6/pnpm-lock.yaml" <<YAML
+lockfileVersion: '6.0'
+
+packages:
+
+  /debug@4.3.1:
+    resolution: {integrity: $SRI512}
+
+  /@scope/3d-lib@1.0.0(react@18.2.0):
+    resolution: {integrity: $SRI512}
 YAML
 cat > "$LH/pnpm5/pnpm-lock.yaml" <<YAML
 lockfileVersion: 5.4
@@ -15712,6 +15728,7 @@ cat > "$LH/bun/bun.lock" <<JSON
   "lockfileVersion": 1,
   "packages": {
     "debug": ["debug@4.3.1", "", { "dependencies": { "ms": "2.1.2" } }, "$SRI512"],
+    "@scope/3d-lib": ["@scope/3d-lib@1.0.0", "", {}, "$SRI512"],
   },
 }
 JSON
@@ -15723,52 +15740,78 @@ cat > "$LH/gradle/gradle/verification-metadata.xml" <<'XML'
       <artifact name="gson-2.10.1.pom"><sha256 value="1111111111111111111111111111111111111111111111111111111111111111"/></artifact>
       <artifact name="gson-2.10.1.jar"><sha256 value="4241C14A7727C34FEEA6507EC801318A3D4A90F070E4525681079FB94EE4C593"/></artifact>
     </component>
+    <component group="androidx.core" name="core" version="1.9.0">
+      <artifact name="core-1.9.0-sources.jar"><sha256 value="2222222222222222222222222222222222222222222222222222222222222222"/></artifact>
+      <artifact name="core-1.9.0.aar"><sha256 value="3333333333333333333333333333333333333333333333333333333333333333"/></artifact>
+    </component>
+    <component group="org.example" name="docs" version="1.0">
+      <artifact name="docs-1.0-javadoc.jar"><sha256 value="4444444444444444444444444444444444444444444444444444444444444444"/></artifact>
+      <artifact name="docs-1.0.module"><sha256 value="5555555555555555555555555555555555555555555555555555555555555555"/></artifact>
+    </component>
+    <component group="org.example" name="short" version="1.0">
+      <artifact name="short-1.0.jar"><sha256 value="aaaa"/></artifact>
+    </component>
   </components>
 </verification-metadata>
 XML
 echo '{not json' > "$LH/bad/package-lock.json"
+echo '[]' > "$LH/odd/package-lock.json"; cp "$LH/bun/bun.lock" "$LH/odd/bun.lock"
 lh_sbom() { # <file> <purl>... : an SBOM with one library per purl
   local f="$1"; shift
   printf '%s\n' "$@" | jq -R '{type:"library",purl:.}' | jq -s '{bomFormat:"CycloneDX",specVersion:"1.6",components:.}' > "$f"
 }
 lh_hash() { jq -r --arg p "$2" --arg a "$3" '[.components[]|select(.purl==$p)|.hashes[]?|select(.alg==$a)|.content]|first // ""' "$1"; }
 LHPY="$ROOT_DIR/docker/lib/static-lock-hashes.py"
-lh_sbom "$LH/npm.json" pkg:npm/debug@4.3.1 pkg:npm/ms@2.1.2 pkg:npm/%40scope/pkg@1.0.0 pkg:npm/other@1.0.0
+lh_sbom "$LH/npm.json" pkg:npm/debug@4.3.1 pkg:npm/ms@2.1.2 pkg:npm/%40scope/pkg@1.0.0 pkg:npm/other@1.0.0 pkg:npm/real@3.0.0 pkg:npm/short@1.0.0
 python3 "$LHPY" "$LH/npm" "$LH/npm.json" >/dev/null 2>&1
 [ "$(lh_hash "$LH/npm.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
     && [ "$(lh_hash "$LH/npm.json" pkg:npm/%40scope/pkg@1.0.0 SHA-512)" = "$HEX512" ] \
     && [ "$(lh_hash "$LH/npm.json" pkg:npm/ms@2.1.2 SHA-1)" = "86bbef00281a7a25a5282726174c589b45da6bd2" ] \
-    && [ "$(jq '[.components[]|select(.purl=="pkg:npm/other@1.0.0")|.hashes]|first' "$LH/npm.json")" = "null" ] \
-    && pass "static read: package-lock.json integrity becomes a hex SHA-512 or SHA-1 hash, nested and scoped packages too, and a package the lock does not list gets none" \
+    && [ "$(lh_hash "$LH/npm.json" pkg:npm/real@3.0.0 SHA-512)" = "$HEX512" ] \
+    && [ "$(jq '[.components[]|select(.purl=="pkg:npm/other@1.0.0" or .purl=="pkg:npm/short@1.0.0")|.hashes]' "$LH/npm.json")" = "$(printf '[\n  null,\n  null\n]')" ] \
+    && pass "static read: package-lock.json integrity becomes a hex SHA-512 or SHA-1 hash, nested, scoped and aliased packages too; a package the lock does not list, or one whose digest is not 64 bytes, gets none" \
     || fail "static read: package-lock.json integrity was not written as hashes" "$(jq -c '[.components[]|{purl,hashes}]' "$LH/npm.json")"
 lh_sbom "$LH/pnpm9.json" pkg:npm/debug@4.3.1 pkg:npm/%40scope/pkg@1.0.0
 python3 "$LHPY" "$LH/pnpm9" "$LH/pnpm9.json" >/dev/null 2>&1
+lh_sbom "$LH/pnpm9p.json" pkg:npm/react-dom@18.2.0
+python3 "$LHPY" "$LH/pnpm9" "$LH/pnpm9p.json" >/dev/null 2>&1
+lh_sbom "$LH/pnpm6.json" pkg:npm/debug@4.3.1 pkg:npm/%40scope/3d-lib@1.0.0
+python3 "$LHPY" "$LH/pnpm6" "$LH/pnpm6.json" >/dev/null 2>&1
 lh_sbom "$LH/pnpm5.json" pkg:npm/debug@4.3.1
 python3 "$LHPY" "$LH/pnpm5" "$LH/pnpm5.json" >/dev/null 2>&1
 [ "$(lh_hash "$LH/pnpm9.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
     && [ "$(lh_hash "$LH/pnpm9.json" pkg:npm/%40scope/pkg@1.0.0 SHA-512)" = "$HEX512" ] \
+    && [ "$(lh_hash "$LH/pnpm9p.json" pkg:npm/react-dom@18.2.0 SHA-512)" = "$HEX512" ] \
+    && [ "$(lh_hash "$LH/pnpm6.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
+    && [ "$(lh_hash "$LH/pnpm6.json" pkg:npm/%40scope/3d-lib@1.0.0 SHA-512)" = "$HEX512" ] \
     && [ "$(lh_hash "$LH/pnpm5.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
-    && pass "static read: pnpm-lock.yaml resolution integrity becomes a hash (9.x keys and 5.x paths with a peer suffix)" \
+    && pass "static read: pnpm-lock.yaml resolution integrity becomes a hash (9.x and 6.x keys with a peer suffix, a scoped name starting with a digit, and 5.x paths)" \
     || fail "static read: pnpm-lock.yaml integrity was not written as hashes"
-lh_sbom "$LH/bun.json" pkg:npm/debug@4.3.1
+lh_sbom "$LH/bun.json" pkg:npm/debug@4.3.1 pkg:npm/%40scope/3d-lib@1.0.0
 python3 "$LHPY" "$LH/bun" "$LH/bun.json" >/dev/null 2>&1
 [ "$(lh_hash "$LH/bun.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
+    && [ "$(lh_hash "$LH/bun.json" pkg:npm/%40scope/3d-lib@1.0.0 SHA-512)" = "$HEX512" ] \
     && pass "static read: bun.lock's integrity item becomes a hash (the lock's trailing commas are read)" \
     || fail "static read: bun.lock integrity was not written as a hash"
-lh_sbom "$LH/gradle.json" pkg:maven/com.google.code.gson/gson@2.10.1
+lh_sbom "$LH/gradle.json" pkg:maven/com.google.code.gson/gson@2.10.1 'pkg:maven/androidx.core/core@1.9.0?type=aar' pkg:maven/org.example/docs@1.0 pkg:maven/org.example/short@1.0
 python3 "$LHPY" "$LH/gradle" "$LH/gradle.json" >/dev/null 2>&1
 [ "$(lh_hash "$LH/gradle.json" pkg:maven/com.google.code.gson/gson@2.10.1 SHA-256)" = "4241c14a7727c34feea6507ec801318a3d4a90f070e4525681079fb94ee4c593" ] \
-    && pass "static read: gradle/verification-metadata.xml gives the jar's checksum, not the pom's, in lower case" \
+    && [ "$(lh_hash "$LH/gradle.json" 'pkg:maven/androidx.core/core@1.9.0?type=aar' SHA-256)" = "3333333333333333333333333333333333333333333333333333333333333333" ] \
+    && [ "$(jq -c '[.components[]|select(.purl|test("docs|short"))|.hashes]' "$LH/gradle.json")" = "[null,null]" ] \
+    && pass "static read: gradle/verification-metadata.xml gives the main jar's or aar's checksum in lower case, never a pom, sources or javadoc one, and none of the wrong length" \
     || fail "static read: the Gradle verification checksum was not written" "$(jq -c '.components' "$LH/gradle.json")"
 lh_sbom "$LH/keep.json" pkg:npm/debug@4.3.1
 jq '.components[0].hashes=[{"alg":"SHA-256","content":"00"}]' "$LH/keep.json" > "$LH/keep.tmp" && mv "$LH/keep.tmp" "$LH/keep.json"
 python3 "$LHPY" "$LH/npm" "$LH/keep.json" >/dev/null 2>&1
 lh_sbom "$LH/bad.json" pkg:npm/debug@4.3.1; cp "$LH/bad.json" "$LH/bad.before"
 python3 "$LHPY" "$LH/bad" "$LH/bad.json" >/dev/null 2>&1; rc=$?
+lh_sbom "$LH/odd.json" pkg:npm/debug@4.3.1
+python3 "$LHPY" "$LH/odd" "$LH/odd.json" >/dev/null 2>&1; rc2=$?
 [ "$(jq -c '.components[0].hashes' "$LH/keep.json")" = '[{"alg":"SHA-256","content":"00"}]' ] \
     && [ "$rc" -eq 0 ] && cmp -s "$LH/bad.json" "$LH/bad.before" \
-    && pass "static read: a component that has hashes keeps them, and an unreadable lock file leaves the SBOM as it was with exit 0" \
-    || fail "static read: existing hashes were replaced, or a bad lock file failed or changed the SBOM" "rc=$rc"
+    && [ "$rc2" -eq 0 ] && [ "$(lh_hash "$LH/odd.json" pkg:npm/debug@4.3.1 SHA-512)" = "$HEX512" ] \
+    && pass "static read: a component that has hashes keeps them, an unreadable lock file leaves the SBOM as it was with exit 0, and a lock file that is not an object does not stop the others" \
+    || fail "static read: existing hashes were replaced, or a bad lock file failed, changed the SBOM or stopped the others" "rc=$rc rc2=$rc2"
 cat > "$GS/src/package-lock.json" <<JSON
 {"lockfileVersion":3,"packages":{"node_modules/debug":{"version":"4.3.1","integrity":"$SRI512"}}}
 JSON
