@@ -4404,7 +4404,16 @@ const keep = c => {
   if (!g) return true;                            // app root (single segment)
   if (rootGroup && g.split(':')[0] === rootGroup) return true; // first-party modules
   if ((label === 'gradle' || label === 'android-unresolved') && !fromGradle(c)) return true; // not from a Gradle resolve
-  return rel.has(g);
+  if (!rel.has(g)) return false;
+  // The text report lists a version-alignment BOM and a Kotlin Multiplatform
+  // root module as if they shipped. A BOM has no artifact; a root whose
+  // -jvm or -android module is in the same set is replaced by that module.
+  if (label === 'android') {
+    const [grp, art, ver] = g.split(':');
+    if (/-bom$/.test(art)) return false;
+    if (rel.has(grp + ':' + art + '-jvm:' + ver) || rel.has(grp + ':' + art + '-android:' + ver)) return false;
+  }
+  return true;
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
