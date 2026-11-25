@@ -49,6 +49,13 @@ class StampRelease(unittest.TestCase):
                          (ENGINE, LICENSE, CVE))
         self.assertTrue(self.file.read_text().startswith("# Copyright"))
 
+    def test_a_post_release_keeps_the_release_image_tag(self):
+        self.assertEqual(self.run_stamp("1.16.0.post1", ENGINE), 0)
+        self.assertEqual(self.load().VERSION, "1.16.0.post1")
+        for argv in (("1.16.0.post1", f"ghcr.io/sktelecom/bomlens:1.16.0.post1@{DIGEST}"), ("1.16.0.post", ENGINE)):
+            with self.assertRaises(SystemExit):
+                self.run_stamp(*argv)
+
     def test_optional_images_may_be_left_out(self):
         self.assertEqual(self.run_stamp("1.16.0", ENGINE), 0)
         self.assertEqual(self.load().DEEP_CVE_IMAGE, "")

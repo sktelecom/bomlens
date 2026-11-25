@@ -10,6 +10,11 @@ on:
         description: 'Release version (e.g., v1.0.0)'
         required: true
         type: string
+      runner_post:
+        description: 'Only publish the engine runner again as VERSION.postN (give N, e.g. 1) from the release tag, with the images of that release. Nothing else runs'
+        required: false
+        type: string
+        default: ''
   # Callable from another repository so the release can be assembled on that
   # repository's runners while the artefacts land here and keep this
   # repository's signing identity: Sigstore builds the certificate subject from
@@ -69,6 +74,7 @@ concurrency:
 jobs:
   create-release:
     name: Create Release
+    if: ${{ inputs.runner_post == '' }}
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 15
     permissions:
@@ -292,6 +298,7 @@ jobs:
   # with upload-assets, so it adds little wall-clock time.
   docs-walkthrough:
     name: Docs Walkthrough (release gate)
+    if: ${{ inputs.runner_post == '' }}
     uses: ./.github/workflows/heavy-e2e.yml
     with:
       suites: docs-walkthrough
@@ -410,8 +417,15 @@ jobs:
   publish-runner:
     name: Publish the engine runner to PyPI
     needs: [create-release, release-gate]
+    # A release run needs both jobs to have succeeded. A runner_post run skips
+    # every other job, so it needs them skipped.
     if: >-
-      github.repository == 'sktelecom/bomlens'
+      !cancelled()
+      && (
+        (inputs.runner_post == '' && needs.create-release.result == 'success' && needs.release-gate.result == 'success')
+        || (inputs.runner_post != '' && needs.release-gate.result == 'skipped')
+      )
+      && github.repository == 'sktelecom/bomlens'
       && startsWith(github.workflow_ref, 'sktelecom/bomlens/.github/workflows/release.yml@')
       && (inputs.target_repository || github.repository) == github.repository
     runs-on: ubuntu-latest
@@ -427,7 +441,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The release's own runner, also when dispatched from a later main.
-          ref: refs/tags/${{ needs.create-release.outputs.version }}
+          ref: refs/tags/${{ needs.create-release.outputs.version || inputs.version }}
           persist-credentials: false
 
       - name: Set up Python
@@ -438,8 +452,9 @@ jobs:
       - name: Resolve the release images
         id: images
         env:
-          TAG: ${{ needs.create-release.outputs.version }}
+          TAG: ${{ needs.create-release.outputs.version || inputs.version }}
           OWNER: ${{ env.PUBLISH_OWNER }}
+          POST: ${{ inputs.runner_post }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
@@ -453,8 +468,16 @@ jobs:
             digest="$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}')"
             printf '%s@%s' "$ref" "$digest"
           }
+          package_version="$version"
+          if [ -n "$POST" ]; then
+            if ! printf '%s' "$POST" | grep -Eq '^[1-9][0-9]*$'; then
+              echo "::error::runner_post must be a number such as 1"
+              exit 1
+            fi
+            package_version="$version.post$POST"
+          fi
           {
-            echo "version=$version"
+            echo "version=$package_version"
             echo "engine=$(pinned bomlens)"
             echo "deep_license=$(pinned bomlens-deep-license)"
             echo "deep_cve=$(pinned bomlens-deep-cve)"
@@ -493,7 +516,7 @@ jobs:
         if: steps.images.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.PUBLISH_TOKEN || github.token }}
-          TAG: ${{ needs.create-release.outputs.version }}
+          TAG: ${{ needs.create-release.outputs.version || inputs.version }}
           VERSION: ${{ steps.images.outputs.version }}
         run: |
           set -euo pipefail

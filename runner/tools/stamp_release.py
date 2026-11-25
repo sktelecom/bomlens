@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 from bomlens_runner.errors import PolicyError  # noqa: E402
 from bomlens_runner.images import PinnedImage  # noqa: E402
 
-VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(\.post[0-9]+)?")
 DEFAULT_FILE = HERE.parent / "src" / "bomlens_runner" / "_release.py"
 
 
@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not VERSION_RE.fullmatch(args.version):
-        parser.error("version must be MAJOR.MINOR.PATCH")
+        parser.error("version must be MAJOR.MINOR.PATCH, or that with .postN")
     for ref in (args.engine, args.deep_license, args.deep_cve):
         if not ref:
             continue
@@ -48,8 +48,9 @@ def main(argv: list[str] | None = None) -> int:
             image = PinnedImage.parse(ref)
         except PolicyError as exc:
             parser.error(str(exc))
-        if image.ref.rsplit(":", 1)[1] != args.version:
-            parser.error(f"{image.repository} is not tagged {args.version}")
+        # A .postN package is a re-publication of the release: its images keep the release's tag.
+        if image.ref.rsplit(":", 1)[1] != args.version.split(".post")[0]:
+            parser.error(f"{image.repository} is not tagged {args.version.split('.post')[0]}")
     if not args.engine:
         parser.error("the engine image is required")
 
