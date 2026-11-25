@@ -11,7 +11,7 @@ Generating AIBOM for google-bert/bert-base-uncased...
   - Generating AIBOM model data...
 
 📄 HTML Report:
-   /tmp/tmp.ERZfhbt4ie/aibom.html
+   /tmp/tmp.v7LfbDB4FT/aibom.html
 
 📝 Model Description:
    No description available
@@ -20,11 +20,11 @@ Generating AIBOM for google-bert/bert-base-uncased...
    Apache-2.0
 
 ✅ Successfully generated CycloneDX 1.6 SBOM:
-   /tmp/tmp.ERZfhbt4ie/aibom.json
+   /tmp/tmp.v7LfbDB4FT/aibom.json
    - Schema Validation (1.6): ✅ Valid
 
 ✅ Successfully generated CycloneDX 1.7 SBOM:
-   /tmp/tmp.ERZfhbt4ie/aibom_1_7.json
+   /tmp/tmp.v7LfbDB4FT/aibom_1_7.json
    - Schema Validation (1.7): ✅ Valid
 
 📊 Completeness Score: 63.4/100
@@ -39,7 +39,6 @@ Generating AIBOM for google-bert/bert-base-uncased...
 [aibom] kept CycloneDX 1.7 output
 [aibom] model card present (1 model component(s) with a card).
 [enrich] file security: queued (10 scanned safe, 0 flagged).
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
 [enrich] HuggingFace: 6 weight hash(es), openness assessed (weights=open-weight).
 [enrich] datasets: 2 referenced, 2 resolved, 0 source(s) traced (training-data=open-data).
 [enrich] cdxgen: merged pedigree/metrics/properties.
