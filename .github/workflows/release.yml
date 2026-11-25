@@ -444,6 +444,23 @@ jobs:
           ref: refs/tags/${{ needs.create-release.outputs.version || inputs.version }}
           persist-credentials: false
 
+      # A tag made before post releases existed carries a version check that
+      # rejects MAJOR.MINOR.PATCH.postN, so that one file comes from the
+      # commit this run was dispatched from. The runner itself stays the tag's.
+      - name: Take the version tool from the dispatched commit
+        if: ${{ inputs.runner_post != '' }}
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: dispatched
+          sparse-checkout: runner/tools/stamp_release.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Use that version tool
+        if: ${{ inputs.runner_post != '' }}
+        run: cp dispatched/runner/tools/stamp_release.py runner/tools/stamp_release.py
+
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
