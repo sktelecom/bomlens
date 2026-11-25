@@ -1,6 +1,6 @@
 Unable to find image 'ghcr.io/sktelecom/bomlens:latest' locally
 latest: Pulling from sktelecom/bomlens
-Digest: sha256:4205bf1375a47280104fba6cfd2695d8942e2f14a65689435d9d4400e9689a21
+Digest: sha256:2753801a22462a33449c5040c657790b1c6098d88f8c656e4fddc7dede5a7aae
 Status: Downloaded newer image for ghcr.io/sktelecom/bomlens:latest
 ==========================================
  BomLens (post-process)
