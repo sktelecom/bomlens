@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A jar in the scanned folder that is read as a component now carries the file's SHA-256 and SHA-1 and its real path in `internal:SrcFile`, in place of cdxgen's temporary `jar-deps-*` path and no hash. A name found in more than one place, or a component that already has hashes, is left as it was.
+
 ## [v1.15.4] - 2026-11-24
 
 ### Fixed

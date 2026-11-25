@@ -16625,6 +16625,25 @@ af_got="$(jq -r '[.components[].purl|sub("pkg:maven/";"")]|sort|join(",")' "$AF/
     || fail "android filter: BOM and Multiplatform root" "$af_got"
 rm -rf "$AF"
 
+# A jar read as a component: its temporary path becomes the file's path and it
+# gets the file's hashes, unless the name is ambiguous or hashes exist.
+JH="$(mktemp -d)"; mkdir -p "$JH/lib" "$JH/a" "$JH/b"
+printf 'one' > "$JH/lib/One.jar"; printf 'x' > "$JH/a/Dup.jar"; printf 'y' > "$JH/b/Dup.jar"
+jq -n '{components:[
+  {name:"one",properties:[{name:"internal:SrcFile",value:"jar-deps-AbC123/One.jar"}]},
+  {name:"dup",properties:[{name:"internal:SrcFile",value:"jar-deps-AbC123/Dup.jar"}]},
+  {name:"kept",hashes:[{alg:"SHA-1",content:"aa"}],properties:[{name:"internal:SrcFile",value:"jar-deps-AbC123/One.jar"}]},
+  {name:"pom",properties:[{name:"internal:SrcFile",value:"pom.xml"}]}]}' > "$JH/bom.json"
+python3 "$LIB/jar-file-hashes.py" "$JH" "$JH/bom.json"
+jh_one="$(jq -r '.components[0]|(.properties[0].value)+" "+(.hashes[]|select(.alg=="SHA-256").content)' "$JH/bom.json")"
+[ "$jh_one" = "lib/One.jar $(printf 'one' | shasum -a 256 | cut -d' ' -f1)" ] \
+    && [ "$(jq -r '.components[1].properties[0].value' "$JH/bom.json")" = "jar-deps-AbC123/Dup.jar" ] \
+    && [ "$(jq -c '.components[2].hashes' "$JH/bom.json")" = '[{"alg":"SHA-1","content":"aa"}]' ] \
+    && [ "$(jq -r '.components[3].properties[0].value' "$JH/bom.json")" = "pom.xml" ] \
+    && pass "jar component: the file's path and hashes are added; an ambiguous name, kept hashes and a pom are left alone" \
+    || fail "jar component hashes" "$(jq -c '.components' "$JH/bom.json")"
+rm -rf "$JH"
+
 # shard: closing summary
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
