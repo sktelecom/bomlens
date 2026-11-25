@@ -305,6 +305,28 @@ PYRANGE_DEDUP='
                            | map(.dependsOn |= (if type=="array" then map(select(. as $d | ($drop|index($d))==null)) else . end)) )
      else . end)'
 
+# A requirements.txt line with no version (`flask`) leaves a second pypi entry
+# besides the installed one (`flask@3.1.3`): the manifest entry has a purl and
+# bom-ref without a version, no versionSpecifiers property and no place in the
+# dependency graph. Once pip has installed the package, the installed entry says
+# the same thing with the version, so the manifest entry is dropped. Names are
+# compared the way PEP 503 does (case-insensitive, runs of - _ . are one). A
+# versionless entry with no installed sibling stays, and so does one the graph
+# refers to.
+PYUNPINNED_DEDUP='
+  def pep503: (. // "" | ascii_downcase | gsub("[-_.]+"; "-"));
+  ( [ .components[]?
+      | select(((.purl // "") | startswith("pkg:pypi/")) and ((.version // "") != ""))
+      | (.name | pep503) ] | unique ) as $installed
+  | ( [ .dependencies[]? | (.ref, (.dependsOn[]?)) ] | unique ) as $used
+  | ( [ .components[]?
+        | select(((.purl // "") | startswith("pkg:pypi/"))
+                 and ((.version // "") == "")
+                 and ((.name | pep503) as $nm | ($installed | index($nm)) != null)
+                 and ((.["bom-ref"] // .purl // "") as $r | ($used | index($r)) == null))
+        | (.["bom-ref"] // .purl) ] | unique ) as $drop
+  | .components |= map(select((.["bom-ref"] // .purl // "") as $r | ($drop | index($r)) == null))'
+
 # cdxgen can emit spec-invalid swift PURLs: pkg:swift REQUIRES a namespace
 # (e.g. pkg:swift/github.com/apple/swift-log@1.0.0), but the root component and
 # first-party modules come out as pkg:swift/<name>@<ver> with no namespace. A
@@ -672,6 +694,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${NAME_VERSION_DEDUP}
         | ${DOTNET_BASE_FIX}
         | ${PYRANGE_DEDUP}
+        | ${PYUNPINNED_DEDUP}
         | ${SWIFT_DUP_FIX}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
@@ -695,7 +718,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${URL_CRED_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${BUILD_TOOL_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${URL_CRED_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${PYUNPINNED_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${BUILD_TOOL_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
