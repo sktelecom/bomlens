@@ -134,8 +134,8 @@ docs/start/no-cli.md :: 100 :: 0
 docs/start/no-cli.ko.md :: 118 :: 0
 docs/start/troubleshooting.md :: 85 :: 0
 docs/start/troubleshooting.ko.md :: 119 :: 0
-docs/guides/supplier-sbom.md :: 128 :: 0
-docs/guides/supplier-sbom.ko.md :: 128 :: 0
+docs/guides/supplier-sbom.md :: 152 :: 0
+docs/guides/supplier-sbom.ko.md :: 152 :: 0
 docs/guides/yocto.md :: 125 :: 0
 docs/guides/yocto.ko.md :: 127 :: 0
 docs/guides/ai-model.md :: 350 :: 0

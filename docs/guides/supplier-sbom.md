@@ -14,6 +14,30 @@ If you supply software to SK Telecom, check your SBOM against the submission cri
 2. Open **Conformance check** in the result. If it fails, fix what the failed rows name and scan again ([Reading the conformance check report](#reading-the-conformance-check-report)).
 3. When it passes, submit only `{Project}_{Version}_bom.json` from the output folder. The other files are for your own review.
 
+### What to submit
+
+Submit the one SBOM file. Do not submit the whole output folder, and do not zip it: the other files in the folder are reports, not SBOMs, and several of them are also JSON.
+
+A scan writes a folder like this (the exact set depends on the options):
+
+```text
+MyApp_1.0.0/
+  MyApp_1.0.0_bom.json          <- submit this one (the SBOM, CycloneDX)
+  MyApp_1.0.0_conformance.json  conformance check report (also .md, .html)
+  MyApp_1.0.0_risk-report.md    risk report (also .html)
+  MyApp_1.0.0_security.json     vulnerability report, not an SBOM (also .md, .html)
+  MyApp_1.0.0_NOTICE.txt        open-source notice (also .html)
+  MyApp_1.0.0_files.json        file list of the scanned source, for the viewer
+  MyApp_1.0.0_source.json       file contents of the scanned source, for the viewer
+```
+
+| | Submission | What the receiver sees |
+|--|-----------|------------------------|
+| Wrong | `MyApp_1.0.0.zip` made from the whole folder | Several JSON files and no single SBOM. The receiving tool may read the zip as one binary file: 0 components and no vulnerability rows in its report |
+| Right | `MyApp_1.0.0_bom.json` alone | One SBOM, read as it is |
+
+Zip files only when you send several SBOMs, for example one per product. Put only the `_bom.json` files in the zip, nothing else from the output folders.
+
 ## When to use it
 
 Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets your quality criteria and then check its licenses and vulnerabilities. The input can be CycloneDX (JSON or XML) or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis. SPDX RDF/XML is not supported yet.
