@@ -2393,6 +2393,14 @@ esac
 unset _dc_mode
 [ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
 
+# A jar in the scanned tree is read as a component with no hash and a
+# temporary file path; give it the file's own.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS)
+        python3 "$LIBDIR/jar-file-hashes.py" "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" >/dev/null 2>&1 || true
+        ;;
+esac
+
 # ========================================================
 # Record who generated this SBOM, with what, and at which lifecycle phase — the
 # document-level fields the 2026 SBOM minimum elements ask every SBOM to carry.
