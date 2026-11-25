@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@electron/asar": "3.4.1",
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "electron": "42.11.18",
     "electron-builder": "26.18.0"
   }
