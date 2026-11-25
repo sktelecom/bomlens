@@ -162,10 +162,12 @@ class KubernetesOptions:
             if ok:
                 try:
                     ipaddress.ip_address(alias["ip"])
+                    ok = "%" not in alias["ip"]
                 except ValueError:
                     ok = False
             if ok:
-                ok = all(isinstance(h, str) and re.fullmatch(r"[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?", h)
+                label = r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
+                ok = all(isinstance(h, str) and len(h) <= 253 and re.fullmatch(rf"{label}(\.{label})*", h)
                          for h in alias["hostnames"])
             if not ok:
                 raise PolicyError("a host alias needs an IP address and a list of host names")

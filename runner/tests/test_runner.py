@@ -198,6 +198,20 @@ class Env(Base):
             self.assertNotIn(name, self.backend.spec("engine-stage2").env)
             self.assertNotIn(name, self.backend.spec("engine-plan").env)
 
+    def test_registry_secret_and_lowercase_names_reach_stage_1(self):
+        ref = SecretRef("mirror", "url")
+        self.scan(policy=self.ws.policy(stage1_env={"npm_config_registry": ref, "PIP_INDEX_URL": ref}))
+        s1 = self.backend.spec("engine-stage1").env
+        self.assertEqual((s1["npm_config_registry"], s1["PIP_INDEX_URL"]), (ref, ref))
+
+    def test_credentials_in_urls_need_a_secret_ref(self):
+        for env in ({"GOPROXY": "https://u:p@mirror.example/go,direct"},
+                    {"PIP_EXTRA_INDEX_URL": "https://a.example/simple https://u:p@b.example/simple"}):
+            with self.assertRaises(PolicyError):
+                self.ws.policy(stage1_env=env)
+        self.ws.policy(stage1_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/repo/@org/",
+                                   "GOPROXY": "https://mirror.example/go,direct"})
+
     def test_registry_env_is_checked(self):
         with self.assertRaises(PolicyError):
             self.ws.policy(stage2_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/"})
