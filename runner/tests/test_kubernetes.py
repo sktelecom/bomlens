@@ -79,6 +79,19 @@ class JobManifest(unittest.TestCase):
         sc = job_manifest(spec(user=None), OPTS)["spec"]["template"]["spec"]["containers"][0]["securityContext"]
         self.assertNotIn("runAsUser", sc)
 
+    def test_host_aliases(self):
+        opts = KubernetesOptions(namespace="scan", workspace_claim="pvc-workspace", trivy_db_claim="pvc-trivy",
+                                 host_aliases=({"ip": "10.0.0.5", "hostnames": ["mirror.example", "m2.example"]},))
+        pod = job_manifest(spec(), opts)["spec"]["template"]["spec"]
+        self.assertEqual(pod["hostAliases"], [{"ip": "10.0.0.5", "hostnames": ["mirror.example", "m2.example"]}])
+        self.assertNotIn("hostAliases", job_manifest(spec(), OPTS)["spec"]["template"]["spec"])
+
+    def test_host_alias_is_checked(self):
+        for bad in ({"ip": "not-an-ip", "hostnames": ["a.example"]}, {"ip": "10.0.0.5", "hostnames": []},
+                    {"ip": "10.0.0.5", "hostnames": ["a b"]}, {"ip": "10.0.0.5"}, "10.0.0.5"):
+            with self.assertRaises(PolicyError):
+                KubernetesOptions(namespace="scan", workspace_claim="w", host_aliases=(bad,))
+
     def test_missing_claim(self):
         with self.assertRaises(EngineError):
             job_manifest(spec(), KubernetesOptions(namespace="scan", workspace_claim="pvc-workspace"))

@@ -110,6 +110,7 @@ def load_policy(path: Path) -> tuple[RunnerPolicy, "KubernetesOptions | DockerOp
         except OSError:
             raise PolicyError("the policy names no Kubernetes namespace") from None
     k8s["tolerations"] = tuple(k8s.get("tolerations", ()))
+    k8s["host_aliases"] = tuple(k8s.get("host_aliases", ()))
     k8s["image_pull_secrets"] = tuple(k8s.get("image_pull_secrets", ()))
     try:
         return policy, KubernetesOptions(**k8s)

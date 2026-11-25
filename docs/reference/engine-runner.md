@@ -77,6 +77,7 @@ The runner never reads its own environment for a container. Each value a contain
 | `limits`, `timeouts` | memory, CPU and `/tmp` size per container; the time limit of each container and of an image pull |
 | `uid`, `gid` | the user the plan, stage 2 and image containers run as, and `HOST_UID`/`HOST_GID` for the files stage 1 writes. Give the runner's own user: the files it writes for the containers are readable by their owner only |
 | `stage1_env`, `stage2_env`, `image_env` | values for each container, by name. A name the runner sets itself, or one the container does not take, is refused. A value can be a `SecretRef` to a Kubernetes Secret key, so it is never written into a Job; `NVD_API_KEY`, `TRIVY_USERNAME`, `TRIVY_PASSWORD`, `TRIVY_REGISTRY_TOKEN` and a proxy address with a user name or password are taken only that way |
+| `stage1_env` registry settings | for a network that reaches only a package mirror, stage 1 also takes `NPM_CONFIG_REGISTRY` (or `npm_config_registry`), `YARN_NPM_REGISTRY_SERVER`, `PIP_INDEX_URL`, `PIP_EXTRA_INDEX_URL`, `PIP_TRUSTED_HOST`, `UV_INDEX_URL`, `UV_DEFAULT_INDEX`, `CARGO_REGISTRY_DEFAULT`, `CARGO_REGISTRIES_<name>_INDEX` and `_PROTOCOL`, `BUNDLE_MIRROR__RUBYGEMS__ORG`, `GONOSUMDB`, `GOPRIVATE`, `GONOPROXY`, `GOINSECURE`, besides `GOPROXY` and `GOSUMDB`. The runner passes them whether or not the execution plan lists them. A value with a user name or password is taken only as a `SecretRef`. Maven and Gradle mirrors are set with the `maven-settings` and `gradle-*` roles of `caller_mounts` |
 | `extra_ca_file` | a PEM file of extra CA certificates under the workspace volume, for a proxy that inspects TLS. An image scan mounts it read-only and sets `BOMLENS_EXTRA_CA_CERTS` to it. An image scan also takes `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` in `image_env`, for a network that only reaches an old copy of the Trivy database |
 | `caller_mounts` | folders or files for the plan's caller roles (`cache-maven`, `cache-gradle`, `maven-settings` and the other settings roles) |
 | `labels` | added to every Job and Pod |
@@ -96,6 +97,7 @@ The runner creates Jobs only. What the cluster provides:
 - A namespace whose Pod Security level allows stage 1: it runs as root (`0:0`) with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID` and `SETUID`, because the dependency resolvers install packages and write lock files. `baseline` allows it; `restricted` does not. The other containers run as the policy's non-root user with every capability dropped.
 - A Role for the runner's service account: `jobs` (create, get, list, delete), `pods` (get, list, delete) and `pods/log` (get).
 - The workspace claim, `ReadWriteMany` when the runner and the Jobs can be on different nodes, and a claim for the Trivy database.
+- Pod settings the cluster needs, in the policy's `kubernetes` object: `service_account`, `image_pull_secrets`, `node_selector`, `tolerations`, `priority_class`, `fs_group` and `host_aliases` (a list of `{"ip": ..., "hostnames": [...]}`, added to every Pod).
 - NetworkPolicies selected by the labels below. The runner does not create them, so it needs no permission on them.
 
 | Label | Values |

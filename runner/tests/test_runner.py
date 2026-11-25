@@ -187,6 +187,29 @@ class Env(Base):
         self.assertEqual(s2["ENRICH_EOL"], "false")
         self.assertEqual(self.backend.spec("engine-plan").env["BOMLENS_NODE_FULL_GRAPH"], "1")
 
+    def test_registry_env_reaches_stage_1_only(self):
+        env = {"NPM_CONFIG_REGISTRY": "https://mirror.example/npm/", "PIP_INDEX_URL": "https://mirror.example/pypi/simple",
+               "PIP_TRUSTED_HOST": "mirror.example", "CARGO_REGISTRIES_CRATES_IO_PROTOCOL": "sparse",
+               "GONOSUMDB": "*"}
+        self.scan(policy=self.ws.policy(stage1_env=env))
+        s1 = self.backend.spec("engine-stage1").env
+        for name, value in env.items():
+            self.assertEqual(s1[name], value)
+            self.assertNotIn(name, self.backend.spec("engine-stage2").env)
+            self.assertNotIn(name, self.backend.spec("engine-plan").env)
+
+    def test_registry_env_is_checked(self):
+        with self.assertRaises(PolicyError):
+            self.ws.policy(stage2_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/"})
+        with self.assertRaises(PolicyError):
+            self.ws.policy(stage1_env={"GOFLAGS": "-toolexec=x"})
+        with self.assertRaises(PolicyError):
+            self.ws.policy(stage1_env={"CARGO_REGISTRIES_MIRROR_TOKEN": "x"})
+        with self.assertRaises(PolicyError):
+            self.ws.policy(stage1_env={"PIP_INDEX_URL": "https://user:pw@mirror.example/simple"})
+        self.ws.policy(stage1_env={"PIP_INDEX_URL": SecretRef("mirror", "url"),
+                                   "CARGO_REGISTRIES_MIRROR_INDEX": "sparse+https://mirror.example/index/"})
+
     def test_loopback_proxies_are_dropped(self):
         self.scan(policy=self.ws.policy(stage1_env={"HTTP_PROXY": "http://127.0.0.1:3128", "NO_PROXY": "localhost"}))
         env = self.backend.spec("engine-stage1").env
