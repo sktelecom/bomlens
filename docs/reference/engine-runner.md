@@ -21,7 +21,7 @@ From the first release that ships the runner, each final release (`MAJOR.MINOR.P
 pip install bomlens-runner==<version>
 ```
 
-Each release's notes list the SHA-256 of the published files and the image digests the package names, so a program can pin both. Before that release, install it from a commit on `main`:
+Each release's notes list the SHA-256 of the published files and the image digests the package names, so a program can pin both. PyPI keeps the first upload of a version, so when a release's images are pushed again the package is published again as `MAJOR.MINOR.PATCH.postN`, with the new digests; the release notes name that version. Before that release, install it from a commit on `main`:
 
 ```bash
 pip install "git+https://github.com/sktelecom/bomlens@<commit>#subdirectory=runner"

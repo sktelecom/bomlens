@@ -21,7 +21,7 @@ BomLens를 스캔 엔진으로 쓰는 프로그램은 [엔진 계약](engine-con
 pip install bomlens-runner==<version>
 ```
 
-릴리스 노트마다 발행된 파일의 SHA-256과 패키지에 담긴 이미지 digest를 적어 두므로, 프로그램은 둘 다 고정할 수 있습니다. 그 릴리스 전에는 `main`의 커밋에서 설치합니다.
+릴리스 노트마다 발행된 파일의 SHA-256과 패키지에 담긴 이미지 digest를 적어 두므로, 프로그램은 둘 다 고정할 수 있습니다. PyPI는 한 버전의 첫 업로드를 그대로 보관하므로, 릴리스의 이미지를 다시 올렸을 때는 패키지를 `MAJOR.MINOR.PATCH.postN` 버전으로 새 digest와 함께 다시 발행하고, 릴리스 노트에 그 버전을 적습니다. 그 릴리스 전에는 `main`의 커밋에서 설치합니다.
 
 ```bash
 pip install "git+https://github.com/sktelecom/bomlens@<commit>#subdirectory=runner"
