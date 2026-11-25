@@ -40,7 +40,7 @@ from .errors import (BomLensError, ContainerStillRunning, EngineError, EngineWro
 from .images import _split, check_image, image_target, require_allowed
 from .manifest import MANIFEST_NAME, EngineResult, load_manifest
 from .plan import (PLAN_FILE, PLAN_FILES_DIR, PROXY_ENV_NAMES, STAGE_PASSTHROUGH_ALLOWED, Plan, Stage,
-                   load_plan)
+                   is_registry_env, load_plan)
 from .policy import IMAGE_SCAN_NAMES, RUNNER_OWNED, SCAN_OPTION_NAMES, RunnerPolicy
 
 STAGE1_LOG_NAME = "bomlens-stage1.log"
@@ -542,7 +542,8 @@ def _run_stage1(scan: _Scan, s1: Stage, source: Path, out_dir: Path, files_dir: 
     mounts = _stage1_mounts(scan, s1, source, out_dir, files_dir, guard_dir)
     env1 = dict(s1.env)
     env1.update({"PROJECT_NAME": name, "PROJECT_VERSION": ver, "FETCH_LICENSE": "true" if fetch_license else "false"})
-    env1.update(scan.caller_env(dict(policy.stage1_env), set(s1.env_passthrough)))
+    env1.update(scan.caller_env(
+        dict(policy.stage1_env), set(s1.env_passthrough) | {k for k in policy.stage1_env if is_registry_env(k)}))
     env1.update({k: v for k, v in owner.items() if k in s1.env_passthrough})
     if s1.mount("guard-state"):
         env1["BOMLENS_GUARD_ID"] = f"bomlens-{scan.scan_id}"

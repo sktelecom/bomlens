@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The engine runner's Kubernetes options take `host_aliases`, added to every Job Pod, and stage 1 takes package registry settings in `stage1_env` (`NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL`, `UV_INDEX_URL`, `CARGO_REGISTRIES_<name>_INDEX`, `BUNDLE_MIRROR__RUBYGEMS__ORG`, `GONOSUMDB` and others listed in the runner reference) whether or not the execution plan lists them.
+
 ### Fixed
 
 - A jar in the scanned folder that is read as a component now carries the file's SHA-256 and SHA-1 and its real path in `internal:SrcFile`, in place of cdxgen's temporary `jar-deps-*` path and no hash. A name found in more than one place, or a component that already has hashes, is left as it was.

@@ -17,6 +17,7 @@ read-only. /tmp is an emptyDir.
 from __future__ import annotations
 
 import http.client
+import ipaddress
 import json
 import os
 import queue
@@ -142,6 +143,7 @@ class KubernetesOptions:
     image_pull_secrets: tuple[str, ...] = ()
     node_selector: Mapping[str, str] = field(default_factory=dict)
     tolerations: tuple[dict, ...] = ()
+    host_aliases: tuple[dict, ...] = ()
     priority_class: str | None = None
     fs_group: int | None = None
     request_cpu: str = "100m"
@@ -152,6 +154,23 @@ class KubernetesOptions:
     log_grace: float = 60.0
     api_patience: float = 120.0
     reset_ownership: bool = True
+
+    def __post_init__(self):
+        for alias in self.host_aliases:
+            ok = isinstance(alias, Mapping) and set(alias) == {"ip", "hostnames"} and isinstance(alias["ip"], str) \
+                and isinstance(alias["hostnames"], (list, tuple)) and alias["hostnames"]
+            if ok:
+                try:
+                    ipaddress.ip_address(alias["ip"])
+                    ok = "%" not in alias["ip"]
+                except ValueError:
+                    ok = False
+            if ok:
+                label = r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
+                ok = all(isinstance(h, str) and len(h) <= 253 and re.fullmatch(rf"{label}(\.{label})*", h)
+                         for h in alias["hostnames"])
+            if not ok:
+                raise PolicyError("a host alias needs an IP address and a list of host names")
 
 
 def _quantity_bytes(n: int) -> str:
@@ -231,6 +250,8 @@ def job_manifest(spec: b.ContainerSpec, opts: KubernetesOptions) -> dict:
         pod_spec["nodeSelector"] = dict(opts.node_selector)
     if opts.tolerations:
         pod_spec["tolerations"] = [dict(t) for t in opts.tolerations]
+    if opts.host_aliases:
+        pod_spec["hostAliases"] = [{"ip": a["ip"], "hostnames": list(a["hostnames"])} for a in opts.host_aliases]
     if opts.priority_class:
         pod_spec["priorityClassName"] = opts.priority_class
     labels = dict(spec.labels)

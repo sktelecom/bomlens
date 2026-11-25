@@ -103,6 +103,23 @@ STAGE_PASSTHROUGH_ALLOWED = {
     2: frozenset(("HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE", "NVD_API_KEY") + _BUILD_PREP + _STAGE2_NETWORK),
 }
 
+# Package registry settings a caller gives stage 1 to point its resolvers at a
+# mirror. They are not in the execution plan (the plan lists the names the
+# image knows), so the runner passes them on its own: a name here is taken
+# from the policy's stage1_env whatever the plan's env_passthrough says.
+REGISTRY_ENV_NAMES = frozenset((
+    "NPM_CONFIG_REGISTRY", "npm_config_registry", "YARN_NPM_REGISTRY_SERVER",
+    "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "PIP_TRUSTED_HOST", "UV_INDEX_URL", "UV_DEFAULT_INDEX",
+    "CARGO_REGISTRY_DEFAULT", "BUNDLE_MIRROR__RUBYGEMS__ORG",
+    "GONOSUMDB", "GOPRIVATE", "GONOPROXY", "GOINSECURE",
+))
+_CARGO_REGISTRY_RE = re.compile(r"CARGO_REGISTRIES_[A-Z0-9_]{1,48}_(INDEX|PROTOCOL)")
+
+
+def is_registry_env(name: str) -> bool:
+    return name in REGISTRY_ENV_NAMES or _CARGO_REGISTRY_RE.fullmatch(name) is not None
+
+
 _NAME_RE = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 _OUTPUT_FILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,200}_bom\.json")
 _USER_RE = re.compile(r"[0-9]{1,10}(?::[0-9]{1,10})?")

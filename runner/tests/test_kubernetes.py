@@ -79,6 +79,36 @@ class JobManifest(unittest.TestCase):
         sc = job_manifest(spec(user=None), OPTS)["spec"]["template"]["spec"]["containers"][0]["securityContext"]
         self.assertNotIn("runAsUser", sc)
 
+    def test_host_aliases(self):
+        opts = KubernetesOptions(namespace="scan", workspace_claim="pvc-workspace", trivy_db_claim="pvc-trivy",
+                                 host_aliases=({"ip": "10.0.0.5", "hostnames": ["mirror.example", "m2.example"]},))
+        pod = job_manifest(spec(), opts)["spec"]["template"]["spec"]
+        self.assertEqual(pod["hostAliases"], [{"ip": "10.0.0.5", "hostnames": ["mirror.example", "m2.example"]}])
+        self.assertNotIn("hostAliases", job_manifest(spec(), OPTS)["spec"]["template"]["spec"])
+
+    def test_host_alias_is_checked(self):
+        for bad in ({"ip": "not-an-ip", "hostnames": ["a.example"]}, {"ip": "10.0.0.5", "hostnames": []},
+                    {"ip": "10.0.0.5", "hostnames": ["a b"]}, {"ip": "fe80::1%eth0", "hostnames": ["a.example"]},
+                    {"ip": "10.0.0.5", "hostnames": ["a..example"]}, {"ip": "10.0.0.5", "hostnames": ["a" * 64 + ".example"]}, {"ip": "10.0.0.5"}, "10.0.0.5"):
+            with self.assertRaises(PolicyError):
+                KubernetesOptions(namespace="scan", workspace_claim="w", host_aliases=(bad,))
+
+    def test_host_aliases_in_a_policy_file(self):
+        import json, tempfile
+        from pathlib import Path
+        from bomlens_runner.cli import load_policy
+        base = {"images": {"engine": "ghcr.io/sktelecom/bomlens:1.0.0@sha256:" + "a" * 64},
+                "workspace": {"name": "w", "local_root": "/w"}}
+        with tempfile.TemporaryDirectory() as d:
+            def load(value):
+                f = Path(d) / "p.json"
+                f.write_text(json.dumps({**base, "kubernetes": {"namespace": "scan", "host_aliases": value}}))
+                return load_policy(f)[1]
+            self.assertEqual(load(None).host_aliases, ())
+            self.assertEqual(load([{"ip": "10.0.0.5", "hostnames": ["a.example"]}]).host_aliases[0]["ip"], "10.0.0.5")
+            with self.assertRaises(PolicyError):
+                load({"ip": "10.0.0.5", "hostnames": ["a.example"]})
+
     def test_missing_claim(self):
         with self.assertRaises(EngineError):
             job_manifest(spec(), KubernetesOptions(namespace="scan", workspace_claim="pvc-workspace"))

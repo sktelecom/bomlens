@@ -11,13 +11,14 @@ plan, or named here by the caller and allowed for that container.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
 from .errors import PolicyError
 from .images import PinnedImage, normalize_prefix, stage1_repositories
-from .plan import _BUILD_PREP, PROXY_ENV_NAMES, STAGE_PASSTHROUGH_ALLOWED
+from .plan import _BUILD_PREP, PROXY_ENV_NAMES, STAGE_PASSTHROUGH_ALLOWED, is_registry_env
 
 
 @dataclass(frozen=True)
@@ -131,12 +132,28 @@ SECRET_NAMES = frozenset(("NVD_API_KEY", "TRIVY_PASSWORD", "TRIVY_REGISTRY_TOKEN
 _PROXY_ADDRESS_NAMES = frozenset(("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"))
 
 
-def _check_env(env: Mapping[str, object], allowed: frozenset[str], what: str) -> dict[str, object]:
+def _has_userinfo(value: str) -> bool:
+    """Whether a URL (or a list of them) in a setting carries a user name or password."""
+    for token in re.split(r"[\s,|]+", value):
+        if "://" not in token:
+            continue
+        try:
+            parts = urlsplit(token)
+            if parts.username is not None or parts.password is not None:
+                return True
+        except ValueError:
+            return True
+    return False
+
+
+def _check_env(env: Mapping[str, object], allowed: frozenset[str], what: str,
+               registry: bool = False) -> dict[str, object]:
     out: dict[str, object] = {}
     for name, value in (env or {}).items():
         if name in RUNNER_OWNED:
             raise PolicyError(f"{what} env {name} is set by the runner")
-        if name not in allowed:
+        is_registry = registry and is_registry_env(name)
+        if name not in allowed and not is_registry:
             raise PolicyError(f"{what} env {name} is not one the runner passes")
         if isinstance(value, SecretRef):
             out[name] = value
@@ -145,7 +162,7 @@ def _check_env(env: Mapping[str, object], allowed: frozenset[str], what: str) ->
             raise PolicyError(f"{what} env {name} is not a plain string")
         if name in SECRET_NAMES:
             raise PolicyError(f"{what} env {name} is a credential; give it as a SecretRef")
-        if name in _PROXY_ADDRESS_NAMES and "@" in value:
+        if (name in _PROXY_ADDRESS_NAMES or is_registry or name == "GOPROXY") and _has_userinfo(value):
             raise PolicyError(f"{what} env {name} holds a user name or password; give it as a SecretRef")
         out[name] = value
     return out
@@ -212,7 +229,8 @@ class RunnerPolicy:
                 raise PolicyError("label value is not valid")
             if key.startswith(("app.kubernetes.io/", "bomlens.engine/")):
                 raise PolicyError("label name is reserved by the runner")
-        object.__setattr__(self, "stage1_env", _check_env(self.stage1_env, STAGE_PASSTHROUGH_ALLOWED[1], "stage 1"))
+        object.__setattr__(self, "stage1_env", _check_env(
+            self.stage1_env, STAGE_PASSTHROUGH_ALLOWED[1], "stage 1", registry=True))
         object.__setattr__(self, "stage2_env", _check_env(
             self.stage2_env, STAGE_PASSTHROUGH_ALLOWED[2] | SCAN_OPTION_NAMES, "stage 2"))
         object.__setattr__(self, "image_env", _check_env(
