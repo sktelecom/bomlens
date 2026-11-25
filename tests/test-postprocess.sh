@@ -11611,6 +11611,8 @@ _eca_hint=$(bash -c '. "$1"; tls_trust_hint cdxgen - <<< "connection refused"' _
 _eca_hint=$(_BOMLENS_TLS_HINT_SHOWN=1 bash -c '. "$1"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" 2>&1)
 [ -z "$_eca_hint" ] && pass "_BOMLENS_TLS_HINT_SHOWN=1 keeps the hint to one per run" || fail "the hint was repeated in stage 2" "$_eca_hint"
 
+# The cleanup at the end of this section uses _eca_tmp_before from the one above.
+# shard: same unit as the section above
 echo "== stage 1: a registry that refused the certificate or the login =="
 _rf_reason() { printf '%b' "$1" > "$WORK/rf.log"; bash -c '. "$1"; stage1_fail_reason false "$2" 1' _ "$DETECT" "$WORK/rf.log"; }
 for _rf in \
