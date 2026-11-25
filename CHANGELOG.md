@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A requirements.txt line with no version (`flask`) no longer leaves a second, versionless pypi component beside the installed one (`flask@3.1.3`) when the licence lookup is off or the package index cannot be reached. The versionless entry is merged into the installed one, comparing names the way PEP 503 does; an entry with no installed counterpart, or one the dependency graph refers to, is kept.
 - A jar in the scanned folder that is read as a component now carries the file's SHA-256 and SHA-1 and its real path in `internal:SrcFile`, in place of cdxgen's temporary `jar-deps-*` path and no hash. A name found in more than one place, or a component that already has hashes, is left as it was.
 
 ## [v1.15.4] - 2026-11-24

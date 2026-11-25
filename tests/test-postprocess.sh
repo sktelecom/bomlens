@@ -4846,6 +4846,36 @@ pr_specs=$(jq '[.components[] | select((.purl|startswith("pkg:pypi/")) and ((.pr
 pr_dangling=$(jq '[.dependencies[]? | (.ref, (.dependsOn[]?)) | select(test("pkg:pypi/(flask@2.0|requests@2.25)$"))] | length' "$WORK/pr.json")
 [ "$pr_dangling" = "0" ] && pass "dependency graph has no dangling refs to dropped components" || fail "$pr_dangling dangling dependency ref(s) remain"
 
+echo "== py-unpinned: a requirements line with no version is merged into the installed package =="
+# Shape measured with an unpinned requirements.txt and no licence lookup: a
+# versionless pkg:pypi entry (manifest-analysis only, no versionSpecifiers, not in
+# the graph) beside the installed entry with the version. Names compare as PEP 503
+# does, so Typing_Extensions matches typing-extensions. A versionless entry with
+# no installed sibling, and one the graph refers to, stay.
+cat > "$WORK/pu.json" <<'PUEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"application","name":"app","bom-ref":"pkg:pypi/app@latest","purl":"pkg:pypi/app@latest"}},
+ "components":[
+  {"type":"library","name":"flask","bom-ref":"pkg:pypi/flask","purl":"pkg:pypi/flask"},
+  {"type":"library","name":"flask","version":"3.1.3","bom-ref":"pkg:pypi/flask@3.1.3","purl":"pkg:pypi/flask@3.1.3"},
+  {"type":"library","name":"Typing_Extensions","bom-ref":"pkg:pypi/typing_extensions","purl":"pkg:pypi/typing_extensions"},
+  {"type":"library","name":"typing-extensions","version":"4.12.2","bom-ref":"pkg:pypi/typing-extensions@4.12.2","purl":"pkg:pypi/typing-extensions@4.12.2"},
+  {"type":"library","name":"lonely","bom-ref":"pkg:pypi/lonely","purl":"pkg:pypi/lonely"},
+  {"type":"library","name":"graphed","bom-ref":"pkg:pypi/graphed","purl":"pkg:pypi/graphed"},
+  {"type":"library","name":"graphed","version":"1.0","bom-ref":"pkg:pypi/graphed@1.0","purl":"pkg:pypi/graphed@1.0"},
+  {"type":"library","name":"left-pad","bom-ref":"pkg:npm/left-pad","purl":"pkg:npm/left-pad"},
+  {"type":"library","name":"left-pad","version":"1.3.0","bom-ref":"pkg:npm/left-pad@1.3.0","purl":"pkg:npm/left-pad@1.3.0"}],
+ "dependencies":[{"ref":"pkg:pypi/app@latest","dependsOn":["pkg:pypi/graphed"]}]}
+PUEOF
+bash "$LIB/normalize-sbom.sh" "$WORK/pu.json" >/dev/null 2>&1
+pu_has() { jq -e --arg p "$1" '[.components[].purl] | index($p) != null' "$WORK/pu.json" >/dev/null 2>&1; }
+if ! pu_has "pkg:pypi/flask"; then pass "versionless flask dropped"; else fail "versionless flask still present"; fi
+if pu_has "pkg:pypi/flask@3.1.3"; then pass "installed flask kept"; else fail "flask@3.1.3 was dropped"; fi
+if ! pu_has "pkg:pypi/typing_extensions"; then pass "versionless entry matched by PEP 503 name"; else fail "Typing_Extensions not merged"; fi
+if pu_has "pkg:pypi/lonely"; then pass "versionless entry with no installed sibling kept"; else fail "lonely dropped"; fi
+if pu_has "pkg:pypi/graphed"; then pass "versionless entry the graph refers to kept"; else fail "graphed dropped though referenced"; fi
+if pu_has "pkg:npm/left-pad"; then pass "npm versionless entry untouched (pypi-scoped)"; else fail "npm entry dropped"; fi
+
 echo "== swift-dup: versionless copies of a resolved Swift package are dropped =="
 # Shape measured on examples/swift: Package.resolved gives the namespaced pkg:swift
 # component (with its license); cdxgen also emits a pkg:generic entry from the
