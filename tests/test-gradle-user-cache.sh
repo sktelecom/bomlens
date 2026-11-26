@@ -116,6 +116,24 @@ EOF
     o=$(run_section "$both")
     check "one of two repositories answers: online" "$(line "$o" STATE)" "online"
 
+    # A mirror named only in the user's mounted settings, in shapes the build
+    # file reader does not take: a variable in an init.d script, and an escaped
+    # property in gradle.properties. The build itself names only the closed port.
+    st="$WORK/settings-mirror"; mkdir -p "$st/gradle/init.d"
+    cat > "$st/gradle/init.d/mirror.gradle" <<EOF
+def mirror = "http://127.0.0.1:$_port/maven/store"
+allprojects { repositories { all { r -> if (r instanceof MavenArtifactRepository) { r.url = mirror } } } }
+EOF
+    o=$(run_section "$off" SETTINGS_ROOT="$st")
+    check "a mirror set through a variable in a mounted init.d script answers: online" "$(line "$o" STATE)" "online"
+    rm -rf "$st/gradle/init.d"
+    printf 'systemProp.mirror.url=http\\://127.0.0.1\\:%s/maven/\n' "$_port" > "$st/gradle/gradle.properties"
+    o=$(run_section "$off" SETTINGS_ROOT="$st")
+    check "a mirror in the mounted gradle.properties answers: online" "$(line "$o" STATE)" "online"
+    printf '# http://127.0.0.1:%s/commented/\n' "$_port" > "$st/gradle/gradle.properties"
+    o=$(run_section "$off" SETTINGS_ROOT="$st")
+    check "a commented address in gradle.properties is not read: offline" "$(line "$o" STATE)" "offline"
+
     o=$(run_section "$off" BOMLENS_GRADLE_USER_CACHE=false)
     check "BOMLENS_GRADLE_USER_CACHE=false: the mount is not read" "$(line "$o" RO)|$(line "$o" STATE)|$(line "$o" OFFLINE)" "||"
     o=$(run_section "$off" GRADLE_RO_DEP_CACHE=/elsewhere)
