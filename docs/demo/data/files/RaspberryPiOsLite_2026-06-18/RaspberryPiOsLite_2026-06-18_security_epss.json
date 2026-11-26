@@ -195,6 +195,10 @@
     "epss": null,
     "kev": false
   },
+  "CVE-2026-133730": {
+    "epss": null,
+    "kev": false
+  },
   "CVE-2026-93008": {
     "epss": null,
     "kev": false
@@ -576,6 +580,10 @@
     "kev": false
   },
   "CVE-2026-86144": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-124851": {
     "epss": null,
     "kev": false
   },
@@ -1331,10 +1339,6 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-133730": {
-    "epss": null,
-    "kev": false
-  },
   "CVE-2026-93007": {
     "epss": null,
     "kev": false
@@ -1408,6 +1412,18 @@
     "kev": false
   },
   "CVE-2026-102633": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-124317": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-128241": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-134703": {
     "epss": null,
     "kev": false
   },
@@ -1759,10 +1775,6 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-132138": {
-    "epss": null,
-    "kev": false
-  },
   "CVE-2026-119371": {
     "epss": null,
     "kev": false
@@ -1880,6 +1892,10 @@
     "kev": false
   },
   "CVE-2026-84784": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-84785": {
     "epss": null,
     "kev": false
   },
@@ -4063,10 +4079,6 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-40228": {
-    "epss": null,
-    "kev": false
-  },
   "CVE-2025-11961": {
     "epss": null,
     "kev": false
@@ -4903,18 +4915,6 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-124317": {
-    "epss": null,
-    "kev": false
-  },
-  "CVE-2026-128241": {
-    "epss": null,
-    "kev": false
-  },
-  "CVE-2026-134703": {
-    "epss": null,
-    "kev": false
-  },
   "CVE-2026-127039": {
     "epss": null,
     "kev": false
@@ -4963,11 +4963,19 @@
     "epss": null,
     "kev": false
   },
+  "CVE-2026-40558": {
+    "epss": null,
+    "kev": false
+  },
   "CVE-2026-115791": {
     "epss": null,
     "kev": false
   },
   "CVE-2026-19552": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-82292": {
     "epss": null,
     "kev": false
   },
@@ -4999,7 +5007,35 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-84785": {
+  "CVE-2026-137067": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137068": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137069": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137072": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137073": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137074": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137075": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-137082": {
     "epss": null,
     "kev": false
   },
@@ -5007,11 +5043,19 @@
     "epss": null,
     "kev": false
   },
-  "CVE-2026-124851": {
+  "CVE-2026-99809": {
     "epss": null,
     "kev": false
   },
-  "TEMP-1154946-473926": {
+  "CVE-2026-99810": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-99811": {
+    "epss": null,
+    "kev": false
+  },
+  "CVE-2026-135901": {
     "epss": null,
     "kev": false
   },
