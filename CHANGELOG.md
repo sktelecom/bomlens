@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A source scan that reaches the network copies the Gradle wrapper's distribution from the mounted wrapper folder when its own Gradle home lacks it, as an offline scan already did, unless the wrapper names a `distributionSha256Sum`. The runner reference now says that scans running at the same time need their own `cache-gradle`, sharing downloads through the read-only `gradle-cache` role.
 - The engine runner's `extra_ca_file` now reaches stage 1 and stage 2 of a source scan, not only an image scan, so a source scan works behind a proxy that inspects TLS.
 - A Node.js project with no lock file whose dependencies could not be resolved no longer gives an SBOM with no npm package. The direct dependencies `package.json` declares are listed without versions, marked `bomlens:evidenceGrade=declared-only`, and the result is graded unreliable. Local folder, workspace, repository and URL dependencies are left out, and development dependencies are listed only with `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`.
 - A requirements.txt line with no version (`flask`) no longer leaves a second, versionless pypi component beside the installed one (`flask@3.1.3`) when the licence lookup is off or the package index cannot be reached. The versionless entry is merged into the installed one, comparing names the way PEP 503 does; an entry with no installed counterpart, or one the dependency graph refers to, is kept.
