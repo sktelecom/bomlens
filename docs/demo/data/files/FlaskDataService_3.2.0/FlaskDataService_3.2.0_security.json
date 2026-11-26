@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a21024-dffa-731f-aeaf-191127aad957",
-  "CreatedAt": "2026-11-25T00:39:41.818206194Z",
+  "ReportID": "01a219f6-a7cd-7622-9d13-57ace99d326e",
+  "CreatedAt": "2026-11-26T22:25:24.941403578Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1278,6 +1278,8 @@
           },
           "References": [
             "https://access.redhat.com/security/cve/CVE-2026-114134",
+            "https://advisory.echohq.com/cve/CVE-2026-114134",
+            "https://github.com/advisories/GHSA-cg8m-r9f2-5wm2",
             "https://github.com/psf/black",
             "https://github.com/psf/black/commit/ac1f71563aeccf73cf13ece00f231d9d6c66a514",
             "https://github.com/psf/black/pull/5510",
@@ -1396,8 +1398,10 @@
             }
           },
           "References": [
+            "https://advisory.echohq.com/cve/GHSA-6q48-6c7w-9gw2",
             "https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576",
             "https://emudhra.we-have-a-problem.com",
+            "https://github.com/advisories/GHSA-6q48-6c7w-9gw2",
             "https://github.com/certifi/python-certifi",
             "https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2"
           ],

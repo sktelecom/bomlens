@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a21025-e902-7303-92a6-a8634779bf92",
-  "CreatedAt": "2026-11-25T00:40:49.666199536Z",
+  "ReportID": "01a219f8-03a8-76a0-8dd2-345a9396c4eb",
+  "CreatedAt": "2026-11-26T22:26:53.99243764Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1674,7 +1674,7 @@
             "https://github.com/FasterXML/jackson-core/releases/tag/jackson-core-3.2.3",
             "https://github.com/FasterXML/jackson-core/security/advisories/GHSA-7hhh-6rmp-j9qf",
             "https://linux.oracle.com/cve/CVE-2026-89425.html",
-            "https://linux.oracle.com/errata/ELSA-2026-98493.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98606.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-89425",
             "https://www.cve.org/CVERecord?id=CVE-2026-89425"
           ],
@@ -2179,7 +2179,7 @@
             "https://github.com/FasterXML/jackson-databind/releases/tag/jackson-databind-3.2.3",
             "https://github.com/FasterXML/jackson-databind/security/advisories/GHSA-cxp5-3px4-pw24",
             "https://linux.oracle.com/cve/CVE-2026-91777.html",
-            "https://linux.oracle.com/errata/ELSA-2026-98492.html",
+            "https://linux.oracle.com/errata/ELSA-2026-98606.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-91777",
             "https://www.cve.org/CVERecord?id=CVE-2026-91777"
           ],
@@ -2638,7 +2638,8 @@
           "VendorSeverity": {
             "amazon": 3,
             "ghsa": 2,
-            "redhat": 2
+            "redhat": 2,
+            "ubuntu": 2
           },
           "CVSS": {
             "ghsa": {
