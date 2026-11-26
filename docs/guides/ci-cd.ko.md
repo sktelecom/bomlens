@@ -25,7 +25,7 @@ on:
     types: [published]
 
 env:
-  BOMLENS_VERSION: v1.15.4   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
+  BOMLENS_VERSION: v1.15.5   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
 
 jobs:
   # PR: SBOM만 가볍게 생성 (보고서 생략)
@@ -99,7 +99,7 @@ generate-sbom:
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
-    BOMLENS_VERSION: v1.15.4   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
+    BOMLENS_VERSION: v1.15.5   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
   before_script:
     - apk add --no-cache bash curl
     - mkdir -p /tmp/bomlens
@@ -133,7 +133,7 @@ on:
     tags: ['v*']
 
 env:
-  BOMLENS_VERSION: v1.15.4   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
+  BOMLENS_VERSION: v1.15.5   # 사용할 BomLens 릴리스. 새 릴리스를 쓰려면 이 값을 올린다
 
 jobs:
   sbom:
@@ -197,7 +197,7 @@ stages: [security]
 generate-sbom:
   stage: security
   image:
-    name: ghcr.io/sktelecom/bomlens:1.15.4   # 앞의 v를 뺀 릴리스 태그. 새 릴리스를 쓰려면 이 값을 올린다
+    name: ghcr.io/sktelecom/bomlens:1.15.5   # 앞의 v를 뺀 릴리스 태그. 새 릴리스를 쓰려면 이 값을 올린다
     entrypoint: [""]
   variables:
     MODE: SOURCE

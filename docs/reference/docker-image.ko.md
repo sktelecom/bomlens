@@ -22,7 +22,7 @@ description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호�
 `arm64` 호스트에서는 `linux/amd64`를 강제하지 마세요(`--platform linux/amd64`나 `DOCKER_DEFAULT_PLATFORM=linux/amd64`). 그러면 이미지가 에뮬레이션으로 돌고, 펌웨어 이미지 안의 syft가 비정상 종료할 수 있습니다. 펌웨어 스캔은 실패한 syft 실행을 한 번 더 시도하고(시간 제한을 넘겼거나 메모리 부족으로 강제 종료된 실행은 다시 시도하지 않음), 에뮬레이션으로 돌고 있다는 사실을 로그에 남깁니다. 두 번째 시도도 실패하면 `bomlens-result.json`에 `generate`를 `degraded`로 기록합니다.
 
 ```bash
-docker pull ghcr.io/sktelecom/bomlens:1.15.4   # 릴리스 태그. :latest는 main에서 빌드한 이미지
+docker pull ghcr.io/sktelecom/bomlens:1.15.5   # 릴리스 태그. :latest는 main에서 빌드한 이미지
 ```
 
 ## 이미지에 들어 있는 것
