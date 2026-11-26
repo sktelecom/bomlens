@@ -135,7 +135,7 @@ EOF
     _wr="$WORK/wrapper.sh"
     {
         printf '%s\n' 'log() { echo "[build-prep] $*"; }'
-        sed -n '/^gradle_wrapper_offline() {/,/^}/p' "$PREP"
+        sed -n '/^gradle_wrapper_seed() {/,/^}/p; /^gradle_wrapper_offline() {/,/^}/p; /^gradle_wrapper_online() {/,/^}/p' "$PREP"
         printf '%s\n' 'GRADLE_USER_WRAPPER_DIR="$1"; GRADLEW=./gradlew; GRADLEW_SH=""; gradle_wrapper_offline'
         # shellcheck disable=SC2016
         printf '%s\n' 'echo "GRADLEW:$GRADLEW"; echo "PINNED:${CDXGEN_JVM_TOOL_PINNED:-}"'
@@ -166,6 +166,30 @@ EOF
     o=$( cd "$wp" && PATH="$_fake_bin:$PATH" GRADLE_USER_HOME="$WORK/wgh2" sh "$_wr" "$WORK/no-dists" 2>&1 )
     check "no distribution anywhere: the image's Gradle runs, cdxgen told to skip the wrapper" \
         "$(line "$o" GRADLEW)|$(line "$o" PINNED)" "gradle|true"
+    # Online: the same copy, with no fallback to the image's Gradle.
+    sed 's/GRADLEW_SH=""; gradle_wrapper_offline$/GRADLEW_SH=""; gradle_wrapper_online/' "$_wr" > "$WORK/wrapper-online.sh"
+    o=$( cd "$wp" && GRADLE_USER_HOME="$WORK/wgh3" sh "$WORK/wrapper-online.sh" "$ud" 2>&1 )
+    if [ -f "$WORK/wgh3/wrapper/dists/gradle-8.9-bin/$_hash/gradle-8.9-bin.zip.ok" ] && [ "$(line "$o" GRADLEW)" = ./gradlew ] \
+        && ! printf '%s\n' "$o" | grep -q offline; then
+        pass "online: a new Gradle home gets the mounted distribution"
+    else
+        fail "online copy" "$o"
+    fi
+    o=$( cd "$wp" && PATH="$_fake_bin:$PATH" GRADLE_USER_HOME="$WORK/wgh4" sh "$WORK/wrapper-online.sh" "$WORK/no-dists" 2>&1 )
+    check "online with no distribution mounted: the wrapper runs as it would" \
+        "$(line "$o" GRADLEW)|$(line "$o" PINNED)" "./gradlew|"
+    cp "$wp/gradle/wrapper/gradle-wrapper.properties" "$WORK/wrapper.properties.orig"
+    printf 'distributionSha256Sum=abc\n' >> "$wp/gradle/wrapper/gradle-wrapper.properties"
+    o=$( cd "$wp" && GRADLE_USER_HOME="$WORK/wgh5" sh "$WORK/wrapper-online.sh" "$ud" 2>&1 )
+    [ ! -e "$WORK/wgh5/wrapper/dists/gradle-8.9-bin" ] && pass "online with distributionSha256Sum: the wrapper downloads and checks it" \
+        || fail "copied despite a checksum" "$o"
+    cp "$WORK/wrapper.properties.orig" "$wp/gradle/wrapper/gradle-wrapper.properties"
+    o=$( cd "$wp" && BOMLENS_GRADLE_USER_CACHE=false GRADLE_USER_HOME="$WORK/wgh6" sh "$WORK/wrapper-online.sh" "$ud" 2>&1 )
+    [ ! -e "$WORK/wgh6/wrapper/dists/gradle-8.9-bin" ] && pass "online with BOMLENS_GRADLE_USER_CACHE=false: nothing copied" \
+        || fail "copied although the mount is left out" "$o"
+    o=$( cd "$wp" && GRADLE_USER_HOME="$WORK/wgh7" sh "$_wr" "$ud" 2>&1 )
+    printf '%s\n' "$o" | grep -q "gradle: offline; the wrapper's gradle-8.9-bin copied from" \
+        && pass "the offline copy is logged as offline" || fail "log prefix" "$o"
     chmod -R u+w "$ud"
 else
     echo "  SKIP: node or python3 is not installed"
@@ -207,7 +231,7 @@ check "a report with no FAILED entry records nothing" "$(line "$o" FAILED)" ""
 # real Gradle block, as tests/test-postprocess.sh drives it.
 if command -v node >/dev/null 2>&1; then
     _blk=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
-    _hlp=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p; /^gradle_wrapper_offline() {/,/^}/p' "$PREP")
+    _hlp=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p; /^gradle_wrapper_seed() {/,/^}/p; /^gradle_wrapper_offline() {/,/^}/p; /^gradle_wrapper_online() {/,/^}/p' "$PREP")
     gb="$WORK/gbin"; mkdir -p "$gb"; printf '#!/bin/sh\nexit 0\n' > "$gb/gradle"; chmod +x "$gb/gradle"
     gp="$WORK/gproj"; mkdir -p "$gp"; : > "$gp/build.gradle"
     cat > "$gp/gradlew" <<'STUB'

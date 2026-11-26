@@ -1838,7 +1838,8 @@ GRADLE_REPO_PROBE_JS
 # With neither, the image's Gradle runs instead of the wrapper (cdxgen too,
 # through CDXGEN_JVM_TOOL_PINNED), which can resolve differently from the
 # project's own Gradle.
-gradle_wrapper_offline() {
+gradle_wrapper_seed() {  # gradle_wrapper_seed <prefix of the log lines>
+    _gwo_pre="$1"
     [ "$GRADLEW" = ./gradlew ] || return 0
     _gwo_p=gradle/wrapper/gradle-wrapper.properties
     [ -f "$_gwo_p" ] || return 0
@@ -1858,7 +1859,7 @@ gradle_wrapper_offline() {
     fi
     _gwo_own="$_gwo_home/wrapper/dists/$_gwo_name/$_gwo_hash"
     if [ -f "$_gwo_own/$_gwo_name.zip.ok" ]; then
-        log "gradle: offline; the wrapper's $_gwo_name is in BomLens's Gradle cache"
+        log "gradle: ${_gwo_pre}the wrapper's $_gwo_name is in BomLens's Gradle cache"
         return 0
     fi
     _gwo_user="$GRADLE_USER_WRAPPER_DIR/$_gwo_name/$_gwo_hash"
@@ -1872,17 +1873,35 @@ gradle_wrapper_offline() {
         if mkdir -p "$_gwo_tmp" 2>/dev/null && cp -R "${1%/}" "$_gwo_tmp/" 2>/dev/null \
             && chmod -R u+w "$_gwo_tmp" 2>/dev/null \
             && : > "$_gwo_tmp/$_gwo_name.zip.ok" && mv "$_gwo_tmp" "$_gwo_own" 2>/dev/null; then
-            log "gradle: offline; the wrapper's $_gwo_name copied from your Gradle wrapper folder into BomLens's Gradle cache"
+            log "gradle: ${_gwo_pre}the wrapper's $_gwo_name copied from your Gradle wrapper folder into BomLens's Gradle cache"
             return 0
         fi
         rm -rf "$_gwo_tmp"
         [ ! -f "$_gwo_own/$_gwo_name.zip.ok" ] || return 0
     fi
+    return 1
+}
+
+# Offline: with no copy anywhere, the image's Gradle runs instead.
+gradle_wrapper_offline() {
+    gradle_wrapper_seed "offline; " && return 0
     if command -v gradle >/dev/null 2>&1; then
         GRADLEW=gradle; GRADLEW_SH=""
         CDXGEN_JVM_TOOL_PINNED=true; export CDXGEN_JVM_TOOL_PINNED
         log "gradle: [WARN] offline, and the wrapper's $_gwo_name is neither in BomLens's Gradle cache nor in your Gradle wrapper folder; the image's Gradle runs instead of the wrapper. Run ./gradlew once on this machine, or scan with network access, to use the project's own Gradle."
     fi
+}
+
+# Online: a Gradle home with no copy of the wrapper's distribution (a new one,
+# as when each scan has its own) gets the mounted one, so the wrapper does not
+# download it, which fails where only a package mirror answers. A wrapper that
+# names a checksum (distributionSha256Sum) downloads as before, since it checks
+# it only on a download. With nothing to copy the wrapper runs as it would.
+gradle_wrapper_online() {
+    case "${BOMLENS_GRADLE_USER_CACHE:-}" in false|0) return 0 ;; esac
+    [ -d "$GRADLE_USER_WRAPPER_DIR" ] || return 0
+    ! grep -q '^[[:space:]]*distributionSha256Sum[[:space:]]*[=:]' gradle/wrapper/gradle-wrapper.properties 2>/dev/null || return 0
+    gradle_wrapper_seed "" || true
 }
 
 if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } \
@@ -2292,8 +2311,9 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && [ "$BUILD_TOOL_CHOSEN"
     fi
     # The user's Gradle settings, before the first Gradle run.
     gradle_settings_copy
-    # Offline (see the gradle user cache above): the wrapper's Gradle.
-    [ -z "${GRADLE_OFFLINE_ARG:-}" ] || gradle_wrapper_offline
+    # The wrapper's Gradle from the mounted wrapper folder (see the gradle
+    # user cache above).
+    if [ -n "${GRADLE_OFFLINE_ARG:-}" ]; then gradle_wrapper_offline; else gradle_wrapper_online; fi
     # Which Gradle runs: the first "Gradle X.Y" line of --version.
     _gradle_v=$(run_supervised_timeout "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --version 2>/dev/null \
         | sed -n 's/^\(Gradle [0-9][^ ]*\).*/\1/p' | head -1)
