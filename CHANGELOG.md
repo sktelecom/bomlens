@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.5] - 2026-11-27
+
 ### Added
 
 - The engine runner's Kubernetes options take `host_aliases`, added to every Job Pod, and stage 1 takes package registry settings in `stage1_env` (`MVNW_REPOURL`, `NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL`, `UV_INDEX_URL`, `CARGO_REGISTRIES_<name>_INDEX`, `BUNDLE_MIRROR__RUBYGEMS__ORG`, `GONOSUMDB` and others listed in the runner reference) whether or not the execution plan lists them.
