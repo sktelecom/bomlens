@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A package that one npm project in the tree ships and another lists as a development dependency is no longer left out of the SBOM. cdxgen merges such a package into one component and keeps one development marker, so the marker is now checked against each lock file the component came from.
 - A Gradle scan with the user's Gradle cache mounted no longer runs `--offline` when the only repository that answers is a mirror named in the mounted init scripts or `gradle.properties` in a shape other than `url "..."`, such as a variable. Every http(s) address in those files is now asked.
 - A source scan that reaches the network copies the Gradle wrapper's distribution from the mounted wrapper folder when its own Gradle home lacks it, as an offline scan already did, unless the wrapper names a `distributionSha256Sum`. The runner reference now says that scans running at the same time need their own `cache-gradle`, sharing downloads through the read-only `gradle-cache` role.
 - The engine runner's `extra_ca_file` now reaches stage 1 and stage 2 of a source scan, not only an image scan, so a source scan works behind a proxy that inspects TLS.

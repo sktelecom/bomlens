@@ -140,6 +140,29 @@ node "$WORK/devfilter.js" "$WORK/bom.json" 0 "$WORK/gems.txt" "" >/dev/null 2>&1
 check "avo is kept with scope optional, rspec-rails is dropped" \
     "$(jq -c '[.components[] | {n: .name, s: .scope}]' "$WORK/bom.json")" '[{"n":"avo","s":"optional"},{"n":"rails","s":null}]'
 
+echo "== npm: one package in several projects, development in one only =="
+# cdxgen merges it into one component listing both lock files and keeps one
+# development marker. A lock that lists it without "dev": true keeps it.
+ML="$WORK/multi-lock"; mkdir -p "$ML/backend" "$ML/web"
+printf '%s' '{"lockfileVersion":1,"dependencies":{"express":{"version":"4.17.3"}}}' > "$ML/backend/package-lock.json"
+printf '%s' '{"lockfileVersion":3,"packages":{"":{},"node_modules/express":{"version":"4.17.3","dev":true}}}' > "$ML/web/package-lock.json"
+ml_bom() {
+    cat > "$ML/bom.json" <<'E'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"web","bom-ref":"pkg:npm/web@1.0.0"}},
+ "components":[{"type":"framework","name":"express","version":"4.17.3","purl":"pkg:npm/express@4.17.3","bom-ref":"pkg:npm/express@4.17.3",
+   "properties":[{"name":"cdx:npm:package:development","value":"true"},{"name":"internal:SrcFile","value":"backend/package-lock.json"},{"name":"internal:SrcFile","value":"web/package-lock.json"}]}],
+ "dependencies":[{"ref":"pkg:npm/web@1.0.0","dependsOn":["pkg:npm/backend@1.0.0","pkg:npm/express@4.17.3"]},{"ref":"pkg:npm/backend@1.0.0","dependsOn":["pkg:npm/express@4.17.3"]},{"ref":"pkg:npm/express@4.17.3","dependsOn":[]}]}
+E
+}
+ml_bom; ( cd "$ML" && node "$WORK/devfilter.js" bom.json 1 /dev/null "" >/dev/null 2>&1 )
+check "a package one project ships is kept" "$(jq -c '[.components[].purl]' "$ML/bom.json")" '["pkg:npm/express@4.17.3"]'
+printf '%s' '{"lockfileVersion":1,"dependencies":{"express":{"version":"4.17.3","dev":true}}}' > "$ML/backend/package-lock.json"
+ml_bom; ( cd "$ML" && node "$WORK/devfilter.js" bom.json 1 /dev/null "" >/dev/null 2>&1 )
+check "a package every lock marks development is dropped" "$(jq -c '[.components[].purl]' "$ML/bom.json")" '[]'
+rm -f "$ML/backend/package-lock.json"
+ml_bom; ( cd "$ML" && node "$WORK/devfilter.js" bom.json 1 /dev/null "" >/dev/null 2>&1 )
+check "a lock that cannot be read keeps it" "$(jq -c '[.components[].purl]' "$ML/bom.json")" '["pkg:npm/express@4.17.3"]'
+
 echo "== PHP: vendored package-lock.json =="
 # shellcheck source=docker/lib/source-detect.sh
 . "$LIB/source-detect.sh"
