@@ -176,6 +176,18 @@ class Env(Base):
         self.assertEqual(self.backend.spec("engine-stage2").env["DEEP_LICENSE"], "true")
         self.assertTrue(self.backend.spec("engine-stage2").image.startswith("ghcr.io/sktelecom/bomlens-deep-license@"))
 
+    def test_extra_ca_file_reaches_the_networked_stages_of_a_source_scan(self):
+        ca = self.ws.scan_dir / "ca.pem"
+        ca.write_text("-----BEGIN CERTIFICATE-----\n")
+        self.scan(policy=self.ws.policy(extra_ca_file=ca, stage1_env={"BOMLENS_EXTRA_CA_CERTS": "/elsewhere.pem"}))
+        for stage in ("engine-stage1", "engine-stage2"):
+            spec = self.backend.spec(stage)
+            mount = next(m for m in spec.mounts if m.target == "/bomlens-ca/extra.pem")
+            self.assertTrue(mount.read_only)
+            self.assertEqual(spec.env["BOMLENS_EXTRA_CA_CERTS"], "/bomlens-ca/extra.pem")
+        plan = self.backend.spec("engine-plan")
+        self.assertNotIn("/bomlens-ca/extra.pem", [m.target for m in plan.mounts])
+
     def test_caller_env_reaches_only_allowed_stages(self):
         policy = self.ws.policy(stage1_env={"HTTPS_PROXY": "http://proxy.corp:3128", "BOMLENS_NODE_FULL_GRAPH": "1"},
                                 stage2_env={"NVD_API_KEY": SecretRef("bomlens", "nvd"), "ENRICH_EOL": "false"})
