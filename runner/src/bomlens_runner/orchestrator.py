@@ -301,6 +301,13 @@ class _Scan:
         return b.MountSpec(TRIVY_DB_TARGET, b.VOLUME_TRIVY_DB, self.policy.trivy_db_subpath, True)
 
     # Env --------------------------------------------------------------
+    def trust_extra_ca(self, mounts: list, env: dict) -> None:
+        """Mount the policy's extra CA bundle read-only into a container that
+        reaches the network, and point the engine at it."""
+        if self.policy.extra_ca_file is not None:
+            mounts.append(self.ws(Path(self.policy.extra_ca_file), EXTRA_CA_TARGET, True))
+            env["BOMLENS_EXTRA_CA_CERTS"] = EXTRA_CA_TARGET
+
     def owner_env(self) -> dict[str, str]:
         if self.policy.uid is None:
             return {}
@@ -504,9 +511,11 @@ def run_source_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, p
                      "DEEP_CVE": "true" if policy.deep_cve else "false", **owner})
         if policy.trivy_db is not None:
             env2.update({"TRIVY_CACHE_DIR": TRIVY_DB_TARGET, **_TRIVY_OFFLINE})
+        mounts2 = [scan.ws(source, s2_src, True), scan.ws(out_dir, s2_out, False), scan.trivy_mount()]
+        scan.trust_extra_ca(mounts2, env2)
         outcome, _, rec = scan.run_or_cancel(
             "postprocess", "engine-stage2", s2_image.run_ref, user=scan.nonroot_user, workdir=s2_out, env=env2,
-            mounts=[scan.ws(source, s2_src, True), scan.ws(out_dir, s2_out, False), scan.trivy_mount()],
+            mounts=mounts2,
             network=b.NETWORK_EGRESS if policy.stage2_network else b.NETWORK_NONE,
             read_only_root=policy.read_only_root, root=False, timeout=policy.timeouts.stage2)
         result.stages["stage2"] = rec
@@ -545,6 +554,7 @@ def _run_stage1(scan: _Scan, s1: Stage, source: Path, out_dir: Path, files_dir: 
     env1.update(scan.caller_env(
         dict(policy.stage1_env), set(s1.env_passthrough) | {k for k in policy.stage1_env if is_registry_env(k)}))
     env1.update({k: v for k, v in owner.items() if k in s1.env_passthrough})
+    scan.trust_extra_ca(mounts, env1)
     if s1.mount("guard-state"):
         env1["BOMLENS_GUARD_ID"] = f"bomlens-{scan.scan_id}"
     image1 = f"{_split(s1.image)[0]}@{s1.image_digest}"
@@ -657,9 +667,7 @@ def run_image_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, ta
     env = {"GENERATE_SECURITY": "true", "SECURITY_ENRICH": "false"}
     env.update(scan.caller_env(dict(policy.image_env), IMAGE_SCAN_NAMES))
     mounts = [scan.ws(out_dir, "/host-output", False), scan.trivy_mount()]
-    if policy.extra_ca_file is not None:
-        mounts.append(scan.ws(Path(policy.extra_ca_file), EXTRA_CA_TARGET, True))
-        env["BOMLENS_EXTRA_CA_CERTS"] = EXTRA_CA_TARGET
+    scan.trust_extra_ca(mounts, env)
     env.update({"MODE": "IMAGE", "TARGET_IMAGE": ref, "PROJECT_NAME": project_token(project, "project"),
                 "PROJECT_VERSION": project_token(version, "0"), "HOST_OUTPUT_DIR": "/host-output",
                 "UPLOAD_ENABLED": "false", "DEEP_LICENSE": "false",

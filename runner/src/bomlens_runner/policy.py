@@ -197,8 +197,8 @@ class RunnerPolicy:
     # maven-settings, ...), under the workspace volume.
     caller_mounts: Mapping[str, Path] = field(default_factory=dict)
     # A PEM file of extra CA certificates under the workspace volume, for a
-    # proxy that inspects TLS. An image scan mounts it read-only and points
-    # BOMLENS_EXTRA_CA_CERTS at it.
+    # proxy that inspects TLS. An image scan, and stage 1 and stage 2 of a
+    # source scan, mount it read-only and point BOMLENS_EXTRA_CA_CERTS at it.
     extra_ca_file: Path | None = None
     deep_license: bool = False
     deep_cve: bool = False
