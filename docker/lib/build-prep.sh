@@ -4165,6 +4165,109 @@ GRADLE_PACKAGES_JS
     fi
 fi
 
+# --- node declared only ---
+# With no lock file, a failed `npm install` leaves an SBOM with no npm package
+# at all, although package.json says what the project depends on. Then the
+# direct dependencies it declares are listed, with no version (a range is not
+# an installed version, and its lower bound would draw vulnerabilities the
+# project may not have), marked bomlens:evidenceGrade=declared-only, and linked
+# from the root. A dependency that names a local folder, a workspace package or
+# a repository address is left out, since the npm registry name would not be
+# what is used. Development dependencies are added only with
+# BOMLENS_INCLUDE_DEV_DEPENDENCIES. The step is recorded as failed, and the
+# hint npm-declared-only makes the result unreliable.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && [ -f package.json ] && command -v node >/dev/null 2>&1 \
+   && [ ! -f package-lock.json ] && [ ! -f npm-shrinkwrap.json ] && [ ! -f yarn.lock ] \
+   && [ ! -f pnpm-lock.yaml ] && [ ! -f bun.lock ] && [ ! -f bun.lockb ]; then
+    _nd=$(mktemp).js
+    cat > "$_nd" <<'NPM_DECLARED_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath, includeDev] = process.argv.slice(2);
+let bom, pkg;
+try {
+  bom = JSON.parse(fs.readFileSync(bomPath, 'utf8'));
+  pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+} catch (e) { process.exit(0); }
+const isNpm = c => String((c && c.purl) || '').startsWith('pkg:npm/');
+const anyNpm = list => (list || []).some(c => isNpm(c) || anyNpm(c && c.components));
+if (anyNpm(bom.components)) process.exit(0);
+// Names of the packages inside the project, which a workspace refers to by name.
+const local = new Set();
+const walk = (dir, depth) => {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      if (depth < 4 && e.name !== 'node_modules' && !e.name.startsWith('.')) walk(path.join(dir, e.name), depth + 1);
+    } else if (e.name === 'package.json' && depth > 0) {
+      try {
+        const n = JSON.parse(fs.readFileSync(path.join(dir, e.name), 'utf8')).name;
+        if (n) local.add(n);
+      } catch (err) { /* not a package */ }
+    }
+  }
+};
+walk('.', 0);
+const NAME = /^(@[a-z0-9~-][a-z0-9._~-]*\/)?[a-z0-9~-][a-z0-9._~-]*$/i;
+const sections = ['dependencies', 'optionalDependencies'];
+if (includeDev) sections.push('devDependencies');
+const declared = new Map();
+for (const section of sections) {
+  for (const [key, value] of Object.entries(pkg[section] || {})) {
+    let name = key;
+    let spec = String(value);
+    // "alias": "npm:real-name@range" uses the package real-name.
+    const alias = /^npm:((?:@[^@/]+\/)?[^@]+)(?:@(.*))?$/.exec(spec);
+    if (alias) { name = alias[1]; spec = alias[2] || '*'; }
+    // A folder, workspace, repository or URL: not a registry package.
+    if (/[:/\\]/.test(spec)) continue;
+    if (!NAME.test(name) || local.has(name) || declared.has(name)) continue;
+    declared.set(name, spec);
+  }
+}
+if (declared.size === 0) process.exit(0);
+bom.components = bom.components || [];
+const refs = [];
+for (const [name, spec] of [...declared].sort((a, b) => a[0].localeCompare(b[0]))) {
+  const slash = name.startsWith('@') ? name.indexOf('/') : -1;
+  const group = slash > 0 ? name.slice(0, slash) : '';
+  const short = slash > 0 ? name.slice(slash + 1) : name;
+  const purl = 'pkg:npm/' + (group ? '%40' + group.slice(1) + '/' : '') + short;
+  const comp = {
+    type: 'library', name: short, purl, 'bom-ref': purl,
+    properties: [
+      { name: 'internal:SrcFile', value: 'package.json' },
+      { name: 'bomlens:evidenceGrade', value: 'declared-only' },
+      { name: 'bomlens:declaredRange', value: spec.slice(0, 100) },
+    ],
+  };
+  if (group) comp.group = group;
+  bom.components.push(comp);
+  refs.push(purl);
+}
+const root = bom.metadata && bom.metadata.component && bom.metadata.component['bom-ref'];
+if (root) {
+  bom.dependencies = bom.dependencies || [];
+  let node = bom.dependencies.find(d => d.ref === root);
+  if (!node) { node = { ref: root, dependsOn: [] }; bom.dependencies.push(node); }
+  node.dependsOn = [...new Set([...(node.dependsOn || []), ...refs])];
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stdout.write(String(refs.length));
+NPM_DECLARED_JS
+    _nd_dev=""
+    if opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then _nd_dev=1; fi
+    _nd_n=$(node "$_nd" "$OUT" "$_nd_dev" 2>/dev/null)
+    rm -f "$_nd"
+    if [ -n "$_nd_n" ]; then
+        log "node: [WARN] no npm package was resolved; listing the $_nd_n direct dependencies package.json declares, without versions, so none of them is checked for vulnerabilities"
+        mark_prep_failed npm-production-set
+        prep_hint npm-declared-only
+    fi
+fi
+# --- end node declared only ---
+
 # Record each prep_step that failed or timed out (PREP_FAILED, space-separated
 # labels) on the SBOM, one bomlens:pipeline-step-failed property per label,
 # the same shape docker/lib/pipeline-step.sh's mark_pipeline_warning writes.
