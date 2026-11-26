@@ -5390,7 +5390,59 @@ const pyprojectNames = text => {
 const pyMarked = bom.components.some(c => prop(c, 'cdx:pyproject:group').length);
 const pyProd = pyMarked ? readPyProd() : null;
 
-const npmDev = c => npmMarkers === '1' && every(c, 'cdx:npm:package:development', v => v === 'true');
+// cdxgen merges one package found in several npm projects of the tree into
+// one component that lists each lock file (internal:SrcFile) but keeps the
+// development marker of one of them only. So a package marked development
+// that came from more than one file is checked in each of them: when any npm
+// lock lists that name and version without "dev": true, or a file cannot be
+// read as an npm lock, a project there may ship it and the marker is not used.
+const lockCache = new Map();
+const readLock = f => {
+  if (!lockCache.has(f)) {
+    let doc = null;
+    if (/(^|\/)(package-lock|npm-shrinkwrap)\.json$/.test(f) && !f.split('/').includes('..') && !path.isAbsolute(f)) {
+      try { doc = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { doc = null; }
+    }
+    lockCache.set(f, doc);
+  }
+  return lockCache.get(f);
+};
+// Whether the lock lists name@version, and whether every entry is dev; null
+// when the lock does not list it.
+const lockDev = (doc, name, version) => {
+  const found = [];
+  if (doc.packages && typeof doc.packages === 'object') {
+    for (const [k, v] of Object.entries(doc.packages)) {
+      if (v && (k === 'node_modules/' + name || k.endsWith('/node_modules/' + name)) && v.version === version) found.push(v.dev === true);
+    }
+  } else if (doc.dependencies && typeof doc.dependencies === 'object') {
+    const walk = (deps, depth) => {
+      for (const [k, v] of Object.entries(deps)) {
+        if (!v || typeof v !== 'object') continue;
+        if (k === name && v.version === version) found.push(v.dev === true);
+        if (depth < 50 && v.dependencies && typeof v.dependencies === 'object') walk(v.dependencies, depth + 1);
+      }
+    };
+    walk(doc.dependencies, 0);
+  }
+  return found.length ? found.every(Boolean) : null;
+};
+const npmDevInEveryLock = c => {
+  const files = [...new Set(prop(c, 'internal:SrcFile').concat(prop(c, 'SrcFile')))];
+  if (files.length < 2) return true;
+  const m = /^pkg:npm\/(.+)@([^@?#]+)/.exec(c.purl || '');
+  if (!m) return true;
+  let name, version;
+  try { name = decodeURIComponent(m[1]); version = decodeURIComponent(m[2]); } catch (e) { return false; }
+  for (const f of files) {
+    const doc = readLock(f);
+    if (!doc) return false;
+    const dev = lockDev(doc, name, version);
+    if (dev === false) return false;
+  }
+  return true;
+};
+const npmDev = c => npmMarkers === '1' && every(c, 'cdx:npm:package:development', v => v === 'true') && npmDevInEveryLock(c);
 const otherDev = c =>
   (pyProd !== null && every(c, 'cdx:pyproject:group', g => g !== 'main') && !pyProd.has(pep503(purlName(c, 'pypi'))))
   || every(c, 'cdx:cargo:scope', v => v === 'dev')
