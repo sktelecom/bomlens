@@ -212,6 +212,13 @@ class Env(Base):
         self.ws.policy(stage1_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/repo/@org/",
                                    "GOPROXY": "https://mirror.example/go,direct"})
 
+    def test_the_maven_wrapper_repository_reaches_stage_1(self):
+        url = "https://mirror.example/maven2"
+        self.scan(policy=self.ws.policy(stage1_env={"MVNW_REPOURL": url}))
+        s1, s2 = self.backend.spec("engine-stage1").env, self.backend.spec("engine-stage2").env
+        self.assertEqual(s1["MVNW_REPOURL"], url)
+        self.assertNotIn("MVNW_REPOURL", s2)
+
     def test_registry_env_is_checked(self):
         with self.assertRaises(PolicyError):
             self.ws.policy(stage2_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/"})

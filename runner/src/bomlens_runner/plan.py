@@ -108,7 +108,7 @@ STAGE_PASSTHROUGH_ALLOWED = {
 # image knows), so the runner passes them on its own: a name here is taken
 # from the policy's stage1_env whatever the plan's env_passthrough says.
 REGISTRY_ENV_NAMES = frozenset((
-    "NPM_CONFIG_REGISTRY", "npm_config_registry", "YARN_NPM_REGISTRY_SERVER",
+    "MVNW_REPOURL", "NPM_CONFIG_REGISTRY", "npm_config_registry", "YARN_NPM_REGISTRY_SERVER",
     "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "PIP_TRUSTED_HOST", "UV_INDEX_URL", "UV_DEFAULT_INDEX",
     "CARGO_REGISTRY_DEFAULT", "BUNDLE_MIRROR__RUBYGEMS__ORG",
     "GONOSUMDB", "GOPRIVATE", "GONOPROXY", "GOINSECURE",
