@@ -1739,7 +1739,11 @@ GRADLE_PROBE_TIMEOUT=5
 # dependency folders left out) and in the user's init scripts, and the
 # well-known ones it calls by name (mavenCentral(), google(),
 # gradlePluginPortal(); a plugins block resolves from the plugin portal by
-# default). With none found, Maven Central and the plugin portal.
+# default). With none found, Maven Central and the plugin portal. The user's
+# mounted settings (init scripts, init.d, gradle.properties) are there to point
+# Gradle at a mirror, often through a variable, a property or code that swaps
+# repositories, so every http(s) address written in them counts, whatever the
+# shape, and they come first so the limit never leaves them out.
 gradle_repository_urls() {
     command -v node >/dev/null 2>&1 || return 0
     _gru_js=$(mktemp) || return 0
@@ -1759,11 +1763,23 @@ const walk = (dir, depth) => {
   }
 };
 walk(root, 0);
-for (const f of ['init.gradle', 'init.gradle.kts']) files.push(path.join(settingsDir, f));
-try { for (const f of fs.readdirSync(path.join(settingsDir, 'init.d'))) files.push(path.join(settingsDir, 'init.d', f)); } catch (e) { /* none */ }
+const settings = ['init.gradle', 'init.gradle.kts', 'gradle.properties'].map((f) => path.join(settingsDir, f));
+try { for (const f of fs.readdirSync(path.join(settingsDir, 'init.d')).sort()) settings.push(path.join(settingsDir, 'init.d', f)); } catch (e) { /* none */ }
 const urls = new Set();
+for (const f of settings.slice(0, 50)) {
+  let t = '';
+  try { t = fs.readFileSync(f, 'utf8'); } catch (e) { continue; }
+  t = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'\\])\/\/.*$/gm, '$1').replace(/^\s*[#!].*$/gm, '');
+  // gradle.properties escapes ':' and '=' with a backslash. An address runs
+  // up to a quote, a space or the start of a Groovy/Kotlin expression.
+  t = t.replace(/\\([:=])/g, '$1');
+  const re = /https?:\/\/[^"'\s$<>{}()\\,;]+/g;
+  let m;
+  while ((m = re.exec(t)) !== null) urls.add(m[0]);
+}
+files.push(...settings);
 let central = false, google = false, portal = false;
-for (const f of files.slice(0, 200)) {
+for (const f of files.slice(0, 250)) {
   let t = '';
   try { t = fs.readFileSync(f, 'utf8'); } catch (e) { continue; }
   t = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1');
@@ -1778,7 +1794,7 @@ if (central) urls.add('https://repo.maven.apache.org/maven2/');
 if (google) urls.add('https://dl.google.com/dl/android/maven2/');
 if (portal) urls.add('https://plugins.gradle.org/m2/');
 if (urls.size === 0) { urls.add('https://repo.maven.apache.org/maven2/'); urls.add('https://plugins.gradle.org/m2/'); }
-process.stdout.write([...urls].slice(0, 8).join('\n') + '\n');
+process.stdout.write([...urls].slice(0, 12).join('\n') + '\n');
 GRADLE_REPO_URLS_JS
     node "$_gru_js" . "$SETTINGS_ROOT/gradle" 2>/dev/null
     rm -f "$_gru_js"
