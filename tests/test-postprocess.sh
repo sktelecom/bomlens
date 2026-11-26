@@ -4846,6 +4846,57 @@ pr_specs=$(jq '[.components[] | select((.purl|startswith("pkg:pypi/")) and ((.pr
 pr_dangling=$(jq '[.dependencies[]? | (.ref, (.dependsOn[]?)) | select(test("pkg:pypi/(flask@2.0|requests@2.25)$"))] | length' "$WORK/pr.json")
 [ "$pr_dangling" = "0" ] && pass "dependency graph has no dangling refs to dropped components" || fail "$pr_dangling dangling dependency ref(s) remain"
 
+echo "== npm-declared-only: package.json's dependencies are listed when no npm package was resolved =="
+# The block of build-prep.sh between its markers, run on a project with no lock
+# file and an SBOM with no npm package.
+NDO="$WORK/ndo"; mkdir -p "$NDO/proj/packages/inner"
+{ echo 'opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }'
+  echo 'log() { :; }'
+  echo 'mark_prep_failed() { echo "FAILED:$1"; }'
+  echo 'prep_hint() { echo "HINT:$1"; }'
+  sed -n '/^# --- node declared only ---$/,/^# --- end node declared only ---$/p' "$LIB/build-prep.sh"
+} > "$NDO/block.sh"
+cat > "$NDO/proj/package.json" <<'NDOEOF'
+{"name":"app","workspaces":["packages/*"],
+ "dependencies":{"express":"^4.18.0","@scope/pkg":"1.x","aliased":"npm:real-name@^2","inner":"*",
+   "local":"file:../local","ws":"workspace:*","gitdep":"git+https://example.com/a.git","short":"user/repo"},
+ "optionalDependencies":{"fsevents":"~2.3.0"},
+ "devDependencies":{"jest":"^29.0.0"}}
+NDOEOF
+echo '{"name":"inner","version":"1.0.0"}' > "$NDO/proj/packages/inner/package.json"
+ndo_bom() { printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","bom-ref":"root"}},"components":[]}' > "$NDO/bom.json"; }
+ndo_run() { (cd "$NDO/proj" && OUT="$NDO/bom.json" rc=0 BOMLENS_INCLUDE_DEV_DEPENDENCIES="${1:-}" sh "$NDO/block.sh"); }
+if command -v node >/dev/null 2>&1; then
+    ndo_bom; ndo_out=$(ndo_run)
+    ndo_purls=$(jq -r '[.components[].purl] | join(" ")' "$NDO/bom.json")
+    [ "$ndo_purls" = "pkg:npm/%40scope/pkg pkg:npm/express pkg:npm/fsevents pkg:npm/real-name" ] \
+        && pass "declared registry dependencies listed; local, workspace, git and dev ones left out" || fail "listed: $ndo_purls"
+    [ "$(jq '[.components[] | select(has("version"))] | length' "$NDO/bom.json")" = 0 ] \
+        && pass "no version is made up from a range" || fail "a declared entry has a version"
+    [ "$(jq '[.components[] | select(any(.properties[]; .name == "bomlens:evidenceGrade" and .value == "declared-only"))] | length' "$NDO/bom.json")" = 4 ] \
+        && pass "each entry is marked declared-only" || fail "declared-only mark missing"
+    [ "$(jq '.dependencies[] | select(.ref == "root") | .dependsOn | length' "$NDO/bom.json")" = 4 ] \
+        && pass "the root depends on each declared entry" || fail "root links missing"
+    printf '%s' "$ndo_out" | grep -q 'FAILED:npm-production-set' && printf '%s' "$ndo_out" | grep -q 'HINT:npm-declared-only' \
+        && pass "the step is recorded as failed with the hint" || fail "step or hint not recorded: $ndo_out"
+    ndo_bom; ndo_run 1 >/dev/null
+    jq -e 'any(.components[]; .purl == "pkg:npm/jest")' "$NDO/bom.json" >/dev/null \
+        && pass "development dependencies are listed when asked for" || fail "jest missing with BOMLENS_INCLUDE_DEV_DEPENDENCIES=1"
+    printf '%s' '{"bomFormat":"CycloneDX","components":[{"name":"a","purl":"pkg:npm/a@1.0.0"}]}' > "$NDO/bom.json"
+    ndo_out=$(ndo_run)
+    [ -z "$ndo_out" ] && [ "$(jq '.components | length' "$NDO/bom.json")" = 1 ] \
+        && pass "an SBOM with an npm package is left alone" || fail "a resolved SBOM was changed"
+    ndo_bom; : > "$NDO/proj/package-lock.json"; ndo_out=$(ndo_run); rm -f "$NDO/proj/package-lock.json"
+    [ -z "$ndo_out" ] && [ "$(jq '.components | length' "$NDO/bom.json")" = 0 ] \
+        && pass "a project with a lock file is left alone" || fail "a locked project was changed"
+else
+    echo "  SKIP: node is not installed"
+fi
+# completeness: the hint makes the result unreliable.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"properties":[{"name":"bomlens:pipeline-step-failed","value":"npm-production-set"},{"name":"bomlens:resolution-hint","value":"npm-declared-only"}]},"components":[{"type":"library","name":"express","purl":"pkg:npm/express"}]}' > "$NDO/cmp.json"
+[ "$(bash "$LIB/assess-completeness.sh" "$NDO/cmp.json" "$NDO/cmp")" = unreliable ] \
+    && pass "a declared-only result is graded unreliable" || fail "grade: $(jq -r .grade "$NDO/cmp_completeness.json" 2>/dev/null)"
+
 echo "== py-unpinned: a requirements line with no version is merged into the installed package =="
 # Shape measured with an unpinned requirements.txt and no licence lookup: a
 # versionless pkg:pypi entry (manifest-analysis only, no versionSpecifiers, not in
