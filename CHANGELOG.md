@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- When stage 1 gives no SBOM, the reason recorded in `bomlens:sbom-tool-degraded` no longer comes from BomLens's own note on the licence lookup. A scan whose licence probe timed out was reported as `network` although stage 1 ended for another cause.
 - In the web UI, choosing SBOM upload after the new scan form opened on another input now sets the conformance profile to the SKT submission profile, as its help text says. A profile the user picked is kept.
 
 ## [v1.15.5] - 2026-11-27
