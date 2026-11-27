@@ -4,7 +4,7 @@
     "version": "1.4.0"
   },
   "engine": {
-    "version": "1.15.5",
+    "version": "1.15.6",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-11-26T22:27:36Z",
-    "ended_at": "2026-11-26T22:27:42Z",
+    "started_at": "2026-11-27T12:27:04Z",
+    "ended_at": "2026-11-27T12:27:12Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:38Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:07Z",
+      "ended_at": "2026-11-27T12:27:10Z",
       "stage": 2
     },
     {
@@ -35,8 +35,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:36Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:04Z",
+      "ended_at": "2026-11-27T12:27:10Z",
       "counts": {
         "components": 2
       },
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:40Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:10Z",
+      "ended_at": "2026-11-27T12:27:10Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:40Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:10Z",
+      "ended_at": "2026-11-27T12:27:10Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:40Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:10Z",
+      "ended_at": "2026-11-27T12:27:10Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:40Z",
-      "ended_at": "2026-11-26T22:27:40Z",
+      "started_at": "2026-11-27T12:27:10Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:40Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:11Z",
+      "ended_at": "2026-11-27T12:27:11Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-26T22:27:41Z",
-      "ended_at": "2026-11-26T22:27:41Z",
+      "started_at": "2026-11-27T12:27:12Z",
+      "ended_at": "2026-11-27T12:27:12Z",
       "stage": 2
     }
   ],
@@ -155,7 +155,7 @@
     {
       "role": "sbom.cyclonedx",
       "path": "BertBaseUncased_1.0_bom.json",
-      "sha256": "e0c7b37fd50a7433b3b2cac4b05c3f9fc2e4e0d7cac4b8f559954eb5b924b42d",
+      "sha256": "1c7c3acf926fcb6562f993270e9bcfd91192ce49aa6ab3d5284b1c95beb67b20",
       "bytes": 28535
     },
     {
@@ -167,31 +167,31 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.txt",
-      "sha256": "61e74736ee128097a4472a9fc6d41a80370d400a525cf764b1018a84a3df548e",
+      "sha256": "3447e16313413193f120290aaf1b1f51b1369cd932b6b6e66ed6892ca855524b",
       "bytes": 682
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.html",
-      "sha256": "9bf0833d2b47f2a44f9777f3d13f089968e074c836fe9a123aea41efce54fdf0",
+      "sha256": "b7d2062ca2617af214e24fffd05a02f64073d8ac4ea9aab081806ba558fda9f4",
       "bytes": 19821
     },
     {
       "role": "conformance",
       "path": "BertBaseUncased_1.0_conformance.json",
-      "sha256": "f29bba3222d117c0a7c29afba773e6615e4171c123599016e7a973e29be7ae10",
+      "sha256": "35f4fa24fdad68a6c8e0f2fecf2ff6b55a72d7404cbda55c82ed3cfed81fa490",
       "bytes": 100840
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.md",
-      "sha256": "cbea0d35b8218e05f71fc26095538267fdbe9e479241afe9976f5ac6217822e6",
+      "sha256": "aed9d5bc11cbbd8e5bab1e77212174d319d58d40e1c72ca5b4a6a71003a9e0a7",
       "bytes": 19192
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.html",
-      "sha256": "b1a3d32d70ec6d73156fc7acbf011a324f3ebb69b6dc1b0784bb1f0ce3fed2e9",
+      "sha256": "cc498656c9340d804a1c581b5a6ab1d9194ed22400741a70e8a810ec1444963b",
       "bytes": 69457
     },
     {
@@ -203,25 +203,25 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.md",
-      "sha256": "d1d91acaef1716c4df32cd0a7b9c7018192cb6b754773839064014f0bf14da03",
+      "sha256": "50e7550d5ab1ccd9b9985f3e37d6647f7145999b34b72e743eaf8566c6938495",
       "bytes": 1996
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.html",
-      "sha256": "56b290967ff01c5f1b8b9cf8dbf2c5d0fd8aca0aa0f3e3f7003e08c49d5c2752",
+      "sha256": "1b7cd30bb4d5e40a0e6a11ca8fa3fb845bf6a9de87defa5740c5489e5d0790d5",
       "bytes": 22609
     },
     {
       "role": "sbom.spdx3",
       "path": "BertBaseUncased_1.0_bom.spdx3.json",
-      "sha256": "60e19b49af87fefc442548455c3ae89caf7853a5caeeafee5b55d33fdeba8804",
+      "sha256": "d923abe609a947adfc1b83f6a9fc07d964e3a43536488a75760be2666a788eed",
       "bytes": 18878
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_spdx3-check.json",
-      "sha256": "034ba640245034525848015d549108bda68042f24022e2ba3e081afad02e4691",
+      "sha256": "47210c76db62c286377afd1b7891b3564cfb53280f14f09c62d8fb795f4464b3",
       "bytes": 13097
     },
     {
@@ -239,13 +239,13 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.json",
-      "sha256": "08b75ae48b352c8aad7a19a6517570caa6af295946dc936db98483a37949f005",
+      "sha256": "777d7cc9b95aed45b2ae3865dd90877a13d40016c55fc42191ea2ffd622ef748",
       "bytes": 28693
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.md",
-      "sha256": "4306840beb6be0733b886d164bbfbf6e4823f7efa1cb19459fd449e2e43e9f48",
+      "sha256": "58894c98dfc35969c28df23dbfaa331b6f3c479901dd630493e8e0cb29db65fc",
       "bytes": 4009
     }
   ]

@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-11-26T22:27:18Z
+Generated: 2026-11-27T12:26:43Z
 Total components: 71 · Distinct licenses: 11
 
 This product includes the following open source software.
@@ -15,7 +15,7 @@ Components (50):
   - classmate@1.5.1
       Source: https://github.com/FasterXML/java-classmate
   - commons-lang3@3.17.0
-      Source: https://gitbox.apache.org/repos/asf?p=commons-lang.git
+      Source: https://gitbox.apache.org/repos/asf
   - jackson-annotations@2.17.2
       Source: https://github.com/FasterXML/jackson-annotations
   - jackson-core@2.17.2

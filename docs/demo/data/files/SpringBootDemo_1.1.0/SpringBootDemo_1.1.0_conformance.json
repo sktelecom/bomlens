@@ -2,7 +2,7 @@
   "project": "SpringBootDemo",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-26T22:27:16Z",
+  "generatedAt": "2026-11-27T12:26:40Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-11-26T22:27:09Z",
+      "detail": "2026-11-27T12:26:32Z",
       "missing": [],
       "regulations": [
         {
@@ -42,14 +42,14 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-11-26T22:27:09Z"
+      "detail_ko": "2026-11-27T12:26:32Z"
     },
     {
       "id": "tools",
       "label": "Tool info (metadata.tools)",
       "required": true,
       "status": "pass",
-      "detail": "2 tool(s)",
+      "detail": "3 tool(s)",
       "missing": [],
       "regulations": [
         {
@@ -61,7 +61,7 @@
         }
       ],
       "label_ko": "도구 정보 (metadata.tools)",
-      "detail_ko": "도구 2개"
+      "detail_ko": "도구 3개"
     },
     {
       "id": "top-component",
@@ -1092,7 +1092,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-26T22:27:09Z",
+            "detail": "2026-11-27T12:26:32Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1102,7 +1102,7 @@
             "label": "Tool info (metadata.tools)",
             "status": "pass",
             "source": null,
-            "detail": "2 tool(s)",
+            "detail": "3 tool(s)",
             "refs": [
               "Section 5.2.1"
             ]

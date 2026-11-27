@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a219f6-a7cd-7622-9d13-57ace99d326e",
-  "CreatedAt": "2026-11-26T22:25:24.941403578Z",
+  "ReportID": "01a21cf7-59ed-77f3-9229-f702401b2d4f",
+  "CreatedAt": "2026-11-27T12:25:02.189524081Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1071,6 +1071,7 @@
           },
           "References": [
             "https://access.redhat.com/security/cve/CVE-2026-102598",
+            "https://advisory.echohq.com/cve/CVE-2026-102598",
             "https://github.com/pallets/werkzeug",
             "https://github.com/pallets/werkzeug/commit/8d77320bcdf3a34941ec06dcf16b03c065cd21b6",
             "https://github.com/pallets/werkzeug/pull/3309",
