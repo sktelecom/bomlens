@@ -1632,6 +1632,12 @@ EOF
                 exit 1
             fi
             mark_sbom_degraded "$OUTPUT_FILE" "$_s1_reason"
+            # The manifest-only scan lists exact pins only: a requirements.txt
+            # of version ranges would leave almost no Python package. The
+            # direct dependencies it declares are added without versions.
+            _s1_pydecl="$(python3 "$LIBDIR/python-declared.py" "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" 2>/dev/null)" || _s1_pydecl=0
+            [ "${_s1_pydecl:-0}" = 0 ] \
+                || echo "[WARN] ${_s1_pydecl} declared Python dependenc(ies) listed without versions (bomlens:evidenceGrade=declared-only)." >&2
             mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
         elif [ -s "$OUTPUT_FILE" ] && [ "${BOMLENS_STAGE1_EXIT:-}" = "0" ]; then
             # A stage 1 that wrote an SBOM although the registry refused some

@@ -37,6 +37,15 @@ log() { echo "[build-prep] $*"; }
 # table in every Swift scan log. Nothing here reads it.
 unset SWIFT_SIGNING_KEY
 
+# pip and uv keep each wheel they download in a cache under HOME (in /tmp),
+# beside the copy they install, and cdxgen installs the requirements again in
+# a virtual environment of its own. With large wheels (torch with its CUDA
+# libraries) the copies together filled a 16 GiB temporary volume. A scan
+# installs each package once per tool and does not reuse the cache, so it is
+# off unless the caller set it.
+[ -n "${PIP_NO_CACHE_DIR+x}" ] || { PIP_NO_CACHE_DIR=1; export PIP_NO_CACHE_DIR; }
+[ -n "${UV_NO_CACHE+x}" ] || { UV_NO_CACHE=1; export UV_NO_CACHE; }
+
 # The BOMLENS_* opt-out switches count as set only for 1 or true, as documented.
 opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 

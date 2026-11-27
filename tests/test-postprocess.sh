@@ -4897,6 +4897,60 @@ printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"propertie
 [ "$(bash "$LIB/assess-completeness.sh" "$NDO/cmp.json" "$NDO/cmp")" = unreliable ] \
     && pass "a declared-only result is graded unreliable" || fail "grade: $(jq -r .grade "$NDO/cmp_completeness.json" 2>/dev/null)"
 
+echo "== python-declared-only: the fallback scan keeps the Python dependencies a project declares =="
+PDO="$WORK/py-declared"; rm -rf "$PDO"; mkdir -p "$PDO/src"
+cat > "$PDO/src/requirements.txt" <<'REQ'
+# comment
+accelerate>=0.34.0
+Torch==2.4.0
+einops
+fastapi[all] >=0.100, <1.0 ; python_version >= "3.9"
+-r other.txt
+--index-url https://pypi.example.invalid/simple
+pkg @ https://example.invalid/pkg.whl
+./local-package
+git+https://example.invalid/repo.git#egg=thing
+REQ
+cat > "$PDO/src/pyproject.toml" <<'TOML'
+[project]
+name = "demo"
+dependencies = ["fire>=0.5", "accelerate>=0.30"]
+TOML
+cat > "$PDO/bom.json" <<'BOM'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"demo","bom-ref":"root"},"properties":[{"name":"bomlens:sbom-tool-degraded","value":"disk-space"}]},
+ "components":[{"type":"library","name":"torch","version":"2.4.0","purl":"pkg:pypi/torch@2.4.0","bom-ref":"pkg:pypi/torch@2.4.0"}],
+ "dependencies":[{"ref":"root","dependsOn":["pkg:pypi/torch@2.4.0"]}]}
+BOM
+_pdo_n="$(python3 "$LIB/python-declared.py" "$PDO/src" "$PDO/bom.json")"
+[ "$_pdo_n" = 4 ] && pass "python-declared: four added" || fail "python-declared: count $_pdo_n"
+_pdo_got="$(jq -c '[.components[].purl] | sort' "$PDO/bom.json")"
+[ "$_pdo_got" = '["pkg:pypi/accelerate","pkg:pypi/einops","pkg:pypi/fastapi","pkg:pypi/fire","pkg:pypi/torch@2.4.0"]' ] \
+    && pass "python-declared: names without versions, beside the installed one" || fail "python-declared: components" "$_pdo_got"
+_pdo_got="$(jq -c '[.components[] | select(.purl == "pkg:pypi/fastapi" or .purl == "pkg:pypi/fire") | [(.properties[] | select(.name == "internal:SrcFile" or .name == "bomlens:declaredRange") | .value)]]' "$PDO/bom.json")"
+[ "$_pdo_got" = '[["requirements.txt",">=0.100,<1.0"],["pyproject.toml",">=0.5"]]' ] \
+    && pass "python-declared: the file and the range are kept" || fail "python-declared: properties" "$_pdo_got"
+_pdo_got="$(jq '[.components[] | select(.version == null) | .properties[] | select(.name == "bomlens:evidenceGrade" and .value == "declared-only")] | length' "$PDO/bom.json")"
+[ "$_pdo_got" = 4 ] && pass "python-declared: marked declared-only" || fail "python-declared: declared-only marks" "$_pdo_got"
+_pdo_got="$(jq -c '.dependencies[] | select(.ref == "root") | .dependsOn' "$PDO/bom.json")"
+[ "$_pdo_got" = '["pkg:pypi/torch@2.4.0","pkg:pypi/accelerate","pkg:pypi/einops","pkg:pypi/fastapi","pkg:pypi/fire"]' ] \
+    && pass "python-declared: linked from the root" || fail "python-declared: root links" "$_pdo_got"
+_pdo_n="$(python3 "$LIB/python-declared.py" "$PDO/src" "$PDO/bom.json")"
+_pdo_got="$(jq '[.metadata.properties[] | select(.name == "bomlens:resolution-hint")] | length' "$PDO/bom.json")"
+[ "$_pdo_n:$_pdo_got" = "0:1" ] && pass "python-declared: a second run adds nothing and the hint stays one" || fail "python-declared: second run" "$_pdo_n:$_pdo_got"
+bash "$LIB/assess-completeness.sh" "$PDO/bom.json" "$PDO/cmp" >/dev/null 2>&1
+_pdo_got="$(jq -c '[.grade, (.reasons[] | select(.code == "tool-degraded") | .grade, (.message.en | test("requirements.txt or pyproject.toml")))]' "$PDO/cmp_completeness.json" 2>/dev/null)"
+[ "$_pdo_got" = '["unreliable","unreliable",true]' ] \
+    && pass "python-declared: unreliable, named in the tool-degraded reason" || fail "python-declared: completeness" "$_pdo_got"
+mkdir -p "$PDO/none"; cp "$PDO/bom.json" "$PDO/before.json"
+_pdo_n="$(python3 "$LIB/python-declared.py" "$PDO/none" "$PDO/bom.json")"
+[ "$_pdo_n" = 0 ] && cmp -s "$PDO/bom.json" "$PDO/before.json" \
+    && pass "python-declared: a tree without Python manifests is left alone" || fail "python-declared: changed a tree without manifests" "$_pdo_n"
+# A resolution hint of a failed step is not added to tool-degraded.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"properties":[{"name":"bomlens:sbom-tool-degraded","value":"network"},{"name":"bomlens:resolution-hint","value":"npm-declared-only"}]},"components":[{"type":"library","name":"express","purl":"pkg:npm/express"}]}' > "$PDO/npm.json"
+bash "$LIB/assess-completeness.sh" "$PDO/npm.json" "$PDO/npm" >/dev/null 2>&1
+_pdo_got="$(jq -r .grade "$PDO/npm_completeness.json" 2>/dev/null)"
+[ "$_pdo_got" = partial ] && pass "python-declared: the npm hint stays with a failed step" || fail "python-declared: npm hint on tool-degraded" "$_pdo_got"
+
 echo "== py-unpinned: a requirements line with no version is merged into the installed package =="
 # Shape measured with an unpinned requirements.txt and no licence lookup: a
 # versionless pkg:pypi entry (manifest-analysis only, no versionSpecifiers, not in
