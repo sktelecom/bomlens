@@ -26,8 +26,8 @@ cd examples/swift
 
 ## Expected Output
 
-The scan writes its outputs into a `SwiftExample_1.0.0/` folder (`SwiftExample_1.0.0_bom.json` and related files). The SBOM lists roughly 4-8 entries: swift-argument-parser and swift-log, the package itself and the platform modules it imports.
-<!-- expected-components: 4-8 -->
+The scan writes its outputs into a `SwiftExample_1.0.0/` folder (`SwiftExample_1.0.0_bom.json` and related files). The SBOM lists roughly 3-6 entries: swift-argument-parser and swift-log and the package itself. The platform modules it imports (Foundation and others) are part of the Swift toolchain and are not listed.
+<!-- expected-components: 3-6 -->
 
 ### Sample Components
 

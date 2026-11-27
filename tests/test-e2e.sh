@@ -1117,7 +1117,7 @@ else
         # (no local layer cache) the pull itself can take longer than a
         # resolve step would, and the wait below is measuring build-prep.sh's
         # own responsiveness, not network/registry variance.
-        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.5.0}" >/dev/null 2>&1
+        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.8.0}" >/dev/null 2>&1
         w="$(mktemp -d "$WORK_ROOT/interrupt.XXXXXX")"
         out="$(mktemp -d "$WORK_ROOT/interrupt-out.XXXXXX")"
         cp -R "$swiftsrc/." "$w/"

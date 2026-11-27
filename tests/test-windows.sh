@@ -832,7 +832,7 @@ N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
 # A first use shows the download instead of waiting silently.
 d="$(new_proj firstuse)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
 N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
-( cd "$d" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/cdxgen-alpine-node24:13.5.0" bash "$SCAN" --project FirstUse --version 1.0 --detection build --generate-only ) > "$OUT" 2>&1; RC=$?
+( cd "$d" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/cdxgen-alpine-node24:13.8.0" bash "$SCAN" --project FirstUse --version 1.0 --detection build --generate-only ) > "$OUT" 2>&1; RC=$?
 { in_out "First use of" && in_out "내려받습니다" && in_log "docker pull"; } \
   && pass "an image that is not here is pulled up front with a visible message (English and Korean)" \
   || { fail "first-use pull message missing" "rc=$RC"; show; }

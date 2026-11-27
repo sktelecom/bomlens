@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- cdxgen 13.8.0 (was 13.5.0) for the language images, their digests in the execution plan, the Android SDK base and the AI SBOM image. A yarn.lock whose dependency names a scoped npm alias without a version (`ref "npm:@scope/name"`) no longer stops stage 1 with `E_MISSING_NAME`; cdxgen fixed this in 13.8.0. A Swift scan no longer lists the platform modules a package imports (`Foundation`, `XCTest`, `dispatch`) as `pkg:generic` components; the Swift example and its note follow.
+
 ### Fixed
 
 - When stage 1 gives no SBOM, the reason recorded in `bomlens:sbom-tool-degraded` no longer comes from BomLens's own note on the licence lookup. A scan whose licence probe timed out was reported as `network` although stage 1 ended for another cause.
