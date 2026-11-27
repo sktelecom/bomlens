@@ -34,6 +34,18 @@ export function profileLabelKey(profile: string | null | undefined): string | nu
   return CONFORMANCE_PROFILE_LABEL_KEY[profile as ConformanceProfile];
 }
 
+/** The profile the scan form uses: the one the user picked (or a re-scan
+ *  seeded), else the default of the input chosen now, skt-submission for an
+ *  SBOM under review and default for one BomLens generates. Read at each
+ *  render, so switching the input after the form opened changes the default
+ *  too, while a profile the user picked stays. */
+export function formConformanceProfile(
+  chosen: ConformanceProfile | null,
+  isAnalyze: boolean,
+): ConformanceProfile {
+  return chosen ?? (isAnalyze ? "skt-submission" : "default");
+}
+
 export function isG7(check: ConformanceCheck): boolean {
   return check.id.startsWith("g7-");
 }

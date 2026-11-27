@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- In the web UI, choosing SBOM upload after the new scan form opened on another input now sets the conformance profile to the SKT submission profile, as its help text says. A profile the user picked is kept.
+
 ## [v1.15.5] - 2026-11-27
 
 ### Added
