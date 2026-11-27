@@ -266,7 +266,13 @@ def build(args):
         print(f'{comp} {ver}: {len(strings)} strings', file=sys.stderr)
     for d in args.bg or []:
         for tb in sorted(os.path.join(d, f) for f in os.listdir(d)):
-            name = 'bg:' + re.split(r'-\d', os.path.basename(tb), maxsplit=1)[0]
+            base = re.split(r'-\d', os.path.basename(tb), maxsplit=1)[0]
+            if base in versions:
+                # A component's own release in the background would make every one of its strings shared,
+                # so it could never score unique strings and would never be reported.
+                print(f'background {os.path.basename(tb)} skipped: {base} is a component', file=sys.stderr)
+                continue
+            name = 'bg:' + base
             cid = comp_id(name, 'bg')
             strings = source_strings(tb)
             for s in strings:

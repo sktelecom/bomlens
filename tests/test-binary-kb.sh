@@ -182,6 +182,14 @@ if [ "$(prop "$near" bomlens:kbConfidence)" = "low" ]; then
     pass "a score close to the stored threshold is marked low confidence, for the review page to list first"
 else fail "a near-threshold result was not marked low confidence" "$near"; fi
 
+mkdir -p "$TMP/bg-own" "$TMP/kb-own"
+cp "$TMP/bg/"* "$TMP/src/alpha-1.1.tar.gz" "$TMP/bg-own/"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg-own" --release test-own --out "$TMP/kb-own/kb.sqlite3" 2>"$TMP/own.err"
+own="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-own/kb.sqlite3" 2>/dev/null)"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .version' <<<"$own")" = "1.1" ] && grep -q "skipped: alpha is a component" "$TMP/own.err"; then
+    pass "a component's own release given as background is skipped, so the component is still found"
+else fail "a component listed as background too was not found" "$own"; fi
+
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
 dec() { printf '%s' "$1" > "$TMP/dec.json"; ident release-1.1 FW_BINARY_KB_DECISIONS="$TMP/dec.json"; }
