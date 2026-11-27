@@ -182,6 +182,7 @@ class StageRecord:
     timed_out: bool = False
     cancelled: bool = False
     start_error: str | None = None
+    evicted: str | None = None
 
 
 @dataclass
@@ -364,7 +365,7 @@ class _Scan:
         record.ended_at = _now()
         record.exit_code, record.oom_killed = outcome.exit_code, outcome.oom_killed
         record.timed_out, record.start_error = outcome.timed_out, outcome.start_error
-        record.cancelled = outcome.cancelled
+        record.cancelled, record.evicted = outcome.cancelled, outcome.evicted
         return outcome, log, record
 
     def run_or_cancel(self, *args, **kw):
@@ -478,10 +479,10 @@ def run_source_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, p
                     write_new_file(out_dir / m.source, data)
 
         # 2. Stage 1 -------------------------------------------------------
-        s1_exit, s1_oom = EXIT_NOT_RUN, False
+        s1_exit, s1_oom, s1_reason = EXIT_NOT_RUN, False, None
         if plan.supported:
             _stage_hook(on_stage, "cdxgen")
-            s1_exit, s1_oom = _run_stage1(scan, plan.stage(1), source, out_dir, files_dir, name, ver,
+            s1_exit, s1_oom, s1_reason = _run_stage1(scan, plan.stage(1), source, out_dir, files_dir, name, ver,
                                           fetch_license, owner, result)
         else:
             write_new_file(out_dir / STAGE1_LOG_NAME,
@@ -509,6 +510,8 @@ def run_source_scan(policy: RunnerPolicy, backend: b.Backend, *, scan_id: str, p
                      "BOMLENS_IMAGE_DIGEST": s2_image.digest,
                      "DEEP_LICENSE": "true" if policy.deep_license else "false",
                      "DEEP_CVE": "true" if policy.deep_cve else "false", **owner})
+        if s1_reason:
+            env2["BOMLENS_STAGE1_REASON"] = s1_reason
         if policy.trivy_db is not None:
             env2.update({"TRIVY_CACHE_DIR": TRIVY_DB_TARGET, **_TRIVY_OFFLINE})
         mounts2 = [scan.ws(source, s2_src, True), scan.ws(out_dir, s2_out, False), scan.trivy_mount()]
@@ -540,10 +543,11 @@ def _read_plan_json(plan_dir: Path) -> bytes:
 
 
 def _run_stage1(scan: _Scan, s1: Stage, source: Path, out_dir: Path, files_dir: Path, name: str, ver: str,
-                fetch_license: bool, owner: dict, result: RunResult) -> tuple[int, bool]:
-    """Run stage 1 (and its restore when it was killed). Returns its exit code
-    and out-of-memory state for stage 2; a stage 1 that could not start is
-    exit 127, which stage 2 reads as cdxgen-unavailable."""
+                fetch_license: bool, owner: dict, result: RunResult) -> tuple[int, bool, str | None]:
+    """Run stage 1 (and its restore when it was killed). Returns its exit code,
+    out-of-memory state and, when the platform evicted it, the reason stage 2
+    records (disk-space or oom; None when the log is to tell); a stage 1 that
+    could not start is exit 127, which stage 2 reads as cdxgen-unavailable."""
     policy = scan.policy
     if scan.cancel():
         raise ScanCancelled("the scan was cancelled")
@@ -570,19 +574,36 @@ def _run_stage1(scan: _Scan, s1: Stage, source: Path, out_dir: Path, files_dir: 
         # The Job could not even be created: stage 2 still runs, on no SBOM.
         write_new_file(out_dir / STAGE1_LOG_NAME, f"stage 1 did not start: {exc}\n".encode())
         result.stages["stage1"] = StageRecord(container="", image=image1, start_error=str(exc))
-        return EXIT_NOT_RUN, False
+        return EXIT_NOT_RUN, False, None
     result.stages["stage1"] = rec
     if outcome.start_error:
         write_new_file(out_dir / STAGE1_LOG_NAME, f"stage 1 did not start: {outcome.start_error}\n".encode())
-        return EXIT_NOT_RUN, False
-    write_new_file(out_dir / STAGE1_LOG_NAME, bytes(log1.tail))
+        return EXIT_NOT_RUN, False, None
+    tail = bytes(log1.tail)
+    if outcome.evicted:
+        tail += f"[bomlens-runner] stage 1 was evicted by the platform: {outcome.evicted}\n".encode()
+    write_new_file(out_dir / STAGE1_LOG_NAME, tail)
     killed = outcome.killed or (outcome.cancelled and outcome.started)
     if killed and s1.mount("guard-state"):
         result.source_restored = _restore(scan, image1, run1, env1, result)
     if outcome.cancelled:
         raise ScanCancelled("the scan was cancelled")
     code = outcome.exit_code if outcome.exit_code is not None else 137
-    return code, outcome.oom_killed
+    return code, outcome.oom_killed, _eviction_reason(outcome.evicted)
+
+
+def _eviction_reason(message: str | None) -> str | None:
+    """The stage 1 failure reason an eviction message names: disk-space for
+    ephemeral storage (an emptyDir or the container's local storage over its
+    limit, or the node short of it), oom for memory; None for any other."""
+    if not message:
+        return None
+    text = message.lower()
+    if "ephemeral" in text or "emptydir" in text or "storage" in text or "disk" in text:
+        return "disk-space"
+    if "memory" in text:
+        return "oom"
+    return None
 
 
 def _stage1_mounts(scan: _Scan, s1: Stage, source: Path, out_dir: Path, files_dir: Path,

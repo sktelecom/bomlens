@@ -93,6 +93,10 @@ class ContainerOutcome:
     # Why the container never started (an image that could not be pulled).
     # Short, never a path or a value from the caller.
     start_error: str | None = None
+    # Why the platform stopped a container it had started, when it says so: a
+    # Kubernetes eviction's message ("Usage of EmptyDir volume ... exceeds the
+    # limit"). Short, from the platform, never a value from the caller.
+    evicted: str | None = None
     extra: dict = field(default_factory=dict)
 
     @property
