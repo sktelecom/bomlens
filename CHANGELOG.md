@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - When stage 1 gives no SBOM, the reason recorded in `bomlens:sbom-tool-degraded` no longer comes from BomLens's own note on the licence lookup. A scan whose licence probe timed out was reported as `network` although stage 1 ended for another cause.
 - When Kubernetes evicts stage 1 of an engine runner scan, the runner records the kubelet's message on the stage (`evicted`) and in `bomlens-stage1.log`, and passes the reason to stage 2: `disk-space` when ephemeral storage ran out, `oom` for memory. Such a scan was recorded as `network` or `cdxgen-crash`.
+- When stage 1 gives no SBOM and the manifest-only scan takes its place, the Python dependencies that `requirements.txt` and the `[project]` dependencies of `pyproject.toml` declare are listed without versions, marked `bomlens:evidenceGrade=declared-only` with the range in `bomlens:declaredRange`, and the result is graded unreliable (hint `python-declared-only`). The manifest-only scan lists exact pins only, so a requirements file of version ranges left almost no Python package.
+- Stage 1 turns off the pip and uv download caches (`PIP_NO_CACHE_DIR`, `UV_NO_CACHE`) unless the caller sets them. With large wheels the cached copies beside the installed ones filled the temporary volume. The runner reference says that such projects need a larger `tmp_bytes`.
 - In the web UI, choosing SBOM upload after the new scan form opened on another input now sets the conformance profile to the SKT submission profile, as its help text says. A profile the user picked is kept.
 
 ## [v1.15.5] - 2026-11-27

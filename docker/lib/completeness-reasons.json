@@ -45,6 +45,14 @@
       "fixEn": "Fix the npm error named in the scan log (the registry must be reachable), or commit a lock file, then scan again.",
       "fixKo": "스캔 로그에 나온 npm 오류를 해결하거나(레지스트리에 접속할 수 있어야 합니다) 락 파일을 커밋한 뒤 다시 스캔하세요."
     },
+    "python-declared-only": {
+      "grade": "unreliable",
+      "reason": "tool-degraded",
+      "en": "Nothing resolved the Python dependencies, so the SBOM lists the ones requirements.txt or pyproject.toml declares, without versions. Their own dependencies are missing and none of them is checked for vulnerabilities.",
+      "ko": "Python 의존성을 해석하지 못해 SBOM에는 requirements.txt나 pyproject.toml에 선언된 의존성이 버전 없이 들어 있습니다. 그 아래의 의존성은 빠졌고, 목록의 어느 항목도 취약점을 확인하지 않았습니다.",
+      "fixEn": "Fix the cause named in the scan log (a large requirement such as torch needs more temporary disk space for the scan), or commit a lock file, then scan again.",
+      "fixKo": "스캔 로그에 나온 원인을 해결하거나(torch처럼 큰 패키지는 스캔에 임시 디스크 공간이 더 필요합니다) 락 파일을 커밋한 뒤 다시 스캔하세요."
+    },
     "android-useandroidx-missing": {
       "en": "The app uses AndroidX libraries, but the Gradle property android.useAndroidX=true is not set, so Gradle stopped before it resolved the app's dependencies.",
       "ko": "앱이 AndroidX 라이브러리를 쓰는데 Gradle 속성 android.useAndroidX=true가 설정되어 있지 않아 Gradle이 앱의 의존성을 해석하기 전에 멈췄습니다.",
