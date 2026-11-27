@@ -77,6 +77,10 @@ for name, strings in roots.items():
     open(f'{tmp}/root-{name}/usr/bin/prog', 'wb').write(blob(strings) + b'\0' * 64)
 os.makedirs(f'{tmp}/root-own-lib/usr/lib')
 open(f'{tmp}/root-own-lib/usr/lib/libalpha.so.1', 'wb').write(blob(A + SHARED + B + D) + b'\0' * 64)
+os.makedirs(f'{tmp}/root-mixed/usr/lib'); os.makedirs(f'{tmp}/root-mixed/usr/bin')
+open(f'{tmp}/root-mixed/usr/lib/libalpha.so.1', 'wb').write(blob(A + D) + b'\0' * 64)            # names 1.1, weakly
+open(f'{tmp}/root-mixed/usr/bin/mid', 'wb').write(blob(A + SHARED + B) + b'\0' * 64)            # fits 1.1 and 1.2
+open(f'{tmp}/root-mixed/usr/bin/top', 'wb').write(blob(A + SHARED + B + C) + b'\0' * 64)        # fits only 1.2
 PY
 
 KB="$TMP/kb/kb.sqlite3"; mkdir -p "$TMP/kb"
@@ -499,6 +503,26 @@ out="$(ident two FW_BINKB_TRUST_NEWEST=true)"
 if [ "$(jq -r '[.[] | select(.name == "alpha") | .version] | sort | join(",")' <<<"$out")" = "1.1,1.2" ]; then
     pass "two releases of one component in two files are two components"
 else fail "two releases were merged into one" "$out"; fi
+
+# A file that names one release does not absorb a file that only fits another.
+mkdir -p "$TMP/root-named/usr/lib" "$TMP/root-named/usr/bin" "$TMP/root-fits/usr/lib" "$TMP/root-fits/usr/bin"
+cp "$TMP/root-release-1.1/usr/bin/prog" "$TMP/root-named/usr/lib/libalpha.so.1"
+cp "$TMP/root-newest/usr/bin/prog" "$TMP/root-named/usr/bin/other"
+out="$(ident named)"
+if [ "$(jq -r '[.[] | select(.name == "alpha") | (.version // ([.properties[] | select(.name == "bomlens:versionRange") | .value][0]))] | sort | join(",")' <<<"$out")" = "1.1,1.2 or later" ]; then
+    pass "a release named by one file is kept apart from a file that only fits another release"
+else fail "a named release absorbed a file of another release" "$out"; fi
+cp "$TMP/root-release-1.1/usr/bin/prog" "$TMP/root-fits/usr/lib/libalpha.so.1"
+cp "$TMP/root-only-core/usr/bin/prog" "$TMP/root-fits/usr/bin/other"
+out="$(ident fits)"
+if [ "$(jq -r '[.[] | select(.name == "alpha") | .version] | join(",")' <<<"$out")" = "1.1" ]; then
+    pass "a file that still fits the named release joins it instead of becoming a second component"
+else fail "a file that fits the named release was reported apart" "$out"; fi
+out="$(ident mixed)"
+if [ "$(jq -r '[.[] | select(.name == "alpha") | (.version // ([.properties[] | select(.name == "bomlens:versionRange") | .value][0]))] | sort | join(",")' <<<"$out")" = "1.1,1.2 or later" ] \
+   && [ "$(jq '[.[]."bom-ref"] | length == (unique | length)' <<<"$out")" = "true" ]; then
+    pass "a version group keeps its version when a stronger file in it only fits, and no two results share a reference"
+else fail "a version group lost its version or two results share a reference" "$out"; fi
 
 # The walk is sorted, so the cap keeps the same files on every run.
 mkdir -p "$TMP/root-order/a" "$TMP/root-order/b"
