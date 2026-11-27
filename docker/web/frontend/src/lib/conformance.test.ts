@@ -9,6 +9,7 @@ import {
   checkKind,
   conformanceReports,
   formatMeasure,
+  formConformanceProfile,
   clusterOf,
   crosswalkTotals,
   dedupeMissing,
@@ -565,5 +566,17 @@ describe("profileLabelKey", () => {
     expect(profileLabelKey(null)).toBeNull();
     expect(profileLabelKey("")).toBeNull();
     expect(profileLabelKey("eu-cra")).toBeNull();
+  });
+});
+
+describe("formConformanceProfile", () => {
+  it("follows the input chosen now while the user has picked no profile", () => {
+    expect(formConformanceProfile(null, false)).toBe("default");
+    expect(formConformanceProfile(null, true)).toBe("skt-submission");
+  });
+
+  it("keeps a profile the user picked or a re-scan seeded", () => {
+    expect(formConformanceProfile("default", true)).toBe("default");
+    expect(formConformanceProfile("bsi-tr-03183-2", false)).toBe("bsi-tr-03183-2");
   });
 });

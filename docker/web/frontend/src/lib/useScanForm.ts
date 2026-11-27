@@ -35,6 +35,7 @@ import {
   type BuildTool,
 } from "@/lib/buildTool";
 import i18n from "@/lib/i18n";
+import { formConformanceProfile } from "@/lib/conformance";
 import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
 import {
@@ -319,18 +320,19 @@ export function useScanForm({
     showDeepSource && deepSource ? "scan-target-src" : source;
   const isAnalyze = source === "sbom-upload";
   // Conformance profile. Defaults to skt-submission for a document under
-  // review (ANALYZE) and default for a generated SBOM, unless a re-scan seeds
-  // an explicit choice. A named profile (not a boolean) so a later addition
+  // review (ANALYZE) and default for a generated SBOM, following the input
+  // chosen now, unless the user picks one or a re-scan seeds an explicit choice. A named profile (not a boolean) so a later addition
   // (an EU CRA profile, say) is a third option, not a contract rewrite.
-  const [conformanceProfile, setConformanceProfile] = useState<ConformanceProfile>(
+  const [conformanceChoice, setConformanceProfile] = useState<ConformanceProfile | null>(
     () => {
       const seeded = initialConfig?.conformanceProfile;
       if (seeded && (CONFORMANCE_PROFILES as string[]).includes(seeded)) {
         return seeded as ConformanceProfile;
       }
-      return isAnalyze ? "skt-submission" : "default";
+      return null;
     },
   );
+  const conformanceProfile = formConformanceProfile(conformanceChoice, isAnalyze);
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply. True
   // of both AI inputs: the model named on HuggingFace and the model file read
