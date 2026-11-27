@@ -434,12 +434,16 @@ class KnowledgeBase:
         return dict(hits)
 
     def detected(self, hits, tables, path=''):
-        """Names of the components reported for one file under the rule stored in the database."""
+        """Names of the components reported for one file under the rule stored in the database.
+        A kernel image or module reports only kernel-only components: drivers spell many messages and
+        counter names through macros, so the sources do not carry them as literals and they cannot be
+        put in the background, while a user-space project that shares the driver code (DPDK with the
+        Intel and Broadcom drivers) has them as literals and would be credited with the kernel module."""
         r = self.rule
-        out = {n for n, h in hits.items() if h['unique'] >= r['unique'] and h['score'] >= r['score']
-               and (n not in self.kernel_only or KERNEL_FILE.search(os.path.basename(path)))}
+        kernel_file = bool(KERNEL_FILE.search(os.path.basename(path)))
+        out = {n for n, h in hits.items() if h['unique'] >= r['unique'] and h['score'] >= r['score']}
         out.update(n for n, (cnt, size) in tables.items() if cnt >= r['table_count'] and size >= r['table_bytes'])
-        return out
+        return {n for n in out if (n in self.kernel_only) == kernel_file}
 
     def scan_bytes(self, data, path=''):
         """(hits, tables) for the bytes of one file."""

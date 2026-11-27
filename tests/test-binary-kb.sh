@@ -211,6 +211,19 @@ if python3 "$LIB/binarykb.py" build --kb "$TMP/wide/kb.csv" --release test-wide 
         pass "a component with more than 63 releases builds and its 67th release is read back exactly"
     else fail "a release past the 63rd was not read back" "$wide"; fi
 else fail "a component with more than 63 releases did not build" "$(tail -1 "$TMP/wide.err")"; fi
+# ---- kernel files -----------------------------------------------------------------------
+mkdir -p "$TMP/root-kmod/lib/modules/6.1/kernel" "$TMP/kb-kmod"
+cp "$TMP/root-release-1.1/usr/bin/prog" "$TMP/root-kmod/lib/modules/6.1/kernel/drv.ko"
+cp "$TMP/root-beta-only/usr/bin/prog" "$TMP/root-kmod/lib/modules/6.1/kernel/other.ko"
+kmod="$(ident kmod)"
+if [ "$(jq 'length' <<<"$kmod")" = "0" ]; then
+    pass "a kernel module is not credited to a user-space component whose strings it carries"
+else fail "a kernel module was reported as a user-space component" "$kmod"; fi
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --kernel-only beta --release test-kmod --out "$TMP/kb-kmod/kb.sqlite3" 2>/dev/null
+kmod="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-kmod" "$TMP/kb-kmod/kb.sqlite3" 2>/dev/null)"
+if [ "$(jq -r '[.[].name] | sort | join(",")' <<<"$kmod")" = "beta" ]; then
+    pass "a kernel module still reports a kernel-only component"
+else fail "a kernel-only component was not reported in a kernel module" "$kmod"; fi
 
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
