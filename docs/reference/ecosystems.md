@@ -292,7 +292,7 @@ Dependencies are read from the committed lockfiles, so include them in the scan:
 
 > Note: a folder with no manifest at its top level but an Xcode project (`*.xcodeproj`), `Package.swift`, `Podfile` or `Package.resolved` up to three folders down, for example `App/App.xcodeproj`, is scanned as Swift. A tree that has a root manifest of another language keeps that language. The Swift resolver steps and the `cdxgen` run stop after `BOMLENS_PREP_TIMEOUT` seconds (900 by default) and git is told not to ask for a login, so a dependency clone that cannot finish ends the step instead of holding the scan.
 
-> Note: the bundled example lists 6 components, of which 5 carry a PURL (83%) and 2 a license (33%). Both are below the default thresholds of the conformance checks: the PURL check fails and the license check warns. The two resolved packages (`swift-argument-parser`, `swift-log`) have a PURL and a license. The rest are the package itself and the platform modules it imports (`Foundation`, `XCTest`, `dispatch`), which have no license to declare. BomLens drops the versionless duplicates of a resolved package that the import scan adds, so a package is counted once.
+> Note: the bundled example lists 3 components, of which 2 carry a PURL (67%) and 2 a license (67%). Both are below the default thresholds of the conformance checks: the PURL check fails and the license check warns. The two resolved packages (`swift-argument-parser`, `swift-log`) have a PURL and a license; the third is the package itself. The platform modules it imports (`Foundation`, `XCTest`, `dispatch`) belong to the Swift toolchain and are not listed. BomLens drops the versionless duplicates of a resolved package that the import scan adds, so a package is counted once.
 
 ---
 
