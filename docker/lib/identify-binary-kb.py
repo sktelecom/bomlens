@@ -202,23 +202,31 @@ def main():
     if capped:
         print(f"[binary-kb] WARN: stopped at {MAX_FILES} files; raise FW_BINKB_MAX_FILES to cover the rest.", file=sys.stderr)
 
-    def group(per):
+    def group(per, version=None):
         files = [(x["file"], x["sha256"]) for x in per]
-        best = max(per, key=lambda x: x["rank"])
+        # A version group takes its evidence from a file that named that version, so the result keeps it.
+        best = max([x for x in per if version and x["resolved"] == version] or per, key=lambda x: x["rank"])
         return {"files": files, "best": {"hit": best["hit"], "tables": best["tables"], "file": best["file"], "sha256": best["sha256"]}}
 
     # One result per name, unless the files disagree on the version: a library of one release next to a
     # program that carries another release is two components, and one of them must not hide the other.
-    # A file that could not name a single version joins the groups whose version it still allows.
+    # A file that could not name a single version joins the groups whose version it still allows. When the
+    # strongest file of all allows none of the named versions, the files that allow none of them are one
+    # more component: a weaker copy that names its release must not hide the main copy of another release.
+    # Weaker disagreeing files are left as they were, since files of one package often disagree a little.
     entries = []
     for name in sorted(found):
         per = found[name]["per"]
         versions = sorted({x["resolved"] for x in per if x["resolved"]})
-        if len(versions) < 2:
+        rest = [x for x in per if not x["resolved"] and x["cands"] and not any(v in x["cands"] for v in versions)]
+        apart = bool(versions) and bool(rest) and max(per, key=lambda x: x["rank"]) in rest
+        if len(versions) < 2 and not apart:
             entries.append((name, group(per)))
             continue
         for v in versions:
-            entries.append((name, group([x for x in per if x["resolved"] == v or (not x["resolved"] and v in x["cands"])])))
+            entries.append((name, group([x for x in per if x["resolved"] == v or (not x["resolved"] and v in x["cands"])], v)))
+        if apart:   # files found by tables alone name no version and stay with the strongest copy
+            entries.append((name, group(rest + [x for x in per if not x["cands"]])))
 
     components, dropped = [], 0
     for name, e in entries:
