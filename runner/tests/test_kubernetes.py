@@ -240,6 +240,19 @@ class Follow(unittest.TestCase):
         out, _ = self.run_spec(api)
         self.assertTrue(out.oom_killed and out.killed)
 
+    def test_eviction_is_named(self):
+        state = cs({"terminated": {"exitCode": 137, "reason": "Error"}}, "Failed")
+        state.update({"reason": "Evicted",
+                      "message": 'Usage of EmptyDir volume "tmp" exceeds the limit "17179869184". '})
+        out, _ = self.run_spec(FakeApi([state]))
+        self.assertTrue(out.killed)
+        self.assertFalse(out.oom_killed)
+        self.assertEqual(out.evicted, 'Usage of EmptyDir volume "tmp" exceeds the limit "17179869184".')
+
+    def test_a_container_that_ends_by_itself_is_not_evicted(self):
+        out, _ = self.run_spec(FakeApi([cs({"terminated": {"exitCode": 1}}, "Failed")]))
+        self.assertIsNone(out.evicted)
+
     def test_timeout_kills(self):
         api = FakeApi([cs({"running": {}})])
         out, _ = self.run_spec(api, timeout=30)

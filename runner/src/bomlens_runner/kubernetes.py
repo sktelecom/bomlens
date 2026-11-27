@@ -421,6 +421,7 @@ class KubernetesBackend:
                 code = term.get("exitCode")
                 outcome.exit_code = code if isinstance(code, int) else None
                 outcome.oom_killed = term.get("reason") == "OOMKilled"
+                outcome.evicted = _eviction(pod)
                 logs.finish(self.opts.log_grace)
                 return outcome
             if "running" in state:
@@ -547,3 +548,14 @@ class _Follower:
                 on_line(self.queue.get_nowait())
             except queue.Empty:
                 return
+
+
+def _eviction(pod: dict) -> str | None:
+    """The kubelet's message when it evicted the Pod (status.reason Evicted),
+    cut to one short line; None otherwise."""
+    status = pod.get("status", {}) if isinstance(pod, dict) else {}
+    if not isinstance(status, dict) or status.get("reason") != "Evicted":
+        return None
+    message = status.get("message")
+    text = " ".join(message.split())[:200] if isinstance(message, str) else ""
+    return text or "Evicted"

@@ -289,6 +289,35 @@ class KillPaths(Base):
         self.assertTrue(result.source_restored)
         self.assertTrue(result.oom_killed)
 
+    def test_an_eviction_for_storage_reaches_stage2_as_disk_space(self):
+        self.backend.logs["engine-stage1"] = ["Running pip/uv install"]
+        self.backend.outcomes["engine-stage1"] = b.ContainerOutcome(
+            started=True, exit_code=143, evicted='Usage of EmptyDir volume "tmp" exceeds the limit "17179869184".')
+        result = self.scan()
+        self.assertIn("engine-restore", self.backend.components)
+        env = self.backend.spec("engine-stage2").env
+        self.assertEqual((env["BOMLENS_STAGE1_EXIT"], env["BOMLENS_STAGE1_OOM"]), ("143", "false"))
+        self.assertEqual(env["BOMLENS_STAGE1_REASON"], "disk-space")
+        self.assertIn("stage 1 was evicted by the platform: Usage of EmptyDir volume",
+                      (result.output_dir / STAGE1_LOG_NAME).read_text())
+        self.assertEqual(result.as_metadata()["stages"]["stage1"]["evicted"],
+                         'Usage of EmptyDir volume "tmp" exceeds the limit "17179869184".')
+
+    def test_an_eviction_for_memory_is_oom_and_another_is_left_to_the_log(self):
+        for message, reason in (("The node was low on resource: memory.", "oom"),
+                                ("Pod was preempted", None)):
+            with self.subTest(message=message):
+                self.setUp()
+                self.backend.outcomes["engine-stage1"] = b.ContainerOutcome(
+                    started=True, exit_code=137, evicted=message)
+                self.scan()
+                self.assertEqual(self.backend.spec("engine-stage2").env.get("BOMLENS_STAGE1_REASON"), reason)
+
+    def test_a_stage1_that_was_not_evicted_passes_no_reason(self):
+        self.backend.outcomes["engine-stage1"] = b.ContainerOutcome(started=True, exit_code=1)
+        self.scan()
+        self.assertNotIn("BOMLENS_STAGE1_REASON", self.backend.spec("engine-stage2").env)
+
     def test_timeout_runs_restore(self):
         self.backend.outcomes["engine-stage1"] = b.ContainerOutcome(started=True, exit_code=137, timed_out=True)
         self.scan()
