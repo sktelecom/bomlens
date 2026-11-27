@@ -1,6 +1,6 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-11-26T22:27:41Z",
+  "generatedAt": "2026-11-27T12:27:12Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
@@ -558,7 +558,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-26T22:27:38+00:00",
+            "detail": "2026-11-27T12:27:06+00:00",
             "refs": [
               "Section 5.2.1"
             ]
