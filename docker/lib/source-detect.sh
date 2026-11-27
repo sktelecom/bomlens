@@ -668,8 +668,27 @@ source_dev_only_manifests() {
 stage1_fail_reason() {
     if [ "${1:-}" = "true" ]; then echo oom; return; fi
     if [ "${3:-}" = "127" ]; then echo cdxgen-unavailable; return; fi
-    local log="${2:-}"
+    local log="${2:-}" own=""
     if [ -n "$log" ] && [ -f "$log" ]; then
+        # BomLens's own note on the licence lookup quotes the probe's error
+        # (ETIMEDOUT, a certificate message) for a registry stage 1 does not
+        # need; it is not why stage 1 failed, so it is read without it.
+        own="$(mktemp 2>/dev/null)" || own=""
+        if [ -n "$own" ]; then
+            grep -v '^\[build-prep\] license-fetch:' "$log" > "$own" 2>/dev/null || true
+            log="$own"
+        fi
+        _stage1_fail_reason_of "$log"
+        [ -z "$own" ] || rm -f "$own"
+        return
+    fi
+    echo cdxgen-crash
+}
+
+# The reason stage1_fail_reason reads from the stage 1 log.
+_stage1_fail_reason_of() {
+    local log="$1"
+    if [ -f "$log" ]; then
         if grep -qi "no space left on device" "$log"; then echo disk-space; return; fi
         # Gradle's own report that its build process died. Nothing in the log
         # says why, and the usual cause is the kernel killing it for memory (the

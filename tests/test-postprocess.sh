@@ -11697,6 +11697,10 @@ for _rf in 'npm error code ECONNREFUSED' 'getaddrinfo EAI_AGAIN registry.npmjs.o
     "[build-prep] node: no lock file, and the npm registry registry.npmjs.org did not answer (it did not answer within 6s); cdxgen's npm install runs offline instead of waiting for it"; do
     [ "$(_rf_reason "$_rf")" = network ] && pass "network: $(printf '%b' "$_rf" | cut -c1-60)" || fail "not network ($(_rf_reason "$_rf"))" "$_rf"
 done
+[ "$(_rf_reason '[build-prep] license-fetch: registry license lookup off (FETCH_LICENSE=false), pypi.org: it could not be reached (ETIMEDOUT); licenses in lock files and package manifests are still read\nRunning pip/uv install without --only-binary argument.')" = cdxgen-crash ] \
+    && pass "BomLens's own note on the licence lookup is not read as the stage 1 failure" || fail "the licence lookup note was read as the failure" ""
+[ "$(_rf_reason '[build-prep] license-fetch: registry license lookup off (FETCH_LICENSE=false), pypi.org: it could not be reached (ETIMEDOUT)\ngetaddrinfo ENOTFOUND registry.npmjs.org')" = network ] \
+    && pass "a network error of stage 1 beside that note stays network" || fail "network lost beside the licence note" ""
 [ "$(_rf_reason 'added lodash@4.17.401\nDownloading foo-403.tar.gz (E4010 bytes)\nchecksum 401403e4013\nbuild 401 of 403 done')" = cdxgen-crash ] \
     && pass "a version or file name holding 401/403 is not registry-auth" || fail "an ordinary line matched" ""
 [ "$(bash -c '. "$1"; printf "npm error code E401\n" > "$2"; stage1_fail_reason true "$2" 1' _ "$DETECT" "$WORK/rf.log")" = oom ] \
