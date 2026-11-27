@@ -1,16 +1,16 @@
 {
-  "_comment": "Expected on-disk size (MB, after the layers are unpacked) of each image a scan can download, keyed by image name without registry, path or tag. image_size_mb and image_size_note in source-detect.sh read it, and so do the disk checks in scan-sbom.sh, entrypoint.sh and check-setup. Measured with the cdxgen tag in docker/lib/cdxgen-images.json; measure again when that tag changes (scripts/update-cdxgen-digests.sh reminds you). An image not listed here has no size note and no disk check.",
+  "_comment": "Expected on-disk size (MB, after the layers are unpacked) of each image a scan can download, keyed by image name without registry, path or tag. image_size_mb and image_size_note in source-detect.sh read it, and so do the disk checks in scan-sbom.sh, entrypoint.sh and check-setup. Measured with the cdxgen tag in docker/lib/cdxgen-images.json (for 13.8.0, the 13.5.0 measurement scaled by the growth of the compressed layers); measure again when that tag changes (scripts/update-cdxgen-digests.sh reminds you). An image not listed here has no size note and no disk check.",
   "sizes_mb": {
-    "cdxgen": 16000,
-    "cdxgen-temurin-java21": 5630,
-    "cdxgen-python312": 4860,
-    "cdxgen-debian-golang124": 3830,
-    "cdxgen-java17": 3800,
-    "cdxgen-alpine-node24": 2910,
-    "cdxgen-debian-php84": 4340,
-    "cdxgen-debian-rust": 4030,
-    "cdxgen-debian-ruby34": 4220,
-    "cdxgen-debian-dotnet9": 14700,
+    "cdxgen": 16450,
+    "cdxgen-temurin-java21": 6000,
+    "cdxgen-python312": 5100,
+    "cdxgen-debian-golang124": 4230,
+    "cdxgen-java17": 4020,
+    "cdxgen-alpine-node24": 3160,
+    "cdxgen-debian-php84": 4760,
+    "cdxgen-debian-rust": 4450,
+    "cdxgen-debian-ruby34": 4630,
+    "cdxgen-debian-dotnet9": 14940,
     "bomlens-android-sdk": 6300,
     "bomlens": 1420
   }

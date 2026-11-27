@@ -1,21 +1,21 @@
 {
   "_comment": "Digests of the cdxgen language images, for the image tag in source-detect.sh (CDXGEN_TAG). The execution plan (MODE=PLAN) names each stage-1 image by this digest, so a caller runs exactly the image this BomLens release was tested with. scripts/update-cdxgen-digests.sh refreshes the table after a tag bump; tests/test-engine-contract.sh checks it covers every image img_for_lang can return.",
-  "tag": "13.5.0",
+  "tag": "13.8.0",
   "digests": {
-    "ghcr.io/cdxgen/cdxgen": "sha256:6b1f2ef9c976ab52400140f336a2df1633d8ff59c1cb0941d01fc131788fa60a",
-    "ghcr.io/cdxgen/cdxgen-debian-rust": "sha256:1e460cb0cc109144cbfa3d9026c0a40d56361c6e0eecdcce95d30a06720a50b0",
-    "ghcr.io/cdxgen/cdxgen-debian-golang124": "sha256:0d2c65a0fa19df9c07d227e362d8ad0b353bba45b3e4c466085d1ca0b3a1cc8a",
-    "ghcr.io/cdxgen/cdxgen-debian-ruby34": "sha256:cbf8006ad6cc5bfe2e6eb88f7e5549bcf146b4ac87992d93fd0cbe92e6e26b24",
-    "ghcr.io/cdxgen/cdxgen-temurin-java21": "sha256:7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275",
-    "ghcr.io/cdxgen/cdxgen-temurin-java24": "sha256:50616c8ac79925d93de7d986b7076450bfff15c27bc86fccfd0f82326e53252c",
-    "ghcr.io/cdxgen/cdxgen-temurin-java25": "sha256:a34b3cb81964c299043194dc0a978a41c74b0187db17961c33114be26d34974c",
-    "ghcr.io/cdxgen/cdxgen-python312": "sha256:f29221765f5c1a7702a8f22f552bb633db4905b13265da218052a0aaa5c1b10e",
-    "ghcr.io/cdxgen/cdxgen-alpine-node24": "sha256:0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84",
-    "ghcr.io/cdxgen/cdxgen-debian-php84": "sha256:adf952138a08ff77f3948d30c59b08249bbc3c91265b8a6a63bd5555faf1e6c9",
-    "ghcr.io/cdxgen/cdxgen-debian-dotnet9": "sha256:682d26d690ce6dc32e10776f5a5cf88891c42aa69b15c53556ab3260b7bef65c",
-    "ghcr.io/cdxgen/cdxgen-debian-swift": "sha256:83aab52f62327b7ef3b705a0e4199bc8ecb6d011a9b3681b808059f228d5d3d7",
-    "ghcr.io/cdxgen/cdxgen-temurin-java8": "sha256:6fc7a06392a71dfce373e239f17f21734822171313ccaaaceb634a3df7843699",
-    "ghcr.io/cdxgen/cdxgen-java11": "sha256:fbdf7cbfe285c92f1c5b2eb2e998ecc00c90d6c3d6f935831cafa1f92cd8bf07",
-    "ghcr.io/cdxgen/cdxgen-java17": "sha256:40cdd85f42ffaf7911c25a758844b22753b326a2be5c8b68d3d664709f9cbba5"
+    "ghcr.io/cdxgen/cdxgen": "sha256:2bbfeffaa64801cac126e60441acaf8ceedd8eb939b32c3dad15519dce3ef5c6",
+    "ghcr.io/cdxgen/cdxgen-debian-rust": "sha256:686499d02d722a45dbc5ba670a5b0d2bf2fc27aade02c390e12165c0cf60a048",
+    "ghcr.io/cdxgen/cdxgen-debian-golang124": "sha256:6c2efb834d84d15478143301bc32d222ffc48ec65f7d0b87b2ff1136df920624",
+    "ghcr.io/cdxgen/cdxgen-debian-ruby34": "sha256:33486877d3ec363630bc8b341f2f6c3ec728159e278eab436cb7b5c628d458c3",
+    "ghcr.io/cdxgen/cdxgen-temurin-java21": "sha256:a060d6e913255c3aa0959d217dc705e1ed6712f6408e50ed56d2f4156831581b",
+    "ghcr.io/cdxgen/cdxgen-temurin-java24": "sha256:785c22706751d2923b289e87c8745d4c527d4f05fc10ac92f652070fe71e4a69",
+    "ghcr.io/cdxgen/cdxgen-temurin-java25": "sha256:45620939478ec4b3a3fc859c316a4dc80ff2f1170260b6d7920f9272580fec17",
+    "ghcr.io/cdxgen/cdxgen-python312": "sha256:a786eabe070308c1165a7308f58d34acdcdab1b36f908c1e4196774500adea78",
+    "ghcr.io/cdxgen/cdxgen-alpine-node24": "sha256:0f390da85ee0cd0fe37852f340c004e310604d4173b1f67986912fa832dab884",
+    "ghcr.io/cdxgen/cdxgen-debian-php84": "sha256:03433f86c0da5b1506740484aa0b67b22670a4eb6be9cbedef90b4c368ba4f44",
+    "ghcr.io/cdxgen/cdxgen-debian-dotnet9": "sha256:11c92e8dc562c1a88ea67114b7d1832e8ecd9026d21d7c975406de0d25413f2d",
+    "ghcr.io/cdxgen/cdxgen-debian-swift": "sha256:85f1233f6c2925aea5f5e3abfbc6b9529c50a3d4f5d0eaeb362eb4aebbc535c0",
+    "ghcr.io/cdxgen/cdxgen-temurin-java8": "sha256:5d43a1a765cc883dd0dcc4ecf550997157d6b5d9a4ff52c33cc58e88976e6740",
+    "ghcr.io/cdxgen/cdxgen-java11": "sha256:72a084b551b40b3da23dedf113dba850fe240b4355e6b69d885db6d0e18fbd5b",
+    "ghcr.io/cdxgen/cdxgen-java17": "sha256:1b6a3882de12b1e45e748a2b9e325917d5c8c251ed9864cb88e5ef742bb5923a"
   }
 }
