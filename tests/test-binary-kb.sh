@@ -182,6 +182,36 @@ if [ "$(prop "$near" bomlens:kbConfidence)" = "low" ]; then
     pass "a score close to the stored threshold is marked low confidence, for the review page to list first"
 else fail "a near-threshold result was not marked low confidence" "$near"; fi
 
+mkdir -p "$TMP/bg-own" "$TMP/kb-own"
+cp "$TMP/bg/"* "$TMP/src/alpha-1.1.tar.gz" "$TMP/bg-own/"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg-own" --release test-own --out "$TMP/kb-own/kb.sqlite3" 2>"$TMP/own.err"
+own="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-own/kb.sqlite3" 2>/dev/null)"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .version' <<<"$own")" = "1.1" ] && grep -q "skipped: alpha is a component" "$TMP/own.err"; then
+    pass "a component's own release given as background is skipped, so the component is still found"
+else fail "a component listed as background too was not found" "$own"; fi
+
+mkdir -p "$TMP/wide/src" "$TMP/wide/kb" "$TMP/root-wide/usr/bin"
+python3 - "$TMP/wide" "$TMP/root-wide/usr/bin/prog" <<'PY'
+import io, sys, tarfile
+w, prog = sys.argv[1:3]
+core = [f'wide core message number {i} for the knowledge base test' for i in range(40)]
+with open(f'{w}/kb.csv', 'w') as kb:
+    for r in range(70):   # more releases than a 64-bit version mask holds
+        own = [f'wide release {r} only message number {i} for the test' for i in range(3)]
+        data = ('\n'.join(f'const char *s{i} = "{s}";' for i, s in enumerate(core + own)) + '\n').encode()
+        with tarfile.open(f'{w}/src/wide-1.{r}.tar.gz', 'w:gz') as tf:
+            ti = tarfile.TarInfo(f'wide-1.{r}/w.c'); ti.size = len(data); tf.addfile(ti, io.BytesIO(data))
+        kb.write(f'wide,1.{r},{w}/src/wide-1.{r}.tar.gz\n')
+own = [f'wide release 66 only message number {i} for the test' for i in range(3)]
+open(prog, 'wb').write(b'\0'.join(s.encode() for s in core + own) + b'\0' * 64)
+PY
+if python3 "$LIB/binarykb.py" build --kb "$TMP/wide/kb.csv" --release test-wide --out "$TMP/wide/kb/kb.sqlite3" 2>"$TMP/wide.err"; then
+    wide="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-wide" "$TMP/wide/kb/kb.sqlite3" 2>/dev/null)"
+    if [ "$(jq -r '.[] | select(.name == "wide") | .version' <<<"$wide")" = "1.66" ]; then
+        pass "a component with more than 63 releases builds and its 67th release is read back exactly"
+    else fail "a release past the 63rd was not read back" "$wide"; fi
+else fail "a component with more than 63 releases did not build" "$(tail -1 "$TMP/wide.err")"; fi
+
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
 dec() { printf '%s' "$1" > "$TMP/dec.json"; ident release-1.1 FW_BINARY_KB_DECISIONS="$TMP/dec.json"; }

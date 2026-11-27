@@ -240,6 +240,12 @@ CREATE INDEX tbl_key ON tbl (key);
 """
 
 
+def mask_value(mask):
+    """A version bitmask as SQLite stores it: an integer while it fits in 63 bits, big-endian bytes beyond
+    that (a component with more than 63 releases). Readers accept both, so older bases read unchanged."""
+    return mask if mask < 1 << 63 else mask.to_bytes((mask.bit_length() + 7) // 8, 'big')
+
+
 def build(args):
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     if os.path.exists(args.out):
@@ -266,7 +272,13 @@ def build(args):
         print(f'{comp} {ver}: {len(strings)} strings', file=sys.stderr)
     for d in args.bg or []:
         for tb in sorted(os.path.join(d, f) for f in os.listdir(d)):
-            name = 'bg:' + re.split(r'-\d', os.path.basename(tb), maxsplit=1)[0]
+            base = re.split(r'-\d', os.path.basename(tb), maxsplit=1)[0]
+            if base in versions:
+                # A component's own release in the background would make every one of its strings shared,
+                # so it could never score unique strings and would never be reported.
+                print(f'background {os.path.basename(tb)} skipped: {base} is a component', file=sys.stderr)
+                continue
+            name = 'bg:' + base
             cid = comp_id(name, 'bg')
             strings = source_strings(tb)
             for s in strings:
@@ -318,7 +330,7 @@ def build(args):
     con.executemany('INSERT INTO ver VALUES (?,?,?)', [(names[c], j, v) for c in sorted(versions) for j, v in enumerate(versions[c])])
     # Rows go in sorted, so the same inputs give the same file bytes whatever the hash seed or the machine.
     con.executemany('INSERT INTO str VALUES (?,?)', ((s, ','.join(str(i) for i in sorted(owners[s]))) for s in sorted(owners)))
-    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((s, names[c], vmask[c][s]) for c in sorted(vmask) for s in sorted(vmask[c])))
+    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((s, names[c], mask_value(vmask[c][s])) for c in sorted(vmask) for s in sorted(vmask[c])))
     rows_t = sorted((key, k, c, name, data) for key, ents in index.items() for data, k, c, name in ents)
     for n, (key, k, c, name, data) in enumerate(rows_t, 1):
         con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?)', (n, c, name, k, key, data))
@@ -367,7 +379,7 @@ class KnowledgeBase:
         for i in range(0, len(strings), 500):
             chunk = strings[i:i + 500]
             for s, m in self.con.execute(f'SELECT s, mask FROM strv WHERE comp = ? AND s IN ({",".join("?" * len(chunk))})', [comp] + chunk):
-                out[bytes(s)] = m
+                out[bytes(s)] = int.from_bytes(m, 'big') if isinstance(m, bytes) else m
         return out
 
     def identify(self, strings):
