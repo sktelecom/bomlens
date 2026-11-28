@@ -224,6 +224,17 @@ class Env(Base):
         self.ws.policy(stage1_env={"NPM_CONFIG_REGISTRY": "https://mirror.example/repo/@org/",
                                    "GOPROXY": "https://mirror.example/go,direct"})
 
+    def test_licence_lookup_addresses_reach_stage_1_only(self):
+        env = {"NPM_URL": "https://mirror.example/npm/", "MAVEN_CENTRAL_URL": "https://mirror.example/maven2/",
+               "PYPI_URL": "https://mirror.example/pypi/", "RUST_CRATES_URL": "https://mirror.example/crates/"}
+        self.scan(policy=self.ws.policy(stage1_env=env))
+        s1, s2 = self.backend.spec("engine-stage1").env, self.backend.spec("engine-stage2").env
+        for name, value in env.items():
+            self.assertEqual(s1[name], value)
+            self.assertNotIn(name, s2)
+        with self.assertRaises(PolicyError):
+            self.ws.policy(stage1_env={"NPM_URL": "https://u:p@mirror.example/npm/"})
+
     def test_the_maven_wrapper_repository_reaches_stage_1(self):
         url = "https://mirror.example/maven2"
         self.scan(policy=self.ws.policy(stage1_env={"MVNW_REPOURL": url}))

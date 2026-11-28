@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The engine runner passes the addresses where stage 1 asks registries for licences (`NPM_URL`, `PYPI_URL`, `MAVEN_CENTRAL_URL`, `RUST_CRATES_URL`, `RUBYGEMS_V1_URL`, `NUGET_URL`, `GO_PKG_URL`, `PUB_DEV_URL`, `GITHUB_API_URL`) from `stage1_env`, so a scan on a network that reaches only a mirror can keep the licence lookup on.
+
 ## [v1.15.7] - 2026-11-28
 
 ### Fixed
