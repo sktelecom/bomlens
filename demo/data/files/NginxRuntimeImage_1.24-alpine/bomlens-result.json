@@ -1,0 +1,370 @@
+{
+  "contract": {
+    "name": "bomlens-engine",
+    "version": "1.4.0"
+  },
+  "engine": {
+    "version": "1.15.7",
+    "image": null,
+    "image_digest": null
+  },
+  "input": {
+    "kind": "image",
+    "mode": "IMAGE",
+    "target": "nginx:1.24-alpine",
+    "image": {
+      "reference": "nginx:1.24-alpine",
+      "source": "daemon",
+      "digest": "sha256:77e5d4a6ad906c5d3793764085706577fa705b1dc6f244ea0241c4b5e2155385",
+      "platform": "linux/amd64"
+    }
+  },
+  "run": {
+    "status": "succeeded",
+    "reason": null,
+    "started_at": "2026-11-28T10:10:04Z",
+    "ended_at": "2026-11-28T10:10:16Z",
+    "exit_code": 0
+  },
+  "steps": [
+    {
+      "id": "generate",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:04Z",
+      "ended_at": "2026-11-28T10:10:07Z",
+      "counts": {
+        "components": 1885
+      },
+      "stage": 2
+    },
+    {
+      "id": "os-licenses",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:07Z",
+      "ended_at": "2026-11-28T10:10:07Z",
+      "counts": {
+        "replaced": 0,
+        "hashes_dropped": 0
+      },
+      "stage": 2
+    },
+    {
+      "id": "docmeta",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:07Z",
+      "ended_at": "2026-11-28T10:10:07Z",
+      "stage": 2
+    },
+    {
+      "id": "normalize",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:07Z",
+      "ended_at": "2026-11-28T10:10:10Z",
+      "stage": 2
+    },
+    {
+      "id": "license-registry",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:10Z",
+      "ended_at": "2026-11-28T10:10:10Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:10Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-os-context",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-distro-supplier",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-maven-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-github-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-interpreter-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-eol",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-malicious",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-staleness",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:11Z",
+      "stage": 2
+    },
+    {
+      "id": "conformance",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:11Z",
+      "ended_at": "2026-11-28T10:10:12Z",
+      "stage": 2
+    },
+    {
+      "id": "source-file-tree",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:13Z",
+      "ended_at": "2026-11-28T10:10:13Z",
+      "stage": 2
+    },
+    {
+      "id": "source-snapshot",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:13Z",
+      "ended_at": "2026-11-28T10:10:13Z",
+      "stage": 2
+    },
+    {
+      "id": "scan-security",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:14Z",
+      "ended_at": "2026-11-28T10:10:14Z",
+      "stage": 2
+    },
+    {
+      "id": "deep-cve",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:14Z",
+      "ended_at": "2026-11-28T10:10:14Z",
+      "stage": 2
+    },
+    {
+      "id": "go-vulndb",
+      "status": "skipped",
+      "reason": "no_input",
+      "detail": "no Go module (pkg:golang) in the SBOM",
+      "started_at": "2026-11-28T10:10:15Z",
+      "ended_at": "2026-11-28T10:10:15Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:15Z",
+      "ended_at": "2026-11-28T10:10:15Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-risk-report",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:15Z",
+      "ended_at": "2026-11-28T10:10:15Z",
+      "stage": 2
+    },
+    {
+      "id": "sign",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-28T10:10:15Z",
+      "ended_at": "2026-11-28T10:10:15Z",
+      "stage": 2
+    }
+  ],
+  "tools": {
+    "syft": "1.54.1",
+    "trivy": "0.75.0"
+  },
+  "engines": [
+    "trivy"
+  ],
+  "data_sources": {
+    "trivy_db": {
+      "schema_version": 2,
+      "updated_at": "2026-11-28T07:04:51.381284779Z",
+      "downloaded_at": "2026-11-28T10:08:28.788855364Z"
+    },
+    "go_vulndb": null
+  },
+  "outputs": [
+    {
+      "role": "sbom.cyclonedx",
+      "path": "NginxRuntimeImage_1.24-alpine_bom.json",
+      "sha256": "7023a1d91295bd4ae670f819b537c9f9634ee6eade5b321ccfc6947f11f0cc8e",
+      "bytes": 1200996
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_files.json",
+      "sha256": "bd7d46c94d7ed14f6b368deed6320a1b98d5245d1446a74165e2635e56ec7563",
+      "bytes": 243046
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_source.json",
+      "sha256": "af4314c2eec411f8ae23eb40fbc219047d8f1565ae50aa77f03d5cead9a55383",
+      "bytes": 2122980
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_completeness.json",
+      "sha256": "65f1e01919dd2144b249c726b964347c917850331b73dccf18e95d86346a04a3",
+      "bytes": 184
+    },
+    {
+      "role": "vulnerabilities.all",
+      "path": "NginxRuntimeImage_1.24-alpine_security.json",
+      "sha256": "740ac45a3e4953433c0e7974e3909639a8d06883de92576ddfdb1a4bb6ff377f",
+      "bytes": 402323
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_security.md",
+      "sha256": "c0c9142e49118e6ae9f88fd245353ddfcae65f6b76b0ef41072d98ae02c2a077",
+      "bytes": 7925
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_security.html",
+      "sha256": "d57a2e601a42ede562bf877546cbef6d6561c8b61ca11024536b5605ca18cd13",
+      "bytes": 56315
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_security_epss.json",
+      "sha256": "2378bb801bcece446102a23e1af1241ad9ed89ec722caea63681407e4cd5798d",
+      "bytes": 2265
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_NOTICE.txt",
+      "sha256": "71169d30d794a6842f499d2103fcc7c8847ff023b8a7913cb163d62822c7ab95",
+      "bytes": 66481
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_NOTICE.html",
+      "sha256": "1573bf8a1518d394294de09b8b132461c4c50d83ac1e5da0517f9f8830d53d70",
+      "bytes": 99908
+    },
+    {
+      "role": "conformance",
+      "path": "NginxRuntimeImage_1.24-alpine_conformance.json",
+      "sha256": "3564e6606592edbd81aa8f58d9d9a4b9e54a93f4dac0904da4a61e4425d06365",
+      "bytes": 57406
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_conformance.md",
+      "sha256": "ec17901c352f3fe2f5e085860ab23b7c747f1fa57d0dd1d9e9f8ff4b444417cf",
+      "bytes": 17247
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_conformance.html",
+      "sha256": "9fb5184c7f7e9642ba63298209dc5d3d01b35115825734b0be2e2680815ab000",
+      "bytes": 54250
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_conformance.result",
+      "sha256": "d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1",
+      "bytes": 4
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_summary.result",
+      "sha256": "d8e6b09fb4f4699e65263101284ee93ac7bf8b87df70021eacd528f86092706f",
+      "bytes": 182
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_risk-report.md",
+      "sha256": "b824abf0e900bf478b90b74edebee7422f4962ed42dd21fe8482cd6838008053",
+      "bytes": 7416
+    },
+    {
+      "role": "other",
+      "path": "NginxRuntimeImage_1.24-alpine_risk-report.html",
+      "sha256": "43b7b148b9a46bd94008129eb89600f3d56a368a3cea6f366dcad0899cffe817",
+      "bytes": 46819
+    },
+    {
+      "role": "vulnerabilities.trivy",
+      "path": "NginxRuntimeImage_1.24-alpine_security.json",
+      "sha256": "740ac45a3e4953433c0e7974e3909639a8d06883de92576ddfdb1a4bb6ff377f",
+      "bytes": 402323
+    }
+  ]
+}

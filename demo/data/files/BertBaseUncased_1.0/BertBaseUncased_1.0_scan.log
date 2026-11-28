@@ -1,0 +1,86 @@
+==========================================
+ BomLens (post-process)
+ Mode: AIBOM
+ Project: BertBaseUncased (1.0)
+==========================================
+[1/2] aibom: generate AI SBOM for google-bert/bert-base-uncased
+[aibom] generating AI SBOM for google-bert/bert-base-uncased (OWASP AIBOM Generator)
+[aibom] HuggingFace auth: anonymous
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Generating AIBOM for google-bert/bert-base-uncased...
+  - Generating AIBOM model data...
+
+📄 HTML Report:
+   /tmp/tmp.8sZaWx23R1/aibom.html
+
+📝 Model Description:
+   No description available
+
+⚖️ License:
+   Apache-2.0
+
+✅ Successfully generated CycloneDX 1.6 SBOM:
+   /tmp/tmp.8sZaWx23R1/aibom.json
+   - Schema Validation (1.6): ✅ Valid
+
+✅ Successfully generated CycloneDX 1.7 SBOM:
+   /tmp/tmp.8sZaWx23R1/aibom_1_7.json
+   - Schema Validation (1.7): ✅ Valid
+
+📊 Completeness Score: 63.4/100
+   Profile: Basic - Minimal fields required for identification
+
+📋 Section Breakdown:
+   - Required Fields: 20/20
+   - Metadata: 8/20
+   - Component Basic: 17.1/20
+   - Component Model Card: 8.3/30
+   - External References: 10/10
+[aibom] kept CycloneDX 1.7 output
+[aibom] model card present (1 model component(s) with a card).
+[enrich] file security: queued (0 scanned safe, 0 flagged).
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[enrich] HuggingFace: 6 weight hash(es), openness assessed (weights=open-weight).
+[enrich] datasets: 2 referenced, 2 resolved, 0 source(s) traced (training-data=open-data).
+[enrich] cdxgen: merged pedigree/metrics/properties.
+[enrich] subject: bert-base-uncased is now the document's component (the generator's scan job is not what this SBOM describes).
+[enrich] enrichment complete.
+[INFO] SBOM ready: BertBaseUncased_1.0_bom.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
+[docmeta] tool=BomLens@1.15.7, lifecycle=post-build: BertBaseUncased_1.0_bom.json
+[docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
+[normalize] normalized: BertBaseUncased_1.0_bom.json (mode=sort-only)
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-28).
+[assess] stamped bomlens:assessment:* (conditional=1 review=2)
+[2/2] ai: G7 minimum-element conformance
+[validate] detected format: CycloneDX
+[validate] AI SBOM detected -> added G7 minimum-element checks
+[validate] added the 2026 SBOM minimum-element checks
+[validate] CycloneDX -> result=pass (mandatory fails=0, warns=13, review=14, n/a=11, untraceable=0): BertBaseUncased_1.0_conformance.json, BertBaseUncased_1.0_conformance.md, BertBaseUncased_1.0_conformance.html
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
+[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint).
+[notice] generated: BertBaseUncased_1.0_NOTICE.txt, BertBaseUncased_1.0_NOTICE.html (2 licenses, 2 components)
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_completeness.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_NOTICE.txt
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_NOTICE.html
+[risk] generated: BertBaseUncased_1.0_risk-report.md, BertBaseUncased_1.0_risk-report.html (conformance=pass, vulns total=0, crit=0, high=0, copyleft=0 strong/network + 1 weak, license-conflict incompatible=0, malicious=0)
+[spdx3] wrote BertBaseUncased_1.0_bom.spdx3.json (draft, 8 required field(s) open).
+[ai-profile] generated: BertBaseUncased_1.0_ai-profile.json, BertBaseUncased_1.0_ai-profile.md (G7 present=32/41, license flags=0, models assessed=1)
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_completeness.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_NOTICE.txt
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_NOTICE.html
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_conformance.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_conformance.md
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_conformance.html
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_conformance.result
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_risk-report.md
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_risk-report.html
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.spdx3.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_spdx3-check.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_spdx3-check.md
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_ai-declaration.template.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_ai-profile.json
+[SUCCESS] copied: /host-output/BertBaseUncased_1.0_ai-profile.md
+[INFO] Generate-only mode. Done.
