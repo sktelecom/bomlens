@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A container image built on Red Hat Enterprise Linux or SUSE Linux Enterprise now gets its OS package vulnerabilities. Syft names the Red Hat system `rhel` and the SLES packages `pkg:rpm/sles/...`, which Trivy does not read, so such images reported only application findings. Trivy's input copy now uses `redhat` and `pkg:rpm/suse/...`; the SBOM keeps syft's names and the findings carry its purls.
+
 ## [v1.15.6] - 2026-11-27
 
 ### Changed

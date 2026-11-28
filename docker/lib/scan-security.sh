@@ -49,10 +49,38 @@ echo "[security] running Trivy SBOM scan..."
 # Trivy's stderr goes to a file of this run's own: a shared /tmp/trivy.err let
 # two scans at once read each other's errors and pick the wrong retry.
 TRIVY_ERR=$(mktemp)
-trap 'rm -f "$TRIVY_ERR"' EXIT
+# Trivy's view of the SBOM. Syft names the Red Hat operating system `rhel` and
+# writes SUSE Linux Enterprise packages as `pkg:rpm/sles/...`, and Trivy reads
+# neither: the OS packages of such an image got no vulnerabilities at all. Trivy's
+# input copy calls the OS `redhat` and those packages `pkg:rpm/suse/...`; the
+# delivered SBOM keeps syft's names, and the SLES purls in Trivy's result are
+# written back below so that they match the SBOM's components.
+SBOM_TRIVY="$SBOM"
+sles_rewritten=""
+trap 'rm -f "$TRIVY_ERR"; [ "$SBOM_TRIVY" = "$SBOM" ] || rm -f "$SBOM_TRIVY"' EXIT
+if command -v jq >/dev/null 2>&1 \
+   && jq -e '[.components[]? | select((.type == "operating-system" and ((.name // "") | ascii_downcase) == "rhel")
+                                      or ((.purl // "") | startswith("pkg:rpm/sles/")))] | length > 0' "$SBOM" >/dev/null 2>&1; then
+    trivy_view="$(mktemp)"
+    if jq '
+        ([.components[]? | (.purl // "") | select(startswith("pkg:rpm/suse/"))] | length == 0) as $no_suse
+        | .components |= map(
+            if .type == "operating-system" and ((.name // "") | ascii_downcase) == "rhel" then .name = "redhat"
+            elif $no_suse and ((.purl // "") | startswith("pkg:rpm/sles/")) then .purl |= sub("^pkg:rpm/sles/"; "pkg:rpm/suse/")
+            else . end)
+       ' "$SBOM" > "$trivy_view" 2>/dev/null; then
+        SBOM_TRIVY="$trivy_view"
+        if grep -q '"pkg:rpm/suse/' "$trivy_view" && ! grep -q '"pkg:rpm/suse/' "$SBOM"; then
+            sles_rewritten=1
+        fi
+        echo "[security] gave Trivy the Red Hat and SUSE names it reads for the OS packages (delivered SBOM unchanged)."
+    else
+        rm -f "$trivy_view"
+    fi
+fi
 # --exit-code 0: report-only (never fail the scan pipeline on findings).
 trivy_ok=""
-trivy_in="$SBOM"
+trivy_in="$SBOM_TRIVY"
 trivy_in_tmp=""
 for _attempt in 1 2; do
     if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>"$TRIVY_ERR"; then
@@ -104,7 +132,7 @@ if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" "$TRIVY_ERR" &
         [ .components[]? | (.purl // "")
           | select(test("^pkg:(rpm|deb|apk)/"))
           | capture("^pkg:(?<t>rpm|deb|apk)/").t ]
-        | unique | .[]' "$SBOM" 2>/dev/null)
+        | unique | .[]' "$SBOM_TRIVY" 2>/dev/null)
     if [ -n "$os_types" ]; then
         split_outs=()
         for t in $os_types; do
@@ -113,7 +141,7 @@ if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" "$TRIVY_ERR" &
                 .components = [ .components[]
                     | select((((.purl // "") | test("^pkg:(rpm|deb|apk)/")) | not)
                               or ((.purl // "") | test("^pkg:" + $t + "/"))) ]
-            ' "$SBOM" > "$split_in" 2>/dev/null
+            ' "$SBOM_TRIVY" > "$split_in" 2>/dev/null
             if trivy sbom --quiet --format json --output "$split_out" --exit-code 0 "$split_in" 2>>"$TRIVY_ERR"; then
                 split_outs+=("$split_out")
             else
@@ -161,6 +189,17 @@ fi
 if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     tmp_r="$(mktemp)"
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
+fi
+
+# The SLES purls Trivy reports are the ones it was given; write back the SBOM's own.
+if [ -n "$sles_rewritten" ]; then
+    tmp_s="$(mktemp)"
+    if jq '(.Results[]?.Vulnerabilities[]?.PkgIdentifier.PURL | strings) |= sub("^pkg:rpm/suse/"; "pkg:rpm/sles/")
+           | (.Results[]?.Packages[]?.Identifier.PURL | strings) |= sub("^pkg:rpm/suse/"; "pkg:rpm/sles/")' "$JSON" > "$tmp_s" 2>/dev/null; then
+        mv "$tmp_s" "$JSON"
+    else
+        rm -f "$tmp_s"
+    fi
 fi
 
 # Distribution advisory numbers (DLA-..., SUSE-SU-...) are not vulnerability
