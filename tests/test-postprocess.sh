@@ -5264,6 +5264,43 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
 # shard: same unit as the section above
+echo "== sec-os-names: Trivy gets the Red Hat and SUSE names it reads, the SBOM keeps syft's =="
+# Syft names the Red Hat OS `rhel` and SLES packages `pkg:rpm/sles/...`; Trivy reads
+# neither and reported no OS vulnerability for such images. Trivy's input copy says
+# `redhat` and `pkg:rpm/suse/...`, and the purls in its result are written back.
+OSN="$WORK/osnames"; mkdir -p "$OSN"
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; in=""
+while [ $# -gt 0 ]; do
+    case "$1" in --output) out="$2"; shift ;; -*) ;; *) in="$1" ;; esac
+    shift
+done
+cp "$in" "$OSN_SEEN"
+echo '{"SchemaVersion":2,"Results":[{"Target":"sbom (sles 15.7)","Class":"os-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2025-0001","PkgName":"libexpat1","InstalledVersion":"2.7.1","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:rpm/suse/libexpat1@2.7.1?arch=x86_64&distro=sles-15.7"}}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+cat > "$OSN/bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"operating-system","name":"rhel","version":"8.2"},
+ {"type":"library","name":"libexpat1","version":"2.7.1","purl":"pkg:rpm/sles/libexpat1@2.7.1?arch=x86_64&distro=sles-15.7"},
+ {"type":"library","name":"bash","version":"4.4.19","purl":"pkg:rpm/redhat/bash@4.4.19-10.el8?arch=x86_64&distro=rhel-8.2"}]}
+JSON
+cp "$OSN/bom.json" "$OSN/bom.orig.json"
+OSN_SEEN="$OSN/seen.json" PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$OSN/bom.json" "$OSN/r" proj >/dev/null 2>&1 || fail "scan-security.sh failed on the rhel/sles input"
+[ "$(jq -r '.components[] | select(.type=="operating-system") | .name' "$OSN/seen.json")" = "redhat" ] \
+    && pass "Trivy is told the OS is redhat" || fail "Trivy's OS name: $(jq -c '[.components[]|select(.type=="operating-system")|.name]' "$OSN/seen.json")"
+jq -e '[.components[].purl // empty] | index("pkg:rpm/suse/libexpat1@2.7.1?arch=x86_64&distro=sles-15.7") != null' "$OSN/seen.json" >/dev/null \
+    && pass "Trivy gets the SLES package as pkg:rpm/suse" || fail "Trivy's SLES purl was not rewritten"
+jq -e '[.components[].purl // empty] | index("pkg:rpm/redhat/bash@4.4.19-10.el8?arch=x86_64&distro=rhel-8.2") != null' "$OSN/seen.json" >/dev/null \
+    && pass "other rpm purls reach Trivy unchanged" || fail "a redhat purl was changed"
+[ "$(jq -r '.Results[0].Vulnerabilities[0].PkgIdentifier.PURL' "$OSN/r_security.json")" = "pkg:rpm/sles/libexpat1@2.7.1?arch=x86_64&distro=sles-15.7" ] \
+    && pass "the finding carries the SBOM's own sles purl" || fail "finding purl: $(jq -r '.Results[0].Vulnerabilities[0].PkgIdentifier.PURL' "$OSN/r_security.json")"
+cmp -s "$OSN/bom.json" "$OSN/bom.orig.json" && pass "the delivered SBOM is unchanged" || fail "the delivered SBOM was changed"
+
+# shard: same unit as the section above
 echo "== sec-introduced-by: each finding names the direct dependency it arrives through =="
 IBDIR="$WORK/introby"; mkdir -p "$IBDIR"
 cat > "$FAKEBIN/trivy" <<'SH'
