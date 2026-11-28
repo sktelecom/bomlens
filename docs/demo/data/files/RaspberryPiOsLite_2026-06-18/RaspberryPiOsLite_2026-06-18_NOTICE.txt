@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for RaspberryPiOsLite
-Generated: 2026-11-27T12:41:08Z
+Generated: 2026-11-28T10:21:36Z
 Total components: 60123 · Distinct licenses: 397
 Counted: 2228 libraries, 632 OS packages, 1 operating system, 57262 files
 

@@ -8,14 +8,14 @@
 [license] outbound license read from the project manifest: Apache-2.0
 [stamp] metadata.component set to SpringBootDemo@1.0.0: SpringBootDemo_1.0.0_bom.json
 [stamp] outbound license declared: Apache-2.0 (drives the license-conflict check)
-[docmeta] tool=BomLens@1.15.6, lifecycle=pre-build: SpringBootDemo_1.0.0_bom.json
+[docmeta] tool=BomLens@1.15.7, lifecycle=pre-build: SpringBootDemo_1.0.0_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [normalize] normalized: SpringBootDemo_1.0.0_bom.json (mode=sort-only)
 [cpe] set/normalized a whitelisted cpe:2.3 on 0 component(s) for CVE matching.
 [cpe] filled a confirmed SPDX license on 0 previously license-null whitelisted component(s).
 [maven-cpe] attached NVD-matchable cpe:2.3 candidates to 64 maven component(s) for CPE-based CVE matching.
-[eol] flagged 22 end-of-life and 0 still-supported component(s), 22 behind the latest patch in their cycle, from endoflife.date@2026-11-27.
-[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-27).
+[eol] flagged 22 end-of-life and 0 still-supported component(s), 22 behind the latest patch in their cycle, from endoflife.date@2026-11-28.
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-28).
 [validate] detected format: CycloneDX
 [validate] added the 2026 SBOM minimum-element checks
 [validate] CycloneDX -> result=pass (mandatory fails=0, warns=4, review=5, n/a=4, untraceable=0): SpringBootDemo_1.0.0_conformance.json, SpringBootDemo_1.0.0_conformance.md, SpringBootDemo_1.0.0_conformance.html
