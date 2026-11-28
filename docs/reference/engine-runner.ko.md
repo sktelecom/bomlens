@@ -39,7 +39,7 @@ from bomlens_runner import Images, RunnerPolicy, Volume, run_source_scan
 from bomlens_runner.kubernetes import KubeApi, KubernetesBackend, KubernetesOptions
 
 policy = RunnerPolicy(
-    images=Images.parse("ghcr.io/sktelecom/bomlens:1.15.6@sha256:d51b2d8a928aed6ea4765beaa4bb04d37d2eee55b9edf945f9e79da748e53760"),
+    images=Images.parse("ghcr.io/sktelecom/bomlens:1.15.7@sha256:f5fd2d0ec129b9b8d0d02b777f1efc0db035d499f6fbcf63de8b40cfb73b8290"),
     workspace=Volume("pvc-workspace", Path("/workspace")),   # 클레임 이름과 이 프로세스에서 보이는 위치
     trivy_db=Volume("pvc-trivy", Path("/trivy")),
     uid=1000, gid=1000,
