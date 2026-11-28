@@ -671,6 +671,15 @@ run_engine "$D" "$ROOT_DIR/docker/lib" LICENSE_REGISTRY=true LICENSE_REGISTRY_AP
 [ "$(lic "$D" slf4j-api)" = "GPL-2.0-only -" ] \
     && pass "with no answer the recorded licences are left as they were" || fail "slf4j-api is '$(lic "$D" slf4j-api)'"
 
+D="$(new_run lr-exclude)"; cp "$WORK/lr-bom.json" "$D/demo_1.0_bom.json"
+run_engine "$D" "$ROOT_DIR/docker/lib" LICENSE_REGISTRY=true LICENSE_REGISTRY_FIXTURE_DIR="$LRF" LICENSE_REGISTRY_EXCLUDE="pkg:npm/LODASH, pkg:maven/org.slf4j"
+[ "$(lic "$D" lodash)" = "-" ] && [ "$(lic "$D" slf4j-api)" = "GPL-2.0-only -" ] \
+    && pass "LICENSE_REGISTRY_EXCLUDE: an excluded component is not asked about, whatever its letter case" \
+    || fail "lodash '$(lic "$D" lodash)', slf4j-api '$(lic "$D" slf4j-api)'"
+[ "$(jq -r '[.steps[] | select(.id=="license-registry")][0].counts | "\(.excluded) \(.candidates)"' "$D/bomlens-result.json")" = "2 2" ] \
+    && pass "the excluded components are counted apart from the ones asked about" \
+    || fail "counts: $(jq -c '[.steps[] | select(.id=="license-registry")][0].counts' "$D/bomlens-result.json")"
+
 echo "== license-registry: evidence, deprecated ids, mixed answers, nesting, supplier SBOMs, budget =="
 echo '{"licenses":["MIT"]}' > "$LRF/npm_withtext_1.0.json"
 echo '{"licenses":["MIT"]}' > "$LRF/npm_concluded_1.0.json"

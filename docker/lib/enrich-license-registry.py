@@ -49,6 +49,9 @@
 #   LICENSE_REGISTRY_BUDGET        total seconds for the lookups (default 240)
 #   LICENSE_REGISTRY_API           base URL of a deps.dev v3 compatible API
 #                                  (default https://api.deps.dev/v3)
+#   LICENSE_REGISTRY_EXCLUDE       space- or comma-separated purl prefixes that
+#                                  are never asked about (in-house packages,
+#                                  whose names should not leave the network)
 #   LICENSE_REGISTRY_FIXTURE_DIR   read "<system>_<name>_<version>.json" files
 #                                  from this directory instead of the network
 #   LICENSE_REGISTRY_FIXTURE_DELAY seconds each fixture answer takes (tests)
@@ -89,6 +92,18 @@ DEFAULT_VERIFY = (
     "AGPL-1.0-only AGPL-1.0-or-later AGPL-3.0-only AGPL-3.0-or-later AGPL-3.0 "
     "SSPL-1.0 BUSL-1.1 CC-BY-NC-4.0 CC-BY-NC-SA-4.0 CC-BY-NC-ND-4.0"
 )
+
+
+def excluded_prefixes():
+    """The LICENSE_REGISTRY_EXCLUDE prefixes, percent-decoded and lowercased."""
+    raw = os.environ.get("LICENSE_REGISTRY_EXCLUDE", "")
+    return tuple(urllib.parse.unquote(p).lower() for p in re.split(r"[,\s]+", raw.strip()) if p)
+
+
+def is_excluded(purl, prefixes):
+    """True when the purl starts with one of the prefixes. Compared percent-decoded
+    and lowercased, so `pkg:npm/@org` and `pkg:npm/%40org` name the same scope."""
+    return bool(prefixes) and urllib.parse.unquote(purl or "").lower().startswith(prefixes)
 
 
 def coordinate(purl):
@@ -240,6 +255,9 @@ def main():
         return 1
 
     # component -> ("fill" | "verify", coordinate); one question per coordinate.
+    # A component under LICENSE_REGISTRY_EXCLUDE is not asked about at all.
+    exclude = excluded_prefixes()
+    excluded = 0
     work = []
     for comp in walk(bom.get("components")):
         current, evidence = licences_of(comp)
@@ -251,6 +269,9 @@ def main():
             continue
         coord = coordinate(comp.get("purl"))
         if coord is None:
+            continue
+        if is_excluded(comp.get("purl"), exclude):
+            excluded += 1
             continue
         work.append((comp, kind, coord))
 
@@ -275,7 +296,7 @@ def main():
 
     counts = {"candidates": len(work), "filled": 0, "superseded": 0, "confirmed": 0,
               "no_answer": 0, "not_found": 0, "non_standard": 0, "lookup_failed": 0,
-              "budget_reached": 0}
+              "budget_reached": 0, "excluded": excluded}
     for comp, kind, coord in work:
         if coord in skipped:
             counts["budget_reached"] += 1
@@ -322,7 +343,7 @@ def main():
         f"{counts['superseded']} replaced, {counts['confirmed']} confirmed, "
         f"{counts['no_answer']} without an answer, {counts['not_found']} not found, "
         f"{counts['non_standard']} with a non-SPDX licence, {counts['lookup_failed']} failed, "
-        f"{counts['budget_reached']} over the time budget.\n"
+        f"{counts['budget_reached']} over the time budget, {counts['excluded']} excluded.\n"
     )
     print(json.dumps(counts))
     return 0

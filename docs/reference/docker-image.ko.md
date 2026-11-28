@@ -258,6 +258,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1, CC-BY-NC 식별자 | 하나뿐일 때 레지스트리와 대조할 SPDX 식별자(공백 또는 쉼표 구분) |
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다 |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(`unavailable`)로 기록한다 |
+| `LICENSE_REGISTRY_EXCLUDE` | — | (없음) | 레지스트리로 보내지 않을 purl 접두어. 공백이나 쉼표로 구분한다. 사내 패키지(`pkg:maven/com.example pkg:npm/@example`)처럼 이름이 밖으로 나가면 안 되는 것에 쓴다. 대소문자를 가리지 않고, `@`는 `%40`으로 써도 된다. 지정하지 않으면 라이선스가 없는 컴포넌트는 공개 레지스트리에 있는지와 관계없이 모두 이름과 버전으로 조회한다. `excluded`로 센다 |
 | `COCOAPODS_CDN_URL` | - | `https://cdn.cocoapods.org` | `FETCH_LICENSE`가 켜진 소스 스캔. pod 라이선스를 읽어 오는 CocoaPods trunk CDN, 또는 같은 `Specs/` 구조를 가진 미러의 기본 URL. 응답이 없으면 pod는 라이선스 없이 남고 로그에 그 사실을 적는다 |
 | `COCOAPODS_LICENSE_BUDGET` | - | `120` | CocoaPods podspec 조회에 쓰는 전체 시간(초). 시간 안에 조회하지 못한 pod는 라이선스 없이 남는다 |
 | `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 검사 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
