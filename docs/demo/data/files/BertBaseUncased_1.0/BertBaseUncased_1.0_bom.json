@@ -554,7 +554,7 @@
   "metadata": {
     "authors": [
       {
-        "name": "BomLens 1.15.6"
+        "name": "BomLens 1.15.7"
       }
     ],
     "component": {
@@ -776,11 +776,11 @@
         },
         {
           "name": "cdx:huggingface:downloads",
-          "value": "32907405"
+          "value": "33220173"
         },
         {
           "name": "cdx:huggingface:downloadsAllTime",
-          "value": "3310747358"
+          "value": "3312056804"
         },
         {
           "name": "cdx:huggingface:fileCount",
@@ -804,7 +804,7 @@
         },
         {
           "name": "cdx:huggingface:likes",
-          "value": "3094"
+          "value": "3095"
         },
         {
           "name": "cdx:huggingface:private",
@@ -865,7 +865,7 @@
         "value": "tool"
       }
     ],
-    "timestamp": "2026-11-27T12:27:06+00:00",
+    "timestamp": "2026-11-28T10:10:19+00:00",
     "tools": {
       "components": [
         {
@@ -881,12 +881,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.15.6"
+          "version": "1.15.7"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:d3d19c4f-e992-4889-b15b-28ea07d0bab7",
+  "serialNumber": "urn:uuid:8000ab2f-9444-4228-ae34-05c9c3a3a0ea",
   "specVersion": "1.7",
   "version": 1,
   "compositions": [

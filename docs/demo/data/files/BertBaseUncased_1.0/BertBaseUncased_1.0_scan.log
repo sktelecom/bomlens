@@ -11,7 +11,7 @@ Generating AIBOM for google-bert/bert-base-uncased...
   - Generating AIBOM model data...
 
 📄 HTML Report:
-   /tmp/tmp.sG46YZygwc/aibom.html
+   /tmp/tmp.8sZaWx23R1/aibom.html
 
 📝 Model Description:
    No description available
@@ -20,11 +20,11 @@ Generating AIBOM for google-bert/bert-base-uncased...
    Apache-2.0
 
 ✅ Successfully generated CycloneDX 1.6 SBOM:
-   /tmp/tmp.sG46YZygwc/aibom.json
+   /tmp/tmp.8sZaWx23R1/aibom.json
    - Schema Validation (1.6): ✅ Valid
 
 ✅ Successfully generated CycloneDX 1.7 SBOM:
-   /tmp/tmp.sG46YZygwc/aibom_1_7.json
+   /tmp/tmp.8sZaWx23R1/aibom_1_7.json
    - Schema Validation (1.7): ✅ Valid
 
 📊 Completeness Score: 63.4/100
@@ -38,7 +38,7 @@ Generating AIBOM for google-bert/bert-base-uncased...
    - External References: 10/10
 [aibom] kept CycloneDX 1.7 output
 [aibom] model card present (1 model component(s) with a card).
-[enrich] file security: queued (10 scanned safe, 0 flagged).
+[enrich] file security: queued (0 scanned safe, 0 flagged).
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
 [enrich] HuggingFace: 6 weight hash(es), openness assessed (weights=open-weight).
 [enrich] datasets: 2 referenced, 2 resolved, 0 source(s) traced (training-data=open-data).
@@ -47,10 +47,10 @@ Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF
 [enrich] enrichment complete.
 [INFO] SBOM ready: BertBaseUncased_1.0_bom.json
 [SUCCESS] copied: /host-output/BertBaseUncased_1.0_bom.json
-[docmeta] tool=BomLens@1.15.6, lifecycle=post-build: BertBaseUncased_1.0_bom.json
+[docmeta] tool=BomLens@1.15.7, lifecycle=post-build: BertBaseUncased_1.0_bom.json
 [docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)
 [normalize] normalized: BertBaseUncased_1.0_bom.json (mode=sort-only)
-[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-27).
+[malicious] no known-malicious packages in this SBOM (osv.dev@2026-11-28).
 [assess] stamped bomlens:assessment:* (conditional=1 review=2)
 [2/2] ai: G7 minimum-element conformance
 [validate] detected format: CycloneDX

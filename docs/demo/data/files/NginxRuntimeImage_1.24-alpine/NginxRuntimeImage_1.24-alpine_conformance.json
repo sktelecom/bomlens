@@ -2,7 +2,7 @@
   "project": "NginxRuntimeImage",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-27T12:26:55Z",
+  "generatedAt": "2026-11-28T10:10:11Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-11-27T12:26:50Z",
+      "detail": "2026-11-28T10:10:07Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-11-27T12:26:50Z"
+      "detail_ko": "2026-11-28T10:10:07Z"
     },
     {
       "id": "tools",
@@ -1279,7 +1279,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-27T12:26:50Z",
+            "detail": "2026-11-28T10:10:07Z",
             "refs": [
               "Section 5.2.1"
             ]
