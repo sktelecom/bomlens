@@ -384,8 +384,9 @@ def build(args):
         print(f'string key collision, dropped: {h.hex()}', file=sys.stderr)
     keyed = sorted((h, s) for h, s in keys.items() if h not in clash)
     con.executemany('INSERT INTO str VALUES (?,?,?)', ((h, len(s), ','.join(str(i) for i in sorted(owners[s]))) for h, s in keyed))
-    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((h, names[c], mask_value(vmask[c][s])) for c in sorted(vmask)
-                                                        for h, s in keyed if s in vmask[c]))
+    key_of = {s: h for h, s in keyed}
+    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((h, names[c], mask_value(m)) for c in sorted(vmask)
+                                                        for h, m in sorted((key_of[s], m) for s, m in vmask[c].items() if s in key_of)))
     rows_t = sorted((key, k, c, name, n, digest) for key, ents in index.items() for n, digest, k, c, name in ents)
     for i, (key, k, c, name, n, digest) in enumerate(rows_t, 1):
         con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?,?)', (i, c, name, k, key, n, digest))
