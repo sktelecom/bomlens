@@ -23,8 +23,10 @@ only it has, or when at least `table_count` distinct tables totalling `table_byt
 Usage:
   binarykb.py build --kb kb.csv [--bg DIR]... [--ref refs.csv] [--ref-bg files.txt]
                     [--kernel-only NAME]... --release ID --out kb.sqlite3
-      kb.csv     lines `component,version,tarball`. Every release of a component belongs here;
-                 a version missing from the list is reported as the nearest release that is there.
+      kb.csv     lines `component,version,tarball[,url[,purl]]`. Every release of a component belongs
+                 here; a version missing from the list is reported as the nearest release that is there.
+                 `url` is where the tarball was published, `purl` the package URL of the component
+                 without a version (`pkg:generic/busybox`); both are optional and kept in the base.
       DIR        tarballs of packages that are not reported. Their strings only lower the weight
                  of strings they share with a reported component.
       refs.csv   lines `component,path` of unstripped ELF files; each large read-only object with a
@@ -37,10 +39,13 @@ Usage:
                  and raise the score until they stop.
   binarykb.py info kb.sqlite3
 
-The database is SQLite, opened read-only, and holds no code.
+The database is SQLite, opened read-only, and holds no code and no text from the sources: a literal is
+kept as the first 8 bytes of its SHA-256 and its length, and a table as one 16-byte window, its length
+and its SHA-256. The tarball each release was read from is recorded by its SHA-256 (and URL when given).
 """
 import argparse
 import collections
+import hashlib
 import json
 import os
 import re
@@ -48,7 +53,9 @@ import sqlite3
 import sys
 import tarfile
 
-SCHEMA = 1
+SCHEMA = 2
+READABLE_SCHEMAS = (1, 2)   # schema 1 keeps literals and tables as text and bytes
+STRING_KEY_BYTES = 8
 MIN_LEN = 6
 SRC_EXT = ('.c', '.h', '.cc', '.cpp', '.cxx', '.hh', '.hpp')
 TABLE_MIN_SIZE, TABLE_KEY = 256, 16
@@ -210,6 +217,16 @@ def version_key(v):
 
 # --------------------------------------------------------------------------- tables
 
+def string_key(s):
+    """The key a literal is stored under: the first 8 bytes of its SHA-256."""
+    return hashlib.sha256(s).digest()[:STRING_KEY_BYTES]
+
+
+def table_entry(blob, k, c, name):
+    """(length, SHA-256, window offset, component, name): what a table signature is matched by."""
+    return len(blob), hashlib.sha256(blob).digest(), k, c, name
+
+
 def table_key(blob):
     """Offset of the first 16-byte window with at least 8 distinct values, so runs of zeros do not flood the index."""
     return next((k for k in range(len(blob) - TABLE_KEY + 1) if len(set(blob[k:k + TABLE_KEY])) >= 8), None)
@@ -217,12 +234,12 @@ def table_key(blob):
 
 def tables_in(index, data):
     """{table name: component id} for every signature table whose bytes occur in data."""
-    found, get = {}, index.get
+    found, get, sha = {}, index.get, hashlib.sha256
     for p in range(len(data) - TABLE_KEY + 1):
         cand = get(data[p:p + TABLE_KEY])
         if cand:
-            for blob, k, c, name in cand:
-                if name not in found and p >= k and data[p - k:p - k + len(blob)] == blob:
+            for n, digest, k, c, name in cand:
+                if name not in found and p >= k and p - k + n <= len(data) and sha(data[p - k:p - k + n]).digest() == digest:
                     found[name] = c
     return found
 
@@ -231,13 +248,22 @@ def tables_in(index, data):
 
 SCHEMA_SQL = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE comp (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL);
+CREATE TABLE comp (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, purl TEXT);
 CREATE TABLE ver (comp INTEGER NOT NULL, idx INTEGER NOT NULL, version TEXT NOT NULL, PRIMARY KEY (comp, idx));
-CREATE TABLE str (s BLOB PRIMARY KEY, owners TEXT NOT NULL) WITHOUT ROWID;
-CREATE TABLE strv (s BLOB NOT NULL, comp INTEGER NOT NULL, mask INTEGER NOT NULL, PRIMARY KEY (s, comp)) WITHOUT ROWID;
-CREATE TABLE tbl (id INTEGER PRIMARY KEY, comp INTEGER NOT NULL, name TEXT NOT NULL, koff INTEGER NOT NULL, key BLOB NOT NULL, data BLOB NOT NULL);
+CREATE TABLE src (comp INTEGER NOT NULL, version TEXT NOT NULL, sha256 TEXT NOT NULL, url TEXT NOT NULL, PRIMARY KEY (comp, version, sha256)) WITHOUT ROWID;
+CREATE TABLE str (h BLOB PRIMARY KEY, n INTEGER NOT NULL, owners TEXT NOT NULL) WITHOUT ROWID;
+CREATE TABLE strv (h BLOB NOT NULL, comp INTEGER NOT NULL, mask INTEGER NOT NULL, PRIMARY KEY (h, comp)) WITHOUT ROWID;
+CREATE TABLE tbl (id INTEGER PRIMARY KEY, comp INTEGER NOT NULL, name TEXT NOT NULL, koff INTEGER NOT NULL, key BLOB NOT NULL, size INTEGER NOT NULL, sha256 BLOB NOT NULL);
 CREATE INDEX tbl_key ON tbl (key);
 """
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
 
 
 def mask_value(mask):
@@ -250,8 +276,23 @@ def build(args):
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     if os.path.exists(args.out):
         os.remove(args.out)
-    rows = sorted((tuple(l.strip().split(',', 2)) for l in open(args.kb) if l.strip() and not l.startswith('#')),
-                  key=lambda r: (r[0], version_key(r[1])))
+    rows = []
+    for n, line in enumerate(open(args.kb), 1):
+        if not line.strip() or line.startswith('#'):
+            continue
+        f = line.strip().split(',')
+        if not 3 <= len(f) <= 5 or not all(f[:3]):
+            sys.exit(f'{args.kb}:{n}: expected component,version,tarball[,url[,purl]]')
+        rows.append((f + ['', ''])[:5])
+    rows.sort(key=lambda r: (r[0], version_key(r[1])))
+    purls, sources = {}, []
+    for comp, _, _, _, purl in rows:
+        if not purl:
+            continue
+        if not purl.startswith('pkg:') or '@' in purl:
+            sys.exit(f'{args.kb}: purl of {comp} must be a package URL without a version: {purl}')
+        if purls.setdefault(comp, purl) != purl:
+            sys.exit(f'{args.kb}: {comp} has two purls: {purls[comp]} and {purl}')
     names, kinds, owners = {}, {}, collections.defaultdict(set)
     versions = collections.defaultdict(list)
     vmask = collections.defaultdict(dict)          # comp -> {string: version bitmask}
@@ -261,8 +302,9 @@ def build(args):
             names[name] = len(names) + 1; kinds[name] = kind
         return names[name]
 
-    for comp, ver, tb in rows:
+    for comp, ver, tb, url, _ in rows:
         cid = comp_id(comp, 'kb')
+        sources.append((cid, ver, file_sha256(tb), url))
         bit = 1 << len(versions[comp])
         versions[comp].append(ver)
         strings = source_strings(tb)
@@ -280,6 +322,7 @@ def build(args):
                 continue
             name = 'bg:' + base
             cid = comp_id(name, 'bg')
+            sources.append((cid, '', file_sha256(tb), ''))
             strings = source_strings(tb)
             for s in strings:
                 owners[s].add(cid)
@@ -304,7 +347,7 @@ def build(args):
         for v in byte_order_variants(blob):
             k = table_key(v)
             if k is not None:
-                index[v[k:k + TABLE_KEY]].append((v, k, c, tname[blob]))
+                index[v[k:k + TABLE_KEY]].append(table_entry(v, k, c, tname[blob]))
         per[c] += 1
     dropped = collections.Counter()
     for path in (l.strip() for l in open(args.ref_bg)) if args.ref_bg else []:
@@ -312,7 +355,7 @@ def build(args):
             continue
         for name, c in tables_in(index, open(path, 'rb').read()).items():
             for key in list(index):
-                index[key] = [e for e in index[key] if e[3] != name]
+                index[key] = [e for e in index[key] if e[4] != name]
                 if not index[key]:
                     del index[key]
             dropped[c] += 1
@@ -326,14 +369,26 @@ def build(args):
             rule[k] = getattr(args, 'rule_' + k)
     meta = {'schema': SCHEMA, 'release': args.release, 'rule': rule, 'kernel_only': sorted(args.kernel_only or [])}
     con.executemany('INSERT INTO meta VALUES (?,?)', [(k, json.dumps(v)) for k, v in meta.items()])
-    con.executemany('INSERT INTO comp VALUES (?,?,?)', [(i, n, kinds[n]) for n, i in sorted(names.items(), key=lambda x: x[1])])
+    con.executemany('INSERT INTO comp VALUES (?,?,?,?)', [(i, n, kinds[n], purls.get(n)) for n, i in sorted(names.items(), key=lambda x: x[1])])
+    con.executemany('INSERT OR IGNORE INTO src VALUES (?,?,?,?)', sorted(sources))
     con.executemany('INSERT INTO ver VALUES (?,?,?)', [(names[c], j, v) for c in sorted(versions) for j, v in enumerate(versions[c])])
     # Rows go in sorted, so the same inputs give the same file bytes whatever the hash seed or the machine.
-    con.executemany('INSERT INTO str VALUES (?,?)', ((s, ','.join(str(i) for i in sorted(owners[s]))) for s in sorted(owners)))
-    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((s, names[c], mask_value(vmask[c][s])) for c in sorted(vmask) for s in sorted(vmask[c])))
-    rows_t = sorted((key, k, c, name, data) for key, ents in index.items() for data, k, c, name in ents)
-    for n, (key, k, c, name, data) in enumerate(rows_t, 1):
-        con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?)', (n, c, name, k, key, data))
+    # Two literals whose keys collide would share one row and credit each other's owners; neither is kept.
+    keys, clash = {}, set()
+    for s in owners:
+        h = string_key(s)
+        if h in keys:
+            clash.add(h)
+        keys[h] = s
+    for h in clash:
+        print(f'string key collision, dropped: {h.hex()}', file=sys.stderr)
+    keyed = sorted((h, s) for h, s in keys.items() if h not in clash)
+    con.executemany('INSERT INTO str VALUES (?,?,?)', ((h, len(s), ','.join(str(i) for i in sorted(owners[s]))) for h, s in keyed))
+    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((h, names[c], mask_value(vmask[c][s])) for c in sorted(vmask)
+                                                        for h, s in keyed if s in vmask[c]))
+    rows_t = sorted((key, k, c, name, n, digest) for key, ents in index.items() for n, digest, k, c, name in ents)
+    for i, (key, k, c, name, n, digest) in enumerate(rows_t, 1):
+        con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?,?)', (i, c, name, k, key, n, digest))
     con.commit(); con.close()
     print(f'db: {len(owners)} distinct strings, {sum(1 for _ in per)} components with table signatures '
           f'({sum(per.values())} tables, {sum(dropped.values())} dropped as background)', file=sys.stderr)
@@ -348,28 +403,42 @@ class KnowledgeBase:
         self.path = path
         self.con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
         self.meta = {k: json.loads(v) for k, v in self.con.execute('SELECT key, value FROM meta')}
-        if self.meta.get('schema') != SCHEMA:
-            raise ValueError(f'unsupported knowledge base schema {self.meta.get("schema")!r} (this reader knows {SCHEMA})')
+        self.schema = self.meta.get('schema')
+        if self.schema not in READABLE_SCHEMAS:
+            raise ValueError(f'unsupported knowledge base schema {self.schema!r} (this reader knows {", ".join(map(str, READABLE_SCHEMAS))})')
+        hashed = self.schema >= 2
+        self._key = string_key if hashed else bytes
+        self._col = 'h' if hashed else 's'
         self.rule = dict(DEFAULT_RULE, **self.meta.get('rule', {}))
         self.release = self.meta.get('release', '')
         self.kernel_only = set(self.meta.get('kernel_only', []))
         self.comps = {i: (n, k) for i, n, k in self.con.execute('SELECT id, name, kind FROM comp')}
+        self.purls = dict(self.con.execute('SELECT name, purl FROM comp WHERE purl IS NOT NULL')) if hashed else {}
         self.versions = collections.defaultdict(list)
         for c, _, v in self.con.execute('SELECT comp, idx, version FROM ver ORDER BY comp, idx'):
             self.versions[c].append(v)
         self.index = collections.defaultdict(list)
         self.table_size = {}
-        for c, name, k, key, data in self.con.execute('SELECT comp, name, koff, key, data FROM tbl'):
-            self.index[bytes(key)].append((bytes(data), k, c, name)); self.table_size[name] = len(data)
+        if hashed:
+            for c, name, k, key, n, digest in self.con.execute('SELECT comp, name, koff, key, size, sha256 FROM tbl'):
+                self.index[bytes(key)].append((n, bytes(digest), k, c, name)); self.table_size[name] = n
+        else:
+            for c, name, k, key, data in self.con.execute('SELECT comp, name, koff, key, data FROM tbl'):
+                self.index[bytes(key)].append(table_entry(bytes(data), k, c, name)); self.table_size[name] = len(data)
         self._owners = {}
 
     def owners_of(self, strings):
         """{string: tuple of component ids} for the strings the database knows."""
         need = [s for s in strings if s not in self._owners]
+        hashed = self.schema >= 2
         for i in range(0, len(need), 500):
             chunk = need[i:i + 500]
-            for s, o in self.con.execute(f'SELECT s, owners FROM str WHERE s IN ({",".join("?" * len(chunk))})', chunk):
-                self._owners[bytes(s)] = tuple(int(x) for x in o.split(','))
+            by_key = {self._key(s): s for s in chunk}
+            cols = 'h, n, owners' if hashed else 's, 0, owners'
+            for k, n, o in self.con.execute(f'SELECT {cols} FROM str WHERE {self._col} IN ({",".join("?" * len(by_key))})', list(by_key)):
+                s = by_key[bytes(k)]
+                if not hashed or n == len(s):
+                    self._owners[s] = tuple(int(x) for x in o.split(','))
             for s in chunk:
                 self._owners.setdefault(s, ())
         return {s: self._owners[s] for s in strings if self._owners[s]}
@@ -377,9 +446,10 @@ class KnowledgeBase:
     def _masks(self, comp, strings):
         out = {}
         for i in range(0, len(strings), 500):
-            chunk = strings[i:i + 500]
-            for s, m in self.con.execute(f'SELECT s, mask FROM strv WHERE comp = ? AND s IN ({",".join("?" * len(chunk))})', [comp] + chunk):
-                out[bytes(s)] = int.from_bytes(m, 'big') if isinstance(m, bytes) else m
+            by_key = {self._key(s): s for s in strings[i:i + 500]}
+            for k, m in self.con.execute(f'SELECT {self._col}, mask FROM strv WHERE comp = ? AND {self._col} IN ({",".join("?" * len(by_key))})',
+                                         [comp] + list(by_key)):
+                out[by_key[bytes(k)]] = int.from_bytes(m, 'big') if isinstance(m, bytes) else m
         return out
 
     def identify(self, strings):
@@ -456,9 +526,11 @@ class KnowledgeBase:
 def content_hash(con):
     """SHA-256 of the rows of every table in key order. Two builds from the same inputs agree on it even when
     the SQLite library that wrote them differs, which changes the file bytes but not the content."""
-    import hashlib
     h = hashlib.sha256()
-    for table, order in (('meta', 'key'), ('comp', 'id'), ('ver', 'comp, idx'), ('str', 's'), ('strv', 's, comp'), ('tbl', 'id')):
+    schema = json.loads(con.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0])
+    tables = (('meta', 'key'), ('comp', 'id'), ('ver', 'comp, idx'), ('str', 's'), ('strv', 's, comp'), ('tbl', 'id')) if schema < 2 else \
+        (('meta', 'key'), ('comp', 'id'), ('ver', 'comp, idx'), ('src', 'comp, version, sha256'), ('str', 'h'), ('strv', 'h, comp'), ('tbl', 'id'))
+    for table, order in tables:
         h.update(table.encode())
         for row in con.execute(f'SELECT * FROM {table} ORDER BY {order}'):
             h.update(repr(row).encode())
@@ -469,7 +541,9 @@ def info(args):
     kb = KnowledgeBase(args.db)
     print(json.dumps({'release': kb.release, 'content_sha256': content_hash(kb.con), 'rule': kb.rule, 'kernel_only': sorted(kb.kernel_only),
                       'components': {kb.comps[c][0]: {'versions': len(v), 'first': v[0], 'last': v[-1]} for c, v in kb.versions.items()},
-                      'background': sum(1 for n, k in kb.comps.values() if k == 'bg'), 'table_signatures': len(kb.table_size)},
+                      'background': sum(1 for n, k in kb.comps.values() if k == 'bg'), 'table_signatures': len(kb.table_size),
+                      'schema': kb.schema, 'purls': kb.purls,
+                      'sources': kb.con.execute('SELECT count(*) FROM src').fetchone()[0] if kb.schema >= 2 else 0},
                      indent=2, ensure_ascii=False))
 
 

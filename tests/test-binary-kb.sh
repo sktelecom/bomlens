@@ -568,6 +568,72 @@ if [ "$(jq -r '[.[] | "\(.name)@\(.version // "none")"] | join(",")' <<<"$mout")
     pass "the merge keeps a presence-only record that names other releases and drops one that repeats a version"
 else fail "the merge handled presence-only records wrongly" "$mout"; fi
 
+# ---- the base holds no source text -----------------------------------------------------------
+# Literals are kept as a hash and a length, tables as one window, a length and a hash, so a base
+# can be published without carrying text or bytes from the sources it was built from.
+if python3 - "$LIB" "$KB" "$TMP/kbt/kb.sqlite3" "$TMP/tabs.csv" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+raw = open(sys.argv[2], 'rb').read() + open(sys.argv[3], 'rb').read()
+lits = [b'alpha core message number 1 for the knowledge base test', b'copied helper message number 3', b'gamma only message']
+blobs = [blob for line in open(sys.argv[4]) if line.strip() for _, blob in b.rodata_objects(line.strip().split(',', 1)[1])]
+sys.exit(0 if blobs and not any(x in raw for x in lits) and not any(blob[:64] in raw for blob in blobs) else 1)
+PY
+then pass "the base keeps no literal text and no table bytes beyond a 16-byte window"
+else fail "source text or table bytes are stored in the base"; fi
+
+# A base of the earlier schema, which kept the literals as text, is still read and gives the same result.
+python3 - "$LIB" "$TMP/kb.csv" "$TMP/bg" "$TMP/kb-s1.sqlite3" <<'PY'
+import collections, json, os, re, sqlite3, sys
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+rows = sorted((l.strip().split(',') for l in open(sys.argv[2]) if l.strip()), key=lambda r: (r[0], b.version_key(r[1])))
+ids, vers, owners, vmask = {}, collections.defaultdict(list), collections.defaultdict(set), collections.defaultdict(dict)
+for comp, ver, tb in rows:
+    c = ids.setdefault(comp, len(ids) + 1); bit = 1 << len(vers[comp]); vers[comp].append(ver)
+    for s in b.source_strings(tb):
+        owners[s].add(c); vmask[c][s] = vmask[c].get(s, 0) | bit
+kinds = {n: 'kb' for n in ids}
+for f in sorted(os.listdir(sys.argv[3])):
+    n = 'bg:' + re.split(r'-\d', f, maxsplit=1)[0]; c = ids.setdefault(n, len(ids) + 1); kinds[n] = 'bg'
+    for s in b.source_strings(os.path.join(sys.argv[3], f)):
+        owners[s].add(c)
+con = sqlite3.connect(sys.argv[4])
+con.executescript("""CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE comp (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL);
+CREATE TABLE ver (comp INTEGER NOT NULL, idx INTEGER NOT NULL, version TEXT NOT NULL, PRIMARY KEY (comp, idx));
+CREATE TABLE str (s BLOB PRIMARY KEY, owners TEXT NOT NULL) WITHOUT ROWID;
+CREATE TABLE strv (s BLOB NOT NULL, comp INTEGER NOT NULL, mask INTEGER NOT NULL, PRIMARY KEY (s, comp)) WITHOUT ROWID;
+CREATE TABLE tbl (id INTEGER PRIMARY KEY, comp INTEGER NOT NULL, name TEXT NOT NULL, koff INTEGER NOT NULL, key BLOB NOT NULL, data BLOB NOT NULL);""")
+con.executemany('INSERT INTO meta VALUES (?,?)', [(k, json.dumps(v)) for k, v in {'schema': 1, 'release': 'test-1', 'rule': b.DEFAULT_RULE, 'kernel_only': []}.items()])
+con.executemany('INSERT INTO comp VALUES (?,?,?)', [(i, n, kinds[n]) for n, i in ids.items()])
+con.executemany('INSERT INTO ver VALUES (?,?,?)', [(ids[c], j, v) for c in vers for j, v in enumerate(vers[c])])
+con.executemany('INSERT INTO str VALUES (?,?)', [(s, ','.join(map(str, sorted(o)))) for s, o in owners.items()])
+con.executemany('INSERT INTO strv VALUES (?,?,?)', [(s, c, m) for c in vmask for s, m in vmask[c].items()])
+con.commit()
+PY
+v1="$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-s1.sqlite3" 2>/dev/null | jq -c '[.[] | {name, version, s: [.properties[] | select(.name == "bomlens:kbScore" or .name == "bomlens:kbEvidenceStrings") | .value]}]')"
+v2="$(ident release-1.1 | jq -c '[.[] | {name, version, s: [.properties[] | select(.name == "bomlens:kbScore" or .name == "bomlens:kbEvidenceStrings") | .value]}]')"
+if [ -n "$v1" ] && [ "$v1" != "[]" ] && [ "$v1" = "$v2" ]; then pass "a base of the earlier schema is read and gives the same result, evidence strings included"
+else fail "the earlier schema reads differently" "$v1 vs $v2"; fi
+
+# The release sources and the package URL are kept in the base and the purl reaches the result.
+sed 's|^\(alpha,[^,]*,[^,]*\)$|\1,https://example.org/alpha.tar.gz,pkg:generic/alpha|' "$TMP/kb.csv" > "$TMP/kb-purl.csv"
+mkdir -p "$TMP/kb-purl"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb-purl.csv" --bg "$TMP/bg" --release test-purl --out "$TMP/kb-purl/kb.sqlite3" 2>/dev/null
+pout="$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-purl/kb.sqlite3" 2>/dev/null)"
+srcs="$(python3 -c 'import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("select count(*), sum(url != \"\") from src").fetchone())' "$TMP/kb-purl/kb.sqlite3")"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .purl' <<<"$pout")" = "pkg:generic/alpha@1.1" ] \
+   && [ "$(jq -r '.[] | select(.name == "alpha") | .properties[] | select(.name == "bomlens:purlSource") | .value' <<<"$pout")" = "binary-kb" ] \
+   && [ "$(python3 "$LIB/binarykb.py" info "$TMP/kb-purl/kb.sqlite3" | jq -c .purls)" = '{"alpha":"pkg:generic/alpha"}' ] && [ "$srcs" = "(5, 3)" ]; then
+    pass "the base keeps each release's tarball hash and URL, and the purl reaches the result with the version"
+else fail "sources or purl are wrong" "$srcs $pout"; fi
+sed 's|pkg:generic/alpha$|pkg:generic/alpha@1.0|' "$TMP/kb-purl.csv" > "$TMP/kb-badpurl.csv"
+if ! python3 "$LIB/binarykb.py" build --kb "$TMP/kb-badpurl.csv" --release bad --out "$TMP/kb-bad.sqlite3" 2>/dev/null; then
+    pass "a purl that carries a version is refused at build time"
+else fail "a purl with a version was accepted"; fi
+
 echo
 echo "binary knowledge base: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

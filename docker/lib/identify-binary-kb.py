@@ -39,6 +39,7 @@ import os
 import re
 import sqlite3
 import sys
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import binarykb  # noqa: E402
@@ -299,6 +300,12 @@ def main():
                 "properties": props, "evidence": {"occurrences": occurrences}}
         if version:
             comp["version"] = version
+        purl = kb.purls.get(name)
+        if purl:
+            # The base names the package, not the ecosystem that shipped it: the merge does not let
+            # this purl keep a distribution's record of the same component apart.
+            comp["purl"] = purl + ("@" + urllib.parse.quote(version, safe=".+-_~") if version else "")
+            props.append({"name": "bomlens:purlSource", "value": "binary-kb"})
         components.append(comp)
 
     print(json.dumps(components, ensure_ascii=False))
