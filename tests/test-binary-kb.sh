@@ -567,6 +567,13 @@ mout="$(jq -n --slurpfile a "$TMP/m-a.json" --slurpfile b "$TMP/m-e.json" --slur
 if [ "$(jq -r '[.[] | "\(.name)@\(.version // "none")"] | join(",")' <<<"$mout")" = "openssl@none,openssl@1.1.1,zlib@1.2.11" ]; then
     pass "the merge keeps a presence-only record that names other releases and drops one that repeats a version"
 else fail "the merge handled presence-only records wrongly" "$mout"; fi
+echo '[{"name":"zlib","version":"1.2.11","type":"library","purl":"pkg:deb/debian/zlib1g@1.2.11"}]' > "$TMP/m-a2.json"
+echo '[{"name":"zlib","version":"1.2.11","type":"library","purl":"pkg:generic/zlib@1.2.11","properties":[{"name":"bomlens:purlSource","value":"binary-kb"}]}]' > "$TMP/m-g2.json"
+mout="$(jq -n --slurpfile a "$TMP/m-a2.json" --slurpfile b "$TMP/m-e.json" --slurpfile c "$TMP/m-e.json" --slurpfile d "$TMP/m-e.json" \
+    --slurpfile e "$TMP/m-e.json" --slurpfile f "$TMP/m-e.json" --slurpfile g "$TMP/m-g2.json" -f "$TMP/merge.jq" 2>&1)"
+if [ "$(jq -r '[.[] | .purl] | join(",")' <<<"$mout")" = "pkg:deb/debian/zlib1g@1.2.11" ]; then
+    pass "a purl from the base does not keep a package record of the same component apart"
+else fail "the base purl split a component in the merge" "$mout"; fi
 
 # ---- the base holds no source text -----------------------------------------------------------
 # Literals are kept as a hash and a length, tables as one window, a length and a hash, so a base
