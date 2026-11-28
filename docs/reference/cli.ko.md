@@ -86,7 +86,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 
 | 환경변수 | 기본값 | 설명 |
 |----------|--------|------|
-| `SBOM_SCANNER_IMAGE` | 릴리스 압축 파일에서는 그 릴리스 태그(v1.15.6이면 `ghcr.io/sktelecom/bomlens:1.15.6`), 저장소를 체크아웃해 쓰면 `main`에서 빌드한 `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의. 압축 파일에서는 아래 행들의 `:latest` 기본값도 릴리스 태그가 됩니다 |
+| `SBOM_SCANNER_IMAGE` | 릴리스 압축 파일에서는 그 릴리스 태그(v1.15.7이면 `ghcr.io/sktelecom/bomlens:1.15.7`), 저장소를 체크아웃해 쓰면 `main`에서 빌드한 `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의. 압축 파일에서는 아래 행들의 `:latest` 기본값도 릴리스 태그가 됩니다 |
 | `SBOM_FIRMWARE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-firmware:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
 | `SBOM_AIBOM_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-aibom:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
 | `SBOM_DEEP_CVE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-deep-cve:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |

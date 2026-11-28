@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.7] - 2026-11-28
+
 ### Fixed
 
 - A container image built on Red Hat Enterprise Linux or SUSE Linux Enterprise now gets its OS package vulnerabilities. Syft names the Red Hat system `rhel` and the SLES packages `pkg:rpm/sles/...`, which Trivy does not read, so such images reported only application findings. Trivy's input copy now uses `redhat` and `pkg:rpm/suse/...`; the SBOM keeps syft's names and the findings carry its purls.
+- Building a binary knowledge base no longer skips a component whose name is also a background release, and no longer stops with an SQLite integer overflow on a component with more than 63 releases. Version masks that wide are stored as bytes; existing knowledge bases read as before.
+- In a kernel image or module, binary knowledge base identification reports only kernel-only components. A driver module was credited to a user-space project that shares the driver code.
+- Binary knowledge base identification reports a second copy of another release as its own result when the strongest file of the component fits none of the releases the other files name, and each version group cites a file that named its version.
 
 ## [v1.15.6] - 2026-11-27
 
