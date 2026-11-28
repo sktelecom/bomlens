@@ -919,15 +919,26 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
       --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" \
       --slurpfile e "$EXTRA_COMPS" --slurpfile f "$APP_COMPS" \
       --slurpfile g "$BINKB_COMPS" '
+    # A binary knowledge base record only fills in what the others lack. It is
+    # never the base (the bom-ref, type and name stay those of the package or
+    # ELF record), and its purl is kept only when no other record has one; the
+    # purlSource it carries goes with its purl, so a distribution record does
+    # not come out of the merge marked as holding a purl BomLens wrote.
+    def from_binary_kb:
+      any(.properties[]?; .name == "bomlens:identifiedBy" and .value == "binary-kb");
+
     def merge_group:
       . as $g
-      | (([$g[] | select(.purl)] + $g) | .[0]) as $base
+      | ([$g[] | select(from_binary_kb | not)] | if length > 0 then . else $g end) as $first
+      | (([$first[] | select(.purl)] + $first) | .[0]) as $base
+      | ([$g[] | select(from_binary_kb | not) | .purl // empty] | length > 0) as $other_purl
       | ($g | map(.hashes // []) | add | unique) as $hashes
-      | ($g | map(.properties // []) | add | unique) as $props
+      | ($g | map(.properties // []) | add | unique
+         | if $other_purl then map(select((.name == "bomlens:purlSource" and .value == "binary-kb") | not)) else . end) as $props
       | ($g | map(.licenses // []) | add | unique) as $lics
       | ($g | map(.evidence.occurrences // []) | add | unique) as $occ
       | $base
-        + ([$g[] | .purl // empty]     | if length > 0 then {purl: .[0]}     else {} end)
+        + ([($first + $g)[] | .purl // empty] | if length > 0 then {purl: .[0]} else {} end)
         + ([$g[] | .cpe // empty]      | if length > 0 then {cpe: .[0]}      else {} end)
         + ([$g[] | .supplier // empty] | if length > 0 then {supplier: .[0]} else {} end)
         + (if ($hashes | length) > 0 then {hashes: $hashes} else {} end)

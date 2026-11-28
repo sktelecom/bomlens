@@ -430,7 +430,7 @@ else fail "the background table was kept" "$out2 $(grep -c background "$TMP/tab2
 # ---- wiring -------------------------------------------------------------------------------------
 if grep -q 'identify-binary-kb.py' "$LIB/scan-firmware.sh" && grep -q -- '--slurpfile g "\$BINKB_COMPS"' "$LIB/scan-firmware.sh" \
    && grep -q '\$a\[0\] + \$b\[0\] + \$c\[0\] + \$d\[0\] + \$f\[0\] + \$e\[0\] + \$g\[0\]' "$LIB/scan-firmware.sh"; then
-    pass "scan-firmware.sh runs the pass and merges its result last, so it never becomes the base record"
+    pass "scan-firmware.sh runs the pass and merges its result last (that it is never the base is checked on the merge below)"
 else fail "the pass is not wired into the merge in scan-firmware.sh"; fi
 if grep -q 'FW_BINARY_KB' "$LIB/scan-firmware.sh" && grep -q -- '-e FW_BINARY_KB=' "$ROOT_DIR/scripts/scan-sbom.sh"; then
     pass "scan-sbom.sh forwards --binary-kb to the container"
@@ -568,6 +568,206 @@ if [ "$(jq -r '[.[] | "\(.name)@\(.version // "none")"] | join(",")' <<<"$mout")
     pass "the merge keeps a presence-only record that names other releases and drops one that repeats a version"
 else fail "the merge handled presence-only records wrongly" "$mout"; fi
 
+# ---- the base holds no source text -----------------------------------------------------------
+# Literals are kept as a hash and a length, tables as one window, a length and a hash, so a base
+# can be published without carrying text or bytes from the sources it was built from.
+if python3 - "$LIB" "$KB" "$TMP/kbt/kb.sqlite3" "$TMP/tabs.csv" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+raw = open(sys.argv[2], 'rb').read() + open(sys.argv[3], 'rb').read()
+lits = [b'alpha core message number 1 for the knowledge base test', b'copied helper message number 3', b'gamma only message']
+blobs = [blob for line in open(sys.argv[4]) if line.strip() for _, blob in b.rodata_objects(line.strip().split(',', 1)[1])]
+sys.exit(0 if blobs and not any(x in raw for x in lits) and not any(blob[:64] in raw for blob in blobs) else 1)
+PY
+then pass "the base keeps no literal text and no table bytes beyond a 16-byte window"
+else fail "source text or table bytes are stored in the base"; fi
+
+# A base of the earlier schema, which kept the literals as text and the tables as bytes, is still read and
+# gives the same result. The fixture is built by the schema 1 builder itself (binarykb.py as it was before
+# schema 2, kept in tests/fixtures/binary-kb), constant tables included.
+OLDB="$ROOT_DIR/tests/fixtures/binary-kb/binarykb-schema1.py"
+mkdir -p "$TMP/kb-s1" "$TMP/kbt-s1"
+python3 "$OLDB" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --release test-1 --out "$TMP/kb-s1/kb.sqlite3" 2>/dev/null
+python3 "$OLDB" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --ref "$TMP/tabs.csv" --release tab-1 --out "$TMP/kbt-s1/kb.sqlite3" 2>/dev/null
+cmpview() { jq -c '[.[] | {name, version, s: [.properties[] | select(.name | IN("bomlens:kbScore", "bomlens:kbUniqueStrings", "bomlens:kbEvidenceStrings", "bomlens:versionCandidates", "bomlens:versionRange", "bomlens:kbTables", "bomlens:kbConfidence")) | "\(.name)=\(.value)"]}]'; }
+s1="" ; s2=""
+for r in release-1.1 only-core newest beta-only; do
+    s1="$s1$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-$r" "$TMP/kb-s1/kb.sqlite3" 2>/dev/null | cmpview)"
+    s2="$s2$(ident $r | cmpview)"
+done
+for r in tab-le32 tab-be64 tab-be32-four; do
+    s1="$s1$(tabident "$TMP/kbt-s1/kb.sqlite3" $r | cmpview)"
+    s2="$s2$(tabident "$TMP/kbt/kb.sqlite3" $r | cmpview)"
+done
+if [ "$(sqlite3 "$TMP/kbt-s1/kb.sqlite3" 'select count(*) from tbl' 2>/dev/null || python3 -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from tbl").fetchone()[0])' "$TMP/kbt-s1/kb.sqlite3")" -gt 0 ] \
+   && grep -q 'versionCandidates' <<<"$s1" && grep -q 'kbTables' <<<"$s1" && [ "$s1" = "$s2" ]; then
+    pass "a base of the earlier schema, tables included, is read and gives the same result"
+else fail "the earlier schema reads differently" "$s1 vs $s2"; fi
+
+# Keys that collide: a row is keyed by the hash and the length, so literals that share a hash but not a
+# length keep their rows and are still found, and only literals of the same length are dropped.
+if python3 - "$LIB" "$TMP" <<'PY' 2>"$TMP/clash.err"
+import io, os, sys, tarfile
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+tmp = sys.argv[2] + '/clash'; os.makedirs(tmp)
+b.string_key = lambda s: b'\0' * 8          # every literal gets the same hash
+lits = ['x' * n + ' distinct length literal' for n in range(30)] + ['same length literal ' + 'y' * 60 + 'A', 'same length literal ' + 'y' * 60 + 'B']
+src = ('\n'.join(f'const char *s{i} = "{s}";' for i, s in enumerate(lits)) + '\n').encode()
+with tarfile.open(f'{tmp}/c-1.0.tar.gz', 'w:gz') as tf:
+    ti = tarfile.TarInfo('c-1.0/c.c'); ti.size = len(src); tf.addfile(ti, io.BytesIO(src))
+open(f'{tmp}/kb.csv', 'w').write(f'clash,1.0,{tmp}/c-1.0.tar.gz\n')
+b.main(['build', '--kb', f'{tmp}/kb.csv', '--release', 'clash', '--out', f'{tmp}/kb.sqlite3'])
+kb = b.KnowledgeBase(f'{tmp}/kb.sqlite3')
+found = kb.owners_of({s.encode() for s in lits})
+same = {lits[-1].encode(), lits[-2].encode()}
+sys.exit(0 if len(found) == 30 and not (same & set(found)) else 1)
+PY
+then
+    if grep -q 'string key collision, dropped' "$TMP/clash.err"; then
+        pass "literals whose hashes collide keep their rows unless their lengths match too, and the drop is reported"
+    else fail "a collision was not reported" "$(cat "$TMP/clash.err")"; fi
+else fail "colliding keys were handled wrongly" "$(tail -3 "$TMP/clash.err")"; fi
+
+# The release sources and the package URL are kept in the base and the purl reaches the result.
+sed 's|^\(alpha,[^,]*,[^,]*\)$|\1,https://example.org/alpha.tar.gz,pkg:generic/alpha|' "$TMP/kb.csv" > "$TMP/kb-purl.csv"
+mkdir -p "$TMP/kb-purl"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb-purl.csv" --bg "$TMP/bg" --release test-purl --out "$TMP/kb-purl/kb.sqlite3" 2>/dev/null
+pout="$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-purl/kb.sqlite3" 2>/dev/null)"
+srcs="$(python3 -c 'import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("select count(*), sum(url != \"\") from src").fetchone())' "$TMP/kb-purl/kb.sqlite3")"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .purl' <<<"$pout")" = "pkg:generic/alpha@1.1" ] \
+   && [ "$(jq -r '.[] | select(.name == "alpha") | .properties[] | select(.name == "bomlens:purlSource") | .value' <<<"$pout")" = "binary-kb" ] \
+   && [ "$(python3 "$LIB/binarykb.py" info "$TMP/kb-purl/kb.sqlite3" | jq -c .purls)" = '{"alpha":"pkg:generic/alpha"}' ] && [ "$srcs" = "(5, 3)" ]; then
+    pass "the base keeps each release's tarball hash and URL, and the purl reaches the result with the version"
+else fail "sources or purl are wrong" "$srcs $pout"; fi
+# A purl the result could not append a version to is refused, and so is a purl in the URL's place.
+bad_ok=true
+for bad in 'pkg:generic/alpha@1.0' 'pkg:generic/alpha?arch=x86' 'pkg:generic/alpha#src' 'pkg:generic/alpha/'; do
+    sed "s|pkg:generic/alpha\$|$bad|" "$TMP/kb-purl.csv" > "$TMP/kb-badpurl.csv"
+    if python3 "$LIB/binarykb.py" build --kb "$TMP/kb-badpurl.csv" --release bad --out "$TMP/kb-bad.sqlite3" 2>"$TMP/bad.err" \
+       || ! grep -q "must be a package URL without a version, qualifiers or subpath: $bad" "$TMP/bad.err"; then bad_ok=false; fi
+done
+sed 's|^\(alpha,[^,]*,[^,]*\),.*$|\1,pkg:generic/alpha|' "$TMP/kb-purl.csv" > "$TMP/kb-purl4.csv"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb-purl4.csv" --release bad --out "$TMP/kb-bad4.sqlite3" 2>"$TMP/bad4.err" && bad_ok=false
+grep -q 'the fourth field is the tarball URL; give the purl as the fifth' "$TMP/bad4.err" || bad_ok=false
+if $bad_ok; then pass "a purl with a version, qualifiers, a subpath or a trailing slash, or one in the URL's field, is refused with the reason"
+else fail "a bad purl was accepted or refused without the reason" "$(cat "$TMP/bad.err" "$TMP/bad4.err")"; fi
+# Lines that are wrong in other ways are refused with what is wrong, and a missing tarball is named.
+T11="$TMP/src/alpha-1.1.tar.gz"
+lines_ok=true
+while IFS='|' read -r line want; do
+    printf '%s\n' "$line" > "$TMP/kb-line.csv"
+    if python3 "$LIB/binarykb.py" build --kb "$TMP/kb-line.csv" --release l --out "$TMP/kb-line.sqlite3" 2>"$TMP/line.err" \
+       || ! grep -qF "kb-line.csv:1: $want" "$TMP/line.err" || grep -q Traceback "$TMP/line.err"; then
+        lines_ok=false; echo "        [$line] $(cat "$TMP/line.err")"
+    fi
+done <<EOF2
+alpha,1.1,$T11,|the line ends with an empty field
+alpha,1.1,$T11,pkg:generic/alpha,|the line ends with an empty field
+alpha,1.1,$T11,,|the line ends with an empty field
+alpha,1.1,$T11,pkg:generic/a,pkg:generic/alpha|two purls
+alpha,1.1|expected component,version,tarball[,url[,purl]]
+alpha,1.1,$TMP/none.tar.gz|tarball not found: $TMP/none.tar.gz
+alpha,1.1,$TMP/none.tar.gz,https://example.org/a.tgz,pkg:generic/alpha|tarball not found: $TMP/none.tar.gz
+EOF2
+for line in "alpha,1.1,$T11,FILE://localhost/mirror/alpha-1.1.tar.gz" "alpha,1.1,$T11,Ftp://example.org/a.tgz,pkg:generic/alpha"; do
+    printf '%s\n' "$line" > "$TMP/kb-line.csv"
+    python3 "$LIB/binarykb.py" build --kb "$TMP/kb-line.csv" --release l --out "$TMP/kb-line.sqlite3" 2>"$TMP/line.err" || { lines_ok=false; echo "        [$line] $(cat "$TMP/line.err")"; }
+done
+if $lines_ok && [ "$(python3 -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select url from src").fetchone()[0])' "$TMP/kb-line.sqlite3")" = "Ftp://example.org/a.tgz" ]; then
+    pass "a URL of any scheme in any case is read as the URL; empty trailing fields, two purls, short lines and a missing tarball are refused with the reason"
+else fail "a malformed kb.csv line was accepted or refused without the reason"; fi
+# A tarball path with a comma reads as it did before the optional fields existed.
+mkdir -p "$TMP/com,ma"; cp "$TMP/src/alpha-1.1.tar.gz" "$TMP/com,ma/"
+printf 'alpha,1.1,%s\n' "$TMP/com,ma/alpha-1.1.tar.gz" > "$TMP/kb-comma.csv"
+printf 'alpha,1.1,%s,https://example.org/a.tar.gz,pkg:generic/alpha\n' "$TMP/com,ma/alpha-1.1.tar.gz" > "$TMP/kb-comma2.csv"
+if python3 "$LIB/binarykb.py" build --kb "$TMP/kb-comma.csv" --release c1 --out "$TMP/kb-comma/kb.sqlite3" 2>/dev/null \
+   && python3 "$LIB/binarykb.py" build --kb "$TMP/kb-comma2.csv" --release c2 --out "$TMP/kb-comma2/kb.sqlite3" 2>/dev/null \
+   && [ "$(python3 "$LIB/binarykb.py" info "$TMP/kb-comma2/kb.sqlite3" | jq -c .purls)" = '{"alpha":"pkg:generic/alpha"}' ]; then
+    pass "a tarball path with a comma is read, with and without the URL and purl after it"
+else fail "a tarball path with a comma was misread"; fi
+# The version in the purl is encoded as container-membership.py encodes it.
+if python3 - "$LIB" <<'PY'
+import importlib.util, sys
+sys.path.insert(0, sys.argv[1])
+import binarykb
+spec = importlib.util.spec_from_file_location('cm', sys.argv[1] + '/container-membership.py')
+cm = importlib.util.module_from_spec(spec); spec.loader.exec_module(cm)
+v = '1:2.3+dfsg~1'
+want = cm.deb_purl('x', v, ('debian', '12'), '', '').split('@')[1].split('?')[0]
+sys.exit(0 if binarykb.purl_version(v) == want == '1%3A2.3%2Bdfsg~1' else 1)
+PY
+then pass "a version in a base purl is encoded the way container purls encode it"
+else fail "the purl version encoding differs from container-membership.py"; fi
+
+# The merge: a base record fills only what the others lack.
+# Next to a distribution record with a purl and a CPE, it gives up its purl and its purlSource, so the
+# merged component is not offered to the CPE index as a purl BomLens wrote.
+echo '[{"bom-ref":"pkg:deb/debian/zlib1g@1.2.11","name":"zlib","version":"1.2.11","type":"library","purl":"pkg:deb/debian/zlib1g@1.2.11","cpe":"cpe:2.3:a:zlib:zlib:1.2.11:*:*:*:*:*:*:*"}]' > "$TMP/m-a2.json"
+echo '[{"bom-ref":"binary-kb:zlib@1.2.11","name":"zlib","version":"1.2.11","type":"library","purl":"pkg:generic/zlib@1.2.11","properties":[{"name":"bomlens:identifiedBy","value":"binary-kb"},{"name":"bomlens:purlSource","value":"binary-kb"}]}]' > "$TMP/m-g2.json"
+mout="$(jq -n --slurpfile a "$TMP/m-a2.json" --slurpfile b "$TMP/m-e.json" --slurpfile c "$TMP/m-e.json" --slurpfile d "$TMP/m-e.json" \
+    --slurpfile e "$TMP/m-e.json" --slurpfile f "$TMP/m-e.json" --slurpfile g "$TMP/m-g2.json" -f "$TMP/merge.jq" 2>&1)"
+cand="$(jq -r "$(cat "$LIB/vuln-coverage.jq") .[] | vc_cpe_index_candidate" <<<"$mout" 2>&1)"
+if [ "$(jq -r 'length' <<<"$mout")" = "1" ] && [ "$(jq -r '.[0].purl' <<<"$mout")" = "pkg:deb/debian/zlib1g@1.2.11" ] \
+   && [ "$(jq -r '.[0]["bom-ref"]' <<<"$mout")" = "pkg:deb/debian/zlib1g@1.2.11" ] \
+   && [ "$(jq '[.[0].properties[] | select(.name == "bomlens:purlSource")] | length' <<<"$mout")" = "0" ] && [ "$cand" = "false" ]; then
+    pass "next to a distribution record the base record gives up its purl and purlSource, and the CPE index is not asked"
+else fail "the base record changed the merged distribution record" "$mout $cand"; fi
+# Next to an ELF record with a CPE and no purl it is still not the base: the bom-ref, type and name stay
+# the ELF record's, and its purl fills the gap with its purlSource.
+echo '[{"bom-ref":"elf:usr/lib/libz.so.1","name":"zlib","version":"1.2.11","type":"application","cpe":"cpe:2.3:a:zlib:zlib:1.2.11:*:*:*:*:*:*:*","properties":[{"name":"bomlens:identifiedBy","value":"elf-presence"}]}]' > "$TMP/m-c3.json"
+mout="$(jq -n --slurpfile a "$TMP/m-e.json" --slurpfile b "$TMP/m-e.json" --slurpfile c "$TMP/m-c3.json" --slurpfile d "$TMP/m-e.json" \
+    --slurpfile e "$TMP/m-e.json" --slurpfile f "$TMP/m-e.json" --slurpfile g "$TMP/m-g2.json" -f "$TMP/merge.jq" 2>&1)"
+if [ "$(jq -c '[.[] | [.["bom-ref"], .type, .purl, .cpe != null, ([.properties[] | select(.name == "bomlens:purlSource") | .value] | join(","))]]' <<<"$mout")" \
+     = '[["elf:usr/lib/libz.so.1","application","pkg:generic/zlib@1.2.11",true,"binary-kb"]]' ]; then
+    pass "next to an ELF record the base record is not the base, and its purl fills the gap"
+else fail "the base record became the base of the merge" "$mout"; fi
+
+# The version masks are looked up by hash and length too: with every hash the same, a literal still gets
+# the releases of its own length and not those of another literal that shares its hash.
+if python3 - "$LIB" "$TMP" <<'PY' 2>/dev/null
+import io, os, sys, tarfile
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+tmp = sys.argv[2] + '/clashv'; os.makedirs(tmp)
+b.string_key = lambda s: b'\0' * 8
+def tb(v, lits):
+    src = ('\n'.join(f'const char *s{i} = "{s}";' for i, s in enumerate(lits)) + '\n').encode()
+    with tarfile.open(f'{tmp}/c-{v}.tar.gz', 'w:gz') as tf:
+        ti = tarfile.TarInfo(f'c-{v}/c.c'); ti.size = len(src); tf.addfile(ti, io.BytesIO(src))
+A, B = 'literal only in the first release', 'a longer literal only in the second release'
+tb('1.0', [A]); tb('2.0', [B])
+open(f'{tmp}/kb.csv', 'w').write(f'clash,1.0,{tmp}/c-1.0.tar.gz\nclash,2.0,{tmp}/c-2.0.tar.gz\n')
+b.main(['build', '--kb', f'{tmp}/kb.csv', '--release', 'clashv', '--out', f'{tmp}/kb.sqlite3'])
+kb = b.KnowledgeBase(f'{tmp}/kb.sqlite3')
+c = next(i for i, (n, _) in kb.comps.items() if n == 'clash')
+m = kb._masks(c, [A.encode(), B.encode()])
+sys.exit(0 if m == {A.encode(): 1, B.encode(): 2} else 1)
+PY
+then pass "version masks of literals whose hashes collide stay with their own literal"
+else fail "colliding hashes mixed the version masks"; fi
+
+# A version filled from the component-versions file reaches the base purl too.
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"library","name":"alpha","purl":"pkg:generic/alpha","properties":[{"name":"bomlens:identifiedBy","value":"binary-kb"},{"name":"bomlens:purlSource","value":"binary-kb"},{"name":"bomlens:evidenceGrade","value":"presence-only"}]}]}' > "$TMP/cv.json"
+printf 'name,version\nalpha,1.1+b\n' > "$TMP/cv.csv"
+python3 "$LIB/component-versions.py" --no-template "$TMP/cv.json" "$TMP/cvp" "$TMP/cv.csv" >/dev/null 2>&1
+if [ "$(jq -r '.components[0] | "\(.version) \(.purl)"' "$TMP/cv.json")" = "1.1+b pkg:generic/alpha@1.1%2Bb" ]; then
+    pass "a version filled from the component-versions file is written into the base purl"
+else fail "the base purl kept no version after the fill" "$(cat "$TMP/cv.json")"; fi
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"library","name":"alpha","purl":"pkg:generic/alpha@9.9","properties":[{"name":"bomlens:identifiedBy","value":"binary-kb"},{"name":"bomlens:purlSource","value":"binary-kb"}]}]}' > "$TMP/cv2.json"
+python3 "$LIB/component-versions.py" --no-template "$TMP/cv2.json" "$TMP/cvp2" "$TMP/cv.csv" >/dev/null 2>&1
+if [ "$(jq -r '.components[0] | "\(.version) \(.purl)"' "$TMP/cv2.json")" = "1.1+b pkg:generic/alpha@9.9" ]; then
+    pass "a base purl that already has a version is left as it is by the fill"
+else fail "the fill rewrote a base purl that had a version" "$(cat "$TMP/cv2.json")"; fi
+# A purl stored in a base that the result could not carry is left out with one warning.
+cp "$TMP/kb-purl/kb.sqlite3" "$TMP/kb-badstored.sqlite3"
+python3 -c 'import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);c.execute("update comp set purl = ? where name = ?", ("pkg:generic/alpha?x=1", "alpha"));c.commit()' "$TMP/kb-badstored.sqlite3"
+bout="$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb-badstored.sqlite3" 2>"$TMP/badstored.err")"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .purl // "none"' <<<"$bout")" = "none" ] \
+   && [ "$(grep -c 'WARN: the base gives alpha a purl that is not a package URL without a version; left out: pkg:generic/alpha?x=1' "$TMP/badstored.err")" = "1" ]; then
+    pass "a malformed purl stored in a base is left out with one warning"
+else fail "a malformed stored purl was used or not warned about" "$(cat "$TMP/badstored.err")"; fi
 echo
 echo "binary knowledge base: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

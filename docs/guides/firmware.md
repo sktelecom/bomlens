@@ -92,8 +92,11 @@ Signature checkers read a version out of a string the build left behind. A libra
 It is opt-in and local. Nothing is downloaded and no database is shipped in the image; you build the base once from sources you trust and pass it to a scan.
 
 ```bash
-# kb.csv: one line per release, component,version,path-to-tarball. List every release of a
-# component: a version missing from the list comes back as the nearest release that is there.
+# kb.csv: one line per release, component,version,path-to-tarball[,url[,purl]]. List every
+# release of a component: a version missing from the list comes back as the nearest release
+# that is there. The optional url is where the tarball was published, and the optional purl
+# (without a version, for example pkg:generic/busybox) goes on the component's result; the
+# merge keeps it only when no other pass gave the component a purl.
 python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
   --release my-kb-2026-11 --out kb/kb.sqlite3
 

@@ -36,9 +36,10 @@ def vc_repository_purl:
 # to the purl path: a CPE for a language package is derived from its name, and
 # two projects that share a name do not share a version line. A purl
 # synthesized from a container layer's os-release is the exception (see
-# match-cpe-index.sh).
+# match-cpe-index.sh). A purl a binary knowledge base wrote is not: it names
+# the package, and the component is offered only when its purl has no ecosystem.
 def vc_cpe_index_candidate:
-  vc_no_ecosystem_purl or any(.properties[]?; .name == "bomlens:purlSource");
+  vc_no_ecosystem_purl or any(.properties[]?; .name == "bomlens:purlSource" and .value != "binary-kb");
 
 # A component BomLens's own upstream table gave its repository purl
 # (upstream-purl.py writes bomlens:purlSource=upstream-map). The value is read,

@@ -91,8 +91,10 @@ libfoo,,version-unknown
 옵트인이며 로컬에서만 동작합니다. 이미지에는 베이스가 들어 있지 않고 아무것도 내려받지 않습니다. 믿을 수 있는 소스로 베이스를 한 번 만들어 스캔에 넘깁니다.
 
 ```bash
-# kb.csv: 릴리스마다 한 줄, 컴포넌트,버전,tarball 경로. 컴포넌트의 모든 릴리스를 적는다.
-# 목록에 없는 버전은 목록에 있는 가장 가까운 릴리스로 나온다.
+# kb.csv: 릴리스마다 한 줄, 컴포넌트,버전,tarball 경로[,주소[,purl]]. 컴포넌트의 모든 릴리스를 적는다.
+# 목록에 없는 버전은 목록에 있는 가장 가까운 릴리스로 나온다. 주소는 tarball을 공개한 곳이고,
+# purl(버전 없이, 예: pkg:generic/busybox)을 적으면 그 컴포넌트의 결과에 붙는다. 병합 단계는
+# 다른 검사가 그 컴포넌트에 purl을 주지 않았을 때만 이 purl을 남긴다.
 python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
   --release my-kb-2026-11 --out kb/kb.sqlite3
 

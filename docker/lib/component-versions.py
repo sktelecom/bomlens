@@ -69,6 +69,7 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 
 MAX_BYTES = 256 * 1024
 MAX_ROWS = 5000
@@ -231,6 +232,11 @@ def apply(doc, versions):
             continue
         replaced = c.get("version") if placeholder_version(c) and _EVR_PREFIX.match(c["version"]) else None
         c["version"] = version
+        purl = c.get("purl")
+        if isinstance(purl, str) and prop(c, "bomlens:purlSource") == "binary-kb" and "@" not in purl:
+            # The binary knowledge base writes its purl without a version when it could not pick one.
+            # Left as it is, the purl would disagree with the version declared here.
+            c["purl"] = purl + "@" + urllib.parse.quote(version, safe="")
         props = [p for p in (c.get("properties") or [])
                  if not (isinstance(p, dict)
                          and ((p.get("name") == "bomlens:evidenceGrade" and p.get("value") == "presence-only")
