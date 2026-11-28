@@ -47,6 +47,7 @@ import binarykb  # noqa: E402
 # `<image>.extracted/`. The same rootfs lands under both, so one file is seen twice.
 MARKER = re.compile(r".*(?:_extract/|\.extracted/)")
 MAX_EVIDENCE_FILES = 10
+BAD_PURL_WARNED = set()   # components whose stored purl was left out, warned once each
 WEAK_FACTOR = 2.5   # a score under this multiple of the stored threshold is reported as low confidence
 
 
@@ -300,7 +301,13 @@ def main():
         if version:
             comp["version"] = version
         purl = kb.purls.get(name)
-        if purl and binarykb.PURL_BASE.match(purl):
+        if purl and not binarykb.PURL_BASE.match(purl):
+            if name not in BAD_PURL_WARNED:
+                BAD_PURL_WARNED.add(name)
+                print(f"[binary-kb] WARN: the base gives {name} a purl that is not a package URL without a version; left out: {purl}",
+                      file=sys.stderr)
+            purl = None
+        if purl:
             # The base names the package, not the ecosystem that shipped it: the merge does not let
             # this purl keep a distribution's record of the same component apart, and keeps it only
             # when no other record of the component has one.

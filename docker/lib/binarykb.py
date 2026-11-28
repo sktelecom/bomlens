@@ -263,25 +263,40 @@ CREATE INDEX tbl_key ON tbl (key);
 
 
 # A purl the result can append `@version` to: type, optional namespace, name, and nothing after them.
-PURL_BASE = re.compile(r'^pkg:[a-z][a-z0-9.+-]*/[^@?#\s]+$')
-URL_FIELD = re.compile(r'^(https?|ftp)://\S*$')
+PURL_BASE = re.compile(r'^pkg:[a-z][a-z0-9.+-]*/(?:[^/@?#\s]+/)*[^/@?#\s]+$')
+URL_FIELD = re.compile(r'^[a-z][a-z0-9+.-]*://\S+$', re.I)   # any scheme: https, ftp, file, ...
+
+
+class KbLineError(ValueError):
+    pass
 
 
 def parse_kb_line(line):
-    """[component, version, tarball, url, purl] of a kb.csv line, or None.
+    """[component, version, tarball, url, purl] of a kb.csv line; KbLineError says what is wrong with it.
 
     The tarball path may hold commas, as it always could: the URL and purl are recognised only at the
-    end of the line, by their form, so a path with a comma reads as it did before they existed."""
+    end of the line, by their form, so a path with a comma reads as it did before they existed. A purl
+    after such a path needs the URL field before it, empty if there is no URL."""
     f = line.strip().split(',')
     if len(f) < 3 or not f[0] or not f[1]:
-        return None
+        raise KbLineError('expected component,version,tarball[,url[,purl]]')
+    if len(f) > 3 and f[-1] == '':
+        raise KbLineError('the line ends with an empty field; leave out a trailing field that has no value')
     url = purl = ''
-    if len(f) >= 5 and (f[-1] == '' or f[-1].startswith('pkg:')) and (f[-2] == '' or URL_FIELD.match(f[-2])):
-        url, purl, f = f[-2], f[-1], f[:-2]
-    elif len(f) >= 4 and (URL_FIELD.match(f[-1]) or f[-1].startswith('pkg:')):
-        url, f = f[-1], f[:-1]
+    if f[-1][:4].lower() == 'pkg:':
+        purl = f.pop()
+        if len(f) >= 4 and (f[-1] == '' or URL_FIELD.match(f[-1])):
+            url = f.pop()
+        elif len(f) >= 4 and f[-1][:4].lower() == 'pkg:':
+            raise KbLineError('two purls; give the URL as the fourth field and one purl as the fifth')
+        else:
+            raise KbLineError(f'the fourth field is the tarball URL; give the purl as the fifth (component,version,tarball,,{purl})')
+    elif len(f) >= 4 and URL_FIELD.match(f[-1]):
+        url = f.pop()
     tarball = ','.join(f[2:])
-    return [f[0], f[1], tarball, url, purl] if tarball else None
+    if not tarball:
+        raise KbLineError('the tarball path is empty')
+    return [f[0], f[1], tarball, url, purl]
 
 
 def purl_version(version):
@@ -311,11 +326,12 @@ def build(args):
     for n, line in enumerate(open(args.kb), 1):
         if not line.strip() or line.startswith('#'):
             continue
-        f = parse_kb_line(line)
-        if f is None:
-            sys.exit(f'{args.kb}:{n}: expected component,version,tarball[,url[,purl]]')
-        if f[3].startswith('pkg:'):
-            sys.exit(f'{args.kb}:{n}: the fourth field is the tarball URL; give the purl as the fifth (component,version,tarball,,{f[3]})')
+        try:
+            f = parse_kb_line(line)
+        except KbLineError as why:
+            sys.exit(f'{args.kb}:{n}: {why}')
+        if not os.path.isfile(f[2]):
+            sys.exit(f'{args.kb}:{n}: tarball not found: {f[2]}')
         rows.append(f)
     rows.sort(key=lambda r: (r[0], version_key(r[1])))
     purls, sources = {}, []
